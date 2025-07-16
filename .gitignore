@@ -1,41 +1,73 @@
-# Flutter/Dart/Pub
+# Dart & Flutter
 .dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
 .packages
-.pub/
 build/
-*.lock
+.pub-cache/
+.pub/
+.metadata
 
-# VS Code settings
+# VS Code
 .vscode/
+*.code-workspace
 
-# Android specific
-android/.gradle/
-android/captures/
+# IntelliJ / Android Studio
+.idea/
 *.iml
 
-# iOS specific
-ios/Flutter/Flutter.framework
-ios/Flutter/Flutter.podspec
-ios/.generated/
-ios/Pods/
-ios/.symlinks/
-ios/Runner.xcworkspace/
+# Android
+android/.gradle/
+android/captures/
+android/app/debug/
+android/app/profile/
+android/app/release/
+*.keystore
 
-# macOS
-macos/Flutter/ephemeral/
+# iOS/macOS (if added later)
+ios/Flutter/Flutter.podspec
+ios/Pods/
+ios/Runner.xcworkspace/
+ios/build/
+ios/.symlinks/
+ios/.flutter-plugins
+macos/Pods/
+macos/build/
 
 # Web
 web/.dart_tool/
+web/build/
+
+# Firebase
+firebase.json
+*.firebaserc
 
 # Windows
-windows/flutter/ephemeral/
+*.exe
+*.dll
 
-# Linux
-linux/flutter/ephemeral/
+# Linux/macOS
+.DS_Store
+*.so
 
-# Other
+# Logs
 *.log
-*.tmp
+
+# Archives / Large Files
 *.zip
+*.tar.gz
 *.apk
-*.aab
+*.ipa
+commandlinetools.zip
+
+# Test/Setup Scripts (if you don’t want to ignore them, remove these)
+# setup_android.ps1
+# run_tests.bat
+# START_APP.ps1
+
+# Environment variables (if using dotenv)
+.env
+.env.*
+
+# Node (if using Node for Firebase Functions later)
+node_modules/
