@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 // import 'package:flutter_facebook_auth/flutter_facebook_auth.dart'; // Uncomment if you add Facebook package
 import '../../home_screen.dart';
+import '../../ui/app_colors.dart';
 
 class InitialWelcomeScreen extends StatefulWidget {
   const InitialWelcomeScreen({super.key});
@@ -121,7 +122,7 @@ class _InitialWelcomeScreenState extends State<InitialWelcomeScreen> with Single
   Widget build(BuildContext context) {
     final isSignUp = _tabController.index == 1;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: kSoftWhite,
       body: Stack(
         children: [
           SafeArea(
@@ -136,10 +137,10 @@ class _InitialWelcomeScreenState extends State<InitialWelcomeScreen> with Single
                       width: 80,
                       height: 80,
                       decoration: BoxDecoration(
-                        color: Colors.grey[200],
+                        color: kAccentBlue.withOpacity(0.25),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.local_fire_department, size: 48, color: Colors.deepPurple),
+                      child: const Icon(Icons.local_fire_department, size: 48, color: kAccentBlue),
                     ),
                     const SizedBox(height: 24),
                     Text(
@@ -150,23 +151,23 @@ class _InitialWelcomeScreenState extends State<InitialWelcomeScreen> with Single
                     const SizedBox(height: 8),
                     Text(
                       'Track what you eat. Feel better.',
-                      style: GoogleFonts.montserrat(fontSize: 16, color: Colors.black54),
+                      style: GoogleFonts.montserrat(fontSize: 16, color: kTextGrey),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 32),
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
+                        color: kSoftWhite,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: TabBar(
                         controller: _tabController,
                         indicator: BoxDecoration(
-                          color: Colors.deepPurple,
+                          color: kAccentBlue,
                           borderRadius: BorderRadius.circular(16),
                         ),
                         labelColor: Colors.white,
-                        unselectedLabelColor: Colors.deepPurple,
+                        unselectedLabelColor: kAccentBlue,
                         tabs: const [
                           Tab(text: 'Sign In'),
                           Tab(text: 'Sign Up'),
@@ -186,7 +187,7 @@ class _InitialWelcomeScreenState extends State<InitialWelcomeScreen> with Single
                         hintText: 'Email',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                         filled: true,
-                        fillColor: Colors.grey[100],
+                        fillColor: kSoftWhite,
                         prefixIcon: const Icon(Icons.email_outlined),
                       ),
                     ),
@@ -198,7 +199,7 @@ class _InitialWelcomeScreenState extends State<InitialWelcomeScreen> with Single
                         hintText: 'Password',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                         filled: true,
-                        fillColor: Colors.grey[100],
+                        fillColor: kSoftWhite,
                         prefixIcon: const Icon(Icons.lock_outline),
                       ),
                     ),
@@ -213,7 +214,7 @@ class _InitialWelcomeScreenState extends State<InitialWelcomeScreen> with Single
                         style: ElevatedButton.styleFrom(
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: Colors.deepPurple,
+                          backgroundColor: kAccentBlue,
                           textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                         onPressed: loading

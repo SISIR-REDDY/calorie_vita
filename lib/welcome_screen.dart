@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'home_screen.dart';
+import 'app_colors.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -131,11 +132,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         width: double.infinity,
         height: double.infinity,
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFb2fefa), Color(0xFFe0c3fc), Colors.white],
-          ),
+          gradient: kPremiumBackgroundGradient,
         ),
         child: Center(
           child: Padding(
@@ -149,11 +146,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   curve: Curves.easeInOut,
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.7),
+                    color: kSoftWhite.withOpacity(0.7),
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.blue.withOpacity(0.08),
+                        color: kAccentBlue.withOpacity(0.08),
                         blurRadius: 32,
                         offset: const Offset(0, 8),
                       ),

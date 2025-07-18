@@ -67,16 +67,20 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
+    final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+    final isAITrainer = _currentIndex == 3;
     return Scaffold(
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 400),
         child: _screens[_currentIndex],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _onTabSelected(2),
-        child: const Icon(Icons.camera_alt_rounded),
-        shape: const CircleBorder(),
-      ),
+      floatingActionButton: (!isKeyboardOpen || !isAITrainer)
+          ? FloatingActionButton(
+              onPressed: () => _onTabSelected(2),
+              child: const Icon(Icons.camera_alt_rounded),
+              shape: const CircleBorder(),
+            )
+          : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: PremiumNavBar(
         currentIndex: _currentIndex,

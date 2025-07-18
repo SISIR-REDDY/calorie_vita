@@ -24,7 +24,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   int currentWeight = 119;
   double bmi = 19.8;
   String bmiStatus = 'Healthy';
-  Color bmiStatusColor = kAccentGreen;
+  Color bmiStatusColor = kAccentBlue;
   int streak = 0;
   double goalProgress = 0.0;
   int selectedTimeRange = 0; // 0: 90 Days, 1: 6 Months, 2: 1 Year, 3: All time
@@ -89,7 +89,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Color _bmiStatusColor(double bmi) {
     if (bmi < 18.5) return Colors.blue;
-    if (bmi < 25) return kAccentGreen;
+    if (bmi < 25) return kAccentBlue;
     if (bmi < 30) return Colors.yellow[700]!;
     return Colors.red;
   }
@@ -149,9 +149,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: kPremiumBackgroundGradient,
-      ),
+      decoration: kAppBackground,
       child: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -180,8 +178,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                 children: [
                                   Container(
                                     decoration: BoxDecoration(
-                                      color: Color(0xFFFFF8E1),
-                                      shape: BoxShape.circle,
+                                      color: kAccentBlue.withOpacity(0.35),
+                                      borderRadius: BorderRadius.circular(24),
+                                      border: Border.all(color: kAccentBlue.withOpacity(0.7), width: 2),
+                                      boxShadow: [BoxShadow(color: kAccentBlue.withOpacity(0.08), blurRadius: 16, offset: Offset(0, 8))],
                                     ),
                                     padding: EdgeInsets.all(10),
                                     child: Icon(Icons.emoji_events, color: Color(0xFFFFC107), size: 28),
@@ -211,9 +211,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                     width: double.infinity,
                                     child: ElevatedButton(
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: kTextDark,
+                                        backgroundColor: kAccentBlue,
                                         foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                         padding: const EdgeInsets.symmetric(vertical: 12),
                                         elevation: 4,
                                         shadowColor: Colors.black.withOpacity(0.15),
@@ -257,8 +257,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                 children: [
                                   Container(
                                     decoration: BoxDecoration(
-                                      color: Color(0xFFE3F2FD),
-                                      shape: BoxShape.circle,
+                                      color: kAccentBlue.withOpacity(0.35),
+                                      borderRadius: BorderRadius.circular(24),
+                                      border: Border.all(color: kAccentBlue.withOpacity(0.7), width: 2),
+                                      boxShadow: [BoxShadow(color: kAccentBlue.withOpacity(0.08), blurRadius: 16, offset: Offset(0, 8))],
                                     ),
                                     padding: EdgeInsets.all(10),
                                     child: Icon(Icons.monitor_weight, color: Color(0xFF1976D2), size: 28),
@@ -288,9 +290,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                     width: double.infinity,
                                     child: ElevatedButton(
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: kTextDark,
+                                        backgroundColor: kAccentBlue,
                                         foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                         padding: const EdgeInsets.symmetric(vertical: 12),
                                         elevation: 4,
                                         shadowColor: Colors.black.withOpacity(0.15),
@@ -349,7 +351,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       bmiStatusColor = Colors.blue;
                     } else if (bmi < 25) {
                       bmiStatus = 'Healthy';
-                      bmiStatusColor = kAccentGreen;
+                      bmiStatusColor = kAccentBlue;
                     } else if (bmi < 30) {
                       bmiStatus = 'Overweight';
                       bmiStatusColor = Colors.yellow[700]!;
@@ -372,7 +374,28 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                 child: Text('Your weight is $bmiStatus', style: TextStyle(fontSize: 12, color: kTextDark, fontWeight: FontWeight.bold)),
                               ),
                               const SizedBox(width: 12),
-                              Icon(Icons.info_outline, color: kTextGrey, size: 18),
+                              IconButton(
+                                icon: Icon(Icons.info_outline, color: kTextGrey, size: 18),
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('BMI Disclaimer'),
+                                      content: const Text(
+                                        'BMI (Body Mass Index) is a general guideline and may not accurately reflect your individual health.\n\n'
+                                        '- BMI does not account for muscle mass, bone density, age, gender, or overall body composition.\n'
+                                        '- Always consult a healthcare professional for personalized health advice.'
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context),
+                                          child: const Text('OK'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
                             ],
                           ),
                           const SizedBox(height: 10),
@@ -482,7 +505,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           Row(
                             children: [
                               _BmiBarSegment(color: Colors.blue, label: 'Underweight'),
-                              _BmiBarSegment(color: kAccentGreen, label: 'Healthy'),
+                              _BmiBarSegment(color: kAccentBlue, label: 'Healthy'),
                               _BmiBarSegment(color: Colors.yellow[700]!, label: 'Overweight'),
                               _BmiBarSegment(color: Colors.red, label: 'Obese'),
                             ],
@@ -709,7 +732,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                         width: 18,
                                         borderRadius: BorderRadius.circular(8),
                                         gradient: LinearGradient(
-                                          colors: [kAccentGold, kAccentBlue.withOpacity(0.7)],
+                                          colors: [kAccentBlue.withOpacity(0.5), kAccentBlue.withOpacity(0.7)],
                                           begin: Alignment.bottomCenter,
                                           end: Alignment.topCenter,
                                         ),

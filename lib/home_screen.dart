@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'ui/app_colors.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -29,13 +30,7 @@ class HomeScreen extends StatelessWidget {
     final String aiCoach = 'Based on your recent meals, try adding more protein at lunch for sustained energy!';
 
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFe0c3fc), Color(0xFF8ec5fc)],
-        ),
-      ),
+      decoration: kAppBackground,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
@@ -44,22 +39,22 @@ class HomeScreen extends StatelessWidget {
           title: Row(
             children: [
               CircleAvatar(
-                backgroundColor: Colors.white,
-                child: Icon(Icons.person, color: Colors.deepPurple),
+                backgroundColor: kSoftWhite,
+                child: Icon(Icons.person, color: kAccentBlue),
               ),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Hi, User!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
-                  Text(today, style: const TextStyle(fontSize: 14, color: Colors.black54)),
+                  const Text('Hi, User!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kTextDark)),
+                  Text(today, style: const TextStyle(fontSize: 14, color: kTextGrey)),
                 ],
               ),
             ],
           ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.notifications_none, color: Colors.deepPurple),
+              icon: const Icon(Icons.notifications_none, color: kAccentBlue),
               onPressed: () {},
             ),
           ],
@@ -247,12 +242,12 @@ class _AnimatedTipBannerState extends State<_AnimatedTipBanner> with SingleTicke
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
         decoration: BoxDecoration(
-          color: Colors.blue[50],
+          color: kAccentBlue.withOpacity(0.25),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
           children: [
-            const Icon(Icons.lightbulb, color: Colors.blue),
+            const Icon(Icons.lightbulb, color: kAccentBlue),
             const SizedBox(width: 12),
             Expanded(child: Text(widget.tip, style: const TextStyle(fontSize: 16))),
           ],
