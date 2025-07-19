@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../config.dart';
 
 class Message {
   final String sender;
@@ -10,32 +9,46 @@ class Message {
 }
 
 class SisirService {
+  static const String _geminiApiKey = 'AIzaSyCid1YKfdcCfeytaTkfMm1Qa_GekRh6vik';
+
   static Future<String> getSisirReply(List<Message> messages) async {
-    // Limit to last 5 messages
-    final recent = messages.takeLast(5).toList();
+    // Send only the latest user message for best Gemini results
+    final latestUserMsg = messages.lastWhere((m) => m.sender == 'user', orElse: () => Message(sender: 'user', text: '', timestamp: DateTime.now())).text;
+    final prompt = latestUserMsg;
     try {
       final response = await http.post(
-        Uri.parse(openAIEndpoint),
+        Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent'),
         headers: {
-          'Authorization': 'Bearer $openAIApiKey',
           'Content-Type': 'application/json',
+          'x-goog-api-key': _geminiApiKey,
         },
         body: jsonEncode({
-          'model': 'gpt-3.5-turbo',
-          'messages': recent.map((m) => {
-            'role': m.sender == 'user' ? 'user' : 'assistant',
-            'content': m.text,
-          }).toList(),
-          'max_tokens': 120,
+          'contents': [
+            {
+              'parts': [
+                {'text': prompt}
+              ]
+            }
+          ]
         }),
       );
+      print('Gemini API status: ${response.statusCode}');
+      print('Gemini API body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['choices'][0]['message']['content']?.trim() ?? 'Sorry, I have no answer.';
+        final candidates = data['candidates'] as List?;
+        if (candidates != null && candidates.isNotEmpty) {
+          final content = candidates[0]['content'];
+          if (content != null && content['parts'] != null && content['parts'].isNotEmpty) {
+            return content['parts'][0]['text']?.trim() ?? 'Sorry, I have no answer.';
+          }
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      print('Gemini API error: ${e.toString()}');
+    }
     // Fallback offline logic
-    final last = recent.isNotEmpty ? recent.last.text.toLowerCase() : '';
+    final last = messages.isNotEmpty ? messages.last.text.toLowerCase() : '';
     if (last.contains('lose fat')) {
       return 'Start with cutting sugar and walking 30 mins daily.';
     } else if (last.contains('lazy')) {
