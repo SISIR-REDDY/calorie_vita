@@ -149,33 +149,58 @@ class _CameraScreenState extends State<CameraScreen> {
                         ],
                         if (_result == null && !_loading) ...[
                           const SizedBox(height: 24),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              ElevatedButton.icon(
-                                icon: const Icon(Icons.camera_alt),
-                                label: const Text('Capture Food'),
+                              ElevatedButton(
                                 onPressed: _pickImage,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.white,
                                   foregroundColor: Colors.blue,
-                                  elevation: 4,
+                                  elevation: 6,
+                                  minimumSize: const Size(200, 80),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius: BorderRadius.circular(20),
                                   ),
+                                  shadowColor: Colors.blueAccent.withOpacity(0.2),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    CircleAvatar(
+                                      backgroundColor: Colors.blue.shade50,
+                                      radius: 28,
+                                      child: Icon(Icons.camera_alt, size: 32, color: Colors.blue),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    const Text('Capture Food', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                                  ],
                                 ),
                               ),
-                              ElevatedButton.icon(
-                                icon: const Icon(Icons.qr_code_scanner),
-                                label: const Text('Scan Barcode'),
+                              const SizedBox(height: 20),
+                              ElevatedButton(
                                 onPressed: _scanBarcode,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.white,
                                   foregroundColor: Colors.blue,
-                                  elevation: 4,
+                                  elevation: 6,
+                                  minimumSize: const Size(200, 80),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius: BorderRadius.circular(20),
                                   ),
+                                  shadowColor: Colors.blueAccent.withOpacity(0.2),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    CircleAvatar(
+                                      backgroundColor: Colors.blue.shade50,
+                                      radius: 28,
+                                      child: Icon(Icons.qr_code_scanner, size: 32, color: Colors.blue),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    const Text('Scan Barcode', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                                  ],
                                 ),
                               ),
                             ],
