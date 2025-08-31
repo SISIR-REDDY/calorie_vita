@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'home_screen.dart';
-import 'app_colors.dart';
+import 'screens/home/home_screen.dart';
+import 'ui/app_colors.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -20,104 +20,188 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 32,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        return Container(
+          decoration: const BoxDecoration(
+            color: kSurfaceColor,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          child: StatefulBuilder(
-            builder: (context, setState) {
-              return Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isSignUp ? 'Sign Up' : 'Sign In',
-                      style: GoogleFonts.montserrat(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 32,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            ),
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                return Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              gradient: isSignUp ? kSecondaryGradient : kPrimaryGradient,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Icon(
+                              isSignUp ? Icons.person_add : Icons.login,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Text(
+                            isSignUp ? 'Create Account' : 'Welcome Back',
+                            style: GoogleFonts.inter(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: kTextPrimary,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    TextFormField(
-                      controller: emailController,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
-                      ),
-                      validator: (v) => v != null && v.contains('@') ? null : 'Enter a valid email',
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: passwordController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Password',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
-                      ),
-                      validator: (v) => v != null && v.length >= 6 ? null : 'Min 6 characters',
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                      const SizedBox(height: 24),
+                      
+                      // Email field
+                      TextFormField(
+                        controller: emailController,
+                        decoration: InputDecoration(
+                          labelText: 'Email',
+                          hintText: 'Enter your email address',
+                          prefixIcon: Icon(Icons.email_outlined, color: kTextTertiary),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: kBorderColor),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: kBorderColor),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: kPrimaryColor, width: 2),
+                          ),
+                          filled: true,
+                          fillColor: kSurfaceLight,
                         ),
-                        onPressed: loading
-                            ? null
-                            : () async {
-                                if (!formKey.currentState!.validate()) return;
-                                setState(() => loading = true);
-                                try {
-                                  if (isSignUp) {
-                                    await FirebaseAuth.instance.createUserWithEmailAndPassword(
-                                      email: emailController.text.trim(),
-                                      password: passwordController.text.trim(),
-                                    );
-                                  } else {
-                                    await FirebaseAuth.instance.signInWithEmailAndPassword(
-                                      email: emailController.text.trim(),
-                                      password: passwordController.text.trim(),
-                                    );
-                                  }
-                                  if (mounted) {
-                                    Navigator.pop(context); // Close dialog
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(builder: (_) => const HomeScreen()),
-                                    );
-                                  }
-                                } on FirebaseAuthException catch (e) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text(e.message ?? 'Authentication error')),
-                                  );
-                                } finally {
-                                  setState(() => loading = false);
-                                }
-                              },
-                        child: loading
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : Text(isSignUp ? 'Sign Up' : 'Sign In'),
+                        validator: (v) => v != null && v.contains('@') ? null : 'Enter a valid email',
                       ),
-                    ),
-                  ],
-                ),
-              );
-            },
+                      const SizedBox(height: 16),
+                      
+                      // Password field
+                      TextFormField(
+                        controller: passwordController,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          hintText: 'Enter your password',
+                          prefixIcon: Icon(Icons.lock_outline, color: kTextTertiary),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: kBorderColor),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: kBorderColor),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: kPrimaryColor, width: 2),
+                          ),
+                          filled: true,
+                          fillColor: kSurfaceLight,
+                        ),
+                        validator: (v) => v != null && v.length >= 6 ? null : 'Min 6 characters',
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      // Submit button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isSignUp ? kSecondaryColor : kPrimaryColor,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          onPressed: loading
+                              ? null
+                              : () async {
+                                  if (!formKey.currentState!.validate()) return;
+                                  setState(() => loading = true);
+                                  try {
+                                    if (isSignUp) {
+                                      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+                                        email: emailController.text.trim(),
+                                        password: passwordController.text.trim(),
+                                      );
+                                    } else {
+                                      await FirebaseAuth.instance.signInWithEmailAndPassword(
+                                        email: emailController.text.trim(),
+                                        password: passwordController.text.trim(),
+                                      );
+                                    }
+                                    if (mounted) {
+                                      Navigator.pop(context); // Close dialog
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(builder: (_) => const HomeScreen()),
+                                      );
+                                    }
+                                  } on FirebaseAuthException catch (e) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(e.message ?? 'Authentication failed'),
+                                          backgroundColor: kErrorColor,
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  } finally {
+                                    if (mounted) {
+                                      setState(() => loading = false);
+                                    }
+                                  }
+                                },
+                          child: loading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : Text(
+                                  isSignUp ? 'Create Account' : 'Sign In',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         );
       },
@@ -127,105 +211,179 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: kPremiumBackgroundGradient,
-        ),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 48),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 800),
-                  curve: Curves.easeInOut,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: kSoftWhite.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: kAccentBlue.withOpacity(0.08),
-                        blurRadius: 32,
-                        offset: const Offset(0, 8),
+      backgroundColor: kSurfaceLight,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              const Spacer(),
+              
+              // App Logo/Icon
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: kPrimaryGradient,
+                  borderRadius: BorderRadius.circular(32),
+                  boxShadow: kElevatedShadow,
+                ),
+                child: const Icon(
+                  Icons.restaurant_menu,
+                  size: 64,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 32),
+              
+              // App Title
+              Text(
+                'Calorie Vita',
+                style: GoogleFonts.inter(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  color: kTextPrimary,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // App Subtitle
+              Text(
+                'Track your nutrition, achieve your goals',
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  color: kTextSecondary,
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 48),
+              
+              // Features
+              _buildFeatureItem(
+                Icons.camera_alt,
+                'AI Food Recognition',
+                'Take a photo and get instant nutrition info',
+              ),
+              const SizedBox(height: 20),
+              _buildFeatureItem(
+                Icons.track_changes,
+                'Smart Tracking',
+                'Monitor calories and macros effortlessly',
+              ),
+              const SizedBox(height: 20),
+              _buildFeatureItem(
+                Icons.psychology,
+                'AI Coach',
+                'Get personalized nutrition advice',
+              ),
+              
+              const Spacer(),
+              
+              // Action Buttons
+              Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kPrimaryColor,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
-                    ],
+                      onPressed: () => _showAuthDialog(isSignUp: false),
+                      child: Text(
+                        'Sign In',
+                        style: GoogleFonts.inter(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ),
-                  child: Column(
-                    children: [
-                      Text(
-                        'Calorie Vita',
-                        style: GoogleFonts.montserrat(
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                          shadows: [
-                            Shadow(
-                              blurRadius: 8,
-                              color: Colors.blue.withOpacity(0.2),
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Track what you eat. Feel better.',
-                        style: GoogleFonts.montserrat(fontSize: 16, color: Colors.black54),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 32),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          onPressed: () => _showAuthDialog(isSignUp: true),
-                          child: const Text('Sign Up'),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kPrimaryColor,
+                        side: const BorderSide(color: kPrimaryColor, width: 2),
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          onPressed: () => _showAuthDialog(isSignUp: false),
-                          child: const Text('Sign In'),
+                      onPressed: () => _showAuthDialog(isSignUp: true),
+                      child: Text(
+                        'Create Account',
+                        style: GoogleFonts.inter(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.blueAccent,
-                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                        onPressed: () {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(builder: (_) => const HomeScreen()),
-                          );
-                        },
-                        child: const Text('Skip & Use App'),
-                      ),
-                    ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureItem(IconData icon, String title, String subtitle) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        color: kSurfaceColor,
+        borderRadius: BorderRadius.all(Radius.circular(16)),
+        boxShadow: kCardShadow,
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: kPrimaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: kPrimaryColor,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: kTextPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    color: kTextSecondary,
+                    height: 1.3,
                   ),
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }

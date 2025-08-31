@@ -60,7 +60,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Weight History')),
       body: Container(
-        decoration: kAppBackground,
+        color: kAppBackground,
         child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _weightsStream,
           builder: (context, snapshot) {

@@ -63,7 +63,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : Container(
-              decoration: kAppBackground,
+              color: kAppBackground,
               child: Center(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(24.0),

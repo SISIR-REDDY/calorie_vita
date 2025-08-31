@@ -2,7 +2,8 @@
   "project_info": {
     "project_number": "868343457049",
     "project_id": "calorie-vita",
-    "storage_bucket": "calorie-vita.firebasestorage.app"
+    "storage_bucket": "calorie-vita.firebasestorage.app",
+    "firebase_url": "https://calorie-vita-default-rtdb.firebaseio.com"
   },
   "client": [
     {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:animated_bottom_navigation_bar/animated_bottom_navigation_bar.dart';
+import '../ui/app_colors.dart';
 
 class PremiumNavBar extends StatelessWidget {
   final int currentIndex;
@@ -19,31 +20,39 @@ class PremiumNavBar extends StatelessWidget {
       Icons.auto_awesome_rounded,
       Icons.settings_rounded,
     ];
-    final labels = [
-      'Home', 'Analytics', 'AI Trainer', 'Settings'
-    ];
-    return AnimatedBottomNavigationBar(
-      icons: icons,
-      activeIndex: currentIndex > 1 ? currentIndex - 1 : currentIndex,
-      gapLocation: GapLocation.center,
-      notchSmoothness: NotchSmoothness.softEdge,
-      leftCornerRadius: 24,
-      rightCornerRadius: 24,
-      onTap: (index) {
-        if (index >= 2) {
-          onTabSelected(index + 1);
-        } else {
-          onTabSelected(index);
-        }
-      },
-      activeColor: Theme.of(context).colorScheme.primary,
-      inactiveColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-      iconSize: 28,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      splashColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-      shadow: const BoxShadow(
-        color: Colors.black12,
-        blurRadius: 8,
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: kSurfaceColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: AnimatedBottomNavigationBar(
+        icons: icons,
+        activeIndex: currentIndex > 1 ? currentIndex - 1 : currentIndex,
+        gapLocation: GapLocation.center,
+        notchSmoothness: NotchSmoothness.softEdge,
+        leftCornerRadius: 24,
+        rightCornerRadius: 24,
+        onTap: (index) {
+          if (index >= 2) {
+            onTabSelected(index + 1);
+          } else {
+            onTabSelected(index);
+          }
+        },
+        activeColor: kPrimaryColor,
+        inactiveColor: kTextTertiary,
+        iconSize: 24,
+        backgroundColor: kSurfaceColor,
+        splashColor: kPrimaryColor.withValues(alpha: 0.1),
+        splashSpeedInMilliseconds: 300,
+        elevation: 0,
       ),
     );
   }
