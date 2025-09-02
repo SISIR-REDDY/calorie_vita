@@ -10,7 +10,7 @@ class Message {
 }
 
 class SisirService {
-  static const String _openRouterApiKey = 'YOUR_OPENROUTER_API_KEY_HERE'; // Replace with your actual key
+  static const String _openRouterApiKey = 'YOUR_OPENROUTER_API_KEY_HERE'; // TODO: Replace with your actual OpenRouter API key
 
   static Future<String> getSisirReply(List<Message> messages) async {
     final latestUserMsg = messages.lastWhere((m) => m.sender == 'user', orElse: () => Message(sender: 'user', text: '', timestamp: DateTime.now())).text;

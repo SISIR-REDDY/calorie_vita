@@ -50,22 +50,22 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBPwqX7mpf757PbTYn29dy8tw510XFuhF0',
-    appId: '1:868343457049:web:771373959459a135831188',
-    messagingSenderId: '868343457049',
-    projectId: 'calorie-vita',
-    authDomain: 'calorie-vita.firebaseapp.com',
-    storageBucket: 'calorie-vita.firebasestorage.app',
-    measurementId: 'G-XXXXXXXXXX',
-    databaseURL: 'https://calorie-vita-default-rtdb.firebaseio.com',
+    apiKey: 'YOUR_FIREBASE_WEB_API_KEY_HERE',
+    appId: 'YOUR_FIREBASE_WEB_APP_ID_HERE',
+    messagingSenderId: 'YOUR_FIREBASE_MESSAGING_SENDER_ID_HERE',
+    projectId: 'YOUR_FIREBASE_PROJECT_ID_HERE',
+    authDomain: 'YOUR_FIREBASE_AUTH_DOMAIN_HERE',
+    storageBucket: 'YOUR_FIREBASE_STORAGE_BUCKET_HERE',
+    measurementId: 'YOUR_FIREBASE_MEASUREMENT_ID_HERE',
+    databaseURL: 'YOUR_FIREBASE_DATABASE_URL_HERE',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBPwqX7mpf757PbTYn29dy8tw510XFuhF0',
-    appId: '1:868343457049:android:771373959459a135831188',
-    messagingSenderId: '868343457049',
-    projectId: 'calorie-vita',
-    storageBucket: 'calorie-vita.firebasestorage.app',
-    databaseURL: 'https://calorie-vita-default-rtdb.firebaseio.com',
+    apiKey: 'YOUR_FIREBASE_ANDROID_API_KEY_HERE',
+    appId: 'YOUR_FIREBASE_ANDROID_APP_ID_HERE',
+    messagingSenderId: 'YOUR_FIREBASE_MESSAGING_SENDER_ID_HERE',
+    projectId: 'YOUR_FIREBASE_PROJECT_ID_HERE',
+    storageBucket: 'YOUR_FIREBASE_STORAGE_BUCKET_HERE',
+    databaseURL: 'YOUR_FIREBASE_DATABASE_URL_HERE',
   );
 } 
