@@ -8,6 +8,7 @@ import '../ui/app_colors.dart';
 import 'profile_edit_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'terms_conditions_screen.dart';
+import 'goals_screen.dart';
 
 /// Professional Settings Screen for Calorie Vita App
 /// Features: Profile section, settings toggles, navigation options, and logout
@@ -372,6 +373,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildProfileCard(),
             const SizedBox(height: 24),
 
+            // Goals & Targets Section
+            _buildGoalsCard(),
+            const SizedBox(height: 16),
+
+            // Calorie Units Section
+            _buildCalorieUnitsCard(),
+            const SizedBox(height: 24),
+
             // Settings Options
             _buildSettingsCard(),
                                 const SizedBox(height: 24),
@@ -380,6 +389,269 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildLogoutCard(),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Build Goals & Targets card
+  Widget _buildGoalsCard() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ListTile(
+        leading: const Icon(Icons.flag, color: kPrimaryColor),
+        title: Text(
+          'Goals & Targets',
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w500,
+            color: kTextDark,
+          ),
+        ),
+        subtitle: Text(
+          'Set your health goals and targets',
+          style: GoogleFonts.poppins(color: kTextSecondary, fontSize: 12),
+        ),
+        trailing: const Icon(Icons.arrow_forward_ios, color: kTextSecondary, size: 16),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => GoalsScreen()),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Build Calorie Units card
+  Widget _buildCalorieUnitsCard() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ListTile(
+        leading: const Icon(Icons.straighten, color: kAccentColor),
+        title: Text(
+          'Calorie Units',
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w500,
+            color: kTextDark,
+          ),
+        ),
+        subtitle: Text(
+          'Choose your preferred calorie unit',
+          style: GoogleFonts.poppins(color: kTextSecondary, fontSize: 12),
+        ),
+        trailing: const Icon(Icons.arrow_forward_ios, color: kTextSecondary, size: 16),
+        onTap: () {
+          _showCalorieUnitsDialog();
+        },
+      ),
+    );
+  }
+
+  /// Show calorie units selection dialog
+  void _showCalorieUnitsDialog() {
+    String selectedUnit = 'kcal'; // Default selection
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: kAccentColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.straighten, color: kAccentColor, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Select Calorie Unit',
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              content: Container(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Choose your preferred unit for displaying calories throughout the app',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: kTextSecondary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    _buildEnhancedUnitOption('kcal', 'Kilocalories', 'kcal', 'Most common unit', selectedUnit, () {
+                      setState(() => selectedUnit = 'kcal');
+                    }),
+                    const SizedBox(height: 8),
+                    _buildEnhancedUnitOption('cal', 'Calories', 'cal', 'Small calorie unit', selectedUnit, () {
+                      setState(() => selectedUnit = 'cal');
+                    }),
+                    const SizedBox(height: 8),
+                    _buildEnhancedUnitOption('J', 'Joules', 'J', 'SI energy unit', selectedUnit, () {
+                      setState(() => selectedUnit = 'J');
+                    }),
+                    const SizedBox(height: 8),
+                    _buildEnhancedUnitOption('kJ', 'Kilojoules', 'kJ', 'Large energy unit', selectedUnit, () {
+                      setState(() => selectedUnit = 'kJ');
+                    }),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    'Cancel',
+                    style: GoogleFonts.poppins(
+                      color: kTextSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _saveCalorieUnit(selectedUnit);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kAccentColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
+                  child: Text(
+                    'Save Unit',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Build enhanced unit option for dialog
+  Widget _buildEnhancedUnitOption(String value, String label, String unit, String description, String selectedUnit, VoidCallback onTap) {
+    final isSelected = selectedUnit == value;
+    
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? kAccentColor.withValues(alpha: 0.1)
+              : Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected 
+                ? kAccentColor
+                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? kAccentColor : kTextSecondary,
+                  width: 2,
+                ),
+                color: isSelected ? kAccentColor : Colors.transparent,
+              ),
+              child: isSelected
+                  ? const Icon(
+                      Icons.check,
+                      color: Colors.white,
+                      size: 12,
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        label,
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          color: isSelected ? kAccentColor : Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isSelected 
+                              ? kAccentColor.withValues(alpha: 0.2)
+                              : kTextSecondary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          unit,
+                          style: GoogleFonts.poppins(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: isSelected ? kAccentColor : kTextSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: kTextSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Save calorie unit preference
+  void _saveCalorieUnit(String unit) {
+    // In a real app, you would save this to user preferences
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white, size: 20),
+            const SizedBox(width: 12),
+            Text('Calorie unit set to $unit'),
+          ],
+        ),
+        backgroundColor: kAccentColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -573,4 +845,3 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 } 
-

@@ -5,9 +5,20 @@ import 'main_app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  
+  // Initialize Firebase with error handling
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    // If Firebase is already initialized, that's fine
+    if (e.toString().contains('duplicate-app')) {
+      print('Firebase already initialized, continuing...');
+    } else {
+      rethrow;
+    }
+  }
   ErrorWidget.builder = (FlutterErrorDetails details) => MaterialApp(
         home: Scaffold(
           backgroundColor: Colors.red[50],

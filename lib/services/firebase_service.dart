@@ -4,6 +4,8 @@ import '../models/food_entry.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
 import '../models/user_achievement.dart';
+import '../models/user_goals.dart';
+import '../models/user_preferences.dart';
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -582,6 +584,119 @@ class FirebaseService {
     } catch (e) {
       print('Error generating personalized recommendations: $e');
       return [];
+    }
+  }
+
+  // User Goals Methods
+  Future<UserGoals?> getUserGoals(String userId) async {
+    try {
+      final doc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('profile')
+          .doc('goals')
+          .get();
+
+      if (doc.exists) {
+        return UserGoals.fromMap(doc.data()!);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting user goals: $e');
+      return null;
+    }
+  }
+
+  Future<void> saveUserGoals(String userId, UserGoals goals) async {
+    try {
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('profile')
+          .doc('goals')
+          .set(goals.toMap());
+    } catch (e) {
+      print('Error saving user goals: $e');
+      rethrow;
+    }
+  }
+
+  Stream<UserGoals?> getUserGoalsStream(String userId) {
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('profile')
+        .doc('goals')
+        .snapshots()
+        .map((doc) {
+      if (doc.exists) {
+        return UserGoals.fromMap(doc.data()!);
+      }
+      return null;
+    });
+  }
+
+  // User Preferences Methods
+  Future<UserPreferences?> getUserPreferences(String userId) async {
+    try {
+      final doc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('profile')
+          .doc('preferences')
+          .get();
+
+      if (doc.exists) {
+        return UserPreferences.fromMap(doc.data()!);
+      }
+      return const UserPreferences();
+    } catch (e) {
+      print('Error getting user preferences: $e');
+      return const UserPreferences();
+    }
+  }
+
+  Future<void> saveUserPreferences(String userId, UserPreferences preferences) async {
+    try {
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('profile')
+          .doc('preferences')
+          .set(preferences.toMap());
+    } catch (e) {
+      print('Error saving user preferences: $e');
+      rethrow;
+    }
+  }
+
+  Stream<UserPreferences> getUserPreferencesStream(String userId) {
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('profile')
+        .doc('preferences')
+        .snapshots()
+        .map((doc) {
+      if (doc.exists) {
+        return UserPreferences.fromMap(doc.data()!);
+      }
+      return const UserPreferences();
+    });
+  }
+
+  // Delete food entry method
+  Future<void> deleteFoodEntry(String userId, String entryId) async {
+    try {
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('entries')
+          .doc(entryId)
+          .delete();
+    } catch (e) {
+      print('Error deleting food entry: $e');
+      rethrow;
     }
   }
 } 
