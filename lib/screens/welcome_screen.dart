@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'screens/home/home_screen.dart';
-import 'ui/app_colors.dart';
+import 'home_screen.dart';
+import '../ui/app_colors.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -157,7 +157,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                       Navigator.pop(context); // Close dialog
                                       Navigator.pushReplacement(
                                         context,
-                                        MaterialPageRoute(builder: (_) => const HomeScreen()),
+                                        MaterialPageRoute(builder: (_) => const PremiumHomeScreen()),
                                       );
                                     }
                                   } on FirebaseAuthException catch (e) {

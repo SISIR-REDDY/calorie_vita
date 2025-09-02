@@ -11,6 +11,9 @@ const Color kSecondaryLight = Color(0xFF34D399); // Lighter emerald
 const Color kAccentColor = Color(0xFFF59E0B); // Amber accent
 const Color kAccentLight = Color(0xFFFBBF24); // Lighter amber
 const Color kAccentBlue = Color(0xFF3B82F6); // Blue accent
+const Color kAccentGreen = Color(0xFF10B981); // Green accent
+const Color kAccentGold = Color(0xFFF59E0B); // Gold accent
+const Color kAccentPurple = Color(0xFF8B5CF6); // Purple accent
 
 const Color kSurfaceColor = Color(0xFFFFFFFF); // Pure white surface
 const Color kSurfaceLight = Color(0xFFF8FAFC); // Very light gray surface

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'screens/home/home_screen.dart';
-import 'screens/analytics/analytics_screen.dart';
-import 'screens/camera/camera_screen.dart';
-// import 'screens/ai_trainer/ai_trainer_screen.dart';
-import 'screens/settings/settings_screen.dart';
-import 'screens/auth/initial_welcome_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/analytics_screen.dart';
+import 'screens/camera_screen.dart';
+import 'screens/trainer_screen.dart';
+import 'screens/welcome_screen.dart';
+import 'screens/settings_screen.dart';
 import 'ui/app_theme.dart';
 
 class MainApp extends StatelessWidget {
@@ -26,7 +26,7 @@ class MainApp extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
           if (!snapshot.hasData) {
-            return const InitialWelcomeScreen();
+            return const WelcomeScreen();
           }
           return const MainNavigation();
         },
@@ -45,11 +45,11 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
   final List<Widget> _screens = [
-    const HomeScreen(),
+    const PremiumHomeScreen(),
     const AnalyticsScreen(),
     const SizedBox(), // Placeholder for FAB
-    // AITrainerScreen(),
-    const SettingsScreen(),
+    const AITrainerScreen(),
+    const SettingsScreen(), 
   ];
 
 
@@ -61,6 +61,12 @@ class _MainNavigationState extends State<MainNavigation> {
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const CameraScreen()),
       );
+    } else if (index == 3) {
+      // AI Trainer screen
+      setState(() => _currentIndex = 3);
+    } else if (index == 4) {
+      // Settings screen
+      setState(() => _currentIndex = 4);
     } else if (index >= 0 && index < _screens.length && index != 2) {
       print('Setting current index to: $index'); // Debug log
       setState(() => _currentIndex = index);
@@ -115,16 +121,12 @@ class _MainNavigationState extends State<MainNavigation> {
                 // Center Camera Button (Larger)
                 _buildCenterCameraButton(),
                 
-                // Placeholder for AI Trainer
+                // AI Trainer Tab
                 _buildNavItem(
                   icon: Icons.auto_awesome_rounded,
                   label: 'AI Trainer',
-                  isSelected: false,
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('AI Trainer coming soon!')),
-                    );
-                  },
+                  isSelected: _currentIndex == 3,
+                  onTap: () => _onTabSelected(3),
                 ),
                 
                 // Settings Tab

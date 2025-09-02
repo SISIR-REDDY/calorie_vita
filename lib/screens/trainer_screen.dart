@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../widgets/chat_bubble.dart';
-import '../../services/sisir_service.dart';
-import '../../ui/app_colors.dart';
+import '../widgets/chat_bubble.dart';
+import '../services/sisir_service.dart';
+import '../ui/app_colors.dart';
 
 class AITrainerScreen extends StatefulWidget {
   const AITrainerScreen({super.key});
