@@ -9,6 +9,7 @@ import 'screens/settings_screen.dart';
 import 'ui/app_theme.dart';
 import 'services/integration_service.dart';
 import 'services/bluetooth_device_service.dart';
+import 'firebase_options.dart';
 
 class MainApp extends StatefulWidget {
   const MainApp({super.key});
@@ -59,6 +60,16 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
 
   Widget _buildHomeScreen() {
     try {
+      // Check if Firebase is properly configured
+      final firebaseOptions = DefaultFirebaseOptions.currentPlatform;
+      final apiKey = firebaseOptions.apiKey;
+      
+      // If API key contains placeholder text, skip Firebase entirely
+      if (apiKey.contains('YOUR_FIREBASE') || apiKey.contains('HERE')) {
+        print('Firebase not configured (placeholder API key), using welcome screen');
+        return const WelcomeScreen();
+      }
+      
       return StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {

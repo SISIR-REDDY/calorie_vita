@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'home_screen.dart';
 import '../ui/app_colors.dart';
 import '../services/demo_auth_service.dart';
+import '../firebase_options.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -146,7 +147,17 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                     if (!formKey.currentState!.validate()) return;
                                     setState(() => loading = true);
                                                                       try {
-                                    // Try Firebase authentication first
+                                    // Check if Firebase is properly configured by looking at the API key
+                                    final firebaseOptions = DefaultFirebaseOptions.currentPlatform;
+                                    final apiKey = firebaseOptions.apiKey;
+                                    
+                                    // If API key contains placeholder text, skip Firebase and use demo mode
+                                    if (apiKey.contains('YOUR_FIREBASE') || apiKey.contains('HERE')) {
+                                      print('Firebase not configured (placeholder API key), using demo mode');
+                                      throw Exception('Firebase not configured');
+                                    }
+                                    
+                                    // Try Firebase authentication
                                     if (isSignUp) {
                                       await FirebaseAuth.instance.createUserWithEmailAndPassword(
                                         email: emailController.text.trim(),
@@ -159,6 +170,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                       );
                                     }
                                     if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Signed in successfully'),
+                                          backgroundColor: kSuccessColor,
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.all(Radius.circular(12)),
+                                          ),
+                                        ),
+                                      );
                                       Navigator.pop(context); // Close dialog
                                       Navigator.pushReplacement(
                                         context,
@@ -179,8 +200,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                       );
                                     }
                                   } catch (e) {
-                                    // Firebase not available, try demo mode
-                                    print('Firebase not available, trying demo mode: $e');
+                                    // Firebase not available or not configured, use demo mode
+                                    print('Using demo mode: $e');
                                     try {
                                       await _demoAuth.initialize();
                                       if (isSignUp) {
@@ -216,7 +237,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                       if (mounted) {
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
-                                            content: Text('Authentication failed: $demoError'),
+                                            content: Text('Authentication failed: ${demoError.toString()}'),
                                             backgroundColor: kErrorColor,
                                             behavior: SnackBarBehavior.floating,
                                             shape: RoundedRectangleBorder(
