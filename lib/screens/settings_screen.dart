@@ -8,6 +8,7 @@ import 'package:health/health.dart';
 import '../ui/app_colors.dart';
 import '../services/app_state_service.dart';
 import '../services/bluetooth_device_service.dart';
+import '../services/demo_auth_service.dart';
 
 import '../models/user_preferences.dart';
 import '../widgets/health_integration_widget.dart';
@@ -27,9 +28,11 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final AppStateService _appStateService = AppStateService();
+  final DemoAuthService _demoAuth = DemoAuthService();
   
   // User data
   User? _user;
+  DemoUser? _demoUser;
   String? _userName;
   String? _userEmail;
   String? _profileImageUrl;
@@ -43,13 +46,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _setupStreamListeners() {
-    // Listen to user stream
+    // Listen to Firebase user stream
     _appStateService.userStream.listen((user) {
       if (mounted) {
         setState(() {
           _user = user;
           if (user != null) {
             _loadUserProfileData(user);
+          }
+        });
+      }
+    });
+
+    // Listen to demo user stream
+    _demoAuth.userStream.listen((demoUser) {
+      if (mounted) {
+        setState(() {
+          _demoUser = demoUser;
+          if (demoUser != null) {
+            _userName = demoUser.displayName ?? 'Demo User';
+            _userEmail = demoUser.email;
           }
         });
       }
@@ -68,8 +84,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// Load current user data from Firebase Auth and Firestore
   Future<void> _loadUserData() async {
     _user = _appStateService.currentUser;
+    _demoUser = _demoAuth.currentUser;
+    
     if (_user != null) {
       _loadUserProfileData(_user!);
+    } else if (_demoUser != null) {
+      _userName = _demoUser!.displayName ?? 'Demo User';
+      _userEmail = _demoUser!.email;
     }
   }
 
@@ -364,8 +385,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (shouldLogout == true) {
       try {
-        await FirebaseAuth.instance.signOut();
+        // Try Firebase logout first
+        if (_user != null) {
+          await FirebaseAuth.instance.signOut();
+        }
+        
+        // Also try demo logout
+        if (_demoUser != null) {
+          await _demoAuth.signOut();
+        }
+        
         if (mounted) {
+          // Navigate to welcome screen
           Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
         }
       } catch (e) {

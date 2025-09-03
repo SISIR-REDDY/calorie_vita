@@ -9,6 +9,7 @@ import 'screens/settings_screen.dart';
 import 'ui/app_theme.dart';
 import 'services/integration_service.dart';
 import 'services/bluetooth_device_service.dart';
+import 'services/demo_auth_service.dart';
 import 'firebase_options.dart';
 
 class MainApp extends StatefulWidget {
@@ -21,6 +22,7 @@ class MainApp extends StatefulWidget {
 class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   final IntegrationService _integrationService = IntegrationService();
   final BluetoothDeviceService _bluetoothService = BluetoothDeviceService();
+  final DemoAuthService _demoAuth = DemoAuthService();
   bool _isInitialized = false;
 
   @override
@@ -32,6 +34,9 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
 
   Future<void> _initializeApp() async {
     print('Starting app initialization...');
+    
+    // Initialize demo auth service
+    await _demoAuth.initialize();
     
     // Initialize Bluetooth service and restore connected devices
     _bluetoothService.restoreConnectedDevices().catchError((error) {
@@ -64,12 +69,24 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
       final firebaseOptions = DefaultFirebaseOptions.currentPlatform;
       final apiKey = firebaseOptions.apiKey;
       
-      // If API key contains placeholder text, skip Firebase entirely
+      // If API key contains placeholder text, use demo authentication
       if (apiKey.contains('YOUR_FIREBASE') || apiKey.contains('HERE')) {
-        print('Firebase not configured (placeholder API key), using welcome screen');
-        return const WelcomeScreen();
+        print('Firebase not configured (placeholder API key), using demo authentication');
+        return StreamBuilder<DemoUser?>(
+          stream: _demoAuth.userStream,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (!snapshot.hasData || snapshot.data == null) {
+              return const WelcomeScreen();
+            }
+            return const MainNavigation();
+          },
+        );
       }
       
+      // Firebase is configured, use Firebase authentication
       return StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
@@ -89,9 +106,20 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
         },
       );
     } catch (e) {
-      // If Firebase is not available, show welcome screen
-      print('Firebase not available, showing welcome screen: $e');
-      return const WelcomeScreen();
+      // If Firebase is not available, use demo authentication
+      print('Firebase not available, using demo authentication: $e');
+      return StreamBuilder<DemoUser?>(
+        stream: _demoAuth.userStream,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data == null) {
+            return const WelcomeScreen();
+          }
+          return const MainNavigation();
+        },
+      );
     }
   }
 
