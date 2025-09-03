@@ -24,22 +24,26 @@ class DemoAuthService {
   Future<void> initialize() async {
     if (_isInitialized) return;
     
-    // Check if user is already logged in locally
-    final isLoggedIn = await _localStorage.isLoggedIn();
-    if (isLoggedIn) {
-      final credentials = await _localStorage.getUserCredentials();
-      if (credentials != null) {
-        _currentUser = DemoUser(
-          uid: 'demo_${credentials['email']!.hashCode}',
-          email: credentials['email']!,
-          displayName: credentials['email']!.split('@')[0],
-        );
-        _userController.add(_currentUser);
-        print('Demo user restored from local storage: ${_currentUser!.email}');
+    try {
+      // Check if user is already logged in locally
+      final isLoggedIn = await _localStorage.isLoggedIn();
+      if (isLoggedIn) {
+        final credentials = await _localStorage.getUserCredentials();
+        if (credentials != null) {
+          _currentUser = DemoUser(
+            uid: 'demo_${credentials['email']!.hashCode}',
+            email: credentials['email']!,
+            displayName: credentials['email']!.split('@')[0],
+          );
+          _userController.add(_currentUser);
+          print('Demo user restored from local storage: ${_currentUser!.email}');
+        }
       }
+    } catch (e) {
+      print('Demo auth initialization error: $e');
+    } finally {
+      _isInitialized = true;
     }
-    
-    _isInitialized = true;
   }
 
   /// Sign in with email and password (demo mode)

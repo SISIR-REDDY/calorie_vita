@@ -35,21 +35,28 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   Future<void> _initializeApp() async {
     print('Starting app initialization...');
     
-    // Initialize demo auth service
-    await _demoAuth.initialize();
-    
-    // Initialize Bluetooth service and restore connected devices
-    _bluetoothService.restoreConnectedDevices().catchError((error) {
-      print('Bluetooth service initialization error: $error');
-    });
-    
-    // Skip all complex initialization for now
-    await Future.delayed(const Duration(milliseconds: 100));
-    
-    print('App initialization completed (minimal)');
-    setState(() {
-      _isInitialized = true;
-    });
+    try {
+      // Initialize demo auth service (non-blocking)
+      _demoAuth.initialize().catchError((error) {
+        print('Demo auth initialization error: $error');
+      });
+      
+      // Initialize Bluetooth service (non-blocking)
+      _bluetoothService.restoreConnectedDevices().catchError((error) {
+        print('Bluetooth service initialization error: $error');
+      });
+      
+      // Minimal delay to allow UI to render
+      await Future.delayed(const Duration(milliseconds: 50));
+      
+      print('App initialization completed (minimal)');
+    } catch (e) {
+      print('App initialization error: $e');
+    } finally {
+      setState(() {
+        _isInitialized = true;
+      });
+    }
   }
 
   @override

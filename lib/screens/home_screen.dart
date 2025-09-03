@@ -98,38 +98,50 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
   void _setupStreamListeners() {
-    // Listen to real-time data updates
-    _appStateService.dailySummaryStream.listen((summary) {
-      if (mounted) {
-        setState(() {
-          _dailySummary = summary;
-        });
-      }
-    });
+    // Listen to real-time data updates (non-blocking)
+    try {
+      _appStateService.dailySummaryStream.listen((summary) {
+        if (mounted) {
+          setState(() {
+            _dailySummary = summary;
+          });
+        }
+      }).onError((error) {
+        debugPrint('Daily summary stream error: $error');
+      });
 
-    _appStateService.macroBreakdownStream.listen((breakdown) {
-      if (mounted) {
-        setState(() {
-          _macroBreakdown = breakdown;
-        });
-      }
-    });
+      _appStateService.macroBreakdownStream.listen((breakdown) {
+        if (mounted) {
+          setState(() {
+            _macroBreakdown = breakdown;
+          });
+        }
+      }).onError((error) {
+        debugPrint('Macro breakdown stream error: $error');
+      });
 
-    _appStateService.achievementsStream.listen((achievements) {
-      if (mounted) {
-        setState(() {
-          _achievements = achievements;
-        });
-      }
-    });
+      _appStateService.achievementsStream.listen((achievements) {
+        if (mounted) {
+          setState(() {
+            _achievements = achievements;
+          });
+        }
+      }).onError((error) {
+        debugPrint('Achievements stream error: $error');
+      });
 
-    _appStateService.preferencesStream.listen((preferences) {
-      if (mounted) {
-        setState(() {
-          _preferences = preferences;
-        });
-      }
-    });
+      _appStateService.preferencesStream.listen((preferences) {
+        if (mounted) {
+          setState(() {
+            _preferences = preferences;
+          });
+        }
+      }).onError((error) {
+        debugPrint('Preferences stream error: $error');
+      });
+    } catch (e) {
+      debugPrint('Stream setup error: $e');
+    }
   }
 
   @override
@@ -167,23 +179,12 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     setState(() => _isLoading = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        // Load daily summary
-        await _loadDailySummary(user.uid);
-        
-        // Load achievements
-        await _loadAchievements(user.uid);
-        
-        // Load preferences
-        await _loadPreferences(user.uid);
-        
-        // Load reward system
-        await _loadRewardSystem();
-        
-        // Load motivational quote
-        _loadMotivationalQuote();
-      }
+      // Load mock data for demo mode
+      await _loadDailySummary('demo_user');
+      await _loadAchievements('demo_user');
+      await _loadPreferences('demo_user');
+      await _loadRewardSystem();
+      _loadMotivationalQuote();
     } catch (e) {
       // Handle error silently in production
       debugPrint('Error loading home data: $e');
