@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'home_screen.dart';
 import '../ui/app_colors.dart';
+import '../services/demo_auth_service.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -12,6 +13,8 @@ class WelcomeScreen extends StatefulWidget {
 }
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
+  final DemoAuthService _demoAuth = DemoAuthService();
+
   void _showAuthDialog({required bool isSignUp}) {
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
@@ -142,30 +145,78 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                 : () async {
                                     if (!formKey.currentState!.validate()) return;
                                     setState(() => loading = true);
+                                                                      try {
+                                    // Try Firebase authentication first
+                                    if (isSignUp) {
+                                      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+                                        email: emailController.text.trim(),
+                                        password: passwordController.text.trim(),
+                                      );
+                                    } else {
+                                      await FirebaseAuth.instance.signInWithEmailAndPassword(
+                                        email: emailController.text.trim(),
+                                        password: passwordController.text.trim(),
+                                      );
+                                    }
+                                    if (mounted) {
+                                      Navigator.pop(context); // Close dialog
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(builder: (_) => const PremiumHomeScreen()),
+                                      );
+                                    }
+                                  } on FirebaseAuthException catch (e) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(e.message ?? 'Authentication failed'),
+                                          backgroundColor: kErrorColor,
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    // Firebase not available, try demo mode
+                                    print('Firebase not available, trying demo mode: $e');
                                     try {
+                                      await _demoAuth.initialize();
                                       if (isSignUp) {
-                                        await FirebaseAuth.instance.createUserWithEmailAndPassword(
-                                          email: emailController.text.trim(),
-                                          password: passwordController.text.trim(),
+                                        await _demoAuth.createUserWithEmailAndPassword(
+                                          emailController.text.trim(),
+                                          passwordController.text.trim(),
                                         );
                                       } else {
-                                        await FirebaseAuth.instance.signInWithEmailAndPassword(
-                                          email: emailController.text.trim(),
-                                          password: passwordController.text.trim(),
+                                        await _demoAuth.signInWithEmailAndPassword(
+                                          emailController.text.trim(),
+                                          passwordController.text.trim(),
                                         );
                                       }
+                                      
                                       if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Signed in successfully (Demo Mode)'),
+                                            backgroundColor: kSuccessColor,
+                                            behavior: SnackBarBehavior.floating,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.all(Radius.circular(12)),
+                                            ),
+                                          ),
+                                        );
                                         Navigator.pop(context); // Close dialog
                                         Navigator.pushReplacement(
                                           context,
                                           MaterialPageRoute(builder: (_) => const PremiumHomeScreen()),
                                         );
                                       }
-                                    } on FirebaseAuthException catch (e) {
+                                    } catch (demoError) {
                                       if (mounted) {
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
-                                            content: Text(e.message ?? 'Authentication failed'),
+                                            content: Text('Authentication failed: $demoError'),
                                             backgroundColor: kErrorColor,
                                             behavior: SnackBarBehavior.floating,
                                             shape: RoundedRectangleBorder(
@@ -174,25 +225,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                           ),
                                         );
                                       }
-                                    } catch (e) {
-                                      // Handle general Firebase errors (like configuration issues)
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Firebase not configured. Please check your configuration.'),
-                                            backgroundColor: kErrorColor,
-                                            behavior: SnackBarBehavior.floating,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.all(Radius.circular(12)),
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    } finally {
-                                      if (mounted) {
-                                        setState(() => loading = false);
-                                      }
                                     }
+                                  } finally {
+                                    if (mounted) {
+                                      setState(() => loading = false);
+                                    }
+                                  }
                                   },
                             child: loading
                                 ? const SizedBox(
