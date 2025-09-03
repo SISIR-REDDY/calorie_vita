@@ -63,8 +63,9 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            // Handle Firebase errors gracefully
-            return _buildErrorScreen();
+            // Handle Firebase errors gracefully - show welcome screen
+            print('Firebase auth error: ${snapshot.error}');
+            return const WelcomeScreen();
           }
           
           if (snapshot.connectionState == ConnectionState.waiting) {

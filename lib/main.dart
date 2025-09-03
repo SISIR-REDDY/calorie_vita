@@ -18,6 +18,7 @@ void main() async {
       print('Firebase already initialized, continuing...');
     } else {
       print('Firebase initialization error: $e');
+      print('Continuing without Firebase - app will work in demo mode');
       // Continue without Firebase for now
     }
   }

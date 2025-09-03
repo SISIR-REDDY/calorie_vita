@@ -36,12 +36,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             ),
             child: StatefulBuilder(
               builder: (context, setState) {
-                return Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                return SingleChildScrollView(
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                       // Header
                       Row(
                         children: [
@@ -173,6 +174,20 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                         ),
                                       );
                                     }
+                                  } catch (e) {
+                                    // Handle general Firebase errors (like configuration issues)
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Firebase not configured. Please check your configuration.'),
+                                          backgroundColor: kErrorColor,
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                      );
+                                    }
                                   } finally {
                                     if (mounted) {
                                       setState(() => loading = false);
@@ -213,123 +228,158 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     return Scaffold(
       backgroundColor: kSurfaceLight,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              const Spacer(),
-              
-              // App Logo/Icon
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: kPrimaryGradient,
-                  borderRadius: BorderRadius.circular(32),
-                  boxShadow: kElevatedShadow,
-                ),
-                child: const Icon(
-                  Icons.restaurant_menu,
-                  size: 64,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 32),
-              
-              // App Title
-              Text(
-                'Calorie Vita',
-                style: GoogleFonts.inter(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: kTextPrimary,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 16),
-              
-              // App Subtitle
-              Text(
-                'Track your nutrition, achieve your goals',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  color: kTextSecondary,
-                  height: 1.4,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 48),
-              
-              // Features
-              _buildFeatureItem(
-                Icons.camera_alt,
-                'AI Food Recognition',
-                'Take a photo and get instant nutrition info',
-              ),
-              const SizedBox(height: 20),
-              _buildFeatureItem(
-                Icons.track_changes,
-                'Smart Tracking',
-                'Monitor calories and macros effortlessly',
-              ),
-              const SizedBox(height: 20),
-              _buildFeatureItem(
-                Icons.psychology,
-                'AI Coach',
-                'Get personalized nutrition advice',
-              ),
-              
-              const Spacer(),
-              
-              // Action Buttons
-              Column(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height - 
+                         MediaQuery.of(context).padding.top - 
+                         MediaQuery.of(context).padding.bottom - 48,
+            ),
+            child: IntrinsicHeight(
+              child: Column(
                 children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: kPrimaryColor,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      onPressed: () => _showAuthDialog(isSignUp: false),
-                      child: Text(
-                        'Sign In',
-                        style: GoogleFonts.inter(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                  const SizedBox(height: 40),
+                  
+                  // App Logo/Icon
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      gradient: kPrimaryGradient,
+                      borderRadius: BorderRadius.circular(32),
+                      boxShadow: kElevatedShadow,
+                    ),
+                    child: const Icon(
+                      Icons.restaurant_menu,
+                      size: 64,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  
+                  // App Title
+                  Text(
+                    'Calorie Vita',
+                    style: GoogleFonts.inter(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      color: kTextPrimary,
+                      letterSpacing: -0.5,
                     ),
                   ),
                   const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: kPrimaryColor,
-                        side: const BorderSide(color: kPrimaryColor, width: 2),
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      onPressed: () => _showAuthDialog(isSignUp: true),
-                      child: Text(
-                        'Create Account',
-                        style: GoogleFonts.inter(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                  
+                  // App Subtitle
+                  Text(
+                    'Track your nutrition, achieve your goals',
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      color: kTextSecondary,
+                      height: 1.4,
                     ),
+                    textAlign: TextAlign.center,
                   ),
+                  const SizedBox(height: 48),
+                  
+                  // Features
+                  _buildFeatureItem(
+                    Icons.camera_alt,
+                    'AI Food Recognition',
+                    'Take a photo and get instant nutrition info',
+                  ),
+                  const SizedBox(height: 20),
+                  _buildFeatureItem(
+                    Icons.track_changes,
+                    'Smart Tracking',
+                    'Monitor calories and macros effortlessly',
+                  ),
+                  const SizedBox(height: 20),
+                  _buildFeatureItem(
+                    Icons.psychology,
+                    'AI Coach',
+                    'Get personalized nutrition advice',
+                  ),
+                  
+                  const Spacer(),
+                  
+                  // Action Buttons
+                  Column(
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kPrimaryColor,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          onPressed: () => _showAuthDialog(isSignUp: false),
+                          child: Text(
+                            'Sign In',
+                            style: GoogleFonts.inter(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: kPrimaryColor,
+                            side: const BorderSide(color: kPrimaryColor, width: 2),
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          onPressed: () => _showAuthDialog(isSignUp: true),
+                          child: Text(
+                            'Create Account',
+                            style: GoogleFonts.inter(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextButton(
+                          style: TextButton.styleFrom(
+                            foregroundColor: kTextSecondary,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          onPressed: () {
+                            // Demo mode - navigate directly to home screen
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (_) => const PremiumHomeScreen()),
+                            );
+                          },
+                          child: Text(
+                            'Try Demo Mode',
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),
