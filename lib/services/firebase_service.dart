@@ -699,4 +699,18 @@ class FirebaseService {
       rethrow;
     }
   }
+
+  // Save food entry method
+  Future<void> saveFoodEntry(String userId, FoodEntry entry) async {
+    try {
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('entries')
+          .add(entry.toMap());
+    } catch (e) {
+      print('Error saving food entry: $e');
+      rethrow;
+    }
+  }
 } 

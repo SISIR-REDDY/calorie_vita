@@ -8,6 +8,7 @@ import '../models/macro_breakdown.dart';
 import '../models/user_achievement.dart';
 import '../models/daily_summary.dart';
 import '../models/reward_system.dart';
+import '../services/app_state_service.dart';
 import '../services/firebase_service.dart';
 import 'camera_screen.dart';
 import 'trainer_screen.dart';
@@ -27,6 +28,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
+  // Services
+  final FirebaseService _firebaseService = FirebaseService();
+  
   // Data
   DailySummary? _dailySummary;
   MacroBreakdown? _macroBreakdown;
@@ -83,13 +87,49 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   ];
 
   // Services
-  final FirebaseService _firebaseService = FirebaseService();
+  final AppStateService _appStateService = AppStateService();
 
   @override
   void initState() {
     super.initState();
     _setupAnimations();
+    _setupStreamListeners();
     _loadData();
+  }
+
+  void _setupStreamListeners() {
+    // Listen to real-time data updates
+    _appStateService.dailySummaryStream.listen((summary) {
+      if (mounted) {
+        setState(() {
+          _dailySummary = summary;
+        });
+      }
+    });
+
+    _appStateService.macroBreakdownStream.listen((breakdown) {
+      if (mounted) {
+        setState(() {
+          _macroBreakdown = breakdown;
+        });
+      }
+    });
+
+    _appStateService.achievementsStream.listen((achievements) {
+      if (mounted) {
+        setState(() {
+          _achievements = achievements;
+        });
+      }
+    });
+
+    _appStateService.preferencesStream.listen((preferences) {
+      if (mounted) {
+        setState(() {
+          _preferences = preferences;
+        });
+      }
+    });
   }
 
   @override

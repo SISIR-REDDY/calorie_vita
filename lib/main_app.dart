@@ -7,21 +7,66 @@ import 'screens/trainer_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/settings_screen.dart';
 import 'ui/app_theme.dart';
+import 'services/integration_service.dart';
+import 'services/bluetooth_device_service.dart';
 
-class MainApp extends StatelessWidget {
+class MainApp extends StatefulWidget {
   const MainApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Calorie Vita',
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      home: StreamBuilder<User?>(
+  State<MainApp> createState() => _MainAppState();
+}
+
+class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
+  final IntegrationService _integrationService = IntegrationService();
+  final BluetoothDeviceService _bluetoothService = BluetoothDeviceService();
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    print('Starting app initialization...');
+    
+    // Initialize Bluetooth service and restore connected devices
+    _bluetoothService.restoreConnectedDevices().catchError((error) {
+      print('Bluetooth service initialization error: $error');
+    });
+    
+    // Skip all complex initialization for now
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    print('App initialization completed (minimal)');
+    setState(() {
+      _isInitialized = true;
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Handle app lifecycle state if needed
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  Widget _buildHomeScreen() {
+    try {
+      return StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            // Handle Firebase errors gracefully
+            return _buildErrorScreen();
+          }
+          
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -30,7 +75,80 @@ class MainApp extends StatelessWidget {
           }
           return const MainNavigation();
         },
+      );
+    } catch (e) {
+      // If Firebase is not available, show welcome screen
+      print('Firebase not available, showing welcome screen: $e');
+      return const WelcomeScreen();
+    }
+  }
+
+  Widget _buildErrorScreen() {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(
+              'Connection Error',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Please check your internet connection and try again.',
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                // Restart the app
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (context) => const MainApp()),
+                );
+              },
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_isInitialized) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'Calorie Vita',
+        home: Scaffold(
+          backgroundColor: Colors.white,
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(
+                  'Initializing Calorie Vita...',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Calorie Vita',
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
+      home: _buildHomeScreen(),
     );
   }
 }
