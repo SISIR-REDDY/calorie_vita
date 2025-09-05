@@ -5,6 +5,7 @@ import '../ui/app_colors.dart';
 import '../models/user_goals.dart';
 import '../services/firebase_service.dart';
 import '../services/real_time_input_service.dart';
+import '../services/calorie_units_service.dart';
 
 class GoalsScreen extends StatefulWidget {
   const GoalsScreen({super.key});
@@ -35,11 +36,17 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
 
   final FirebaseService _firebaseService = FirebaseService();
   final RealTimeInputService _realTimeInputService = RealTimeInputService();
+  final CalorieUnitsService _calorieUnitsService = CalorieUnitsService();
 
   @override
   void initState() {
     super.initState();
     _setupAnimations();
+    _initializeServices();
+  }
+
+  Future<void> _initializeServices() async {
+    await _calorieUnitsService.initialize();
     _loadGoals();
   }
 
@@ -104,29 +111,29 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
   void _populateFields() {
     if (_currentGoals != null) {
       _weightController.text = _currentGoals!.weightGoal?.toString() ?? '';
-      _calorieController.text = _currentGoals!.calorieGoal?.toString() ?? '';
+      _calorieController.text = _calorieUnitsService.formatCaloriesShort(_currentGoals!.calorieGoal?.toDouble() ?? 2000);
       _bmiController.text = _currentGoals!.bmiGoal?.toString() ?? '';
       _waterController.text = _currentGoals!.waterGlassesGoal?.toString() ?? '';
       _stepsController.text = _currentGoals!.stepsPerDayGoal?.toString() ?? '';
       
       if (_currentGoals!.macroGoals != null) {
-        _carbsController.text = _currentGoals!.macroGoals!.carbsCalories?.toString() ?? '';
-        _proteinController.text = _currentGoals!.macroGoals!.proteinCalories?.toString() ?? '';
-        _fatController.text = _currentGoals!.macroGoals!.fatCalories?.toString() ?? '';
+        _carbsController.text = _calorieUnitsService.formatCaloriesShort(_currentGoals!.macroGoals!.carbsCalories?.toDouble() ?? 900);
+        _proteinController.text = _calorieUnitsService.formatCaloriesShort(_currentGoals!.macroGoals!.proteinCalories?.toDouble() ?? 500);
+        _fatController.text = _calorieUnitsService.formatCaloriesShort(_currentGoals!.macroGoals!.fatCalories?.toDouble() ?? 600);
       } else {
         // Set default values
-        _carbsController.text = MacroGoals.defaultMacros.carbsCalories?.toString() ?? '';
-        _proteinController.text = MacroGoals.defaultMacros.proteinCalories?.toString() ?? '';
-        _fatController.text = MacroGoals.defaultMacros.fatCalories?.toString() ?? '';
+        _carbsController.text = _calorieUnitsService.formatCaloriesShort(MacroGoals.defaultMacros.carbsCalories?.toDouble() ?? 900);
+        _proteinController.text = _calorieUnitsService.formatCaloriesShort(MacroGoals.defaultMacros.proteinCalories?.toDouble() ?? 500);
+        _fatController.text = _calorieUnitsService.formatCaloriesShort(MacroGoals.defaultMacros.fatCalories?.toDouble() ?? 600);
       }
     } else {
       // Set default values for new users
-      _calorieController.text = '2000';
+      _calorieController.text = _calorieUnitsService.formatCaloriesShort(2000);
       _waterController.text = '8';
       _stepsController.text = '10000';
-      _carbsController.text = MacroGoals.defaultMacros.carbsCalories?.toString() ?? '';
-      _proteinController.text = MacroGoals.defaultMacros.proteinCalories?.toString() ?? '';
-      _fatController.text = MacroGoals.defaultMacros.fatCalories?.toString() ?? '';
+      _carbsController.text = _calorieUnitsService.formatCaloriesShort(MacroGoals.defaultMacros.carbsCalories?.toDouble() ?? 900);
+      _proteinController.text = _calorieUnitsService.formatCaloriesShort(MacroGoals.defaultMacros.proteinCalories?.toDouble() ?? 500);
+      _fatController.text = _calorieUnitsService.formatCaloriesShort(MacroGoals.defaultMacros.fatCalories?.toDouble() ?? 600);
     }
   }
 
@@ -138,14 +145,14 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
       if (user != null) {
         final goals = UserGoals(
           weightGoal: double.tryParse(_weightController.text),
-          calorieGoal: int.tryParse(_calorieController.text),
+          calorieGoal: _calorieUnitsService.convertToKcal(double.tryParse(_calorieController.text) ?? 2000).round(),
           bmiGoal: double.tryParse(_bmiController.text),
           waterGlassesGoal: int.tryParse(_waterController.text),
           stepsPerDayGoal: int.tryParse(_stepsController.text),
           macroGoals: MacroGoals(
-            carbsCalories: int.tryParse(_carbsController.text),
-            proteinCalories: int.tryParse(_proteinController.text),
-            fatCalories: int.tryParse(_fatController.text),
+            carbsCalories: _calorieUnitsService.convertToKcal(double.tryParse(_carbsController.text) ?? 900).round(),
+            proteinCalories: _calorieUnitsService.convertToKcal(double.tryParse(_proteinController.text) ?? 500).round(),
+            fatCalories: _calorieUnitsService.convertToKcal(double.tryParse(_fatController.text) ?? 600).round(),
           ),
           lastUpdated: DateTime.now(),
         );
@@ -365,7 +372,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
         keyboardType: TextInputType.number,
         decoration: InputDecoration(
           hintText: 'Enter daily calorie target',
-          suffixText: 'kcal',
+          suffixText: _calorieUnitsService.unitSuffix,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
@@ -450,81 +457,280 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
       color: kPrimaryColor,
       child: Column(
         children: [
+          // Macro distribution header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [kPrimaryColor.withValues(alpha: 0.1), kAccentColor.withValues(alpha: 0.1)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: kPrimaryColor.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.info_outline, color: kPrimaryColor, size: 16),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Macro Distribution',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: kPrimaryColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Set your daily macro targets in calories',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: kPrimaryColor.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          
+          // Individual macro input fields
+          _buildMacroField(
+            controller: _carbsController,
+            label: 'Carbohydrates',
+            icon: Icons.grain,
+            color: Colors.orange,
+            description: 'Primary energy source',
+          ),
+          const SizedBox(height: 16),
+          
+          _buildMacroField(
+            controller: _proteinController,
+            label: 'Protein',
+            icon: Icons.fitness_center,
+            color: Colors.red,
+            description: 'Muscle building & repair',
+          ),
+          const SizedBox(height: 16),
+          
+          _buildMacroField(
+            controller: _fatController,
+            label: 'Fat',
+            icon: Icons.opacity,
+            color: Colors.blue,
+            description: 'Essential nutrients & energy',
+          ),
+          const SizedBox(height: 20),
+          
+          // Total calculation and recommendations
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: kAccentColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: kAccentColor.withValues(alpha: 0.3),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: kAccentColor.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.calculate, color: kAccentColor, size: 16),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Recommended Distribution',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: kAccentColor,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildMacroRecommendation(
+                        label: 'Carbs',
+                        value: '45-65%',
+                        color: Colors.orange,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildMacroRecommendation(
+                        label: 'Protein',
+                        value: '10-35%',
+                        color: Colors.red,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildMacroRecommendation(
+                        label: 'Fat',
+                        value: '20-35%',
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Total should equal your daily calorie goal',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: kAccentColor.withValues(alpha: 0.8),
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMacroField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    required Color color,
+    required String description,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _carbsController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Carbs',
-                    suffixText: 'kcal',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    filled: true,
-                    fillColor: Theme.of(context).colorScheme.surface,
-                  ),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
+                child: Icon(icon, color: color, size: 18),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: TextField(
-                  controller: _proteinController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Protein',
-                    suffixText: 'kcal',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                     ),
-                    filled: true,
-                    fillColor: Theme.of(context).colorScheme.surface,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _fatController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Fat',
-                    suffixText: 'kcal',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                    Text(
+                      description,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      ),
                     ),
-                    filled: true,
-                    fillColor: Theme.of(context).colorScheme.surface,
-                  ),
+                  ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: kPrimaryColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+          TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: 'Enter $label calories',
+              suffixText: _calorieUnitsService.unitSuffix,
+              prefixIcon: Icon(Icons.local_fire_department, color: color, size: 20),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: color.withValues(alpha: 0.3)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: color.withValues(alpha: 0.3)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: color, width: 2),
+              ),
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surface,
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline, color: kPrimaryColor, size: 16),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Total should equal your daily calorie goal. Recommended: 900 kcal Carbs, 500 kcal Protein, 600 kcal Fat (for 2000 kcal)',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: kPrimaryColor,
-                    ),
-                  ),
-                ),
-              ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMacroRecommendation({
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: color,
             ),
           ),
         ],

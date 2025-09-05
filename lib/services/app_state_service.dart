@@ -227,7 +227,7 @@ class AppStateService {
 
     _dailySummary = DailySummary(
       caloriesConsumed: caloriesConsumed,
-      caloriesBurned: _healthData.caloriesBurned, // From health data
+      caloriesBurned: _healthData.caloriesBurned.round(), // From health data
       caloriesGoal: _userGoals?.calorieGoal ?? 2000,
       waterIntake: 6, // Default - should be tracked separately
       waterGoal: _userGoals?.waterGlassesGoal ?? 8,

@@ -11,6 +11,7 @@ import '../services/dynamic_icon_service.dart';
 import '../services/real_time_input_service.dart';
 import '../services/daily_summary_service.dart';
 import '../services/simple_streak_service.dart';
+import '../services/calorie_units_service.dart';
 import '../widgets/simple_streak_widgets.dart';
 import 'camera_screen.dart';
 import 'trainer_screen.dart';
@@ -35,6 +36,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   final RealTimeInputService _realTimeInputService = RealTimeInputService();
   final DailySummaryService _dailySummaryService = DailySummaryService();
   final SimpleStreakService _streakService = SimpleStreakService();
+  final CalorieUnitsService _calorieUnitsService = CalorieUnitsService();
   
   // Data
   DailySummary? _dailySummary;
@@ -42,6 +44,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   UserPreferences _preferences = const UserPreferences();
   String _motivationalQuote = '';
   bool _isLoading = true;
+  bool _isStreakLoading = true;
   UserStreakSummary _streakSummary = UserStreakSummary(
     goalStreaks: {},
     totalActiveStreaks: 0,
@@ -52,7 +55,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   String? _currentUserId;
   
   // Task management
-  List<Map<String, dynamic>> _completedTasks = [];
   List<Map<String, dynamic>> _tasks = [
     {
       'id': 'task_1',
@@ -112,6 +114,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     await _realTimeInputService.initialize();
     await _dailySummaryService.initialize();
     await _streakService.initialize();
+    await _calorieUnitsService.initialize();
     _currentUserId = _realTimeInputService.getCurrentUserId();
   }
 
@@ -245,11 +248,44 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   Future<void> _loadStreakData() async {
     try {
-      // Load streak data from the service
+      // Provide immediate fallback data for better UX
+      _streakSummary = _getDefaultStreakData();
+      setState(() => _isStreakLoading = false);
+      
+      // Load actual streak data from the service in background
       _streakSummary = _streakService.currentStreaks;
+      if (mounted) {
+        setState(() => _isStreakLoading = false);
+      }
     } catch (e) {
       debugPrint('Error loading streak data: $e');
+      if (mounted) {
+        setState(() => _isStreakLoading = false);
+      }
     }
+  }
+
+  UserStreakSummary _getDefaultStreakData() {
+    final goalStreaks = <DailyGoalType, GoalStreak>{};
+    
+    for (final goalType in DailyGoalType.values) {
+      goalStreaks[goalType] = GoalStreak(
+        goalType: goalType,
+        currentStreak: 0,
+        longestStreak: 0,
+        lastAchievedDate: DateTime.now().subtract(const Duration(days: 1)),
+        achievedToday: false,
+        totalDaysAchieved: 0,
+      );
+    }
+
+    return UserStreakSummary(
+      goalStreaks: goalStreaks,
+      totalActiveStreaks: 0,
+      longestOverallStreak: 0,
+      lastActivityDate: DateTime.now(),
+      totalDaysActive: 0,
+    );
   }
 
   Future<void> _loadPreferences(String userId) async {
@@ -545,13 +581,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   ),
                   
                   
-                  // Recent Activity
-                  _buildRecentActivitySection(),
-                  
-                  // Spacing between sections
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: 20),
-                  ),
                   
                   // Tasks & To-Do
                   _buildTasksSection(),
@@ -561,8 +590,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     child: SizedBox(height: 20),
                   ),
                   
-                  // AI Suggestions
-                  _buildAISuggestionsSection(),
                   
                   // Bottom padding
                   const SliverToBoxAdapter(
@@ -718,53 +745,323 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     return SliverToBoxAdapter(
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              kPrimaryColor.withValues(alpha: 0.1),
+              kPrimaryColor.withValues(alpha: 0.05),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: kPrimaryColor.withValues(alpha: 0.2),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: kPrimaryColor.withValues(alpha: 0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with icon and title
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [kPrimaryColor, kPrimaryColor.withValues(alpha: 0.8)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: kPrimaryColor.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.today,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Today\'s Summary',
               style: GoogleFonts.poppins(
-                fontSize: 20,
+                          fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildSummaryCard(
-                    'Consumed',
-                    _preferences.calorieUnit.convertFromKcal(_dailySummary!.caloriesConsumed.toDouble()).round(),
-                    Icons.restaurant,
-                    kAccentColor,
-                    _preferences.calorieUnit.displayName,
+                      const SizedBox(height: 4),
+                      Text(
+                        'Track your daily progress',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildSummaryCard(
-                    'Burned',
-                    _preferences.calorieUnit.convertFromKcal(_dailySummary!.caloriesBurned.toDouble()).round(),
-                    Icons.directions_run,
-                    kSecondaryColor,
-                    _preferences.calorieUnit.displayName,
+                // Date badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: kSuccessColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: kSuccessColor.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildSummaryCard(
-                    'Remaining',
-                    _preferences.calorieUnit.convertFromKcal(_dailySummary!.caloriesRemaining.toDouble()).round(),
-                    Icons.local_fire_department,
-                    kAccentBlue,
-                    _preferences.calorieUnit.displayName,
+                  child: Text(
+                    'Live',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: kSuccessColor,
+                    ),
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 24),
+            
+            // Main summary cards
+            Row(
+              children: [
+                Expanded(
+                  child: _buildEnhancedSummaryCard(
+                    'Consumed',
+                    _calorieUnitsService.formatCaloriesShort(_dailySummary!.caloriesConsumed.toDouble()),
+                    _calorieUnitsService.unitSuffix,
+                    Icons.restaurant,
+                    kAccentColor,
+                    'Calories eaten today',
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildEnhancedSummaryCard(
+                    'Burned',
+                    _calorieUnitsService.formatCaloriesShort(_dailySummary!.caloriesBurned.toDouble()),
+                    _calorieUnitsService.unitSuffix,
+                    Icons.directions_run,
+                    kSecondaryColor,
+                    'Calories burned today',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            
+            // Calories to target card (full width)
+            _buildCaloriesToTargetCard(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildEnhancedSummaryCard(String label, String value, String unit, IconData icon, Color color, String description) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.1),
+            color.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [color, color.withValues(alpha: 0.8)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(icon, color: Colors.white, size: 16),
+              ),
+              const SizedBox(width: 10),
+                Expanded(
+                child: Text(
+                  label,
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  ),
+                ),
+              ],
+            ),
+          const SizedBox(height: 12),
+          Text(
+            '$value $unit',
+            style: GoogleFonts.poppins(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+            textAlign: TextAlign.left,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            description,
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+            textAlign: TextAlign.left,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCaloriesToTargetCard() {
+    final caloriesToTarget = _dailySummary!.caloriesGoal - _dailySummary!.caloriesConsumed;
+    final isReached = caloriesToTarget <= 0;
+    final color = isReached ? const Color(0xFF2196F3) : kAccentColor; // Blue when reached, red when working
+    final icon = isReached ? Icons.check_circle : Icons.flag;
+    final status = isReached ? 'Goal Reached!' : 'To Reach Goal';
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.1),
+            color.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [color, color.withValues(alpha: 0.8)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.3),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  status,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                  textAlign: TextAlign.left,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isReached 
+                    ? 'Congratulations!'
+                    : '${_calorieUnitsService.formatCaloriesShort(caloriesToTarget.abs().toDouble())} ${_calorieUnitsService.unitSuffix} remaining',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                  textAlign: TextAlign.left,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isReached 
+                    ? 'You have successfully reached your daily calorie goal'
+                    : 'Keep going to reach your daily target',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                  textAlign: TextAlign.left,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -883,9 +1180,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 Expanded(
                   child: _buildGoalCard(
                     'Calories',
-                    '${_preferences.calorieUnit.convertFromKcal(_dailySummary?.caloriesConsumed.toDouble() ?? 0).round()}',
-                    '${_preferences.calorieUnit.convertFromKcal(_dailySummary?.caloriesGoal.toDouble() ?? 2000).round()}',
-                    _preferences.calorieUnit.displayName,
+                    _calorieUnitsService.formatCaloriesShort(_dailySummary?.caloriesConsumed.toDouble() ?? 0),
+                    _calorieUnitsService.formatCaloriesShort(_dailySummary?.caloriesGoal.toDouble() ?? 2000),
+                    _calorieUnitsService.unitSuffix,
                     Icons.local_fire_department,
                     kAccentColor,
                     (_dailySummary?.calorieProgress ?? 0.0) * 100,
@@ -1017,7 +1314,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     return GestureDetector(
       onTap: onTap,
       child: Container(
-      padding: const EdgeInsets.all(16),
+        height: 180, // Fixed height for consistent sizing
+        padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
           color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -1035,18 +1333,20 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+            // Header with icon and title
           Row(
             children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: progressColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(icon, color: progressColor, size: 18),
+                  child: Icon(icon, color: progressColor, size: 20),
                 ),
-              const SizedBox(width: 8),
+                const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   title,
@@ -1055,66 +1355,72 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     fontWeight: FontWeight.w600,
                     color: Theme.of(context).colorScheme.onSurface,
                   ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
                 if (isCompleted)
                   Container(
-                    padding: const EdgeInsets.all(4),
+                    padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       color: kSuccessColor,
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(
                       Icons.check,
                       color: Colors.white,
-                      size: 12,
+                      size: 14,
                 ),
               ),
             ],
           ),
-            const SizedBox(height: 12),
-            Row(
+            
+            // Values section with better spacing
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  flex: 2,
-                  child: Text(
+                // Current value - larger and more prominent
+                Text(
                     current,
                     style: GoogleFonts.poppins(
-                      fontSize: 22,
+                    fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: progressColor,
+                    height: 1.1,
                     ),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                   ),
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    ' / $target $unit',
+                const SizedBox(height: 4),
+                // Target value with unit
+                Text(
+                  'of $target $unit',
                     style: GoogleFonts.poppins(
-                      fontSize: 16,
+                    fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    height: 1.2,
                     ),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
-                  ),
                 ),
               ],
           ),
-          const SizedBox(height: 8),
+            
+            // Progress section
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
               value: progress / 100,
-                minHeight: 6,
+                    minHeight: 8,
                 backgroundColor: progressColor.withValues(alpha: 0.1),
                 valueColor: AlwaysStoppedAnimation<Color>(progressColor),
               ),
             ),
-            const SizedBox(height: 4),
+                const SizedBox(height: 6),
             Text(
               '${progress.round()}% complete',
               style: GoogleFonts.poppins(
@@ -1124,152 +1430,15 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             ),
           ),
         ],
-        ),
-      ),
-    );
-  }
-
-
-  Widget _buildRecentActivitySection() {
-    return SliverToBoxAdapter(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20),
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: kCardShadow,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: kSecondaryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.history, color: kSecondaryColor, size: 24),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Recent Activity',
-                  style: GoogleFonts.poppins(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-              ],
             ),
-            const SizedBox(height: 20),
-            
-            // Show completed tasks first if any
-            ..._completedTasks.take(3).map((task) => _buildActivityItem(
-              task['emoji'], 
-              task['title'], 
-              task['time'], 
-              task['detail'], 
-              task['entryId']
-            )),
-            
-            // Show regular activity items
-            if (_completedTasks.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              const Divider(height: 1),
-              const SizedBox(height: 12),
-            ],
-            _buildActivityItem(DynamicIconService().generateIcon('Logged Apple'), 'Logged Apple', '2 hours ago', '+52 ${_preferences.calorieUnit.displayName}', 'apple_1'),
-            _buildActivityItem(DynamicIconService().generateIcon('Morning Run'), 'Morning Run', '4 hours ago', '-320 ${_preferences.calorieUnit.displayName}', 'run_1'),
-            _buildActivityItem(DynamicIconService().generateIcon('Water Intake'), 'Water Intake', '1 hour ago', '250ml', 'water_1'),
-            _buildActivityItem(DynamicIconService().generateIcon('Lunch Salad'), 'Lunch Salad', '3 hours ago', '+180 ${_preferences.calorieUnit.displayName}', 'salad_1'),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildActivityItem(String emoji, String title, String time, String detail, String entryId) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(emoji, style: const TextStyle(fontSize: 28)),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  time,
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                detail,
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: kSecondaryColor,
-                ),
-              ),
-              const SizedBox(height: 8),
-              GestureDetector(
-                onTap: () => _showDeleteConfirmation(entryId, title),
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: kErrorColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.delete_outline,
-                    color: kErrorColor,
-                    size: 18,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+
+
 
   Widget _buildTasksSection() {
     return SliverToBoxAdapter(
@@ -1494,94 +1663,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
 
 
-  Widget _buildAISuggestionsSection() {
-    return SliverToBoxAdapter(
-      child: Container(
-        margin: const EdgeInsets.all(20),
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: kCardShadow,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: kPrimaryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.auto_awesome, color: kPrimaryColor, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'AI Suggestions',
-                  style: GoogleFonts.poppins(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: kPrimaryColor.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: kPrimaryColor.withValues(alpha: 0.1),
-                  width: 1,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '💡 Daily Tip',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Try adding more protein to your breakfast to keep you full longer and boost your metabolism!',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _navigateToAITrainer(),
-                icon: const Icon(Icons.chat),
-                label: const Text('Ask Trainer Sisir'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   // Helper methods
   String _getGreeting(int hour) {
@@ -1701,6 +1782,18 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           ),
         ),
         const SizedBox(height: 16),
+        if (_isStreakLoading)
+          ...List.generate(4, (index) => 
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: GoalStreakCard(
+                streak: _streakSummary.goalStreaks.values.first,
+                isLoading: true,
+                onTap: () {},
+              ),
+            ),
+          )
+        else
         ..._streakSummary.goalStreaks.values.map((streak) => 
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -2301,7 +2394,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   void _addTask(String taskTitle, String priority) {
     setState(() {
-      // Create new task
+      // Create new task with improved icon generation
+      final dynamicIconService = DynamicIconService();
+      final bestCategory = dynamicIconService.getBestCategory(taskTitle);
+      final confidence = dynamicIconService.getCategoryConfidence(taskTitle, bestCategory);
+      
       final newTask = {
         'id': 'task_${DateTime.now().millisecondsSinceEpoch}',
         'emoji': _getTaskEmoji(taskTitle),
@@ -2309,6 +2406,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         'isCompleted': false,
         'priority': priority,
         'createdAt': DateTime.now(),
+        'category': bestCategory,
+        'confidence': confidence,
       };
       
       // Add to the beginning of the list
@@ -2336,22 +2435,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         // Toggle completion status
         _tasks[taskIndex]['isCompleted'] = !wasCompleted;
         
-        // If task was just completed, add to recent activity
         if (!wasCompleted) {
-          final completedTask = {
-            'emoji': task['emoji'],
-            'title': 'Completed: ${task['title']}',
-            'time': 'Just now',
-            'detail': 'Task completed',
-            'entryId': 'task_${DateTime.now().millisecondsSinceEpoch}',
-          };
-          
-          _completedTasks.insert(0, completedTask);
-          // Keep only last 10 completed tasks
-          if (_completedTasks.length > 10) {
-            _completedTasks = _completedTasks.take(10).toList();
-          }
-          
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Task completed: ${task['title']}'),
@@ -2375,8 +2459,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
   String _getTaskEmoji(String task) {
-    // Use the dynamic icon service for intelligent icon generation
-    return DynamicIconService().generateIcon(task);
+    // Use the enhanced dynamic icon service with contextual awareness
+    final dynamicIconService = DynamicIconService();
+    
+    // Get contextual icons based on current time
+    final contextualIcons = dynamicIconService.getContextualIcons(task, timeOfDay: DateTime.now());
+    
+    // Return the first contextual icon if available, otherwise use the best match
+    return contextualIcons.isNotEmpty ? contextualIcons.first : dynamicIconService.generateIcon(task);
   }
 
   void _showDeleteTaskConfirmation(String taskId, String taskTitle) {
@@ -2486,6 +2576,4 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       ),
     );
   }
-
 }
-

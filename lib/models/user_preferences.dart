@@ -1,8 +1,6 @@
 enum CalorieUnit {
   kcal,
   cal,
-  joule,
-  kilojoule,
 }
 
 extension CalorieUnitExtension on CalorieUnit {
@@ -12,10 +10,6 @@ extension CalorieUnitExtension on CalorieUnit {
         return 'kcal';
       case CalorieUnit.cal:
         return 'cal';
-      case CalorieUnit.joule:
-        return 'J';
-      case CalorieUnit.kilojoule:
-        return 'kJ';
     }
   }
 
@@ -25,10 +19,6 @@ extension CalorieUnitExtension on CalorieUnit {
         return 'Kilocalories';
       case CalorieUnit.cal:
         return 'Calories';
-      case CalorieUnit.joule:
-        return 'Joules';
-      case CalorieUnit.kilojoule:
-        return 'Kilojoules';
     }
   }
 
@@ -38,10 +28,6 @@ extension CalorieUnitExtension on CalorieUnit {
         return kcalValue;
       case CalorieUnit.cal:
         return kcalValue * 1000;
-      case CalorieUnit.joule:
-        return kcalValue * 4184;
-      case CalorieUnit.kilojoule:
-        return kcalValue * 4.184;
     }
   }
 
@@ -51,10 +37,6 @@ extension CalorieUnitExtension on CalorieUnit {
         return value;
       case CalorieUnit.cal:
         return value / 1000;
-      case CalorieUnit.joule:
-        return value / 4184;
-      case CalorieUnit.kilojoule:
-        return value / 4.184;
     }
   }
 }

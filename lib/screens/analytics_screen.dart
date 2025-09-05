@@ -328,8 +328,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           ),
                           child: Image.asset(
                             'calorie_logo.png',
-                            width: 24,
-                            height: 24,
+                            width: 40,
+                            height: 40,
                             fit: BoxFit.contain,
                           ),
                         ),
@@ -817,52 +817,278 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Widget _buildProgressTracker() {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(
-        color: kSurfaceColor,
-        borderRadius: BorderRadius.all(Radius.circular(20)),
-        boxShadow: kCardShadow,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [kSurfaceColor, kSurfaceColor.withValues(alpha: 0.8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: kPrimaryColor.withValues(alpha: 0.1),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: kPrimaryColor.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Progress Tracker',
-                style: TextStyle(
-              fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: kTextPrimary,
+          // Header with icon and title
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [kPrimaryColor, kPrimaryColor.withValues(alpha: 0.8)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kPrimaryColor.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
+                child: const Icon(
+                  Icons.trending_up,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Health Progress Tracker',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: kTextPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: kSuccessColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: kSuccessColor.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Text(
+                        'Live Data',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: kSuccessColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          
+          // Macro Balance
+          _buildEnhancedProgressItem(
+            'Macro Balance',
+            'Carbs: 45%, Protein: 25%, Fat: 30%',
+            'Ideal: 50%, 25%, 25%',
+            0.85,
+            const Color(0xFF9C27B0), // Purple
+            Icons.pie_chart,
+            'Well balanced!',
           ),
           const SizedBox(height: 20),
           
-          _buildProgressItem(
-            'Weight Goal',
-            'Current: 75.2 kg',
-            'Target: 70.0 kg',
-            0.7,
-            kSecondaryColor,
-            Icons.monitor_weight,
+          // Heart Rate Zone
+          _buildEnhancedProgressItem(
+            'Heart Rate Zone',
+            '65% in fat burn zone',
+            'Target: 70%',
+            0.93,
+            const Color(0xFFE91E63), // Pink
+            Icons.favorite,
+            'Excellent!',
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           
-          _buildProgressItem(
-            'BMI',
-            'Current: 24.1',
-            'Target: 22.0',
+          // Weekly Calorie Deficit
+          _buildEnhancedProgressItem(
+            'Weekly Calorie Deficit',
+            'Current: -2,100 kcal',
+            'Target: -3,500 kcal',
             0.6,
-            kInfoColor,
-            Icons.height,
+            const Color(0xFF2196F3), // Blue
+            Icons.trending_down,
+            'On track!',
           ),
-          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnhancedProgressItem(String title, String current, String target, double progress, Color color, IconData icon, String encouragement) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.05),
+            color.withValues(alpha: 0.02),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with icon and title
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [color, color.withValues(alpha: 0.8)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(icon, color: Colors.white, size: 16),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: kTextPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      current,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: color,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Progress percentage
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: color.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  '${(progress * 100).round()}%',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           
-          _buildProgressItem(
-            'Weekly Goal',
-            '5,200 / 7,000 kcal',
-            '74% Complete',
-            0.74,
-            kAccentColor,
-            Icons.local_fire_department,
+          // Progress bar with enhanced styling
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: color.withValues(alpha: 0.1),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+              minHeight: 6,
+            ),
+          ),
+          const SizedBox(height: 8),
+          
+          // Target and encouragement
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  target,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: kTextSecondary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  encouragement,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

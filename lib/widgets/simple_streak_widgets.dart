@@ -137,151 +137,346 @@ class StreakSummaryWidget extends StatelessWidget {
   }
 }
 
-/// Individual goal streak card
-class GoalStreakCard extends StatelessWidget {
+/// Individual goal streak card with enhanced empty state
+class GoalStreakCard extends StatefulWidget {
   final GoalStreak streak;
   final VoidCallback? onTap;
+  final bool isLoading;
 
   const GoalStreakCard({
     super.key,
     required this.streak,
     this.onTap,
+    this.isLoading = false,
   });
 
   @override
+  State<GoalStreakCard> createState() => _GoalStreakCardState();
+}
+
+class _GoalStreakCardState extends State<GoalStreakCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    ));
+
+    _scaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutBack,
+    ));
+
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: streak.achievedToday 
-                ? streak.goalType.color.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.2),
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: streak.achievedToday 
-                  ? streak.goalType.color.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header with emoji and status
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      streak.goalType.emoji,
-                      style: const TextStyle(fontSize: 24),
+    if (widget.isLoading) {
+      return _buildLoadingCard(context);
+    }
+
+    final isEmpty = widget.streak.currentStreak == 0 && widget.streak.longestStreak == 0;
+    
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _scaleAnimation.value,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: GestureDetector(
+              onTap: widget.onTap,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: widget.streak.achievedToday 
+                        ? widget.streak.goalType.color.withOpacity(0.3)
+                        : isEmpty 
+                            ? Colors.grey.withOpacity(0.15)
+                            : Colors.grey.withOpacity(0.2),
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: widget.streak.achievedToday 
+                          ? widget.streak.goalType.color.withOpacity(0.1)
+                          : Colors.grey.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
-                    const SizedBox(width: 8),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header with emoji and status
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              widget.streak.goalType.emoji,
+                              style: const TextStyle(fontSize: 24),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              widget.streak.goalType.displayName,
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: widget.streak.achievedToday 
+                                ? widget.streak.goalType.color.withOpacity(0.1)
+                                : isEmpty
+                                    ? Colors.orange.withOpacity(0.1)
+                                    : Colors.grey.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            widget.streak.achievedToday 
+                                ? 'Done' 
+                                : isEmpty 
+                                    ? 'Start'
+                                    : 'Pending',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: widget.streak.achievedToday 
+                                  ? widget.streak.goalType.color
+                                  : isEmpty
+                                      ? Colors.orange
+                                      : Colors.grey,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Streak information
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Current Streak',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                ),
+                              ),
+                              Text(
+                                isEmpty ? '0 days' : '${widget.streak.currentStreak} days',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: isEmpty 
+                                      ? Colors.grey.withOpacity(0.6)
+                                      : widget.streak.goalType.color,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Best Streak',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                ),
+                              ),
+                              Text(
+                                isEmpty ? '0 days' : '${widget.streak.longestStreak} days',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: isEmpty
+                                      ? Colors.grey.withOpacity(0.6)
+                                      : Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // Status message with enhanced empty state
                     Text(
-                      streak.goalType.displayName,
+                      isEmpty 
+                          ? 'Start your streak today!'
+                          : widget.streak.statusMessage,
                       style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 12,
+                        color: isEmpty
+                            ? Colors.orange.withOpacity(0.8)
+                            : Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
                   ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: streak.achievedToday 
-                        ? streak.goalType.color.withOpacity(0.1)
-                        : Colors.grey.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    streak.achievedToday ? 'Done' : 'Pending',
-                    style: GoogleFonts.poppins(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: streak.achievedToday 
-                          ? streak.goalType.color
-                          : Colors.grey,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            
-            // Streak information
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Current Streak',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                        ),
-                      ),
-                      Text(
-                        '${streak.currentStreak} days',
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: streak.goalType.color,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Best Streak',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                        ),
-                      ),
-                      Text(
-                        '${streak.longestStreak} days',
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            
-            // Status message
-            Text(
-              streak.statusMessage,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
-                fontStyle: FontStyle.italic,
               ),
             ),
-          ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLoadingCard(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey.withOpacity(0.2),
+          width: 2,
         ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 100,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                width: 50,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      width: 60,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      width: 60,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: 120,
+            height: 12,
+            decoration: BoxDecoration(
+              color: Colors.grey.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ],
       ),
     );
   }

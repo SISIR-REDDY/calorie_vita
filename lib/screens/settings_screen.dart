@@ -9,6 +9,7 @@ import '../services/app_state_service.dart';
 import '../services/demo_auth_service.dart';
 import '../services/real_time_input_service.dart';
 import '../services/health_data_service.dart';
+import '../services/calorie_units_service.dart';
 
 import '../models/user_preferences.dart';
 import '../widgets/health_integration_widget.dart';
@@ -453,8 +454,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Image.asset(
               'calorie_logo.png',
-              width: 32,
-              height: 32,
+              width: 40,
+              height: 40,
               fit: BoxFit.contain,
             ),
             const SizedBox(width: 12),
@@ -711,94 +712,152 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   /// Show calorie units selection dialog
   void _showCalorieUnitsDialog() {
-    String selectedUnit = 'kcal'; // Default selection
-    
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        // Get current unit from CalorieUnitsService (should be up-to-date)
+        final CalorieUnitsService calorieUnitsService = CalorieUnitsService();
+        String selectedUnit = calorieUnitsService.unitSuffix;
+        
         return StatefulBuilder(
           builder: (context, setState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: kAccentColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              elevation: 20,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.9,
+                  maxHeight: MediaQuery.of(context).size.height * 0.7,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    gradient: LinearGradient(
+                      colors: [Colors.white, Colors.white.withValues(alpha: 0.95)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    child: const Icon(Icons.straighten, color: kAccentColor, size: 20),
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Select Calorie Unit',
-                    style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              content: Container(
-                width: double.maxFinite,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                    // Header with icon and title
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [kAccentColor, kAccentColor.withValues(alpha: 0.8)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: kAccentColor.withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.straighten, color: Colors.white, size: 24),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Select Calorie Unit',
+                            style: GoogleFonts.poppins(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Description
                     Text(
                       'Choose your preferred unit for displaying calories throughout the app',
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         color: kTextSecondary,
+                        height: 1.4,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
+                    
+                    // Unit options
                     _buildEnhancedUnitOption('kcal', 'Kilocalories', 'kcal', 'Most common unit', selectedUnit, () {
                       setState(() => selectedUnit = 'kcal');
                     }),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 16),
                     _buildEnhancedUnitOption('cal', 'Calories', 'cal', 'Small calorie unit', selectedUnit, () {
                       setState(() => selectedUnit = 'cal');
                     }),
-                    const SizedBox(height: 8),
-                    _buildEnhancedUnitOption('J', 'Joules', 'J', 'SI energy unit', selectedUnit, () {
-                      setState(() => selectedUnit = 'J');
-                    }),
-                    const SizedBox(height: 8),
-                    _buildEnhancedUnitOption('kJ', 'Kilojoules', 'kJ', 'Large energy unit', selectedUnit, () {
-                      setState(() => selectedUnit = 'kJ');
-                    }),
-                  ],
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Action buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(color: kTextSecondary.withValues(alpha: 0.3)),
+                              ),
+                            ),
+                            child: Text(
+                              'Cancel',
+                              style: GoogleFonts.poppins(
+                                color: kTextSecondary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _saveCalorieUnit(selectedUnit);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: kAccentColor,
+                              foregroundColor: Colors.white,
+                              elevation: 8,
+                              shadowColor: kAccentColor.withValues(alpha: 0.4),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            child: Text(
+                              'Save Unit',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    'Cancel',
-                    style: GoogleFonts.poppins(
-                      color: kTextSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _saveCalorieUnit(selectedUnit);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kAccentColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  ),
-                  child: Text(
-                    'Save Unit',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
             );
           },
         );
@@ -806,38 +865,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+
   /// Build enhanced unit option for dialog
   Widget _buildEnhancedUnitOption(String value, String label, String unit, String description, String selectedUnit, VoidCallback onTap) {
     final isSelected = selectedUnit == value;
     
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected 
-              ? kAccentColor.withValues(alpha: 0.1)
-              : Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
+          gradient: isSelected 
+              ? LinearGradient(
+                  colors: [kAccentColor.withValues(alpha: 0.1), kAccentColor.withValues(alpha: 0.05)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : LinearGradient(
+                  colors: [Colors.white, Colors.white.withValues(alpha: 0.8)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected 
                 ? kAccentColor
-                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                : kTextSecondary.withValues(alpha: 0.15),
             width: isSelected ? 2 : 1,
           ),
+          boxShadow: isSelected ? [
+            BoxShadow(
+              color: kAccentColor.withValues(alpha: 0.2),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ] : [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           children: [
-            Container(
+            // Radio button with animation
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
               width: 20,
               height: 20,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? kAccentColor : kTextSecondary,
-                  width: 2,
+                  color: isSelected ? kAccentColor : kTextSecondary.withValues(alpha: 0.4),
+                  width: isSelected ? 2 : 1.5,
                 ),
                 color: isSelected ? kAccentColor : Colors.transparent,
+                boxShadow: isSelected ? [
+                  BoxShadow(
+                    color: kAccentColor.withValues(alpha: 0.3),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ] : null,
               ),
               child: isSelected
                   ? const Icon(
@@ -851,31 +942,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     children: [
-                      Text(
-                        label,
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                          color: isSelected ? kAccentColor : Theme.of(context).colorScheme.onSurface,
+                      Flexible(
+                        child: Text(
+                          label,
+                          style: GoogleFonts.poppins(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? kAccentColor : kTextPrimary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: isSelected 
-                              ? kAccentColor.withValues(alpha: 0.2)
-                              : kTextSecondary.withValues(alpha: 0.1),
+                          gradient: isSelected 
+                              ? LinearGradient(
+                                  colors: [kAccentColor, kAccentColor.withValues(alpha: 0.8)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )
+                              : LinearGradient(
+                                  colors: [kTextSecondary.withValues(alpha: 0.1), kTextSecondary.withValues(alpha: 0.05)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
                           borderRadius: BorderRadius.circular(6),
+                          boxShadow: isSelected ? [
+                            BoxShadow(
+                              color: kAccentColor.withValues(alpha: 0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ] : null,
                         ),
                         child: Text(
                           unit,
                           style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: isSelected ? kAccentColor : kTextSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? Colors.white : kTextSecondary,
                           ),
                         ),
                       ),
@@ -886,12 +997,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     description,
                     style: GoogleFonts.poppins(
                       fontSize: 12,
-                      color: kTextSecondary,
+                      color: isSelected ? kAccentColor.withValues(alpha: 0.8) : kTextSecondary,
+                      height: 1.2,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
+            // Selection indicator
+            if (isSelected)
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: kAccentColor,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: kAccentColor.withValues(alpha: 0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.check_circle,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
           ],
         ),
       ),
@@ -912,6 +1048,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
       
       await _appStateService.updateUserPreferences(updatedPreferences);
+      
+      // Update the global calorie units service
+      final calorieUnitsService = CalorieUnitsService();
+      calorieUnitsService.updateUnit(calorieUnit);
+      
+      // Update local preferences
+      setState(() {
+        _userPreferences = updatedPreferences;
+      });
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

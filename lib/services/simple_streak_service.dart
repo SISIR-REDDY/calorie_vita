@@ -41,12 +41,17 @@ class SimpleStreakService {
     }
   }
 
-  /// Load user streaks from Firestore
+  /// Load user streaks from Firestore with caching
   Future<void> _loadUserStreaks() async {
     try {
       final user = _auth.currentUser;
       if (user == null) return;
 
+      // First, emit default data immediately for better UX
+      _currentStreaks = _initializeDefaultStreaks();
+      _streakController.add(_currentStreaks);
+
+      // Then load actual data from Firestore
       final doc = await _firestore
           .collection('users')
           .doc(user.uid)
@@ -62,9 +67,11 @@ class SimpleStreakService {
         await _saveUserStreaks();
       }
 
+      // Emit the actual data
       _streakController.add(_currentStreaks);
     } catch (e) {
       _errorHandler.handleDataError('load_streaks', e);
+      // Keep the default data if loading fails
     }
   }
 
