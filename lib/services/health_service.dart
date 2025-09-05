@@ -175,10 +175,10 @@ class HealthService {
           appleHealthData['steps'] ?? 0,
           otherDevicesData['steps'] ?? 0,
         ]),
-        caloriesBurned: _getMaxIntValue([
-          googleFitData['caloriesBurned'] ?? 0,
-          appleHealthData['caloriesBurned'] ?? 0,
-          otherDevicesData['caloriesBurned'] ?? 0,
+        caloriesBurned: _getMaxDoubleValue([
+          googleFitData['caloriesBurned'] ?? 0.0,
+          appleHealthData['caloriesBurned'] ?? 0.0,
+          otherDevicesData['caloriesBurned'] ?? 0.0,
         ]),
         distance: _getMaxDoubleValue([
           googleFitData['distance'] ?? 0.0,
@@ -191,20 +191,26 @@ class HealthService {
           otherDevicesData['activeMinutes'] ?? 0,
         ]),
         heartRate: _getAverageValue([
-          googleFitData['heartRate'] ?? 0,
-          appleHealthData['heartRate'] ?? 0,
-          otherDevicesData['heartRate'] ?? 0,
+          googleFitData['heartRate'] ?? 0.0,
+          appleHealthData['heartRate'] ?? 0.0,
+          otherDevicesData['heartRate'] ?? 0.0,
         ]),
         sleepHours: _getAverageValue([
           googleFitData['sleepHours'] ?? 0.0,
           appleHealthData['sleepHours'] ?? 0.0,
           otherDevicesData['sleepHours'] ?? 0.0,
         ]),
+        waterIntake: _getMaxDoubleValue([
+          googleFitData['waterIntake'] ?? 0.0,
+          appleHealthData['waterIntake'] ?? 0.0,
+          otherDevicesData['waterIntake'] ?? 0.0,
+        ]),
         weight: _getLatestValue([
           googleFitData['weight'] ?? 0.0,
           appleHealthData['weight'] ?? 0.0,
           otherDevicesData['weight'] ?? 0.0,
         ]),
+        source: 'Health Service',
         lastUpdated: now,
       );
 

@@ -326,10 +326,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                             color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: const Icon(
-                      Icons.analytics,
-                            color: Colors.white,
-                            size: 24,
+                          child: Image.asset(
+                            'calorie_logo.png',
+                            width: 24,
+                            height: 24,
+                            fit: BoxFit.contain,
                           ),
                         ),
                         const SizedBox(width: 16),

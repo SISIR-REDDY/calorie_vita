@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../ui/app_colors.dart';
 import '../models/user_goals.dart';
 import '../services/firebase_service.dart';
+import '../services/real_time_input_service.dart';
 
 class GoalsScreen extends StatefulWidget {
   const GoalsScreen({super.key});
@@ -33,6 +34,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
   bool _isSaving = false;
 
   final FirebaseService _firebaseService = FirebaseService();
+  final RealTimeInputService _realTimeInputService = RealTimeInputService();
 
   @override
   void initState() {
@@ -148,7 +150,11 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
           lastUpdated: DateTime.now(),
         );
 
-        await _firebaseService.saveUserGoals(user.uid, goals);
+        // Use real-time input service for faster updates
+        await _realTimeInputService.handleUserGoalsUpdate(
+          context,
+          goals,
+        );
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -161,7 +167,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
               ),
             ),
           );
-          Navigator.pop(context);
+          Navigator.pop(context, true);
         }
       }
     } catch (e) {

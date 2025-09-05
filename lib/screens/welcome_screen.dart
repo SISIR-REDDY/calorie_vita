@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'home_screen.dart';
 import '../ui/app_colors.dart';
-import '../services/demo_auth_service.dart';
-import '../firebase_options.dart';
+import '../services/auth_service.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -13,269 +11,331 @@ class WelcomeScreen extends StatefulWidget {
   State<WelcomeScreen> createState() => _WelcomeScreenState();
 }
 
-class _WelcomeScreenState extends State<WelcomeScreen> {
-  final DemoAuthService _demoAuth = DemoAuthService();
+class _WelcomeScreenState extends State<WelcomeScreen>
+    with TickerProviderStateMixin {
+  final AuthService _authService = AuthService();
+  late AnimationController _fadeController;
+  late AnimationController _slideController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.2),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
+
+    // Start animations
+    _fadeController.forward();
+    Future.delayed(const Duration(milliseconds: 200), () {
+      _slideController.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _slideController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _signInWithGoogle() async {
+    try {
+      final user = await _authService.signInWithGoogle();
+      if (user != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Signed in with Google successfully!'),
+            backgroundColor: kSuccessColor,
+            behavior: SnackBarBehavior.floating,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+            ),
+          ),
+        );
+        // Let AppStateManager handle the navigation
+        // The state change will trigger the main app to show MainNavigation
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google sign-in failed: ${e.toString()}'),
+            backgroundColor: kErrorColor,
+            behavior: SnackBarBehavior.floating,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _signInWithFacebook() async {
+    try {
+      // For now, simulate Facebook sign-in with demo user
+      final user = await _authService.signInWithFacebook();
+      if (user != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Signed in with Facebook successfully!'),
+            backgroundColor: kSuccessColor,
+            behavior: SnackBarBehavior.floating,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+            ),
+          ),
+        );
+        // Let AppStateManager handle the navigation
+        // The state change will trigger the main app to show MainNavigation
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Facebook sign-in is not available yet. Please use Google or Email sign-in.'),
+            backgroundColor: kWarningColor,
+            behavior: SnackBarBehavior.floating,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+            ),
+          ),
+        );
+      }
+    }
+  }
 
   void _showAuthDialog({required bool isSignUp}) {
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
     final formKey = GlobalKey<FormState>();
     bool loading = false;
-    showModalBottomSheet(
+    
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (context) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: kSurfaceColor,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 24,
-              right: 24,
-              top: 32,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-            ),
-            child: StatefulBuilder(
-              builder: (context, setState) {
-                return SingleChildScrollView(
-                  child: Form(
-                    key: formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Header
-                        Row(
+        return Material(
+          type: MaterialType.transparency,
+          child: Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.8,
+              ),
+              decoration: const BoxDecoration(
+                color: kSurfaceColor,
+                borderRadius: BorderRadius.all(Radius.circular(24)),
+              ),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: StatefulBuilder(
+                    builder: (context, setState) {
+                      return Form(
+                        key: formKey,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                gradient: isSignUp ? kSecondaryGradient : kPrimaryGradient,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Icon(
-                                isSignUp ? Icons.person_add : Icons.login,
-                                color: Colors.white,
-                                size: 24,
-                              ),
+                            // Header with logo
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    gradient: isSignUp ? kSecondaryGradient : kPrimaryGradient,
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: (isSignUp ? kSecondaryColor : kPrimaryColor).withOpacity(0.3),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    isSignUp ? Icons.person_add_rounded : Icons.login_rounded,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Text(
+                                  isSignUp ? 'Create Account' : 'Welcome Back',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w700,
+                                    color: kTextPrimary,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 16),
-                            Text(
-                              isSignUp ? 'Create Account' : 'Welcome Back',
-                              style: GoogleFonts.inter(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
-                                color: kTextPrimary,
+                            const SizedBox(height: 32),
+                            
+                            // Email field
+                            TextFormField(
+                              controller: emailController,
+                              decoration: InputDecoration(
+                                labelText: 'Email',
+                                hintText: 'Enter your email address',
+                                prefixIcon: const Icon(Icons.email_outlined, color: kTextTertiary),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(color: kBorderColor),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(color: kBorderColor),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(color: kPrimaryColor, width: 2),
+                                ),
+                                filled: true,
+                                fillColor: kSurfaceLight,
+                              ),
+                              validator: (v) => v != null && v.contains('@') ? null : 'Enter a valid email',
+                            ),
+                            const SizedBox(height: 20),
+                            
+                            // Password field
+                            TextFormField(
+                              controller: passwordController,
+                              obscureText: true,
+                              decoration: InputDecoration(
+                                labelText: 'Password',
+                                hintText: 'Enter your password',
+                                prefixIcon: const Icon(Icons.lock_outline, color: kTextTertiary),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(color: kBorderColor),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(color: kBorderColor),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(color: kPrimaryColor, width: 2),
+                                ),
+                                filled: true,
+                                fillColor: kSurfaceLight,
+                              ),
+                              validator: (v) => v != null && v.length >= 6 ? null : 'Min 6 characters',
+                            ),
+                            const SizedBox(height: 32),
+                            
+                            // Submit button
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: isSignUp ? kSecondaryColor : kPrimaryColor,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 18),
+                                ),
+                                onPressed: loading
+                                    ? null
+                                    : () async {
+                                        if (!formKey.currentState!.validate()) return;
+                                        setState(() => loading = true);
+                                        
+                                        try {
+                                          AuthUser? user;
+                                          if (isSignUp) {
+                                            user = await _authService.createUserWithEmailAndPassword(
+                                              emailController.text.trim(),
+                                              passwordController.text.trim(),
+                                            );
+                                          } else {
+                                            user = await _authService.signInWithEmailAndPassword(
+                                              emailController.text.trim(),
+                                              passwordController.text.trim(),
+                                            );
+                                          }
+                                          
+                                          if (user != null && mounted) {
+                                            final authMethod = _authService.authMethod;
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Signed in successfully${authMethod == 'Demo' ? ' (Demo Mode)' : ''}'),
+                                                backgroundColor: kSuccessColor,
+                                                behavior: SnackBarBehavior.floating,
+                                                shape: const RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                                                ),
+                                              ),
+                                            );
+                                            Navigator.of(context).pop(); // Close dialog
+                                            Navigator.pushReplacement(
+                                              context,
+                                              MaterialPageRoute(builder: (_) => const PremiumHomeScreen()),
+                                            );
+                                          }
+                                        } catch (e) {
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Authentication failed: ${e.toString()}'),
+                                                backgroundColor: kErrorColor,
+                                                behavior: SnackBarBehavior.floating,
+                                                shape: const RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        } finally {
+                                          if (mounted) {
+                                            setState(() => loading = false);
+                                          }
+                                        }
+                                      },
+                                child: loading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        ),
+                                      )
+                                    : Text(
+                                        isSignUp ? 'Create Account' : 'Sign In',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 24),
-                        
-                        // Email field
-                        TextFormField(
-                          controller: emailController,
-                          decoration: InputDecoration(
-                            labelText: 'Email',
-                            hintText: 'Enter your email address',
-                            prefixIcon: const Icon(Icons.email_outlined, color: kTextTertiary),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: kBorderColor),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: kBorderColor),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: kPrimaryColor, width: 2),
-                            ),
-                            filled: true,
-                            fillColor: kSurfaceLight,
-                          ),
-                          validator: (v) => v != null && v.contains('@') ? null : 'Enter a valid email',
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        // Password field
-                        TextFormField(
-                          controller: passwordController,
-                          obscureText: true,
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            hintText: 'Enter your password',
-                            prefixIcon: const Icon(Icons.lock_outline, color: kTextTertiary),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: kBorderColor),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: kBorderColor),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: kPrimaryColor, width: 2),
-                            ),
-                            filled: true,
-                            fillColor: kSurfaceLight,
-                          ),
-                          validator: (v) => v != null && v.length >= 6 ? null : 'Min 6 characters',
-                        ),
-                        const SizedBox(height: 24),
-                        
-                        // Submit button
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isSignUp ? kSecondaryColor : kPrimaryColor,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                            ),
-                            onPressed: loading
-                                ? null
-                                : () async {
-                                    if (!formKey.currentState!.validate()) return;
-                                    setState(() => loading = true);
-                                                                      try {
-                                    // Check if Firebase is properly configured by looking at the API key
-                                    final firebaseOptions = DefaultFirebaseOptions.currentPlatform;
-                                    final apiKey = firebaseOptions.apiKey;
-                                    
-                                    // If API key contains placeholder text, skip Firebase and use demo mode
-                                    if (apiKey.contains('YOUR_FIREBASE') || apiKey.contains('HERE')) {
-                                      print('Firebase not configured (placeholder API key), using demo mode');
-                                      throw Exception('Firebase not configured');
-                                    }
-                                    
-                                    // Try Firebase authentication
-                                    if (isSignUp) {
-                                      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-                                        email: emailController.text.trim(),
-                                        password: passwordController.text.trim(),
-                                      );
-                                    } else {
-                                      await FirebaseAuth.instance.signInWithEmailAndPassword(
-                                        email: emailController.text.trim(),
-                                        password: passwordController.text.trim(),
-                                      );
-                                    }
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Signed in successfully'),
-                                          backgroundColor: kSuccessColor,
-                                          behavior: SnackBarBehavior.floating,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.all(Radius.circular(12)),
-                                          ),
-                                        ),
-                                      );
-                                      Navigator.pop(context); // Close dialog
-                                      Navigator.pushReplacement(
-                                        context,
-                                        MaterialPageRoute(builder: (_) => const PremiumHomeScreen()),
-                                      );
-                                    }
-                                  } on FirebaseAuthException catch (e) {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(e.message ?? 'Authentication failed'),
-                                          backgroundColor: kErrorColor,
-                                          behavior: SnackBarBehavior.floating,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  } catch (e) {
-                                    // Firebase not available or not configured, use demo mode
-                                    print('Using demo mode: $e');
-                                    try {
-                                      await _demoAuth.initialize();
-                                      if (isSignUp) {
-                                        await _demoAuth.createUserWithEmailAndPassword(
-                                          emailController.text.trim(),
-                                          passwordController.text.trim(),
-                                        );
-                                      } else {
-                                        await _demoAuth.signInWithEmailAndPassword(
-                                          emailController.text.trim(),
-                                          passwordController.text.trim(),
-                                        );
-                                      }
-                                      
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Signed in successfully (Demo Mode)'),
-                                            backgroundColor: kSuccessColor,
-                                            behavior: SnackBarBehavior.floating,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.all(Radius.circular(12)),
-                                            ),
-                                          ),
-                                        );
-                                        Navigator.pop(context); // Close dialog
-                                        Navigator.pushReplacement(
-                                          context,
-                                          MaterialPageRoute(builder: (_) => const PremiumHomeScreen()),
-                                        );
-                                      }
-                                    } catch (demoError) {
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Authentication failed: ${demoError.toString()}'),
-                                            backgroundColor: kErrorColor,
-                                            behavior: SnackBarBehavior.floating,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  } finally {
-                                    if (mounted) {
-                                      setState(() => loading = false);
-                                    }
-                                  }
-                                  },
-                            child: loading
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                    ),
-                                  )
-                                : Text(
-                                    isSignUp ? 'Create Account' : 'Sign In',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-                );
-              },
+                ),
+              ),
             ),
           ),
         );
@@ -286,159 +346,28 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kSurfaceLight,
+      backgroundColor: kAppBackground,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: MediaQuery.of(context).size.height - 
-                         MediaQuery.of(context).padding.top - 
-                         MediaQuery.of(context).padding.bottom - 48,
-            ),
-            child: IntrinsicHeight(
-              child: Column(
-                children: [
-                  const SizedBox(height: 40),
-                  
-                  // App Logo/Icon
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      gradient: kPrimaryGradient,
-                      borderRadius: BorderRadius.circular(32),
-                      boxShadow: kElevatedShadow,
-                    ),
-                    child: const Icon(
-                      Icons.restaurant_menu,
-                      size: 64,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  
-                  // App Title
-                  Text(
-                    'Calorie Vita',
-                    style: GoogleFonts.inter(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w800,
-                      color: kTextPrimary,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // App Subtitle
-                  Text(
-                    'Track your nutrition, achieve your goals',
-                    style: GoogleFonts.inter(
-                      fontSize: 18,
-                      color: kTextSecondary,
-                      height: 1.4,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 48),
-                  
-                  // Features
-                  _buildFeatureItem(
-                    Icons.camera_alt,
-                    'AI Food Recognition',
-                    'Take a photo and get instant nutrition info',
-                  ),
-                  const SizedBox(height: 20),
-                  _buildFeatureItem(
-                    Icons.track_changes,
-                    'Smart Tracking',
-                    'Monitor calories and macros effortlessly',
-                  ),
-                  const SizedBox(height: 20),
-                  _buildFeatureItem(
-                    Icons.psychology,
-                    'AI Coach',
-                    'Get personalized nutrition advice',
-                  ),
-                  
-                  const Spacer(),
-                  
-                  // Action Buttons
-                  Column(
-                    children: [
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: kPrimaryColor,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 18),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          onPressed: () => _showAuthDialog(isSignUp: false),
-                          child: Text(
-                            'Sign In',
-                            style: GoogleFonts.inter(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: kPrimaryColor,
-                            side: const BorderSide(color: kPrimaryColor, width: 2),
-                            padding: const EdgeInsets.symmetric(vertical: 18),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          onPressed: () => _showAuthDialog(isSignUp: true),
-                          child: Text(
-                            'Create Account',
-                            style: GoogleFonts.inter(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: TextButton(
-                          style: TextButton.styleFrom(
-                            foregroundColor: kTextSecondary,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          onPressed: () {
-                            // Demo mode - navigate directly to home screen
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(builder: (_) => const PremiumHomeScreen()),
-                            );
-                          },
-                          child: Text(
-                            'Try Demo Mode',
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                ],
-              ),
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: CustomScrollView(
+              slivers: [
+                // Header Section
+                _buildHeaderSection(),
+                
+                // Authentication Section
+                _buildAuthenticationSection(),
+                
+                // Features Section
+                _buildFeaturesSection(),
+                
+                // Footer spacing
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: 40),
+                ),
+              ],
             ),
           ),
         ),
@@ -446,12 +375,107 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     );
   }
 
-  Widget _buildFeatureItem(IconData icon, String title, String subtitle) {
+  Widget _buildHeaderSection() {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+        child: Column(
+          children: [
+            // Logo Section
+            Image.asset(
+              'calorie_logo.png',
+              width: 100,
+              height: 100,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 24),
+            
+            // Title
+            Text(
+              'Welcome to Calorie Vita',
+              style: GoogleFonts.inter(
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                color: kTextPrimary,
+                letterSpacing: -0.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            
+            // Subtitle
+            Text(
+              'Track your nutrition, achieve your goals with AI-powered insights',
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                color: kTextSecondary,
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeaturesSection() {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Key Features',
+              style: GoogleFonts.inter(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: kTextPrimary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            _buildFeatureCard(
+              icon: Icons.camera_alt_rounded,
+              title: 'AI Food Recognition',
+              description: 'Take a photo and get instant nutrition information',
+              color: kAccentBlue,
+            ),
+            const SizedBox(height: 12),
+            
+            _buildFeatureCard(
+              icon: Icons.track_changes_rounded,
+              title: 'Smart Tracking',
+              description: 'Monitor calories and macros effortlessly',
+              color: kAccentGreen,
+            ),
+            const SizedBox(height: 12),
+            
+            _buildFeatureCard(
+              icon: Icons.psychology_rounded,
+              title: 'AI Coach',
+              description: 'Get personalized nutrition advice and insights',
+              color: kAccentPurple,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureCard({
+    required IconData icon,
+    required String title,
+    required String description,
+    required Color color,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
         color: kSurfaceColor,
-        borderRadius: BorderRadius.all(Radius.circular(16)),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kBorderColor),
         boxShadow: kCardShadow,
       ),
       child: Row(
@@ -459,12 +483,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: kPrimaryColor.withOpacity(0.1),
+              color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               icon,
-              color: kPrimaryColor,
+              color: color,
               size: 24,
             ),
           ),
@@ -483,17 +507,206 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  subtitle,
+                  description,
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     color: kTextSecondary,
-                    height: 1.3,
+                    height: 1.4,
                   ),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAuthenticationSection() {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Get Started',
+              style: GoogleFonts.inter(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: kTextPrimary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Google Sign In - Professional Design
+            _buildProfessionalGoogleButton(),
+            const SizedBox(height: 16),
+            
+            // Facebook Sign In
+            _buildAuthButton(
+              onPressed: _signInWithFacebook,
+              icon: Icons.facebook,
+              label: 'Continue with Facebook',
+              backgroundColor: const Color(0xFF1877F2),
+              textColor: Colors.white,
+            ),
+            const SizedBox(height: 16),
+            
+            // Email Sign In
+            _buildAuthButton(
+              onPressed: () => _showAuthDialog(isSignUp: false),
+              icon: Icons.email_outlined,
+              label: 'Sign in with Email',
+              backgroundColor: Colors.transparent,
+              textColor: kPrimaryColor,
+              borderColor: kPrimaryColor,
+            ),
+            const SizedBox(height: 24),
+            
+            // Divider
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 1,
+                    color: kBorderColor,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    'or',
+                    style: GoogleFonts.inter(
+                      color: kTextTertiary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    height: 1,
+                    color: kBorderColor,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            
+            // Create Account - Enhanced UI
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                gradient: kPrimaryGradient,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: kPrimaryColor.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ElevatedButton(
+                onPressed: () => _showAuthDialog(isSignUp: true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.person_add_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Create New Account',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfessionalGoogleButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: _signInWithGoogle,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF3C4043),
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: Color(0xFFDADCE0), width: 1),
+          ),
+        ),
+        icon: const Icon(
+          Icons.g_mobiledata,
+          color: Color(0xFF4285F4),
+          size: 24,
+        ),
+        label: Text(
+          'Continue with Google',
+          style: GoogleFonts.roboto(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: const Color(0xFF3C4043),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAuthButton({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+    required Color backgroundColor,
+    required Color textColor,
+    Color? borderColor,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: backgroundColor,
+          foregroundColor: textColor,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: borderColor != null ? BorderSide(color: borderColor, width: 1.5) : BorderSide.none,
+          ),
+        ),
+        icon: Icon(icon, size: 20),
+        label: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }

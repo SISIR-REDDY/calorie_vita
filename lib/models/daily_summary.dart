@@ -79,6 +79,9 @@ class DailySummary {
     };
   }
 
+  /// Convert to Map (alias for toJson)
+  Map<String, dynamic> toMap() => toJson();
+
   /// Create from JSON
   factory DailySummary.fromJson(Map<String, dynamic> json) {
     return DailySummary(
@@ -94,6 +97,9 @@ class DailySummary {
       date: DateTime.fromMillisecondsSinceEpoch(json['date'] ?? DateTime.now().millisecondsSinceEpoch),
     );
   }
+
+  /// Create from Map (alias for fromJson)
+  factory DailySummary.fromMap(Map<String, dynamic> map) => DailySummary.fromJson(map);
 
   /// Copy with new values
   DailySummary copyWith({

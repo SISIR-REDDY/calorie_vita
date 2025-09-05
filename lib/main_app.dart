@@ -1,61 +1,71 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/home_screen.dart';
 import 'screens/analytics_screen.dart';
 import 'screens/camera_screen.dart';
 import 'screens/trainer_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/settings_screen.dart';
+import 'widgets/reward_notification_widget.dart';
 import 'ui/app_theme.dart';
-import 'services/integration_service.dart';
-import 'services/bluetooth_device_service.dart';
-import 'services/demo_auth_service.dart';
+import 'services/app_state_manager.dart';
 import 'firebase_options.dart';
 
 class MainApp extends StatefulWidget {
-  const MainApp({super.key});
+  final bool firebaseInitialized;
+  
+  const MainApp({super.key, this.firebaseInitialized = false});
 
   @override
   State<MainApp> createState() => _MainAppState();
 }
 
 class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
-  final IntegrationService _integrationService = IntegrationService();
-  final BluetoothDeviceService _bluetoothService = BluetoothDeviceService();
-  final DemoAuthService _demoAuth = DemoAuthService();
+  final AppStateManager _appStateManager = AppStateManager();
   bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initializeApp();
+    
+    // Immediate initialization - no waiting
+    _initializeAppImmediately();
   }
 
-  Future<void> _initializeApp() async {
-    print('Starting app initialization...');
+  void _initializeAppImmediately() {
+    print('Starting immediate app initialization...');
     
+    // Set initialized immediately - no waiting
+    setState(() {
+      _isInitialized = true;
+    });
+    
+    print('App initialized immediately - showing welcome screen');
+    
+    // Initialize app state manager in background (non-blocking)
+    _initializeAppStateManager();
+  }
+
+  void _initializeAppStateManager() async {
     try {
-      // Initialize demo auth service (non-blocking)
-      _demoAuth.initialize().catchError((error) {
-        print('Demo auth initialization error: $error');
+      print('Initializing AppStateManager in background...');
+      
+      // Initialize the centralized app state manager
+      await _appStateManager.initialize();
+      
+      // Listen to app state changes
+      _appStateManager.stateStream.listen((state) {
+        print('AppStateManager state change: userId=${state.currentUserId}, initialized=${state.isInitialized}');
+        if (mounted) {
+          setState(() {
+            // Update UI based on app state changes
+          });
+        }
       });
       
-      // Initialize Bluetooth service (non-blocking)
-      _bluetoothService.restoreConnectedDevices().catchError((error) {
-        print('Bluetooth service initialization error: $error');
-      });
-      
-      // Minimal delay to allow UI to render
-      await Future.delayed(const Duration(milliseconds: 50));
-      
-      print('App initialization completed (minimal)');
+      print('✅ AppStateManager initialization completed');
     } catch (e) {
-      print('App initialization error: $e');
-    } finally {
-      setState(() {
-        _isInitialized = true;
-      });
+      print('❌ AppStateManager initialization error: $e');
     }
   }
 
@@ -71,63 +81,33 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   }
 
   Widget _buildHomeScreen() {
-    try {
-      // Check if Firebase is properly configured
-      final firebaseOptions = DefaultFirebaseOptions.currentPlatform;
-      final apiKey = firebaseOptions.apiKey;
-      
-      // If API key contains placeholder text, use demo authentication
-      if (apiKey.contains('YOUR_FIREBASE') || apiKey.contains('HERE')) {
-        print('Firebase not configured (placeholder API key), using demo authentication');
-        return StreamBuilder<DemoUser?>(
-          stream: _demoAuth.userStream,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (!snapshot.hasData || snapshot.data == null) {
-              return const WelcomeScreen();
-            }
-            return const MainNavigation();
-          },
-        );
-      }
-      
-      // Firebase is configured, use Firebase authentication
-      return StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            // Handle Firebase errors gracefully - show welcome screen
-            print('Firebase auth error: ${snapshot.error}');
-            return const WelcomeScreen();
-          }
-          
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData) {
-            return const WelcomeScreen();
-          }
-          return const MainNavigation();
-        },
-      );
-    } catch (e) {
-      // If Firebase is not available, use demo authentication
-      print('Firebase not available, using demo authentication: $e');
-      return StreamBuilder<DemoUser?>(
-        stream: _demoAuth.userStream,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData || snapshot.data == null) {
-            return const WelcomeScreen();
-          }
-          return const MainNavigation();
-        },
-      );
-    }
+    return StreamBuilder<AppState>(
+      stream: _appStateManager.stateStream,
+      builder: (context, snapshot) {
+        print('App state snapshot: ${snapshot.connectionState}, data: ${snapshot.data}');
+        
+        if (snapshot.hasError) {
+          print('App state error: ${snapshot.error}');
+          return const WelcomeScreen();
+        }
+        
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          print('App state waiting...');
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        final appState = snapshot.data;
+        print('App state data: isInitialized=${appState?.isInitialized}, userId=${appState?.currentUserId}');
+        
+        if (appState == null || appState.currentUserId.isEmpty) {
+          print('No user authenticated, showing welcome screen');
+          return const WelcomeScreen();
+        }
+        
+        print('User authenticated, showing main navigation');
+        return const MainNavigation();
+      },
+    );
   }
 
   Widget _buildErrorScreen() {
@@ -171,18 +151,138 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
         debugShowCheckedModeBanner: false,
         title: 'Calorie Vita',
         home: Scaffold(
-          backgroundColor: Colors.white,
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                Text(
-                  'Initializing Calorie Vita...',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF667eea),
+                  Color(0xFF764ba2),
+                  Color(0xFFf093fb),
+                ],
+                stops: [0.0, 0.5, 1.0],
+              ),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Animated Logo
+                  TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 1500),
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    builder: (context, value, child) {
+                      return Transform.scale(
+                        scale: 0.8 + (0.2 * value),
+                        child: Opacity(
+                          opacity: value,
+                          child: Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(32),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.2),
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
+                            ),
+                            child: Image.asset(
+                              'calorie_logo.png',
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 40),
+                  
+                  // App Title
+                  TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 1200),
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    builder: (context, value, child) {
+                      return Opacity(
+                        opacity: value,
+                        child: Text(
+                          'Calorie Vita',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: -0.5,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black.withOpacity(0.3),
+                                offset: const Offset(0, 2),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Loading indicator
+                  TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 1000),
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    builder: (context, value, child) {
+                      return Opacity(
+                        opacity: value,
+                        child: Column(
+                          children: [
+                            const SizedBox(
+                              width: 30,
+                              height: 30,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 3,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              'Initializing Calorie Vita...',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white.withOpacity(0.9),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            // Debug button to force initialization
+                            ElevatedButton(
+                              onPressed: () {
+                                print('Force initialization button pressed');
+                                setState(() {
+                                  _isInitialized = true;
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white.withOpacity(0.2),
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Skip Loading'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -195,7 +295,9 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
-      home: _buildHomeScreen(),
+      home: RewardNotificationWidget(
+        child: _buildHomeScreen(),
+      ),
     );
   }
 }

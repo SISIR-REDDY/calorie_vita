@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../ui/app_colors.dart';
+import '../services/real_time_input_service.dart';
 
 /// Comprehensive Profile Editing Screen for Calorie Vita App
 /// Features: Personal info, fitness goals, preferences, profile photo
@@ -38,6 +39,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   // User reference
   User? _user;
   String? _userId;
+  
+  // Services
+  final RealTimeInputService _realTimeInputService = RealTimeInputService();
 
   // Dropdown options
   final List<String> _genderOptions = ['Male', 'Female', 'Other', 'Prefer not to say'];
@@ -189,44 +193,89 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
 
 
-  /// Save profile data to Firestore
+  /// Save profile data to Firestore with real-time updates
   Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Optional validation - only validate if fields have content
+    if (_nameController.text.trim().isNotEmpty && _nameController.text.trim().length < 2) {
+      _showErrorSnackBar('Name must be at least 2 characters if provided');
+      return;
+    }
+    
+    if (_ageController.text.trim().isNotEmpty) {
+      final age = int.tryParse(_ageController.text);
+      if (age == null || age < 1 || age > 120) {
+        _showErrorSnackBar('Please enter a valid age (1-120) if provided');
+        return;
+      }
+    }
 
     setState(() => _isSaving = true);
 
     try {
-      // Prepare user data
-      final userData = {
-        'name': _nameController.text.trim(),
-        'email': _emailController.text.trim(),
-        'age': int.tryParse(_ageController.text) ?? 0,
-        'height': double.tryParse(_heightController.text) ?? 0.0,
-        'weight': double.tryParse(_weightController.text) ?? 0.0,
-        'gender': _selectedGender,
-        'activityLevel': _selectedActivityLevel,
-        'fitnessGoal': _selectedFitnessGoal,
-        'dietPreference': _selectedDietPreference,
-        'hobbies': _hobbiesController.text.trim(),
-        'hobbiesList': _selectedHobbies,
-        'profession': _selectedProfession ?? _professionController.text.trim(),
-        'bio': _bioController.text.trim(),
-        'profileImageUrl': _profileImageUrl,
+      // Prepare user data with only non-empty values
+      final userData = <String, dynamic>{
         'lastUpdated': FieldValue.serverTimestamp(),
       };
 
-      // Save to Firestore
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_userId)
-          .set(userData, SetOptions(merge: true));
+      // Only add fields that have values
+      if (_nameController.text.trim().isNotEmpty) {
+        userData['name'] = _nameController.text.trim();
+      }
+      if (_emailController.text.trim().isNotEmpty) {
+        userData['email'] = _emailController.text.trim();
+      }
+      if (_ageController.text.trim().isNotEmpty) {
+        userData['age'] = int.tryParse(_ageController.text) ?? 0;
+      }
+      if (_heightController.text.trim().isNotEmpty) {
+        userData['height'] = double.tryParse(_heightController.text) ?? 0.0;
+      }
+      if (_weightController.text.trim().isNotEmpty) {
+        userData['weight'] = double.tryParse(_weightController.text) ?? 0.0;
+      }
+      if (_selectedGender != null) {
+        userData['gender'] = _selectedGender;
+      }
+      if (_selectedActivityLevel != null) {
+        userData['activityLevel'] = _selectedActivityLevel;
+      }
+      if (_selectedFitnessGoal != null) {
+        userData['fitnessGoal'] = _selectedFitnessGoal;
+      }
+      if (_selectedDietPreference != null) {
+        userData['dietPreference'] = _selectedDietPreference;
+      }
+      if (_selectedProfession != null) {
+        userData['profession'] = _selectedProfession;
+      }
+      if (_hobbiesController.text.trim().isNotEmpty) {
+        userData['hobbies'] = _hobbiesController.text.trim();
+      }
+      if (_selectedHobbies.isNotEmpty) {
+        userData['hobbiesList'] = _selectedHobbies;
+      }
+      if (_professionController.text.trim().isNotEmpty) {
+        userData['profession'] = _professionController.text.trim();
+      }
+      if (_bioController.text.trim().isNotEmpty) {
+        userData['bio'] = _bioController.text.trim();
+      }
+      if (_profileImageUrl != null) {
+        userData['profileImageUrl'] = _profileImageUrl;
+      }
 
-      // Update Firebase Auth display name
+      // Use real-time input service for faster updates
+      await _realTimeInputService.handleProfileUpdate(
+        context,
+        userData,
+      );
+
+      // Update Firebase Auth display name if name is provided
       if (_user != null && _nameController.text.trim().isNotEmpty) {
         await _user!.updateDisplayName(_nameController.text.trim());
       }
 
-      _showSuccessSnackBar('Profile updated successfully!');
+      _showSuccessSnackBar('Profile updated successfully! 🎉');
       Navigator.pop(context, true); // Return true to indicate success
     } catch (e) {
       _showErrorSnackBar('Error saving profile: $e');
@@ -474,8 +523,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           label: 'Full Name',
                           icon: Icons.person,
                           validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Please enter your name';
+                            if (value != null && value.trim().isNotEmpty && value.trim().length < 2) {
+                              return 'Name must be at least 2 characters if provided';
                             }
                             return null;
                           },

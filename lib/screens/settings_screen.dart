@@ -3,15 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:health/health.dart';
 import '../ui/app_colors.dart';
 import '../services/app_state_service.dart';
-import '../services/bluetooth_device_service.dart';
 import '../services/demo_auth_service.dart';
+import '../services/real_time_input_service.dart';
+import '../services/health_data_service.dart';
 
 import '../models/user_preferences.dart';
 import '../widgets/health_integration_widget.dart';
+import '../widgets/health_integration_dialog.dart';
 import 'profile_edit_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'terms_conditions_screen.dart';
@@ -29,6 +30,8 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final AppStateService _appStateService = AppStateService();
   final DemoAuthService _demoAuth = DemoAuthService();
+  final RealTimeInputService _realTimeInputService = RealTimeInputService();
+  final HealthDataService _healthDataService = HealthDataService();
   
   // User data
   User? _user;
@@ -427,17 +430,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  /// Navigate to goals screen
+  Future<void> _navigateToGoals() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const GoalsScreen(),
+      ),
+    );
+    
+    if (result == true) {
+      _loadUserData();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kAppBackground,
       appBar: AppBar(
-        title: Text(
-          'Settings',
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.bold,
-            color: kTextDark,
-          ),
+        title: Row(
+          children: [
+            Image.asset(
+              'calorie_logo.png',
+              width: 32,
+              height: 32,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Settings',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.bold,
+                color: kTextDark,
+              ),
+            ),
+          ],
         ),
         backgroundColor: kSurfaceColor,
         elevation: 0,
@@ -448,19 +476,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-                            child: Column(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
+          children: [
             // Profile Section
             _buildProfileCard(),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+
+            // Google Health Connection Section
+            _buildGoogleHealthCard(),
+            const SizedBox(height: 16),
 
             // Goals & Targets Section
             _buildGoalsCard(),
-            const SizedBox(height: 16),
-
-            // Device Connection Section
-            _buildDeviceConnectionCard(),
             const SizedBox(height: 16),
 
             // Calorie Units Section
@@ -469,7 +497,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             // Settings Options
             _buildSettingsCard(),
-                                const SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // Logout Section
             _buildLogoutCard(),
@@ -479,28 +507,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// Build Device Connection card
-  Widget _buildDeviceConnectionCard() {
+  /// Build Google Health Connection card
+  Widget _buildGoogleHealthCard() {
     return Card(
-      elevation: 4,
+      elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
-        onTap: _showDeviceConnectionDialog,
+        onTap: _showHealthIntegrationDialog,
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(20),
           child: Row(
             children: [
+              // Google Fit Icon
               Container(
-                padding: const EdgeInsets.all(12),
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
-                  color: kAccentBlue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  border: Border.all(color: Colors.grey[300]!, width: 1),
                 ),
-                child: const Icon(
-                  Icons.bluetooth_connected,
-                  color: kAccentBlue,
-                  size: 24,
+                child: Center(
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    child: Image.asset(
+                      'google-fit-png-logo.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -509,7 +545,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Connect to Device',
+                      'Connect Google Health',
                       style: GoogleFonts.poppins(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -518,26 +554,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Connect smartwatch or health apps',
+                      'to track your steps',
                       style: GoogleFonts.poppins(
                         color: kTextSecondary,
-                        fontSize: 12,
+                        fontSize: 14,
                       ),
                     ),
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: kAccentBlue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.arrow_forward_ios,
-                  color: kAccentBlue,
-                  size: 16,
-                ),
+              const Icon(
+                Icons.arrow_forward_ios,
+                color: kTextSecondary,
+                size: 16,
               ),
             ],
           ),
@@ -551,59 +580,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: kPrimaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () => _navigateToGoals(),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: kPrimaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.flag_circle_outlined,
+                  color: kPrimaryColor,
+                  size: 24,
+                ),
               ),
-              child: const Icon(
-                Icons.flag_circle_outlined,
-                color: kPrimaryColor,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Goals & Targets',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: kTextDark,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Goals & Targets',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: kTextDark,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Set your health goals and targets',
-                    style: GoogleFonts.poppins(
-                      color: kTextSecondary,
-                      fontSize: 12,
+                    const SizedBox(height: 4),
+                    Text(
+                      'Set your health goals and targets',
+                      style: GoogleFonts.poppins(
+                        color: kTextSecondary,
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: kPrimaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: kPrimaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.arrow_forward_ios,
+                  color: kPrimaryColor,
+                  size: 16,
+                ),
               ),
-              child: const Icon(
-                Icons.arrow_forward_ios,
-                color: kPrimaryColor,
-                size: 16,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -957,11 +990,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       color: kTextSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
             // Edit Button
             IconButton(
@@ -1150,843 +1183,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         onTap: _logout,
-            ),
+      ),
     );
   }
 
-  /// Show device connection dialog
-  void _showDeviceConnectionDialog() {
+  /// Show health integration dialog
+  void _showHealthIntegrationDialog() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const DeviceConnectionBottomSheet(),
+      builder: (context) => HealthIntegrationDialog(
+        healthDataService: _healthDataService,
+      ),
     );
   }
 }
-
-/// Device Connection Bottom Sheet
-class DeviceConnectionBottomSheet extends StatefulWidget {
-  const DeviceConnectionBottomSheet({super.key});
-
-  @override
-  State<DeviceConnectionBottomSheet> createState() => _DeviceConnectionBottomSheetState();
-}
-
-class _DeviceConnectionBottomSheetState extends State<DeviceConnectionBottomSheet>
-    with TickerProviderStateMixin {
-  late TabController _tabController;
-  final BluetoothDeviceService _bluetoothService = BluetoothDeviceService();
-
-  List<BluetoothDevice> _availableDevices = [];
-  List<BluetoothDevice> _connectedDevices = [];
-  bool _isScanning = false;
-  String _connectionStatus = 'Ready to connect';
-  bool _isHealthConnected = false;
-  String _healthStatus = 'Not connected';
-  Map<String, dynamic> _latestDeviceData = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _setupListeners();
-    _initializeHealthService();
-  }
-
-  void _setupListeners() {
-    _bluetoothService.isScanningStream.listen((isScanning) {
-      if (mounted) {
-        setState(() {
-          _isScanning = isScanning;
-        });
-      }
-    });
-
-    _bluetoothService.connectionStatusStream.listen((status) {
-      if (mounted) {
-        setState(() {
-          _connectionStatus = status;
-        });
-      }
-    });
-
-    _bluetoothService.connectedDevicesStream.listen((devices) {
-      if (mounted) {
-        setState(() {
-          _connectedDevices = devices;
-        });
-      }
-    });
-
-    // Listen to real-time device data
-    _bluetoothService.deviceDataStream.listen((data) {
-      if (mounted) {
-        setState(() {
-          _latestDeviceData[data['dataType']] = data['value'];
-        });
-      }
-    });
-
-
-
-    // Listen to scan results
-    FlutterBluePlus.scanResults.listen((results) {
-      if (mounted) {
-        setState(() {
-          _availableDevices = results
-              .map((result) => result.device)
-              .where((device) => _bluetoothService.isFitnessDevice(
-                  device.platformName.isNotEmpty 
-                      ? device.platformName 
-                      : device.remoteId.toString()))
-              .toList();
-        });
-      }
-    });
-  }
-
-  Future<void> _initializeHealthService() async {
-    try {
-      final types = [
-        HealthDataType.STEPS,
-        HealthDataType.HEART_RATE,
-        HealthDataType.ACTIVE_ENERGY_BURNED,
-        HealthDataType.DISTANCE_DELTA,
-      ];
-
-      final permissions = await Health().hasPermissions(types);
-      if (mounted) {
-        setState(() {
-          _isHealthConnected = permissions ?? false;
-        });
-      }
-    } catch (e) {
-      print('Error initializing health service: $e');
-    }
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: kSurfaceColor,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        children: [
-          // Handle bar
-          Container(
-            margin: const EdgeInsets.only(top: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: kTextSecondary.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: kAccentBlue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.bluetooth_connected,
-                    color: kAccentBlue,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Connect to Device',
-                  style: GoogleFonts.poppins(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: kTextDark,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close, color: kTextSecondary),
-                ),
-              ],
-            ),
-          ),
-
-          // Tab bar
-          TabBar(
-            controller: _tabController,
-            labelColor: kAccentBlue,
-            unselectedLabelColor: kTextSecondary,
-            indicatorColor: kAccentBlue,
-            labelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-            tabs: const [
-              Tab(
-                icon: Icon(Icons.bluetooth, size: 20),
-                text: 'Bluetooth',
-              ),
-              Tab(
-                icon: Icon(Icons.favorite, size: 20),
-                text: 'Health Apps',
-              ),
-            ],
-          ),
-
-          // Tab content
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildBluetoothTab(),
-                _buildHealthTab(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBluetoothTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Connection Status
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: _getStatusColor().withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _getStatusColor().withOpacity(0.3)),
-            ),
-            child: Row(
-              children: [
-                Icon(_getStatusIcon(), color: _getStatusColor(), size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    _connectionStatus,
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: _getStatusColor(),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Connected Devices
-          if (_connectedDevices.isNotEmpty) ...[
-            Text(
-              'Connected Devices',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: kTextDark,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ..._connectedDevices.map((device) => _buildConnectedDeviceCard(device)),
-            const SizedBox(height: 20),
-
-            // Real-time Data Display
-            _buildRealTimeDataSection(),
-            const SizedBox(height: 20),
-          ],
-
-          // Available Devices
-          Text(
-            'Available Devices',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: kTextDark,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          if (_availableDevices.isEmpty && !_isScanning)
-            _buildNoDevicesState()
-          else
-            ..._availableDevices.map((device) => _buildAvailableDeviceCard(device)),
-
-          const SizedBox(height: 20),
-
-          // Scan Button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _isScanning ? null : _startScanning,
-              icon: _isScanning 
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Icon(Icons.search, size: 20),
-              label: Text(
-                _isScanning ? 'Scanning...' : 'Scan for Devices',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kAccentBlue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHealthTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Health Status
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: _isHealthConnected 
-                  ? kAccentGreen.withOpacity(0.1)
-                  : kTextSecondary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: _isHealthConnected 
-                    ? kAccentGreen.withOpacity(0.3)
-                    : kTextSecondary.withOpacity(0.3),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _isHealthConnected ? Icons.check_circle : Icons.health_and_safety,
-                  color: _isHealthConnected ? kAccentGreen : kTextSecondary,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _isHealthConnected 
-                            ? 'Health apps connected'
-                            : 'Health apps not connected',
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: _isHealthConnected ? kAccentGreen : kTextSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      if (_healthStatus.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          _healthStatus,
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: kTextSecondary,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                if (!_isHealthConnected)
-                  ElevatedButton(
-                    onPressed: _connectToHealthApps,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kAccentBlue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    ),
-                    child: Text(
-                      'Connect',
-                      style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-
-
-          // Health Integration Widget (fallback)
-          const HealthIntegrationWidget(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNoDevicesState() {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: kTextSecondary.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.devices_other_outlined,
-            size: 48,
-            color: kTextSecondary.withOpacity(0.5),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No devices found',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: kTextSecondary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Make sure your device is nearby and in pairing mode',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: kTextSecondary.withOpacity(0.7),
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildConnectedDeviceCard(BluetoothDevice device) {
-    final deviceName = device.platformName.isNotEmpty 
-        ? device.platformName 
-        : 'Unknown Device';
-    final deviceIcon = _bluetoothService.getDeviceIcon(deviceName);
-    final deviceColor = _bluetoothService.getDeviceColor(deviceName);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: deviceColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: deviceColor.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          Icon(deviceIcon, color: deviceColor, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              deviceName,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: kTextDark,
-              ),
-            ),
-          ),
-          Icon(
-            Icons.check_circle,
-            color: kAccentGreen,
-            size: 16,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAvailableDeviceCard(BluetoothDevice device) {
-    final deviceName = device.platformName.isNotEmpty 
-        ? device.platformName 
-        : 'Unknown Device';
-    final deviceIcon = _bluetoothService.getDeviceIcon(deviceName);
-    final deviceColor = _bluetoothService.getDeviceColor(deviceName);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: kTextSecondary.withOpacity(0.2)),
-      ),
-      child: Row(
-        children: [
-          Icon(deviceIcon, color: deviceColor, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              deviceName,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: kTextDark,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => _connectToDevice(device),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: deviceColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            ),
-            child: Text(
-              'Connect',
-              style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _getStatusColor() {
-    if (_connectionStatus.contains('Connected')) {
-      return kAccentGreen;
-    } else if (_connectionStatus.contains('Scanning')) {
-      return kAccentBlue;
-    } else if (_connectionStatus.contains('Error')) {
-      return kErrorColor;
-    } else {
-      return kTextSecondary;
-    }
-  }
-
-  IconData _getStatusIcon() {
-    if (_connectionStatus.contains('Connected')) {
-      return Icons.check_circle;
-    } else if (_connectionStatus.contains('Scanning')) {
-      return Icons.search;
-    } else if (_connectionStatus.contains('Error')) {
-      return Icons.error;
-    } else {
-      return Icons.bluetooth;
-    }
-  }
-
-  void _startScanning() {
-    _bluetoothService.startScanning();
-  }
-
-  void _connectToDevice(BluetoothDevice device) async {
-    final success = await _bluetoothService.connectToDevice(device);
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Connected to ${device.platformName}'),
-          backgroundColor: kAccentGreen,
-        ),
-      );
-    }
-  }
-
-  void _connectToHealthApps() async {
-    try {
-      final types = [
-        HealthDataType.STEPS,
-        HealthDataType.HEART_RATE,
-        HealthDataType.ACTIVE_ENERGY_BURNED,
-        HealthDataType.DISTANCE_DELTA,
-      ];
-
-      final requested = await Health().requestAuthorization(types);
-      if (mounted) {
-        setState(() {
-          _isHealthConnected = requested ?? false;
-          _healthStatus = requested == true ? 'Connected' : 'Permission denied';
-        });
-        
-        if (requested == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Connected to health apps successfully!'),
-              backgroundColor: kAccentGreen,
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Health permissions denied'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to connect to health apps: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-
-
-
-
-  Widget _buildHealthDataChip(String label, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 16),
-          const SizedBox(width: 6),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: 10,
-                  color: kTextSecondary,
-                ),
-              ),
-              Text(
-                value,
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRealTimeDataSection() {
-    if (_latestDeviceData.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: kTextSecondary.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              Icons.sync,
-              color: kTextSecondary.withOpacity(0.5),
-              size: 32,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Waiting for device data...',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: kTextSecondary,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kAccentGreen.withOpacity(0.3)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.sync,
-                color: kAccentGreen,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Real-time Data',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: kTextDark,
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: kAccentGreen.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  'LIVE',
-                  style: GoogleFonts.poppins(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: kAccentGreen,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: _buildDataChips(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<Widget> _buildDataChips() {
-    final chips = <Widget>[];
-
-    if (_latestDeviceData.containsKey('heartRate')) {
-      chips.add(_buildDataChip(
-        'Heart Rate',
-        '${_latestDeviceData['heartRate']} bpm',
-        Icons.favorite,
-        Colors.red,
-      ));
-    }
-
-    if (_latestDeviceData.containsKey('steps')) {
-      chips.add(_buildDataChip(
-        'Steps',
-        '${_latestDeviceData['steps']}',
-        Icons.directions_walk,
-        kAccentBlue,
-      ));
-    }
-
-    if (_latestDeviceData.containsKey('calories')) {
-      chips.add(_buildDataChip(
-        'Calories',
-        '${_latestDeviceData['calories']}',
-        Icons.local_fire_department,
-        Colors.orange,
-      ));
-    }
-
-    if (_latestDeviceData.containsKey('distance')) {
-      chips.add(_buildDataChip(
-        'Distance',
-        '${_latestDeviceData['distance'].toStringAsFixed(1)} km',
-        Icons.straighten,
-        kAccentGreen,
-      ));
-    }
-
-    if (_latestDeviceData.containsKey('batteryLevel')) {
-      chips.add(_buildDataChip(
-        'Battery',
-        '${_latestDeviceData['batteryLevel']}%',
-        Icons.battery_std,
-        kAccentBlue,
-      ));
-    }
-
-    if (_latestDeviceData.containsKey('bloodPressure')) {
-      final bp = _latestDeviceData['bloodPressure'] as Map<String, int>;
-      chips.add(_buildDataChip(
-        'Blood Pressure',
-        '${bp['systolic']}/${bp['diastolic']}',
-        Icons.monitor_heart,
-        Colors.red,
-      ));
-    }
-
-    return chips;
-  }
-
-  Widget _buildDataChip(String label, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 16),
-          const SizedBox(width: 6),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: 10,
-                  color: kTextSecondary,
-                ),
-              ),
-              Text(
-                value,
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-} 

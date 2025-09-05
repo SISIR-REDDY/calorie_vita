@@ -61,11 +61,10 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'YOUR_FIREBASE_ANDROID_API_KEY_HERE',
-    appId: 'YOUR_FIREBASE_ANDROID_APP_ID_HERE',
-    messagingSenderId: 'YOUR_FIREBASE_MESSAGING_SENDER_ID_HERE',
-    projectId: 'YOUR_FIREBASE_PROJECT_ID_HERE',
-    storageBucket: 'YOUR_FIREBASE_STORAGE_BUCKET_HERE',
-    databaseURL: 'YOUR_FIREBASE_DATABASE_URL_HERE',
+    apiKey: 'AIzaSyBPwqX7mpf757PbTYn29dy8tw510XFuhF0',
+    appId: '1:868343457049:android:771373959459a135831188',
+    messagingSenderId: '868343457049',
+    projectId: 'calorie-vita',
+    storageBucket: 'calorie-vita.firebasestorage.app',
   );
 } 

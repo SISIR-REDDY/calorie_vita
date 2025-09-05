@@ -2,8 +2,7 @@
   "project_info": {
     "project_number": "868343457049",
     "project_id": "calorie-vita",
-    "storage_bucket": "calorie-vita.firebasestorage.app",
-    "firebase_url": "https://calorie-vita-default-rtdb.firebaseio.com"
+    "storage_bucket": "calorie-vita.firebasestorage.app"
   },
   "client": [
     {
@@ -13,15 +12,33 @@
           "package_name": "com.sisirlabs.calorievita"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "868343457049-j2i12qnbupsenf5rvme7h05m366t9jmk.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sisirlabs.calorievita",
+            "certificate_hash": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+          }
+        },
+        {
+          "client_id": "868343457049-sd90cbg505lpnu7e5cnkskusm7q57kvb.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "YOUR_FIREBASE_ANDROID_API_KEY_HERE"
+          "current_key": "AIzaSyBPwqX7mpf757PbTYn29dy8tw510XFuhF0"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "868343457049-6f38u161n9tj4b8hip023ja3kc7m6kic.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

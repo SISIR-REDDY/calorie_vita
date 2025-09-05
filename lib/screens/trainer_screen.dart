@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/chat_bubble.dart';
 import '../services/sisir_service.dart';
+import '../services/real_time_input_service.dart';
 import '../ui/app_colors.dart';
 
 class AITrainerScreen extends StatefulWidget {
@@ -67,7 +68,12 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
             children: [
               CircleAvatar(
                 backgroundColor: kAccentBlue,
-                child: Icon(Icons.directions_run, color: Colors.white),
+                child: Image.asset(
+                  'calorie_logo.png',
+                  width: 24,
+                  height: 24,
+                  fit: BoxFit.contain,
+                ),
               ),
               const SizedBox(width: 12),
               Text('Trainer Sisir', style: TextStyle(fontWeight: FontWeight.bold, color: kTextDark)),

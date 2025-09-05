@@ -4,12 +4,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class HealthData {
   final DateTime date;
   final int steps;
-  final int caloriesBurned;
+  final double caloriesBurned;
   final double distance; // in kilometers
   final int activeMinutes;
   final double heartRate; // average BPM
   final double sleepHours;
+  final double waterIntake; // in glasses
   final double weight; // in kg
+  final String source; // Google Fit, Apple HealthKit, Bluetooth Device
   final DateTime lastUpdated;
 
   const HealthData({
@@ -20,7 +22,9 @@ class HealthData {
     required this.activeMinutes,
     required this.heartRate,
     required this.sleepHours,
+    required this.waterIntake,
     required this.weight,
+    required this.source,
     required this.lastUpdated,
   });
 
@@ -30,12 +34,14 @@ class HealthData {
     return HealthData(
       date: DateTime(now.year, now.month, now.day),
       steps: 0,
-      caloriesBurned: 0,
+      caloriesBurned: 0.0,
       distance: 0.0,
       activeMinutes: 0,
       heartRate: 0.0,
       sleepHours: 0.0,
+      waterIntake: 0.0,
       weight: 0.0,
+      source: 'Manual',
       lastUpdated: now,
     );
   }
@@ -46,12 +52,14 @@ class HealthData {
     return HealthData(
       date: (data['date'] as Timestamp).toDate(),
       steps: data['steps'] ?? 0,
-      caloriesBurned: data['caloriesBurned'] ?? 0,
+      caloriesBurned: (data['caloriesBurned'] ?? 0.0).toDouble(),
       distance: (data['distance'] ?? 0.0).toDouble(),
       activeMinutes: data['activeMinutes'] ?? 0,
       heartRate: (data['heartRate'] ?? 0.0).toDouble(),
       sleepHours: (data['sleepHours'] ?? 0.0).toDouble(),
+      waterIntake: (data['waterIntake'] ?? 0.0).toDouble(),
       weight: (data['weight'] ?? 0.0).toDouble(),
+      source: data['source'] ?? 'Manual',
       lastUpdated: (data['lastUpdated'] as Timestamp).toDate(),
     );
   }
@@ -61,12 +69,14 @@ class HealthData {
     return HealthData(
       date: (map['date'] as Timestamp).toDate(),
       steps: map['steps'] ?? 0,
-      caloriesBurned: map['caloriesBurned'] ?? 0,
+      caloriesBurned: (map['caloriesBurned'] ?? 0.0).toDouble(),
       distance: (map['distance'] ?? 0.0).toDouble(),
       activeMinutes: map['activeMinutes'] ?? 0,
       heartRate: (map['heartRate'] ?? 0.0).toDouble(),
       sleepHours: (map['sleepHours'] ?? 0.0).toDouble(),
+      waterIntake: (map['waterIntake'] ?? 0.0).toDouble(),
       weight: (map['weight'] ?? 0.0).toDouble(),
+      source: map['source'] ?? 'Manual',
       lastUpdated: (map['lastUpdated'] as Timestamp).toDate(),
     );
   }
@@ -81,7 +91,9 @@ class HealthData {
       'activeMinutes': activeMinutes,
       'heartRate': heartRate,
       'sleepHours': sleepHours,
+      'waterIntake': waterIntake,
       'weight': weight,
+      'source': source,
       'lastUpdated': Timestamp.fromDate(lastUpdated),
     };
   }
@@ -96,7 +108,9 @@ class HealthData {
       'activeMinutes': activeMinutes,
       'heartRate': heartRate,
       'sleepHours': sleepHours,
+      'waterIntake': waterIntake,
       'weight': weight,
+      'source': source,
       'lastUpdated': lastUpdated.millisecondsSinceEpoch,
     };
   }
@@ -106,12 +120,14 @@ class HealthData {
     return HealthData(
       date: DateTime.fromMillisecondsSinceEpoch(json['date']),
       steps: json['steps'] ?? 0,
-      caloriesBurned: json['caloriesBurned'] ?? 0,
+      caloriesBurned: (json['caloriesBurned'] ?? 0.0).toDouble(),
       distance: (json['distance'] ?? 0.0).toDouble(),
       activeMinutes: json['activeMinutes'] ?? 0,
       heartRate: (json['heartRate'] ?? 0.0).toDouble(),
       sleepHours: (json['sleepHours'] ?? 0.0).toDouble(),
+      waterIntake: (json['waterIntake'] ?? 0.0).toDouble(),
       weight: (json['weight'] ?? 0.0).toDouble(),
+      source: json['source'] ?? 'Manual',
       lastUpdated: DateTime.fromMillisecondsSinceEpoch(json['lastUpdated']),
     );
   }
@@ -120,12 +136,14 @@ class HealthData {
   HealthData copyWith({
     DateTime? date,
     int? steps,
-    int? caloriesBurned,
+    double? caloriesBurned,
     double? distance,
     int? activeMinutes,
     double? heartRate,
     double? sleepHours,
+    double? waterIntake,
     double? weight,
+    String? source,
     DateTime? lastUpdated,
   }) {
     return HealthData(
@@ -136,7 +154,9 @@ class HealthData {
       activeMinutes: activeMinutes ?? this.activeMinutes,
       heartRate: heartRate ?? this.heartRate,
       sleepHours: sleepHours ?? this.sleepHours,
+      waterIntake: waterIntake ?? this.waterIntake,
       weight: weight ?? this.weight,
+      source: source ?? this.source,
       lastUpdated: lastUpdated ?? this.lastUpdated,
     );
   }
@@ -144,28 +164,30 @@ class HealthData {
   /// Check if health data is empty
   bool get isEmpty {
     return steps == 0 && 
-           caloriesBurned == 0 && 
+           caloriesBurned == 0.0 && 
            distance == 0.0 && 
            activeMinutes == 0 && 
            heartRate == 0.0 && 
            sleepHours == 0.0 && 
+           waterIntake == 0.0 &&
            weight == 0.0;
   }
 
   /// Check if health data has meaningful values
   bool get hasData {
     return steps > 0 || 
-           caloriesBurned > 0 || 
+           caloriesBurned > 0.0 || 
            distance > 0.0 || 
            activeMinutes > 0 || 
            heartRate > 0.0 || 
            sleepHours > 0.0 || 
+           waterIntake > 0.0 ||
            weight > 0.0;
   }
 
   @override
   String toString() {
-    return 'HealthData(date: $date, steps: $steps, caloriesBurned: $caloriesBurned, distance: $distance, activeMinutes: $activeMinutes, heartRate: $heartRate, sleepHours: $sleepHours, weight: $weight, lastUpdated: $lastUpdated)';
+    return 'HealthData(date: $date, steps: $steps, caloriesBurned: $caloriesBurned, distance: $distance, activeMinutes: $activeMinutes, heartRate: $heartRate, sleepHours: $sleepHours, waterIntake: $waterIntake, weight: $weight, source: $source, lastUpdated: $lastUpdated)';
   }
 
   @override
@@ -179,7 +201,9 @@ class HealthData {
         other.activeMinutes == activeMinutes &&
         other.heartRate == heartRate &&
         other.sleepHours == sleepHours &&
+        other.waterIntake == waterIntake &&
         other.weight == weight &&
+        other.source == source &&
         other.lastUpdated == lastUpdated;
   }
 
@@ -192,7 +216,9 @@ class HealthData {
         activeMinutes.hashCode ^
         heartRate.hashCode ^
         sleepHours.hashCode ^
+        waterIntake.hashCode ^
         weight.hashCode ^
+        source.hashCode ^
         lastUpdated.hashCode;
   }
 }

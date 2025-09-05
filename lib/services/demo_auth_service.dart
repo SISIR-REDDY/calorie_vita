@@ -37,7 +37,10 @@ class DemoAuthService {
           );
           _userController.add(_currentUser);
           print('Demo user restored from local storage: ${_currentUser!.email}');
+          print('Demo user UID: ${_currentUser!.uid}');
         }
+      } else {
+        print('No demo user found in local storage');
       }
     } catch (e) {
       print('Demo auth initialization error: $e');
@@ -49,12 +52,24 @@ class DemoAuthService {
   /// Sign in with email and password (demo mode)
   Future<DemoUser?> signInWithEmailAndPassword(String email, String password) async {
     try {
+      print('Demo auth: Attempting sign in with email: $email');
+      
       // Simulate network delay
-      await Future.delayed(const Duration(seconds: 1));
+      await Future.delayed(const Duration(milliseconds: 500));
       
       // For demo purposes, accept any email/password combination
       // In a real app, you would validate against a server
       if (email.isNotEmpty && password.isNotEmpty) {
+        // Basic email validation
+        if (!email.contains('@') || !email.contains('.')) {
+          throw Exception('Please enter a valid email address');
+        }
+        
+        // Basic password validation
+        if (password.length < 6) {
+          throw Exception('Password must be at least 6 characters long');
+        }
+        
         final user = DemoUser(
           uid: 'demo_${email.hashCode}',
           email: email,
@@ -67,7 +82,7 @@ class DemoAuthService {
         // Save credentials locally
         await _localStorage.saveUserCredentials(email, password);
         
-        print('Demo user signed in: $email');
+        print('Demo user signed in successfully: $email');
         return user;
       } else {
         throw Exception('Email and password are required');
@@ -81,11 +96,23 @@ class DemoAuthService {
   /// Create user with email and password (demo mode)
   Future<DemoUser?> createUserWithEmailAndPassword(String email, String password) async {
     try {
+      print('Demo auth: Attempting to create user with email: $email');
+      
       // Simulate network delay
-      await Future.delayed(const Duration(seconds: 1));
+      await Future.delayed(const Duration(milliseconds: 500));
       
       // For demo purposes, accept any email/password combination
       if (email.isNotEmpty && password.isNotEmpty) {
+        // Basic email validation
+        if (!email.contains('@') || !email.contains('.')) {
+          throw Exception('Please enter a valid email address');
+        }
+        
+        // Basic password validation
+        if (password.length < 6) {
+          throw Exception('Password must be at least 6 characters long');
+        }
+        
         final user = DemoUser(
           uid: 'demo_${email.hashCode}',
           email: email,
@@ -98,11 +125,40 @@ class DemoAuthService {
         // Save credentials locally
         await _localStorage.saveUserCredentials(email, password);
         
-        print('Demo user created: $email');
+        print('Demo user created successfully: $email');
         return user;
       } else {
         throw Exception('Email and password are required');
       }
+    } catch (e) {
+      print('Demo user creation error: $e');
+      rethrow;
+    }
+  }
+
+  /// Create a demo user for social sign-in
+  Future<DemoUser?> createDemoUser({
+    required String email,
+    required String displayName,
+  }) async {
+    try {
+      // Simulate network delay
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      final user = DemoUser(
+        uid: 'demo_${email.hashCode}',
+        email: email,
+        displayName: displayName,
+      );
+      
+      _currentUser = user;
+      _userController.add(user);
+      
+      // Save credentials locally
+      await _localStorage.saveUserCredentials(email, 'demo_password');
+      
+      print('Demo user created: $email');
+      return user;
     } catch (e) {
       print('Demo user creation error: $e');
       rethrow;

@@ -58,7 +58,6 @@ dependencies:
   health: ^13.1.4
   
   # Bluetooth connectivity for fitness devices
-  flutter_blue_plus: ^1.32.5
   permission_handler: ^11.3.1
 
 dev_dependencies:
@@ -78,4 +77,6 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/ 
-    - assets/calorie_data.json 
+    - assets/calorie_data.json
+    - calorie_logo.png
+    - google-fit-png-logo.png 

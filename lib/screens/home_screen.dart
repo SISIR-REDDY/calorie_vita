@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import '../ui/app_colors.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
-import '../models/user_achievement.dart';
-import '../models/daily_summary.dart';
-import '../models/reward_system.dart';
+import '../models/simple_streak_system.dart';
 import '../services/app_state_service.dart';
 import '../services/firebase_service.dart';
+import '../services/dynamic_icon_service.dart';
+import '../services/real_time_input_service.dart';
+import '../services/daily_summary_service.dart';
+import '../services/simple_streak_service.dart';
+import '../widgets/simple_streak_widgets.dart';
 import 'camera_screen.dart';
 import 'trainer_screen.dart';
 import '../models/user_preferences.dart';
@@ -30,23 +32,31 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   // Services
   final FirebaseService _firebaseService = FirebaseService();
+  final RealTimeInputService _realTimeInputService = RealTimeInputService();
+  final DailySummaryService _dailySummaryService = DailySummaryService();
+  final SimpleStreakService _streakService = SimpleStreakService();
   
   // Data
   DailySummary? _dailySummary;
   MacroBreakdown? _macroBreakdown;
-  List<UserAchievement> _achievements = [];
   UserPreferences _preferences = const UserPreferences();
   String _motivationalQuote = '';
   bool _isLoading = true;
-  UserProgress _userProgress = UserProgress.initial();
-  List<UserReward> _allRewards = [];
+  UserStreakSummary _streakSummary = UserStreakSummary(
+    goalStreaks: {},
+    totalActiveStreaks: 0,
+    longestOverallStreak: 0,
+    lastActivityDate: DateTime.now(),
+    totalDaysActive: 0,
+  );
+  String? _currentUserId;
   
   // Task management
   List<Map<String, dynamic>> _completedTasks = [];
   List<Map<String, dynamic>> _tasks = [
     {
       'id': 'task_1',
-      'emoji': '💧',
+      'emoji': DynamicIconService().generateIcon('Drink 8 glasses of water'),
       'title': 'Drink 8 glasses of water',
       'isCompleted': false,
       'priority': 'High',
@@ -54,7 +64,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     },
     {
       'id': 'task_2',
-      'emoji': '🏃',
+      'emoji': DynamicIconService().generateIcon('30 minutes morning walk'),
       'title': '30 minutes morning walk',
       'isCompleted': true,
       'priority': 'Medium',
@@ -62,7 +72,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     },
     {
       'id': 'task_3',
-      'emoji': '🥗',
+      'emoji': DynamicIconService().generateIcon('Eat 5 servings of vegetables'),
       'title': 'Eat 5 servings of vegetables',
       'isCompleted': false,
       'priority': 'High',
@@ -93,14 +103,24 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   void initState() {
     super.initState();
     _setupAnimations();
+    _initializeServices();
     _setupStreamListeners();
     _loadData();
+  }
+
+  Future<void> _initializeServices() async {
+    await _realTimeInputService.initialize();
+    await _dailySummaryService.initialize();
+    await _streakService.initialize();
+    _currentUserId = _realTimeInputService.getCurrentUserId();
   }
 
   void _setupStreamListeners() {
     // Listen to real-time data updates (non-blocking)
     try {
-      _appStateService.dailySummaryStream.listen((summary) {
+      // Listen to daily summary updates from real-time service
+      if (_currentUserId != null) {
+        _realTimeInputService.getTodaySummary(_currentUserId!).listen((summary) {
         if (mounted) {
           setState(() {
             _dailySummary = summary;
@@ -110,6 +130,19 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         debugPrint('Daily summary stream error: $error');
       });
 
+        // Listen to streak updates
+        _streakService.streakStream.listen((streakSummary) {
+        if (mounted) {
+          setState(() {
+              _streakSummary = streakSummary;
+          });
+        }
+      }).onError((error) {
+          debugPrint('Streak stream error: $error');
+      });
+      }
+
+      // Keep existing app state service listeners for backward compatibility
       _appStateService.macroBreakdownStream.listen((breakdown) {
         if (mounted) {
           setState(() {
@@ -120,15 +153,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         debugPrint('Macro breakdown stream error: $error');
       });
 
-      _appStateService.achievementsStream.listen((achievements) {
-        if (mounted) {
-          setState(() {
-            _achievements = achievements;
-          });
-        }
-      }).onError((error) {
-        debugPrint('Achievements stream error: $error');
-      });
 
       _appStateService.preferencesStream.listen((preferences) {
         if (mounted) {
@@ -181,9 +205,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     try {
       // Load mock data for demo mode
       await _loadDailySummary('demo_user');
-      await _loadAchievements('demo_user');
       await _loadPreferences('demo_user');
-      await _loadRewardSystem();
+      await _loadStreakData();
       _loadMotivationalQuote();
     } catch (e) {
       // Handle error silently in production
@@ -220,16 +243,13 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
 
 
-  Future<void> _loadAchievements(String userId) async {
-    // Mock achievements - replace with real data
-    _achievements = Achievements.defaultAchievements.map((achievement) {
-      // Simulate some unlocked achievements
-      final isUnlocked = ['streak_3', 'water_7', 'early_bird'].contains(achievement.id);
-      return achievement.copyWith(
-        isUnlocked: isUnlocked,
-        unlockedAt: isUnlocked ? DateTime.now().subtract(const Duration(days: 2)) : null,
-      );
-    }).toList();
+  Future<void> _loadStreakData() async {
+    try {
+      // Load streak data from the service
+      _streakSummary = _streakService.currentStreaks;
+    } catch (e) {
+      debugPrint('Error loading streak data: $e');
+    }
   }
 
   Future<void> _loadPreferences(String userId) async {
@@ -245,44 +265,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
-  Future<void> _loadRewardSystem() async {
-    try {
-      // Load all available rewards
-      _allRewards = RewardSystem.getAllRewards();
-      
-      // Calculate mock user progress (in real app, load from Firebase)
-      final mockTotalPoints = 1750;
-      final mockCurrentStreak = 7;
-      final mockUnlockedRewards = _allRewards.take(8).map((reward) => 
-        reward.copyWith(isUnlocked: true, earnedAt: DateTime.now().subtract(Duration(days: DateTime.now().day % 7)))
-      ).toList();
-      
-      final currentLevel = RewardSystem.getCurrentLevel(mockTotalPoints);
-      final pointsToNext = RewardSystem.getPointsToNextLevel(mockTotalPoints, currentLevel);
-      final levelProgress = RewardSystem.getLevelProgress(mockTotalPoints, currentLevel);
-      
-      setState(() {
-        _userProgress = UserProgress(
-          totalPoints: mockTotalPoints,
-          currentStreak: mockCurrentStreak,
-          longestStreak: 15,
-          currentLevel: currentLevel,
-          pointsToNextLevel: pointsToNext,
-          levelProgress: levelProgress,
-          unlockedRewards: mockUnlockedRewards,
-          categoryProgress: {
-            'logging': 85,
-            'nutrition': 72,
-            'exercise': 60,
-            'water': 90,
-            'consistency': 78,
-          },
-        );
-      });
-    } catch (e) {
-      debugPrint('Error loading reward system: $e');
-    }
-  }
 
   void _loadMotivationalQuote() {
     final quotes = [
@@ -293,6 +275,237 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       "Fuel your body, fuel your dreams! ⚡",
     ];
     _motivationalQuote = quotes[DateTime.now().day % quotes.length];
+  }
+
+  // ========== INPUT HANDLING METHODS ==========
+
+  /// Handle water intake input
+  Future<void> _handleWaterIntake() async {
+    if (_currentUserId == null) return;
+
+    final controller = TextEditingController();
+    final result = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Water Intake'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('How many glasses of water did you drink?'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Glasses',
+                hintText: 'Enter number of glasses',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final glasses = int.tryParse(controller.text);
+              if (glasses != null) {
+                Navigator.pop(context, glasses);
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null) {
+      await _realTimeInputService.handleWaterIntake(context, result);
+    }
+  }
+
+  /// Handle exercise input
+  Future<void> _handleExercise() async {
+    if (_currentUserId == null) return;
+
+    final caloriesController = TextEditingController();
+    final durationController = TextEditingController();
+    final typeController = TextEditingController();
+    String selectedType = 'Cardio';
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Log Exercise'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Enter your exercise details:'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: typeController,
+                decoration: const InputDecoration(
+                  labelText: 'Exercise Type',
+                  hintText: 'e.g., Running, Weightlifting',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: caloriesController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Calories Burned',
+                  hintText: 'Enter calories burned',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: durationController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Duration (minutes)',
+                  hintText: 'Enter duration in minutes',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final calories = int.tryParse(caloriesController.text);
+                final duration = int.tryParse(durationController.text);
+                final type = typeController.text.trim();
+                
+                if (calories != null && duration != null && type.isNotEmpty) {
+                  Navigator.pop(context, {
+                    'calories': calories,
+                    'duration': duration,
+                    'type': type,
+                  });
+                }
+              },
+              child: const Text('Log Exercise'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != null) {
+      await _realTimeInputService.handleExercise(
+        context,
+        caloriesBurned: result['calories'],
+        durationMinutes: result['duration'],
+        exerciseType: result['type'],
+      );
+    }
+  }
+
+  /// Handle steps input
+  Future<void> _handleSteps() async {
+    if (_currentUserId == null) return;
+
+    final controller = TextEditingController();
+    final result = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Update Steps'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('How many steps did you take today?'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Steps',
+                hintText: 'Enter number of steps',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final steps = int.tryParse(controller.text);
+              if (steps != null) {
+                Navigator.pop(context, steps);
+              }
+            },
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null) {
+      await _realTimeInputService.handleSteps(context, result);
+    }
+  }
+
+  /// Handle sleep hours input
+  Future<void> _handleSleepHours() async {
+    if (_currentUserId == null) return;
+
+    final controller = TextEditingController();
+    final result = await showDialog<double>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Log Sleep'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('How many hours did you sleep?'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Sleep Hours',
+                hintText: 'e.g., 7.5',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final hours = double.tryParse(controller.text);
+              if (hours != null) {
+                Navigator.pop(context, hours);
+              }
+            },
+            child: const Text('Log Sleep'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null) {
+      await _realTimeInputService.handleSleepHours(context, result);
+    }
   }
 
   @override
@@ -323,21 +536,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     child: SizedBox(height: 20),
                   ),
                   
-                  // Health Insights
-                  _buildHealthInsightsSection(),
+                  // Daily Goals
+                  _buildDailyGoalsSection(),
                   
                   // Spacing between sections
                   const SliverToBoxAdapter(
                     child: SizedBox(height: 20),
                   ),
                   
-                  // Streak & Rewards
-                  _buildStreakRewardsSection(),
-                  
-                  // Spacing between sections
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: 20),
-                  ),
                   
                   // Recent Activity
                   _buildRecentActivitySection(),
@@ -610,22 +816,23 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-  Widget _buildHealthInsightsSection() {
+  Widget _buildDailyGoalsSection() {
     return SliverToBoxAdapter(
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20),
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [kAccentBlue.withValues(alpha: 0.1), kAccentBlue.withValues(alpha: 0.05)],
+            colors: [kPrimaryColor.withValues(alpha: 0.1), kPrimaryColor.withValues(alpha: 0.05)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: kAccentBlue.withValues(alpha: 0.2),
+            color: kPrimaryColor.withValues(alpha: 0.2),
             width: 1,
           ),
+          boxShadow: kCardShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -635,64 +842,162 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: kAccentBlue.withValues(alpha: 0.1),
+                    color: kPrimaryColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.insights, color: kAccentBlue, size: 24),
+                  child: const Icon(Icons.flag, color: kPrimaryColor, size: 24),
                 ),
                 const SizedBox(width: 12),
-                Text(
-                  'Health Insights',
+                Expanded(
+                  child: Text(
+                    'Daily Goals',
                   style: GoogleFonts.poppins(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: kPrimaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'Track Progress',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: kPrimaryColor,
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 20),
+            
+            // Main Goals Grid
             Row(
               children: [
                 Expanded(
-                  child: _buildInsightCard(
-                    'Hydration',
-                    '${_dailySummary?.waterIntake ?? 0}/${_dailySummary?.waterGoal ?? 8} glasses',
-                    Icons.water_drop,
-                    kAccentBlue,
-                    (_dailySummary?.waterProgress ?? 0.0) * 100,
+                  child: _buildGoalCard(
+                    'Calories',
+                    '${_preferences.calorieUnit.convertFromKcal(_dailySummary?.caloriesConsumed.toDouble() ?? 0).round()}',
+                    '${_preferences.calorieUnit.convertFromKcal(_dailySummary?.caloriesGoal.toDouble() ?? 2000).round()}',
+                    _preferences.calorieUnit.displayName,
+                    Icons.local_fire_department,
+                    kAccentColor,
+                    (_dailySummary?.calorieProgress ?? 0.0) * 100,
+                    () => _showCalorieGoalDialog(),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: _buildInsightCard(
-                    'Activity',
-                    '${_dailySummary?.steps ?? 0}/${_dailySummary?.stepsGoal ?? 10000} steps',
-                    Icons.directions_walk,
-                    kSecondaryColor,
-                    (_dailySummary?.stepsProgress ?? 0.0) * 100,
+                  child: _buildGoalCard(
+                    'Water',
+                    '${_dailySummary?.waterIntake ?? 0}',
+                    '${_dailySummary?.waterGoal ?? 8}',
+                    'glasses',
+                    Icons.water_drop,
+                    kAccentBlue,
+                    (_dailySummary?.waterProgress ?? 0.0) * 100,
+                    () => _handleWaterIntake(),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildGoalCard(
+                    'Steps',
+                    '${_dailySummary?.steps ?? 0}',
+                    '${_dailySummary?.stepsGoal ?? 10000}',
+                    'steps',
+                    Icons.directions_walk,
+                    kSecondaryColor,
+                    (_dailySummary?.stepsProgress ?? 0.0) * 100,
+                    () => _handleSteps(),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildGoalCard(
+                    'Sleep',
+                    '${_dailySummary?.sleepHours.toStringAsFixed(1) ?? '0.0'}',
+                    '${_dailySummary?.sleepGoal.toStringAsFixed(1) ?? '8.0'}',
+                    'hours',
+                    Icons.bedtime,
+                    kAccentPurple,
+                    (_dailySummary?.sleepProgress ?? 0.0) * 100,
+                    () => _handleSleepHours(),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            
+            // Progress Summary
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.5),
+                color: Colors.white.withValues(alpha: 0.7),
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: kPrimaryColor.withValues(alpha: 0.1),
+                  width: 1,
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.trending_up, color: kSuccessColor, size: 20),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: kSuccessColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.trending_up, color: kSuccessColor, size: 20),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      'You\'re doing great! Keep up the healthy habits.',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Daily Progress',
                       style: GoogleFonts.poppins(
                         fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.w600,
                         color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _getDailyProgressMessage(),
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: kPrimaryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${_getOverallProgressPercentage().round()}%',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: kPrimaryColor,
                       ),
                     ),
                   ),
@@ -705,19 +1010,42 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-  Widget _buildInsightCard(String title, String subtitle, IconData icon, Color color, double progress) {
-    return Container(
+  Widget _buildGoalCard(String title, String current, String target, String unit, IconData icon, Color color, double progress, VoidCallback onTap) {
+    final isCompleted = progress >= 100;
+    final progressColor = isCompleted ? kSuccessColor : color;
+    
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.7),
+          color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isCompleted ? kSuccessColor.withValues(alpha: 0.4) : color.withValues(alpha: 0.3),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.15),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: color, size: 20),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: progressColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: progressColor, size: 18),
+                ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -727,32 +1055,80 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     fontWeight: FontWeight.w600,
                     color: Theme.of(context).colorScheme.onSurface,
                   ),
+                  ),
+                ),
+                if (isCompleted)
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: kSuccessColor,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(
+                      Icons.check,
+                      color: Colors.white,
+                      size: 12,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    current,
+                    style: GoogleFonts.poppins(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: progressColor,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    ' / $target $unit',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ],
           ),
           const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: progress / 100,
-              minHeight: 4,
-              backgroundColor: color.withValues(alpha: 0.1),
-              valueColor: AlwaysStoppedAnimation<Color>(color),
+                minHeight: 6,
+                backgroundColor: progressColor.withValues(alpha: 0.1),
+                valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${progress.round()}% complete',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: progressColor,
             ),
           ),
         ],
+        ),
       ),
     );
   }
+
 
   Widget _buildRecentActivitySection() {
     return SliverToBoxAdapter(
@@ -805,10 +1181,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               const Divider(height: 1),
               const SizedBox(height: 12),
             ],
-            _buildActivityItem('🍎', 'Logged Apple', '2 hours ago', '+52 ${_preferences.calorieUnit.displayName}', 'apple_1'),
-            _buildActivityItem('🏃', 'Morning Run', '4 hours ago', '-320 ${_preferences.calorieUnit.displayName}', 'run_1'),
-            _buildActivityItem('💧', 'Water Intake', '1 hour ago', '250ml', 'water_1'),
-            _buildActivityItem('🥗', 'Lunch Salad', '3 hours ago', '+180 ${_preferences.calorieUnit.displayName}', 'salad_1'),
+            _buildActivityItem(DynamicIconService().generateIcon('Logged Apple'), 'Logged Apple', '2 hours ago', '+52 ${_preferences.calorieUnit.displayName}', 'apple_1'),
+            _buildActivityItem(DynamicIconService().generateIcon('Morning Run'), 'Morning Run', '4 hours ago', '-320 ${_preferences.calorieUnit.displayName}', 'run_1'),
+            _buildActivityItem(DynamicIconService().generateIcon('Water Intake'), 'Water Intake', '1 hour ago', '250ml', 'water_1'),
+            _buildActivityItem(DynamicIconService().generateIcon('Lunch Salad'), 'Lunch Salad', '3 hours ago', '+180 ${_preferences.calorieUnit.displayName}', 'salad_1'),
           ],
         ),
       ),
@@ -1115,205 +1491,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-  Widget _buildStreakRewardsSection() {
-    return SliverToBoxAdapter(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20),
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              _userProgress.currentLevel.color.withValues(alpha: 0.8),
-              _userProgress.currentLevel.color,
-              _userProgress.currentLevel.color.withValues(alpha: 0.9),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: _userProgress.currentLevel.color.withValues(alpha: 0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header with level info
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    _userProgress.currentLevel.emoji,
-                    style: const TextStyle(fontSize: 24),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _userProgress.currentLevel.title,
-                        style: GoogleFonts.poppins(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        '${_userProgress.totalPoints} total points',
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: Colors.white.withValues(alpha: 0.8),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'Level ${UserLevel.values.indexOf(_userProgress.currentLevel) + 1}',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            
-            // Level Progress Bar
-            _buildLevelProgressBar(),
-            const SizedBox(height: 20),
-            
-            // Stats Row
-            Row(
-              children: [
-                Expanded(
-                  child: _buildRewardStat('🔥', '${_userProgress.currentStreak} Day Streak', 'On fire!'),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildRewardStat('🏆', '${_userProgress.unlockedRewards.length} Rewards', 'Earned!'),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildRewardStat('⭐', '${_userProgress.totalPoints} Points', 'Amazing!'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _buildLevelProgressBar() {
-    final nextLevel = RewardSystem.getNextLevel(_userProgress.currentLevel);
-    final isMaxLevel = nextLevel == _userProgress.currentLevel;
-    
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Progress to ${isMaxLevel ? 'Max Level' : nextLevel.title}',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: Colors.white.withValues(alpha: 0.8),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            Text(
-              isMaxLevel ? 'MAX' : '${_userProgress.pointsToNextLevel} points to go',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 8,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: FractionallySizedBox(
-            alignment: Alignment.centerLeft,
-            widthFactor: _userProgress.levelProgress,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(4),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    blurRadius: 4,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
-  Widget _buildRewardStat(String icon, String value, String label) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(icon, style: const TextStyle(fontSize: 24)),
-        const SizedBox(height: 8),
-        Flexible(
-          child: Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Flexible(
-          child: Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: Colors.white.withValues(alpha: 0.8),
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _buildAISuggestionsSection() {
     return SliverToBoxAdapter(
@@ -1430,9 +1609,117 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
+  /// Show rewards details dialog
+  void _showRewardsDetails() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _buildRewardsBottomSheet(),
+    );
+  }
+
+  /// Build rewards bottom sheet
+  Widget _buildRewardsBottomSheet() {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.8,
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Rewards & Achievements',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+          ),
+          
+          // Content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  
+                  // Weekly Streak Calendar
+                  WeeklyStreakCalendar(
+                    goalStreaks: _streakSummary.goalStreaks,
+                    weekStart: DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1)),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Goal Streaks
+                  _buildGoalStreaksSection(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  /// Build goal streaks section
+  Widget _buildGoalStreaksSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Daily Goal Streaks',
+          style: GoogleFonts.poppins(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 16),
+        ..._streakSummary.goalStreaks.values.map((streak) => 
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: GoalStreakCard(
+              streak: streak,
+              onTap: () {
+                // Handle goal tap if needed
+              },
+            ),
+          ),
+        ).toList(),
+      ],
+    );
+  }
+
+
+
   Widget _buildProfileScreen() {
     final user = FirebaseAuth.instance.currentUser;
-    final unlockedAchievements = _achievements.where((a) => a.isUnlocked).toList();
     
     return Scaffold(
       backgroundColor: kAppBackground,
@@ -1529,15 +1816,13 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   const SizedBox(height: 24),
                   
                   // Current Streaks Section
-                  _buildStreaksSection(),
+                  _buildGoalStreaksSection(),
                   const SizedBox(height: 24),
                   
-                  // Achievements Section
-                  _buildLeetCodeAchievementsSection(),
-                  const SizedBox(height: 24),
-                  
-                  // Rewards Section
-                  _buildRewardsSection(),
+                  // Streak Motivation
+                  StreakMotivationWidget(
+                    streakSummary: _streakSummary,
+                  ),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -1696,8 +1981,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             children: List.generate(7, (index) {
               final date = startOfWeek.add(Duration(days: index));
               final isToday = date.day == now.day && date.month == now.month;
-              final hasStreak = _hasStreakForDay(date.day);
-              final hasReward = _hasRewardForDay(date.day);
+              final hasStreak = false; // Simplified for streak system
+              final hasReward = false; // Simplified for streak system
               
               return Expanded(
                 child: Padding(
@@ -1809,903 +2094,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-  // New Reward System UI Components
-  Widget _buildCategoryRewards(Map<String, List<UserReward>> categoryRewards) {
-    final categories = categoryRewards.keys.toList();
-    
-    return Column(
-      children: [
-        // Category Header
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: kPrimaryColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.category, color: kPrimaryColor, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Reward Categories',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: kPrimaryColor,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        
-        // Categories Grid
-        ...categories.take(3).map((category) {
-          final rewards = categoryRewards[category]!;
-          final unlockedCount = rewards.where((r) => 
-            _userProgress.unlockedRewards.any((ur) => ur.id == r.id)
-          ).length;
-          
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: _buildCategoryCard(category, rewards, unlockedCount),
-          );
-        }).toList(),
-      ],
-    );
-  }
+  // Removed reward/achievement methods - replaced with streak system
 
-  Widget _buildCategoryCard(String category, List<UserReward> rewards, int unlockedCount) {
-    final categoryEmojis = {
-      'logging': '📝',
-      'nutrition': '🥗',
-      'exercise': '🏃‍♂️',
-      'water': '💧',
-      'consistency': '🔥',
-      'achievement': '🏆',
-    };
-    
-    final categoryColors = {
-      'logging': Colors.blue,
-      'nutrition': Colors.green,
-      'exercise': Colors.red,
-      'water': Colors.cyan,
-      'consistency': Colors.orange,
-      'achievement': Colors.purple,
-    };
-    
-    final emoji = categoryEmojis[category] ?? '🎯';
-    final color = categoryColors[category] ?? kPrimaryColor;
-    final progress = unlockedCount / rewards.length;
-    
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(emoji, style: const TextStyle(fontSize: 24)),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  category.toUpperCase(),
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$unlockedCount/${rewards.length} unlocked',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: kTextSecondary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Progress bar
-                Container(
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: progress,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: color,
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '${(progress * 100).toInt()}%',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildBeautifulRewardCard(UserReward reward) {
-    final isUnlocked = _userProgress.unlockedRewards.any((r) => r.id == reward.id);
-    
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isUnlocked 
-            ? reward.color.withValues(alpha: 0.1)
-            : Colors.grey.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isUnlocked 
-              ? reward.color 
-              : Colors.grey.withValues(alpha: 0.3),
-          width: 2,
-        ),
-        boxShadow: isUnlocked ? [
-          BoxShadow(
-            color: reward.color.withValues(alpha: 0.2),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ] : null,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Reward Icon/Emoji
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: isUnlocked 
-                  ? reward.color.withValues(alpha: 0.2)
-                  : Colors.grey.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                reward.emoji,
-                style: TextStyle(
-                  fontSize: 24,
-                  color: isUnlocked ? null : Colors.grey,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          
-          // Reward Title
-          Text(
-            reward.title,
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: isUnlocked ? reward.color : Colors.grey,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          
-          // Points
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: isUnlocked 
-                  ? reward.color.withValues(alpha: 0.2)
-                  : Colors.grey.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '${reward.points} pts',
-              style: GoogleFonts.poppins(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: isUnlocked ? reward.color : Colors.grey,
-              ),
-            ),
-          ),
-          
-          // Unlocked indicator
-          if (isUnlocked) ...[
-            const SizedBox(height: 8),
-            Icon(
-              Icons.check_circle,
-              color: reward.color,
-              size: 16,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 
-  // Mock functions for calendar data
-  bool _hasStreakForDay(int day) {
-    // Mock: return true for some days to show streak pattern
-    return day % 3 == 0 || day % 5 == 0;
-  }
 
-  bool _hasRewardForDay(int day) {
-    // Mock: return true for some days to show rewards
-    return day % 7 == 0;
-  }
-
-  Widget _buildStreaksSection() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            kSuccessColor.withValues(alpha: 0.1),
-            kPrimaryColor.withValues(alpha: 0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: kSuccessColor.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [kSuccessColor, Colors.orange],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(Icons.local_fire_department, color: Colors.white, size: 24),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Current Streaks',
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                    Text(
-                      'Your progress this week',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: kTextSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          
-          Row(
-            children: [
-              Expanded(
-                child: _buildStreakCard('🔥', 'Logging Streak', '7 days', kPrimaryColor),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStreakCard('💧', 'Water Streak', '5 days', kAccentColor),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStreakCard('🏃', 'Exercise Streak', '3 days', kSecondaryColor),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStreakCard('🥗', 'Healthy Eating', '12 days', Colors.green),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStreakCard(String emoji, String title, String days, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 24)),
-          const SizedBox(height: 8),
-          Text(
-            days,
-            style: GoogleFonts.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLeetCodeAchievementsSection() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: kAccentColor.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [kAccentColor, Colors.amber],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(Icons.emoji_events, color: Colors.white, size: 24),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Achievements',
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                    Text(
-                      'Unlock badges by building healthy habits',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: kTextSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: kAccentColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${_userProgress.unlockedRewards.length}/15',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: kAccentColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          
-          // Beautiful Achievement Grid
-          _buildBeautifulAchievementGrid(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBeautifulAchievementGrid() {
-    final achievementData = [
-      {'emoji': '🔥', 'title': 'Logger', 'description': '7 days', 'unlocked': true, 'color': Colors.orange},
-      {'emoji': '💧', 'title': 'Hydration', 'description': '8 glasses', 'unlocked': true, 'color': Colors.blue},
-      {'emoji': '🏃‍♂️', 'title': 'Fitness', 'description': '3 times', 'unlocked': true, 'color': Colors.green},
-      {'emoji': '🥗', 'title': 'Healthy', 'description': 'Nutrition', 'unlocked': true, 'color': Colors.lightGreen},
-      {'emoji': '⭐', 'title': 'Warrior', 'description': '7 streak', 'unlocked': true, 'color': Colors.amber},
-      {'emoji': '💪', 'title': 'Strong', 'description': '15 days', 'unlocked': true, 'color': Colors.red},
-      {'emoji': '🎯', 'title': 'Crusher', 'description': 'All goals', 'unlocked': false, 'color': Colors.purple},
-      {'emoji': '🏆', 'title': 'Champion', 'description': '30 streak', 'unlocked': false, 'color': Colors.indigo},
-      {'emoji': '👑', 'title': 'King', 'description': 'Perfect', 'unlocked': false, 'color': Colors.deepPurple},
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 6,
-        crossAxisSpacing: 6,
-        childAspectRatio: 1.1,
-      ),
-      itemCount: achievementData.length,
-      itemBuilder: (context, index) {
-        final achievement = achievementData[index];
-        return _buildSimpleAchievementCard(
-          achievement['emoji'] as String,
-          achievement['title'] as String,
-          achievement['description'] as String,
-          achievement['unlocked'] as bool,
-          achievement['color'] as Color,
-        );
-      },
-    );
-  }
-
-  Widget _buildSimpleAchievementCard(String emoji, String title, String description, bool isUnlocked, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: isUnlocked 
-            ? color.withValues(alpha: 0.1)
-            : Colors.grey.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isUnlocked ? color : Colors.grey.withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Achievement Icon
-          Text(
-            emoji,
-            style: TextStyle(
-              fontSize: 20,
-              color: isUnlocked ? null : Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 2),
-          
-          // Achievement Title
-          Flexible(
-            child: Text(
-              title,
-              style: GoogleFonts.poppins(
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-                color: isUnlocked ? color : Colors.grey,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(height: 1),
-          
-          // Achievement Description
-          Flexible(
-            child: Text(
-              description,
-              style: GoogleFonts.poppins(
-                fontSize: 7,
-                color: isUnlocked ? kTextSecondary : Colors.grey,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          
-          // Status Indicator
-          const SizedBox(height: 2),
-          if (isUnlocked)
-            Icon(
-              Icons.check_circle,
-              color: color,
-              size: 10,
-            )
-          else
-            Icon(
-              Icons.lock,
-              color: Colors.grey,
-              size: 10,
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAchievementItem(UserAchievement achievement) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: kAccentColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              achievement.icon,
-              style: const TextStyle(fontSize: 24),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  achievement.title,
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  achievement.description,
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: kAccentColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              'Unlocked',
-              style: GoogleFonts.poppins(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: kAccentColor,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRewardsSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: kCardShadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: kSecondaryColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.card_giftcard, color: kSecondaryColor, size: 24),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Earned Rewards',
-                style: GoogleFonts.poppins(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          
-          // Recent Rewards
-          _buildRecentRewards(),
-          const SizedBox(height: 16),
-          
-          // All Rewards Grid
-          _buildRewardsGrid(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecentRewards() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Recent Rewards',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        const SizedBox(height: 12),
-        _buildRecentRewardItem('🎯', 'Goal Master', 'Completed 5 goals this week', '2 days ago', Colors.blue),
-        const SizedBox(height: 8),
-        _buildRecentRewardItem('💧', 'Hydration Hero', 'Drank 8 glasses for 7 days', '5 days ago', Colors.cyan),
-      ],
-    );
-  }
-
-  Widget _buildRecentRewardItem(String emoji, String title, String description, String time, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(emoji, style: const TextStyle(fontSize: 20)),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: color,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            time,
-            style: GoogleFonts.poppins(
-              fontSize: 10,
-              color: kTextSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRewardsGrid() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'All Rewards',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildRewardCard('🎯', 'Goal Master', 'Complete 5 goals', Colors.blue, true),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildRewardCard('📊', 'Data Tracker', 'Log 30 days', Colors.green, true),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildRewardCard('💪', 'Fitness Fan', 'Exercise 20 days', Colors.orange, true),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildRewardCard('🥇', 'Champion', 'All achievements', Colors.purple, false),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildRewardCard('💧', 'Hydration Hero', '7 day water streak', Colors.cyan, true),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildRewardCard('⭐', 'Perfect Week', 'Meet all goals', Colors.amber, false),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRewardCard(String emoji, String title, String description, Color color, bool isEarned) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isEarned 
-            ? color.withValues(alpha: 0.1)
-            : Colors.grey.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isEarned 
-              ? color.withValues(alpha: 0.3)
-              : Colors.grey.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Column(
-        children: [
-          Stack(
-            children: [
-              Text(
-                emoji, 
-                style: TextStyle(
-                  fontSize: 24,
-                  color: isEarned ? null : Colors.grey,
-                ),
-              ),
-              if (isEarned)
-                Positioned(
-                  top: -2,
-                  right: -2,
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: kSuccessColor,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1),
-                    ),
-                    child: const Icon(
-                      Icons.check,
-                      color: Colors.white,
-                      size: 8,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: isEarned ? color : Colors.grey,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            description,
-            style: GoogleFonts.poppins(
-              fontSize: 10,
-              color: isEarned 
-                  ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
-                  : Colors.grey.withValues(alpha: 0.7),
-            ),
-            textAlign: TextAlign.center,
-          ),
-          if (isEarned)
-            Container(
-              margin: const EdgeInsets.only(top: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: kSuccessColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'Earned',
-                style: GoogleFonts.poppins(
-                  fontSize: 8,
-                  fontWeight: FontWeight.w600,
-                  color: kSuccessColor,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 
   void _showDeleteConfirmation(String entryId, String title) {
     showDialog(
@@ -2982,12 +2375,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
   String _getTaskEmoji(String task) {
-    if (task.toLowerCase().contains('water')) return '💧';
-    if (task.toLowerCase().contains('walk') || task.toLowerCase().contains('exercise')) return '🏃';
-    if (task.toLowerCase().contains('vegetables') || task.toLowerCase().contains('eat')) return '🥗';
-    if (task.toLowerCase().contains('log') || task.toLowerCase().contains('app')) return '📱';
-    if (task.toLowerCase().contains('sleep')) return '😴';
-    return '✅';
+    // Use the dynamic icon service for intelligent icon generation
+    return DynamicIconService().generateIcon(task);
   }
 
   void _showDeleteTaskConfirmation(String taskId, String taskTitle) {
@@ -3042,4 +2431,61 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
+  // Helper methods for Daily Goals section
+  String _getDailyProgressMessage() {
+    final calorieProgress = (_dailySummary?.calorieProgress ?? 0.0) * 100;
+    final waterProgress = (_dailySummary?.waterProgress ?? 0.0) * 100;
+    final stepsProgress = (_dailySummary?.stepsProgress ?? 0.0) * 100;
+    final sleepProgress = (_dailySummary?.sleepProgress ?? 0.0) * 100;
+    
+    final completedGoals = [calorieProgress, waterProgress, stepsProgress, sleepProgress]
+        .where((progress) => progress >= 100).length;
+    
+    if (completedGoals == 4) {
+      return 'Amazing! You\'ve completed all your daily goals! 🎉';
+    } else if (completedGoals >= 3) {
+      return 'Great progress! You\'re almost there! 💪';
+    } else if (completedGoals >= 2) {
+      return 'Good job! Keep up the momentum! 🌟';
+    } else if (completedGoals >= 1) {
+      return 'Nice start! Keep going! 🚀';
+    } else {
+      return 'Ready to start your healthy day? Let\'s go! 💫';
+    }
+  }
+
+  double _getOverallProgressPercentage() {
+    final calorieProgress = (_dailySummary?.calorieProgress ?? 0.0) * 100;
+    final waterProgress = (_dailySummary?.waterProgress ?? 0.0) * 100;
+    final stepsProgress = (_dailySummary?.stepsProgress ?? 0.0) * 100;
+    final sleepProgress = (_dailySummary?.sleepProgress ?? 0.0) * 100;
+    
+    return (calorieProgress + waterProgress + stepsProgress + sleepProgress) / 4;
+  }
+
+  void _showCalorieGoalDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Calorie Goal'),
+        content: const Text('Your calorie goal is set to 2000 calories. You can adjust this in the Goals & Targets screen.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Navigate to goals screen
+              // You can implement navigation to goals screen here
+            },
+            child: const Text('Edit Goals'),
+          ),
+        ],
+      ),
+    );
+  }
+
 }
+
