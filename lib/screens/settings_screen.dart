@@ -18,6 +18,7 @@ import 'profile_edit_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'terms_conditions_screen.dart';
 import 'goals_screen.dart';
+import 'weight_log_screen.dart';
 
 /// Professional Settings Screen for Calorie Vita App
 /// Features: Profile section, settings toggles, navigation options, and logout
@@ -49,6 +50,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _setupStreamListeners();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh user data when screen becomes visible
+    _loadUserData();
+  }
+
+  @override
+  void didUpdateWidget(SettingsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Refresh user data when widget is updated
+    _loadUserData();
+  }
+
   void _setupStreamListeners() {
     // Listen to Firebase user stream
     _appStateService.userStream.listen((user) {
@@ -59,6 +74,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _loadUserProfileData(user);
           }
         });
+      }
+    });
+
+    // Listen to Firebase Auth state changes directly
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (mounted) {
+        setState(() {
+          _user = user;
+          if (user != null) {
+            _loadUserProfileData(user);
+          }
+        });
+        print('Firebase Auth state changed - User: ${user?.displayName}');
       }
     });
 
@@ -107,31 +135,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
           .doc(user.uid)
           .get();
       
-      if (doc.exists) {
-        final data = doc.data()!;
-        if (mounted) {
-          setState(() {
-            _userName = data['name'] ?? user.displayName ?? 'User';
+      if (mounted) {
+        setState(() {
+          if (doc.exists) {
+            final data = doc.data()!;
+            // Use Firestore name if available, otherwise use Auth displayName
+            final firestoreName = data['name']?.toString();
+            final authName = user.displayName;
+            
+            _userName = firestoreName?.isNotEmpty == true 
+                ? firestoreName 
+                : authName?.isNotEmpty == true 
+                    ? authName 
+                    : 'User';
+            
+            // Debug print to help troubleshoot
+            print('Settings Screen - Firestore name: $firestoreName, Auth name: $authName, Final name: $_userName');
             _userEmail = user.email ?? 'user@example.com';
             _profileImageUrl = data['profileImageUrl'];
-          });
-        }
-      } else {
-        // Fallback to Auth data
-        if (mounted) {
-          setState(() {
-            _userName = user.displayName ?? 'User';
+          } else {
+            // Fallback to Auth data
+            _userName = user.displayName?.isNotEmpty == true ? user.displayName : 'User';
             _userEmail = user.email ?? 'user@example.com';
-          });
-        }
+            print('Settings Screen - No Firestore data, using Auth name: ${user.displayName}');
+          }
+        });
       }
     } catch (e) {
       // Fallback to Auth data on error
       if (mounted) {
         setState(() {
-          _userName = user.displayName ?? 'User';
+          _userName = user.displayName?.isNotEmpty == true ? user.displayName : 'User';
           _userEmail = user.email ?? 'user@example.com';
         });
+        print('Settings Screen - Error loading profile, using Auth name: ${user.displayName}');
       }
     }
   }
@@ -427,7 +464,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
     
     // Reload user data if profile was updated
     if (result == true) {
-      _loadUserData();
+      print('Profile edit completed, refreshing user data...');
+      
+      // Add a small delay to ensure Firebase Auth update has propagated
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Force refresh the current user from Firebase Auth
+      _user = FirebaseAuth.instance.currentUser;
+      print('Current user after edit: ${_user?.displayName}');
+      
+      await _loadUserData();
+      // Also reload profile data specifically for Firebase users
+      if (_user != null) {
+        await _loadUserProfileData(_user!);
+      }
+      // Force a rebuild to ensure UI updates
+      if (mounted) {
+        setState(() {});
+      }
+      
+      // Additional refresh after a short delay
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          setState(() {
+            _user = FirebaseAuth.instance.currentUser;
+          });
+        }
+      });
     }
   }
 
@@ -1085,6 +1148,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   /// Build profile card with user info and edit button
   Widget _buildProfileCard() {
+    // Get the current user directly from Firebase Auth for real-time updates
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final displayName = currentUser?.displayName;
+    
+    // Debug print to see what we're getting
+    print('Profile Card - Current user displayName: $displayName, _userName: $_userName');
+    
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1101,7 +1171,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   : null,
               child: _profileImageUrl == null
                   ? Text(
-                      _userName?.isNotEmpty == true ? _userName!.substring(0, 1).toUpperCase() : 'U',
+                      (displayName?.isNotEmpty == true ? displayName! : _userName?.isNotEmpty == true ? _userName! : 'U').substring(0, 1).toUpperCase(),
                       style: GoogleFonts.poppins(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -1118,7 +1188,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _userName ?? 'User',
+                    displayName?.isNotEmpty == true ? displayName! : (_userName?.isNotEmpty == true ? _userName! : 'User'),
                     style: GoogleFonts.poppins(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -1127,7 +1197,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _userEmail ?? 'user@example.com',
+                    currentUser?.email ?? _userEmail ?? 'user@example.com',
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       color: kTextSecondary,
@@ -1243,6 +1313,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
+          ),
+          const Divider(height: 1),
+
+          // Weight Log
+          ListTile(
+            leading: const Icon(Icons.monitor_weight, color: kAccentGreen),
+            title: Text(
+              'Weight Log',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+            ),
+            subtitle: Text(
+              'Track your weight history',
+              style: GoogleFonts.poppins(
+                color: kTextSecondary,
+                fontSize: 12,
+              ),
+            ),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: kTextSecondary),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const WeightLogScreen(),
+                ),
+              );
+            },
           ),
           const Divider(height: 1),
 

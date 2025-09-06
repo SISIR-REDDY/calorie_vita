@@ -149,6 +149,19 @@ service cloud.firestore {
           isValidTimestamp(resource.data.startDate) &&
           isValidTimestamp(resource.data.endDate);
       }
+      
+      // Weight logs
+      match /weightLogs/{logId} {
+        allow read, write: if isOwner(userId);
+        
+        // Validate weight log data
+        allow create, update: if isOwner(userId) &&
+          isValidString(resource.data.userId, 100) &&
+          isValidNumber(resource.data.weight, 10, 1000) &&
+          isValidTimestamp(resource.data.date) &&
+          isValidTimestamp(resource.data.createdAt) &&
+          isValidTimestamp(resource.data.updatedAt);
+      }
     }
     
     // Public data (if any)

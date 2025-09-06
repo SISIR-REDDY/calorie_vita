@@ -167,9 +167,20 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       if (doc.exists) {
         final data = doc.data()!;
         setState(() {
-          _ageController.text = data['age']?.toString() ?? '';
-          _heightController.text = data['height']?.toString() ?? '';
-          _weightController.text = data['weight']?.toString() ?? '';
+          // Load name from Firestore if available, otherwise keep Auth name
+          if (data['name'] != null && data['name'].toString().isNotEmpty) {
+            _nameController.text = data['name'];
+          }
+          // Only set text if the value is not null and not 0.0
+          if (data['age'] != null && data['age'] != 0) {
+            _ageController.text = data['age'].toString();
+          }
+          if (data['height'] != null && data['height'] != 0.0) {
+            _heightController.text = data['height'].toString();
+          }
+          if (data['weight'] != null && data['weight'] != 0.0) {
+            _weightController.text = data['weight'].toString();
+          }
           _hobbiesController.text = data['hobbies'] ?? '';
           _professionController.text = data['profession'] ?? '';
           _bioController.text = data['bio'] ?? '';
@@ -225,13 +236,16 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         userData['email'] = _emailController.text.trim();
       }
       if (_ageController.text.trim().isNotEmpty) {
-        userData['age'] = int.tryParse(_ageController.text) ?? 0;
+        final age = int.tryParse(_ageController.text);
+        if (age != null) userData['age'] = age;
       }
       if (_heightController.text.trim().isNotEmpty) {
-        userData['height'] = double.tryParse(_heightController.text) ?? 0.0;
+        final height = double.tryParse(_heightController.text);
+        if (height != null) userData['height'] = height;
       }
       if (_weightController.text.trim().isNotEmpty) {
-        userData['weight'] = double.tryParse(_weightController.text) ?? 0.0;
+        final weight = double.tryParse(_weightController.text);
+        if (weight != null) userData['weight'] = weight;
       }
       if (_selectedGender != null) {
         userData['gender'] = _selectedGender;
