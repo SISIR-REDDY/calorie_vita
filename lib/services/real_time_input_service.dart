@@ -74,39 +74,6 @@ class RealTimeInputService {
     return _auth.currentUser?.uid;
   }
 
-  /// Handle water intake input
-  Future<bool> handleWaterIntake(BuildContext context, int glasses) async {
-    final userId = getCurrentUserId();
-    if (userId == null) {
-      _showError(context, 'User not authenticated');
-      return false;
-    }
-
-    // Validate input
-    final validation = InputValidationService.validateWaterIntake(glasses);
-    if (!validation.isValid) {
-      InputValidationService.showValidationResult(context, validation);
-      return false;
-    }
-
-    try {
-      // Update Firestore
-      await _firebaseService.updateWaterIntake(userId, glasses);
-      await _dailySummaryService.updateWaterIntake(userId, glasses);
-
-      // Show warning if any
-      if (validation.warningMessage != null) {
-        InputValidationService.showValidationResult(context, validation);
-      }
-
-      _showSuccess(context, 'Water intake updated: $glasses glasses');
-      return true;
-    } catch (e) {
-      _errorHandler.handleFirebaseError('handleWaterIntake', e);
-      _showError(context, 'Failed to update water intake: $e');
-      return false;
-    }
-  }
 
   /// Handle exercise input
   Future<bool> handleExercise(BuildContext context, {
@@ -200,39 +167,6 @@ class RealTimeInputService {
     }
   }
 
-  /// Handle sleep hours input
-  Future<bool> handleSleepHours(BuildContext context, double hours) async {
-    final userId = getCurrentUserId();
-    if (userId == null) {
-      _showError(context, 'User not authenticated');
-      return false;
-    }
-
-    // Validate input
-    final validation = InputValidationService.validateSleepHours(hours);
-    if (!validation.isValid) {
-      InputValidationService.showValidationResult(context, validation);
-      return false;
-    }
-
-    try {
-      // Update Firestore
-      await _firebaseService.updateSleepHours(userId, hours);
-      await _dailySummaryService.updateSleepHours(userId, hours);
-
-      // Show warning if any
-      if (validation.warningMessage != null) {
-        InputValidationService.showValidationResult(context, validation);
-      }
-
-      _showSuccess(context, 'Sleep hours updated: ${hours.toStringAsFixed(1)} hours');
-      return true;
-    } catch (e) {
-      _errorHandler.handleFirebaseError('handleSleepHours', e);
-      _showError(context, 'Failed to update sleep hours: $e');
-      return false;
-    }
-  }
 
   /// Handle weight input
   Future<bool> handleWeight(BuildContext context, double weight, double bmi) async {

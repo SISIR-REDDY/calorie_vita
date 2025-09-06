@@ -54,29 +54,7 @@ class RewardNotificationService {
     int points = 0;
     Color color = Colors.blue;
 
-    if (activityType == ActivityType.waterIntake) {
-      if (streakDays >= 365) {
-        title = 'Ocean Lord';
-        emoji = '🌊';
-        points = 2500;
-        color = Colors.indigo;
-      } else if (streakDays >= 100) {
-        title = 'Aqua Master';
-        emoji = '🏊‍♂️';
-        points = 1000;
-        color = Colors.lightBlue;
-      } else if (streakDays >= 30) {
-        title = 'Water Champion';
-        emoji = '🌊';
-        points = 500;
-        color = Colors.cyan;
-      } else if (streakDays >= 7) {
-        title = 'Hydration Hero';
-        emoji = '💧';
-        points = 100;
-        color = Colors.blue;
-      }
-    } else if (activityType == ActivityType.mealLogging) {
+    if (activityType == ActivityType.mealLogging) {
       if (streakDays >= 365) {
         title = 'Nutrition Legend';
         emoji = '👑';
@@ -119,28 +97,6 @@ class RewardNotificationService {
         emoji = '💪';
         points = 150;
         color = Colors.red;
-      }
-    } else if (activityType == ActivityType.sleepLogging) {
-      if (streakDays >= 365) {
-        title = 'Dream Lord';
-        emoji = '✨';
-        points = 2500;
-        color = Colors.cyan;
-      } else if (streakDays >= 100) {
-        title = 'Zen Sleeper';
-        emoji = '🧘‍♂️';
-        points = 1000;
-        color = Colors.deepPurple;
-      } else if (streakDays >= 30) {
-        title = 'Sleep Guardian';
-        emoji = '🌙';
-        points = 500;
-        color = Colors.purple;
-      } else if (streakDays >= 7) {
-        title = 'Dream Rookie';
-        emoji = '😴';
-        points = 100;
-        color = Colors.indigo;
       }
     } else {
       title = 'Streak Master';
@@ -202,23 +158,6 @@ class RewardNotificationService {
         points = 50;
         color = Colors.green;
       }
-    } else if (activityType == ActivityType.waterIntake) {
-      if (milestone >= 5000) {
-        title = 'Ocean Lord';
-        emoji = '🏊‍♂️';
-        points = 1500;
-        color = Colors.indigo;
-      } else if (milestone >= 1000) {
-        title = 'Hydration Hero';
-        emoji = '🌊';
-        points = 500;
-        color = Colors.cyan;
-      } else if (milestone >= 100) {
-        title = 'Water Rookie';
-        emoji = '💧';
-        points = 100;
-        color = Colors.blue;
-      }
     } else if (activityType == ActivityType.exercise) {
       if (milestone >= 500) {
         title = 'Titan';
@@ -275,12 +214,8 @@ class RewardNotificationService {
   }
 
   String _getActivityName(ActivityType activityType) {
-    if (activityType == ActivityType.waterIntake) {
-      return 'water glasses';
-    } else if (activityType == ActivityType.mealLogging) {
+    if (activityType == ActivityType.mealLogging) {
       return 'meals';
-    } else if (activityType == ActivityType.sleepLogging) {
-      return 'sleep logs';
     } else if (activityType == ActivityType.exercise) {
       return 'workouts';
     } else if (activityType == ActivityType.calorieGoal) {
@@ -298,12 +233,8 @@ class RewardNotificationService {
   }
 
   BadgeCategory _getActivityCategory(ActivityType activityType) {
-    if (activityType == ActivityType.waterIntake) {
-      return BadgeCategory.water;
-    } else if (activityType == ActivityType.mealLogging) {
+    if (activityType == ActivityType.mealLogging) {
       return BadgeCategory.logging;
-    } else if (activityType == ActivityType.sleepLogging) {
-      return BadgeCategory.sleep;
     } else if (activityType == ActivityType.exercise) {
       return BadgeCategory.exercise;
     } else if (activityType == ActivityType.calorieGoal) {

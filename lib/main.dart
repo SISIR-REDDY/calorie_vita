@@ -7,6 +7,8 @@ import 'main_app.dart';
 import 'services/network_service.dart';
 import 'services/performance_monitor.dart';
 import 'services/error_handler.dart';
+import 'services/firebase_config_service.dart';
+import 'services/database_migration_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +26,7 @@ void main() async {
   final errorHandler = ErrorHandler();
   await errorHandler.initialize();
   
-  // Initialize Firebase with comprehensive error handling
+  // Initialize Firebase with basic configuration
   bool firebaseInitialized = false;
   try {
     await Firebase.initializeApp(

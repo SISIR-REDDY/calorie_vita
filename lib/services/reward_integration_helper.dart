@@ -40,30 +40,6 @@ class RewardIntegrationHelper {
     }
   }
 
-  /// Process water intake activity
-  Future<void> processWaterIntake({
-    required int glasses,
-    required DateTime timestamp,
-  }) async {
-    final result = await _rewardsService.processActivity(
-      activityType: ActivityType.waterIntake,
-      activityData: {
-        'glasses': glasses,
-        'timestamp': timestamp.millisecondsSinceEpoch,
-      },
-      timestamp: timestamp,
-    );
-
-    if (result.success) {
-      for (final reward in result.newRewards) {
-        _notificationService.showRewardNotification(reward);
-      }
-
-      if (result.levelUp != null) {
-        _notificationService.showLevelUpNotification(result.levelUp!);
-      }
-    }
-  }
 
   /// Process exercise activity
   Future<void> processExercise({
@@ -94,33 +70,6 @@ class RewardIntegrationHelper {
     }
   }
 
-  /// Process sleep logging activity
-  Future<void> processSleepLogging({
-    required int hours,
-    required int minutes,
-    required DateTime timestamp,
-  }) async {
-    final result = await _rewardsService.processActivity(
-      activityType: ActivityType.sleepLogging,
-      activityData: {
-        'hours': hours,
-        'minutes': minutes,
-        'totalMinutes': (hours * 60) + minutes,
-        'timestamp': timestamp.millisecondsSinceEpoch,
-      },
-      timestamp: timestamp,
-    );
-
-    if (result.success) {
-      for (final reward in result.newRewards) {
-        _notificationService.showRewardNotification(reward);
-      }
-
-      if (result.levelUp != null) {
-        _notificationService.showLevelUpNotification(result.levelUp!);
-      }
-    }
-  }
 
   /// Process steps activity
   Future<void> processSteps({

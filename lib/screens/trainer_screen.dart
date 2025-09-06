@@ -564,14 +564,21 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
           elevation: 0,
           title: Row(
             children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: kAccentBlue,
-                child: Image.asset(
-                  'calorie_logo.png',
-                  width: 36,
-                  height: 36,
-                  fit: BoxFit.contain,
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: kAccentBlue,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Image.asset(
+                    'calorie_logo.png',
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),

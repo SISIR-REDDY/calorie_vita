@@ -491,12 +491,8 @@ class OptimizedFirebaseService {
           caloriesConsumed: caloriesConsumed,
           caloriesBurned: 300, // Default - should be tracked separately
           caloriesGoal: 2000, // Should come from user profile
-          waterIntake: 6, // Default - should be tracked separately
-          waterGoal: 8,
           steps: 5000, // Default - should be tracked separately
           stepsGoal: 10000,
-          sleepHours: 7.5, // Default - should be tracked separately
-          sleepGoal: 8.0,
           date: date,
         ));
       }

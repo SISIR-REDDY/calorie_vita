@@ -147,12 +147,8 @@ class RewardsService {
   /// Calculate base XP for activity
   int _calculateBaseXp(ActivityType activityType, Map<String, dynamic> activityData) {
     switch (activityType) {
-      case ActivityType.waterIntake:
-        return 5; // +5 XP per glass
       case ActivityType.mealLogging:
         return 10; // +10 XP per meal
-      case ActivityType.sleepLogging:
-        return 10; // +10 XP per sleep log
       case ActivityType.exercise:
         return 20; // +20 XP per workout
       case ActivityType.calorieGoal:
@@ -313,13 +309,6 @@ class RewardsService {
       case 'meals_1000':
         return (_lifetimeTotals[ActivityType.mealLogging.name] ?? 0) >= 1000;
       
-      case 'water_100':
-        return (_lifetimeTotals[ActivityType.waterIntake.name] ?? 0) >= 100;
-      case 'water_1000':
-        return (_lifetimeTotals[ActivityType.waterIntake.name] ?? 0) >= 1000;
-      case 'water_5000':
-        return (_lifetimeTotals[ActivityType.waterIntake.name] ?? 0) >= 5000;
-      
       case 'exercise_10':
         return (_lifetimeTotals[ActivityType.exercise.name] ?? 0) >= 10;
       case 'exercise_100':
@@ -356,11 +345,6 @@ class RewardsService {
     final activityKey = activityType.name;
     
     // Check for unrealistic values
-    if (activityType == ActivityType.waterIntake) {
-      final glasses = activityData['glasses'] as int? ?? 0;
-      if (glasses > 50) return false; // More than 50L water per day
-    }
-    
     if (activityType == ActivityType.exercise) {
       final calories = activityData['calories'] as int? ?? 0;
       if (calories > 5000) return false; // More than 5000 calories burned
@@ -446,17 +430,6 @@ class RewardsService {
       ),
     );
     
-    _challenges['daily_water'] = ChallengeProgress(
-      challenge: Challenge(
-        id: 'daily_water',
-        title: 'Hydration Hero',
-        description: 'Drink 8 glasses of water today',
-        type: ChallengeType.daily,
-        requiredActivity: ActivityType.waterIntake,
-        targetValue: 8,
-        xpReward: 30,
-      ),
-    );
     
     // Weekly challenges
     _challenges['weekly_calorie'] = ChallengeProgress(

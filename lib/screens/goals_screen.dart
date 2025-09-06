@@ -23,7 +23,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
   final _weightController = TextEditingController();
   final _calorieController = TextEditingController();
   final _bmiController = TextEditingController();
-  final _waterController = TextEditingController();
   final _stepsController = TextEditingController();
   final _carbsController = TextEditingController();
   final _proteinController = TextEditingController();
@@ -56,7 +55,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     _weightController.dispose();
     _calorieController.dispose();
     _bmiController.dispose();
-    _waterController.dispose();
     _stepsController.dispose();
     _carbsController.dispose();
     _proteinController.dispose();
@@ -113,7 +111,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
       _weightController.text = _currentGoals!.weightGoal?.toString() ?? '';
       _calorieController.text = _calorieUnitsService.formatCaloriesShort(_currentGoals!.calorieGoal?.toDouble() ?? 2000);
       _bmiController.text = _currentGoals!.bmiGoal?.toString() ?? '';
-      _waterController.text = _currentGoals!.waterGlassesGoal?.toString() ?? '';
       _stepsController.text = _currentGoals!.stepsPerDayGoal?.toString() ?? '';
       
       if (_currentGoals!.macroGoals != null) {
@@ -129,7 +126,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     } else {
       // Set default values for new users
       _calorieController.text = _calorieUnitsService.formatCaloriesShort(2000);
-      _waterController.text = '8';
       _stepsController.text = '10000';
       _carbsController.text = _calorieUnitsService.formatCaloriesShort(MacroGoals.defaultMacros.carbsCalories?.toDouble() ?? 900);
       _proteinController.text = _calorieUnitsService.formatCaloriesShort(MacroGoals.defaultMacros.proteinCalories?.toDouble() ?? 500);
@@ -147,7 +143,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
           weightGoal: double.tryParse(_weightController.text),
           calorieGoal: _calorieUnitsService.convertToKcal(double.tryParse(_calorieController.text) ?? 2000).round(),
           bmiGoal: double.tryParse(_bmiController.text),
-          waterGlassesGoal: int.tryParse(_waterController.text),
           stepsPerDayGoal: int.tryParse(_stepsController.text),
           macroGoals: MacroGoals(
             carbsCalories: _calorieUnitsService.convertToKcal(double.tryParse(_carbsController.text) ?? 900).round(),
@@ -233,8 +228,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                        _buildCalorieGoalCard(),
                        const SizedBox(height: 16),
                        _buildBMIGoalCard(),
-                       const SizedBox(height: 16),
-                       _buildWaterGoalCard(),
                        const SizedBox(height: 16),
                        _buildStepsGoalCard(),
                        const SizedBox(height: 16),
@@ -406,27 +399,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildWaterGoalCard() {
-    return _buildGoalCard(
-      title: 'Daily Water Goal',
-      icon: Icons.water_drop,
-      color: kAccentBlue,
-      child: TextField(
-        controller: _waterController,
-        keyboardType: TextInputType.number,
-        decoration: InputDecoration(
-          hintText: 'Enter daily water glasses',
-          suffixText: 'glasses',
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          filled: true,
-          fillColor: Theme.of(context).colorScheme.surface,
-        ),
-      ),
-    );
-  }
 
   Widget _buildStepsGoalCard() {
     return _buildGoalCard(

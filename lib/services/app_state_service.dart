@@ -229,12 +229,8 @@ class AppStateService {
       caloriesConsumed: caloriesConsumed,
       caloriesBurned: _healthData.caloriesBurned.round(), // From health data
       caloriesGoal: _userGoals?.calorieGoal ?? 2000,
-      waterIntake: 6, // Default - should be tracked separately
-      waterGoal: _userGoals?.waterGlassesGoal ?? 8,
       steps: _healthData.steps, // From health data
       stepsGoal: _userGoals?.stepsPerDayGoal ?? 10000,
-      sleepHours: _healthData.sleepHours, // From health data
-      sleepGoal: 8.0,
       date: today,
     );
 

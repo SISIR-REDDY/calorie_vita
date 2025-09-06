@@ -46,9 +46,7 @@ enum UserLevel {
 
 /// Activity types that can earn rewards
 enum ActivityType {
-  waterIntake,
   mealLogging,
-  sleepLogging,
   exercise,
   calorieGoal,
   steps,
@@ -717,15 +715,8 @@ class RewardSystem {
     int baseXp = 0;
     
     switch (activityType) {
-      case ActivityType.waterIntake:
-        final glasses = activityData['glasses'] as int? ?? 0;
-        baseXp = glasses * 5; // +5 XP per glass
-        break;
       case ActivityType.mealLogging:
         baseXp = 10; // +10 XP per meal
-        break;
-      case ActivityType.sleepLogging:
-        baseXp = 10; // +10 XP per sleep log
         break;
       case ActivityType.exercise:
         baseXp = 20; // +20 XP per workout

@@ -225,12 +225,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       caloriesConsumed: 1450,
       caloriesBurned: 320,
       caloriesGoal: 2000,
-      waterIntake: 6,
-      waterGoal: 8,
       steps: 8500,
       stepsGoal: 10000,
-      sleepHours: 7.5,
-      sleepGoal: 8.0,
       date: DateTime.now(),
     );
 
@@ -315,53 +311,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   // ========== INPUT HANDLING METHODS ==========
 
-  /// Handle water intake input
-  Future<void> _handleWaterIntake() async {
-    if (_currentUserId == null) return;
-
-    final controller = TextEditingController();
-    final result = await showDialog<int>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Water Intake'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('How many glasses of water did you drink?'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Glasses',
-                hintText: 'Enter number of glasses',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final glasses = int.tryParse(controller.text);
-              if (glasses != null) {
-                Navigator.pop(context, glasses);
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-
-    if (result != null) {
-      await _realTimeInputService.handleWaterIntake(context, result);
-    }
-  }
 
   /// Handle exercise input
   Future<void> _handleExercise() async {
@@ -496,53 +445,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
-  /// Handle sleep hours input
-  Future<void> _handleSleepHours() async {
-    if (_currentUserId == null) return;
-
-    final controller = TextEditingController();
-    final result = await showDialog<double>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Log Sleep'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('How many hours did you sleep?'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Sleep Hours',
-                hintText: 'e.g., 7.5',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final hours = double.tryParse(controller.text);
-              if (hours != null) {
-                Navigator.pop(context, hours);
-              }
-            },
-            child: const Text('Log Sleep'),
-          ),
-        ],
-      ),
-    );
-
-    if (result != null) {
-      await _realTimeInputService.handleSleepHours(context, result);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -972,7 +874,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   Widget _buildCaloriesToTargetCard() {
     final caloriesToTarget = _dailySummary!.caloriesGoal - _dailySummary!.caloriesConsumed;
     final isReached = caloriesToTarget <= 0;
-    final color = isReached ? const Color(0xFF2196F3) : kAccentColor; // Blue when reached, red when working
+    final color = isReached ? const Color(0xFF2196F3) : const Color(0xFF2196F3); // Always blue
     final icon = isReached ? Icons.check_circle : Icons.flag;
     final status = isReached ? 'Goal Reached!' : 'To Reach Goal';
     
@@ -1038,7 +940,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 const SizedBox(height: 4),
                 Text(
                   isReached 
-                    ? 'Congratulations!'
+                    ? 'Congratulations! 🎉'
                     : '${_calorieUnitsService.formatCaloriesShort(caloriesToTarget.abs().toDouble())} ${_calorieUnitsService.unitSuffix} remaining',
                   style: GoogleFonts.poppins(
                     fontSize: 18,
@@ -1050,8 +952,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 const SizedBox(height: 4),
                 Text(
                   isReached 
-                    ? 'You have successfully reached your daily calorie goal'
-                    : 'Keep going to reach your daily target',
+                    ? 'You have successfully reached your daily calorie goal! 🏆'
+                    : 'Keep going to reach your daily target! 💪',
                   style: GoogleFonts.poppins(
                     fontSize: 11,
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
@@ -1192,23 +1094,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildGoalCard(
-                    'Water',
-                    '${_dailySummary?.waterIntake ?? 0}',
-                    '${_dailySummary?.waterGoal ?? 8}',
-                    'glasses',
-                    Icons.water_drop,
-                    kAccentBlue,
-                    (_dailySummary?.waterProgress ?? 0.0) * 100,
-                    () => _handleWaterIntake(),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildGoalCard(
                     'Steps',
                     '${_dailySummary?.steps ?? 0}',
                     '${_dailySummary?.stepsGoal ?? 10000}',
@@ -1217,19 +1102,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     kSecondaryColor,
                     (_dailySummary?.stepsProgress ?? 0.0) * 100,
                     () => _handleSteps(),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildGoalCard(
-                    'Sleep',
-                    '${_dailySummary?.sleepHours.toStringAsFixed(1) ?? '0.0'}',
-                    '${_dailySummary?.sleepGoal.toStringAsFixed(1) ?? '8.0'}',
-                    'hours',
-                    Icons.bedtime,
-                    kAccentPurple,
-                    (_dailySummary?.sleepProgress ?? 0.0) * 100,
-                    () => _handleSleepHours(),
                   ),
                 ),
               ],
@@ -1309,7 +1181,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   Widget _buildGoalCard(String title, String current, String target, String unit, IconData icon, Color color, double progress, VoidCallback onTap) {
     final isCompleted = progress >= 100;
-    final progressColor = isCompleted ? kSuccessColor : color;
+    final progressColor = isCompleted ? kSuccessColor : color; // Use original colors
     
     return GestureDetector(
       onTap: onTap,
@@ -1422,7 +1294,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             ),
                 const SizedBox(height: 6),
             Text(
-              '${progress.round()}% complete',
+              isCompleted 
+                ? 'Goal Reached! 🎉'
+                : '${progress.round()}% complete',
               style: GoogleFonts.poppins(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -2524,21 +2398,15 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   // Helper methods for Daily Goals section
   String _getDailyProgressMessage() {
     final calorieProgress = (_dailySummary?.calorieProgress ?? 0.0) * 100;
-    final waterProgress = (_dailySummary?.waterProgress ?? 0.0) * 100;
     final stepsProgress = (_dailySummary?.stepsProgress ?? 0.0) * 100;
-    final sleepProgress = (_dailySummary?.sleepProgress ?? 0.0) * 100;
     
-    final completedGoals = [calorieProgress, waterProgress, stepsProgress, sleepProgress]
+    final completedGoals = [calorieProgress, stepsProgress]
         .where((progress) => progress >= 100).length;
     
-    if (completedGoals == 4) {
+    if (completedGoals == 2) {
       return 'Amazing! You\'ve completed all your daily goals! 🎉';
-    } else if (completedGoals >= 3) {
-      return 'Great progress! You\'re almost there! 💪';
-    } else if (completedGoals >= 2) {
-      return 'Good job! Keep up the momentum! 🌟';
     } else if (completedGoals >= 1) {
-      return 'Nice start! Keep going! 🚀';
+      return 'Great progress! You\'re almost there! 💪';
     } else {
       return 'Ready to start your healthy day? Let\'s go! 💫';
     }
@@ -2546,11 +2414,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   double _getOverallProgressPercentage() {
     final calorieProgress = (_dailySummary?.calorieProgress ?? 0.0) * 100;
-    final waterProgress = (_dailySummary?.waterProgress ?? 0.0) * 100;
     final stepsProgress = (_dailySummary?.stepsProgress ?? 0.0) * 100;
-    final sleepProgress = (_dailySummary?.sleepProgress ?? 0.0) * 100;
     
-    return (calorieProgress + waterProgress + stepsProgress + sleepProgress) / 4;
+    return (calorieProgress + stepsProgress) / 2;
   }
 
   void _showCalorieGoalDialog() {

@@ -126,12 +126,8 @@ class AnalyticsService {
         caloriesConsumed: caloriesConsumed,
         caloriesBurned: 300, // Default - should be tracked separately
         caloriesGoal: 2000, // Should come from user profile
-        waterIntake: 6, // Default - should be tracked separately
-        waterGoal: 8,
         steps: 5000, // Default - should be tracked separately
         stepsGoal: 10000,
-        sleepHours: 7.5, // Default - should be tracked separately
-        sleepGoal: 8.0,
         date: date,
       ));
     }
@@ -288,20 +284,6 @@ class AnalyticsService {
         }
       }
       
-      // Water recommendations
-      if (_cachedDailySummaries.isNotEmpty) {
-        final todayWater = _cachedDailySummaries.last.waterIntake;
-        if (todayWater < 6) {
-          recommendations.add({
-            'title': 'Drink more water',
-            'description': 'You\'re ${8 - todayWater} glasses short of your daily goal.',
-            'icon': '💧',
-            'color': 'info',
-            'priority': 3,
-            'timestamp': DateTime.now(),
-          });
-        }
-      }
       
       // Protein recommendations
       if (_cachedMacroBreakdown.protein < 100) {

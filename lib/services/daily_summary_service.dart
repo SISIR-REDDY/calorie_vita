@@ -78,42 +78,6 @@ class DailySummaryService {
     });
   }
 
-  /// Update water intake
-  Future<void> updateWaterIntake(String userId, int glasses) async {
-    try {
-      // Validate input
-      if (glasses < 0 || glasses > 50) {
-        throw Exception('Invalid water intake: $glasses glasses');
-      }
-
-      final today = DateTime.now();
-      final dateKey = _getDateKey(today);
-      final docRef = _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('dailySummary')
-          .doc(dateKey);
-
-      await docRef.set({
-        'waterIntake': glasses,
-        'lastUpdated': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      // Trigger rewards
-      await _rewardsService.processActivity(
-        activityType: ActivityType.waterIntake,
-        activityData: {'glasses': glasses},
-      );
-
-      // Update local cache
-      await _updateLocalSummary(userId, {'waterIntake': glasses});
-
-      _errorHandler.handleBusinessError('updateWaterIntake', 'Water intake updated successfully');
-    } catch (e) {
-      _errorHandler.handleFirebaseError('updateWaterIntake', e);
-      rethrow;
-    }
-  }
 
   /// Update exercise data
   Future<void> updateExercise(String userId, {
@@ -204,42 +168,6 @@ class DailySummaryService {
     }
   }
 
-  /// Update sleep hours
-  Future<void> updateSleepHours(String userId, double hours) async {
-    try {
-      // Validate input
-      if (hours < 0 || hours > 24) {
-        throw Exception('Invalid sleep hours: $hours');
-      }
-
-      final today = DateTime.now();
-      final dateKey = _getDateKey(today);
-      final docRef = _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('dailySummary')
-          .doc(dateKey);
-
-      await docRef.set({
-        'sleepHours': hours,
-        'lastUpdated': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      // Trigger rewards
-      await _rewardsService.processActivity(
-        activityType: ActivityType.sleepLogging,
-        activityData: {'hours': hours},
-      );
-
-      // Update local cache
-      await _updateLocalSummary(userId, {'sleepHours': hours});
-
-      _errorHandler.handleBusinessError('updateSleepHours', 'Sleep hours updated successfully');
-    } catch (e) {
-      _errorHandler.handleFirebaseError('updateSleepHours', e);
-      rethrow;
-    }
-  }
 
   /// Update meal logging (called when food entry is added)
   Future<void> onMealLogged(String userId, FoodEntry foodEntry) async {
@@ -405,13 +333,9 @@ class DailySummaryService {
     final updatedSummary = _currentDailySummary!.copyWith(
       caloriesConsumed: updates['caloriesConsumed'] ?? _currentDailySummary!.caloriesConsumed,
       caloriesBurned: updates['caloriesBurned'] ?? _currentDailySummary!.caloriesBurned,
-      waterIntake: updates['waterIntake'] ?? _currentDailySummary!.waterIntake,
       steps: updates['steps'] ?? _currentDailySummary!.steps,
-      sleepHours: updates['sleepHours'] ?? _currentDailySummary!.sleepHours,
       caloriesGoal: updates['caloriesGoal'] ?? _currentDailySummary!.caloriesGoal,
-      waterGoal: updates['waterGoal'] ?? _currentDailySummary!.waterGoal,
       stepsGoal: updates['stepsGoal'] ?? _currentDailySummary!.stepsGoal,
-      sleepGoal: updates['sleepGoal'] ?? _currentDailySummary!.sleepGoal,
     );
 
     _currentDailySummary = updatedSummary;
@@ -420,9 +344,7 @@ class DailySummaryService {
     // Emit progress update
     _progressController.add({
       'calorieProgress': updatedSummary.calorieProgress,
-      'waterProgress': updatedSummary.waterProgress,
       'stepsProgress': updatedSummary.stepsProgress,
-      'sleepProgress': updatedSummary.sleepProgress,
       'overallProgress': updatedSummary.overallProgress,
     });
   }
@@ -433,12 +355,8 @@ class DailySummaryService {
       caloriesConsumed: 0,
       caloriesBurned: 0,
       caloriesGoal: 2000,
-      waterIntake: 0,
-      waterGoal: 8,
       steps: 0,
       stepsGoal: 10000,
-      sleepHours: 0.0,
-      sleepGoal: 8.0,
       date: date,
     );
   }

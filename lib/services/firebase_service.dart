@@ -361,12 +361,8 @@ class FirebaseService {
           caloriesConsumed: caloriesConsumed,
           caloriesBurned: 300, // Default - should be tracked separately
           caloriesGoal: 2000, // Should come from user profile
-          waterIntake: 6, // Default - should be tracked separately
-          waterGoal: 8,
           steps: 5000, // Default - should be tracked separately
           stepsGoal: 10000,
-          sleepHours: 7.5, // Default - should be tracked separately
-          sleepGoal: 8.0,
           date: date,
         ));
       }
@@ -760,12 +756,8 @@ class FirebaseService {
           caloriesConsumed: 0,
           caloriesBurned: 0,
           caloriesGoal: 2000,
-          waterIntake: 0,
-          waterGoal: 8,
           steps: 0,
           stepsGoal: 10000,
-          sleepHours: 0.0,
-          sleepGoal: 8.0,
           date: today,
         );
       }
@@ -775,42 +767,13 @@ class FirebaseService {
         caloriesConsumed: 0,
         caloriesBurned: 0,
         caloriesGoal: 2000,
-        waterIntake: 0,
-        waterGoal: 8,
         steps: 0,
         stepsGoal: 10000,
-        sleepHours: 0.0,
-        sleepGoal: 8.0,
         date: today,
       );
     });
   }
 
-  /// Update water intake in daily summary
-  Future<void> updateWaterIntake(String userId, int glasses) async {
-    try {
-      if (glasses < 0 || glasses > 50) {
-        throw Exception('Invalid water intake: $glasses glasses');
-      }
-
-      final today = DateTime.now();
-      final dateKey = _getDateKey(today);
-      final docRef = _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('dailySummary')
-          .doc(dateKey);
-
-      await docRef.set({
-        'waterIntake': glasses,
-        'lastUpdated': FieldValue.serverTimestamp(),
-        'date': Timestamp.fromDate(today),
-      }, SetOptions(merge: true));
-    } catch (e) {
-      print('Error updating water intake: $e');
-      rethrow;
-    }
-  }
 
   /// Update exercise data in daily summary
   Future<void> updateExercise(String userId, {
@@ -873,31 +836,6 @@ class FirebaseService {
     }
   }
 
-  /// Update sleep hours in daily summary
-  Future<void> updateSleepHours(String userId, double hours) async {
-    try {
-      if (hours < 0 || hours > 24) {
-        throw Exception('Invalid sleep hours: $hours');
-      }
-
-      final today = DateTime.now();
-      final dateKey = _getDateKey(today);
-      final docRef = _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('dailySummary')
-          .doc(dateKey);
-
-      await docRef.set({
-        'sleepHours': hours,
-        'lastUpdated': FieldValue.serverTimestamp(),
-        'date': Timestamp.fromDate(today),
-      }, SetOptions(merge: true));
-    } catch (e) {
-      print('Error updating sleep hours: $e');
-      rethrow;
-    }
-  }
 
   /// Update weight in daily summary
   Future<void> updateWeight(String userId, double weight, double bmi) async {

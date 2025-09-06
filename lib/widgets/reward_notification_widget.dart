@@ -467,12 +467,8 @@ class StreakNotificationWidget extends StatelessWidget {
 
   String _getActivityName(ActivityType activityType) {
     switch (activityType) {
-      case ActivityType.waterIntake:
-        return 'Water';
       case ActivityType.mealLogging:
         return 'Meal Logging';
-      case ActivityType.sleepLogging:
-        return 'Sleep';
       case ActivityType.exercise:
         return 'Exercise';
       case ActivityType.calorieGoal:

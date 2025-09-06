@@ -8,10 +8,8 @@ class SimpleStreakSystem {
 
 /// Daily goal types that can be tracked
 enum DailyGoalType {
-  waterIntake('Water Intake', '💧', Colors.blue),
   mealLogging('Meal Logging', '🍽️', Colors.green),
   exercise('Exercise', '🏃‍♂️', Colors.orange),
-  sleep('Sleep', '😴', Colors.purple),
   steps('Steps', '👣', Colors.cyan),
   calorieGoal('Calorie Goal', '🔥', Colors.red);
 
@@ -73,7 +71,7 @@ class GoalStreak {
     return GoalStreak(
       goalType: DailyGoalType.values.firstWhere(
         (e) => e.name == map['goalType'],
-        orElse: () => DailyGoalType.waterIntake,
+        orElse: () => DailyGoalType.mealLogging,
       ),
       currentStreak: map['currentStreak'] ?? 0,
       longestStreak: map['longestStreak'] ?? 0,
@@ -204,7 +202,7 @@ class UserStreakSummary {
       (map['goalStreaks'] as Map<String, dynamic>).forEach((key, value) {
         final goalType = DailyGoalType.values.firstWhere(
           (e) => e.name == key,
-          orElse: () => DailyGoalType.waterIntake,
+          orElse: () => DailyGoalType.mealLogging,
         );
         goalStreaksMap[goalType] = GoalStreak.fromMap(value);
       });

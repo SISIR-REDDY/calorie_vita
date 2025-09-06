@@ -456,7 +456,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               'calorie_logo.png',
               width: 40,
               height: 40,
-              fit: BoxFit.contain,
+              fit: BoxFit.cover,
             ),
             const SizedBox(width: 12),
             Text(
@@ -470,10 +470,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         backgroundColor: kSurfaceColor,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: kTextDark),
-          onPressed: () => Navigator.pop(context),
-        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
