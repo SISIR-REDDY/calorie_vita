@@ -357,6 +357,8 @@ class DailySummaryService {
       caloriesGoal: 2000,
       steps: 0,
       stepsGoal: 10000,
+      waterGlasses: 0,
+      waterGlassesGoal: 8,
       date: date,
     );
   }

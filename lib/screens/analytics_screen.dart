@@ -1,7 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../ui/app_colors.dart';
 import '../services/analytics_service.dart';
 import '../services/firebase_service.dart';
+import '../services/ai_service.dart';
+import '../services/app_state_service.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
 import '../models/user_achievement.dart';
@@ -20,11 +25,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   // Services
   final AnalyticsService _analyticsService = AnalyticsService();
   final FirebaseService _firebaseService = FirebaseService();
+  final AppStateService _appStateService = AppStateService();
   
   // State management
   bool _isLoading = true;
   bool _isRefreshing = false;
   String? _error;
+  bool _isGeneratingInsights = false;
+  String _aiInsights = '';
+  
+  // Stream subscriptions
+  StreamSubscription<Map<String, dynamic>?>? _profileDataSubscription;
   
   // Real-time data
   List<DailySummary> _dailySummaries = [];
@@ -32,6 +43,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   List<UserAchievement> _achievements = [];
   List<Map<String, dynamic>> _insights = [];
   List<Map<String, dynamic>> _recommendations = [];
+  
+  // User profile data for BMI calculation
+  double? _userHeight; // in meters
+  double? _userWeight; // in kg
+  String? _userGender;
+  int? _userAge;
+  
 
   @override
   void initState() {
@@ -41,6 +59,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   @override
   void dispose() {
+    _profileDataSubscription?.cancel();
     _analyticsService.dispose();
     super.dispose();
   }
@@ -53,12 +72,22 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         _error = null;
       });
 
+      // Initialize AppStateService first
+      await _appStateService.initialize();
+      print('AppStateService initialized in analytics screen');
+
+      // Load user profile data for BMI calculation
+      await _loadUserProfileData();
+
       // Initialize analytics service with current period
       final days = _getDaysForPeriod(_selectedPeriod);
       await _analyticsService.initializeRealTimeAnalytics(days: days);
 
       // Set up real-time listeners
       _setupRealTimeListeners();
+
+      // Calculate streaks and achievements based on automated data
+      await _analyticsService.calculateStreaksAndAchievements();
 
       setState(() {
         _isLoading = false;
@@ -70,6 +99,47 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       });
     }
   }
+
+  /// Load user profile data for BMI calculation
+  Future<void> _loadUserProfileData() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('profile')
+            .doc('userData')
+            .get();
+
+        if (doc.exists) {
+          final data = doc.data()!;
+          print('Profile Data Loaded: $data');
+          setState(() {
+            // Height is stored in cm, convert to meters for BMI calculation
+            final heightCm = data['height']?.toDouble();
+            _userHeight = heightCm != null ? heightCm / 100.0 : null;
+            _userWeight = data['weight']?.toDouble();
+            _userGender = data['gender']?.toString();
+            _userAge = data['age']?.toInt();
+          });
+          print('Parsed Profile Data - Height: $_userHeight, Weight: $_userWeight, Gender: $_userGender, Age: $_userAge');
+        } else {
+          print('Profile document does not exist');
+        }
+      }
+    } catch (e) {
+      print('Error loading user profile data: $e');
+      // Set default values if loading fails
+      setState(() {
+        _userHeight = 1.75; // Default height in meters
+        _userWeight = 70.0; // Default weight in kg
+        _userGender = 'Unknown';
+        _userAge = 25;
+      });
+    }
+  }
+
 
   /// Set up real-time data listeners
   void _setupRealTimeListeners() {
@@ -97,6 +167,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         setState(() {
           _achievements = achievements;
         });
+      }
+    });
+
+    // Listen to profile data changes (for BMI updates)
+    _profileDataSubscription?.cancel();
+    _profileDataSubscription = _appStateService.profileDataStream.listen((profileData) {
+      print('Profile data stream received in analytics: $profileData');
+      if (mounted && profileData != null) {
+        setState(() {
+          // Update height and weight from profile data
+          final heightCm = profileData['height']?.toDouble();
+          _userHeight = heightCm != null ? heightCm / 100.0 : null;
+          _userWeight = profileData['weight']?.toDouble();
+          _userGender = profileData['gender']?.toString();
+          _userAge = profileData['age']?.toInt();
+        });
+        print('Profile data updated in analytics: Height=${_userHeight}m, Weight=${_userWeight}kg');
+        print('BMI will be recalculated with new values');
+      } else {
+        print('Profile data is null or widget not mounted');
       }
     });
 
@@ -178,6 +268,74 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     }
   }
 
+  /// Generate AI insights based on current data
+  Future<void> _generateAIInsights() async {
+    if (_isGeneratingInsights) return;
+
+    setState(() {
+      _isGeneratingInsights = true;
+    });
+
+    try {
+      // Fetch user profile data for comprehensive analysis
+      final user = FirebaseAuth.instance.currentUser;
+      Map<String, dynamic>? userProfile;
+      if (user != null) {
+        userProfile = await FirebaseService().getUserProfile(user.uid);
+      }
+
+      // Prepare comprehensive user data for AI analysis
+      final userData = {
+        // Profile data
+        if (userProfile != null) ...userProfile,
+        
+        // Recent activity data
+        'recent_calories': _dailySummaries.map((summary) => {
+          'date': summary.date.toIso8601String().split('T')[0],
+          'calories': summary.caloriesConsumed,
+        }).toList(),
+        'recent_steps': _dailySummaries.map((summary) => {
+          'date': summary.date.toIso8601String().split('T')[0],
+          'steps': summary.steps,
+        }).toList(),
+        // Note: Weight and BMI data would need to be fetched separately from user profile
+        
+        // Macro breakdown
+        'macro_breakdown': {
+          'carbs': _macroBreakdown.carbs,
+          'protein': _macroBreakdown.protein,
+          'fat': _macroBreakdown.fat,
+          'fiber': _macroBreakdown.fiber,
+          'sugar': _macroBreakdown.sugar,
+        },
+        
+        // Analysis period
+        'period': _selectedPeriod,
+        
+        // Additional metrics
+        'total_days_analyzed': _dailySummaries.length,
+        'average_calories': _dailySummaries.isNotEmpty 
+            ? _dailySummaries.map((s) => s.caloriesConsumed).reduce((a, b) => a + b) / _dailySummaries.length
+            : 0,
+        'average_steps': _dailySummaries.isNotEmpty 
+            ? _dailySummaries.map((s) => s.steps).reduce((a, b) => a + b) / _dailySummaries.length
+            : 0,
+      };
+
+      final insights = await AIService.getAnalyticsInsights(userData);
+      
+      setState(() {
+        _aiInsights = insights;
+        _isGeneratingInsights = false;
+      });
+    } catch (e) {
+      setState(() {
+        _aiInsights = '⚠️ AI service unavailable, please try again later.';
+        _isGeneratingInsights = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -210,6 +368,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       _buildCaloriesChart(),
                       const SizedBox(height: 24),
                       _buildMacroBreakdown(),
+                      const SizedBox(height: 24),
+                      _buildBMIAnalytics(),
                       const SizedBox(height: 24),
                       _buildAIInsights(),
                       const SizedBox(height: 24),
@@ -818,6 +978,299 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
+  /// Build BMI Analytics section
+  Widget _buildBMIAnalytics() {
+    // Calculate BMI from real user profile data
+    final currentWeight = _userWeight ?? 70.0; // Use real user weight or default
+    final currentHeight = _userHeight ?? 1.75; // Use real user height or default
+    final bmi = currentWeight / (currentHeight * currentHeight);
+    final bmiCategory = _getBMICategory(bmi);
+    final bmiColor = _getBMIColor(bmi);
+    
+    // Debug logging
+    print('BMI Debug - Weight: $_userWeight, Height: $_userHeight');
+    print('BMI Debug - Current Weight: $currentWeight, Current Height: $currentHeight');
+    print('BMI Debug - Calculated BMI: $bmi');
+    
+    // Check if we have real user data (not null and not zero)
+    final hasRealData = _userWeight != null && _userHeight != null && _userWeight! > 0 && _userHeight! > 0;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        color: kSurfaceColor,
+        borderRadius: BorderRadius.all(Radius.circular(16)),
+        boxShadow: kCardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: bmiColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(
+                  Icons.monitor_weight,
+                  color: bmiColor,
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'BMI Analytics',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: kTextPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // BMI Value and Category
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [bmiColor.withValues(alpha: 0.1), bmiColor.withValues(alpha: 0.05)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: bmiColor.withValues(alpha: 0.2),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Current BMI',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: kTextSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        bmi.toStringAsFixed(1),
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: bmiColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        bmiCategory,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: bmiColor,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Show user data if available
+                      if (hasRealData) ...[
+                        Text(
+                          'Height: ${(_userHeight! * 100).round()} cm | Weight: ${_userWeight!.round()} kg',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: kTextSecondary,
+                          ),
+                        ),
+                      ] else ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Update your profile for accurate BMI',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.orange[700],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // BMI Range Information
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: kInfoColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: kInfoColor,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'BMI Categories',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: kInfoColor,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _buildBMIRangeItem('Underweight', '< 18.5', Colors.blue),
+                _buildBMIRangeItem('Normal', '18.5 - 24.9', Colors.green),
+                _buildBMIRangeItem('Overweight', '25.0 - 29.9', Colors.orange),
+                _buildBMIRangeItem('Obese', '≥ 30.0', Colors.red),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Health Recommendations
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: kSuccessColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.lightbulb_outline,
+                      color: kSuccessColor,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Health Recommendations',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: kSuccessColor,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _getBMIRecommendation(bmi),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: kTextSecondary,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBMIRangeItem(String category, String range, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            category,
+            style: const TextStyle(
+              fontSize: 12,
+              color: kTextPrimary,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            range,
+            style: TextStyle(
+              fontSize: 12,
+              color: kTextSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getBMICategory(double bmi) {
+    if (bmi < 18.5) return 'Underweight';
+    if (bmi < 25.0) return 'Normal';
+    if (bmi < 30.0) return 'Overweight';
+    return 'Obese';
+  }
+
+  Color _getBMIColor(double bmi) {
+    if (bmi < 18.5) return Colors.blue;
+    if (bmi < 25.0) return Colors.green;
+    if (bmi < 30.0) return Colors.orange;
+    return Colors.red;
+  }
+
+  String _getBMIRecommendation(double bmi) {
+    final hasRealData = _userWeight != null && _userHeight != null;
+    final gender = _userGender ?? 'Unknown';
+    final age = _userAge ?? 25;
+    
+    String baseRecommendation;
+    if (bmi < 18.5) {
+      baseRecommendation = 'Consider increasing your calorie intake with healthy foods and strength training to build muscle mass.';
+    } else if (bmi < 25.0) {
+      baseRecommendation = 'Great job! Maintain your current healthy lifestyle with balanced nutrition and regular exercise.';
+    } else if (bmi < 30.0) {
+      baseRecommendation = 'Focus on creating a moderate calorie deficit through healthy eating and increased physical activity.';
+    } else {
+      baseRecommendation = 'Consider consulting with a healthcare professional for a personalized weight management plan.';
+    }
+    
+    if (hasRealData) {
+      return '$baseRecommendation Based on your profile (${gender}, ${age} years old), this recommendation is personalized for you.';
+    } else {
+      return '$baseRecommendation Update your profile in settings for more personalized recommendations.';
+    }
+  }
+
 
 
   Widget _buildAIInsights() {
@@ -846,31 +1299,110 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'AI-Generated Insights',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: kTextPrimary,
+              const Expanded(
+                child: Text(
+                  'AI-Generated Insights',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: kTextPrimary,
+                  ),
                 ),
+              ),
+              IconButton(
+                onPressed: _generateAIInsights,
+                icon: _isGeneratingInsights 
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh, color: kAccentPurple),
+                tooltip: 'Generate AI Insights',
               ),
             ],
           ),
           const SizedBox(height: 16),
           
-          if (_insights.isEmpty)
+          if (_aiInsights.isEmpty && !_isGeneratingInsights)
             _buildEmptyInsights()
+          else if (_isGeneratingInsights)
+            _buildLoadingInsights()
           else
-            ..._insights.map((insight) => Column(
-              children: [
-                _buildInsightItem(
-                  insight['title']?.toString() ?? 'Insight',
-                  insight['description']?.toString() ?? 'No description available',
-                  _getInsightColor(insight['type']?.toString() ?? 'info'),
+            _buildAIInsightsContent(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingInsights() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: kAccentPurple.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'Generating AI insights...',
+            style: TextStyle(
+              fontSize: 14,
+              color: kAccentPurple.withValues(alpha: 0.8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAIInsightsContent() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kAccentPurple.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: kAccentPurple.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.auto_awesome,
+                color: kAccentPurple,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'AI Analysis',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: kAccentPurple,
                 ),
-                const SizedBox(height: 12),
-              ],
-            )).toList(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _aiInsights,
+            style: const TextStyle(
+              fontSize: 13,
+              color: kTextSecondary,
+              height: 1.4,
+            ),
+          ),
         ],
       ),
     );
@@ -1032,4 +1564,5 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       ),
     );
   }
+
 } 

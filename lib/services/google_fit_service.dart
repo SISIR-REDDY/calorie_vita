@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:health/health.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/health_data.dart';
 import 'error_handler.dart';
 
@@ -16,6 +17,8 @@ class GoogleFitService {
   Health? _health;
   bool _isInitialized = false;
   bool _isConnected = false;
+  bool _isGoogleFitAvailable = false;
+  String? _lastError;
 
   // Health data types to track
   final List<HealthDataType> _healthDataTypes = [
@@ -36,16 +39,67 @@ class GoogleFitService {
   Stream<bool> get connectionStatusStream => _connectionStatusController.stream;
   bool get isConnected => _isConnected;
   bool get isInitialized => _isInitialized;
+  bool get isGoogleFitAvailable => _isGoogleFitAvailable;
+  String? get lastError => _lastError;
+
+  /// Check if Google Fit/Health Connect is available on the device
+  Future<bool> checkGoogleFitAvailability() async {
+    try {
+      if (kDebugMode) print('🔍 Checking Health Connect availability...');
+      
+      if (!Platform.isAndroid) {
+        _lastError = 'Health Connect is only available on Android devices';
+        if (kDebugMode) print('❌ Not Android device');
+        return false;
+      }
+
+      _health = Health();
+      if (kDebugMode) print('✅ Health service created');
+      
+      // Try to check if Health Connect is available
+      final today = DateTime.now();
+      final startOfDay = DateTime(today.year, today.month, today.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+
+      if (kDebugMode) print('📅 Testing data access for: ${startOfDay.toString()} to ${endOfDay.toString()}');
+
+      // This will throw an exception if Health Connect is not available
+      final testData = await _health!.getHealthDataFromTypes(
+        startTime: startOfDay,
+        endTime: endOfDay,
+        types: [HealthDataType.STEPS], // Just check one type for availability
+      );
+
+      _isGoogleFitAvailable = true;
+      _lastError = null;
+      if (kDebugMode) print('✅ Health Connect is available');
+      if (kDebugMode) print('📊 Test data retrieved: ${testData.length} points');
+      return true;
+    } catch (e) {
+      _isGoogleFitAvailable = false;
+      _lastError = _getUserFriendlyError(e);
+      if (kDebugMode) print('❌ Health Connect not available: $e');
+      if (kDebugMode) print('💡 Error type: ${e.runtimeType}');
+      if (kDebugMode) print('💡 This usually means Health Connect is not installed or not set up');
+      return false;
+    }
+  }
 
   /// Initialize Google Fit service (now Health Connect)
   Future<bool> initialize() async {
     try {
       if (!Platform.isAndroid) {
+        _lastError = 'Health Connect is only available on Android devices';
         if (kDebugMode) print('Health Connect is only available on Android');
         return false;
       }
 
-      _health = Health();
+      // First check if Google Fit/Health Connect is available
+      final isAvailable = await checkGoogleFitAvailability();
+      if (!isAvailable) {
+        return false;
+      }
+
       _isInitialized = true;
       
       if (kDebugMode) print('✅ Health service initialized');
@@ -103,14 +157,26 @@ class GoogleFitService {
   /// Connect to Health Connect
   Future<bool> connect() async {
     try {
+      if (kDebugMode) print('🚀 Starting Health Connect connection process...');
+      
       if (!_isInitialized) {
         if (kDebugMode) print('🔧 Initializing Health Connect...');
         final initialized = await initialize();
         if (!initialized) {
           if (kDebugMode) print('❌ Failed to initialize Health Connect');
+          _lastError = 'Failed to initialize Health Connect service';
           return false;
         }
+        if (kDebugMode) print('✅ Health Connect initialized successfully');
       }
+
+      // Check if Google Fit/Health Connect is available
+      if (!_isGoogleFitAvailable) {
+        _lastError = 'Health Connect is not installed or not available on this device';
+        if (kDebugMode) print('❌ Health Connect not available - _isGoogleFitAvailable: $_isGoogleFitAvailable');
+        return false;
+      }
+      if (kDebugMode) print('✅ Health Connect availability confirmed');
 
       // Check if already connected
       if (_isConnected) {
@@ -122,9 +188,11 @@ class GoogleFitService {
       // Request permissions first
       final hasPermissions = await requestPermissions();
       if (!hasPermissions) {
+        _lastError = 'Health Connect permissions were denied. Please grant permissions to access your health data.';
         if (kDebugMode) print('❌ Health Connect permissions denied');
         return false;
       }
+      if (kDebugMode) print('✅ Health Connect permissions granted');
 
       if (kDebugMode) print('📊 Testing Health Connect connection...');
       // Test connection by fetching today's data
@@ -132,6 +200,8 @@ class GoogleFitService {
       final startOfDay = DateTime(today.year, today.month, today.day);
       final endOfDay = startOfDay.add(const Duration(days: 1));
 
+      if (kDebugMode) print('📅 Fetching data for: ${startOfDay.toString()} to ${endOfDay.toString()}');
+      
       // Test connection by fetching today's data
       final healthData = await _health!.getHealthDataFromTypes(
         startTime: startOfDay,
@@ -141,13 +211,25 @@ class GoogleFitService {
 
       _isConnected = true;
       _connectionStatusController.add(true);
+      _lastError = null;
       
       if (kDebugMode) print('✅ Connected to Health Connect successfully');
       if (kDebugMode) print('📈 Retrieved ${healthData.length} health data points');
+      
+      // Log what data we got
+      if (kDebugMode) {
+        for (final dataPoint in healthData) {
+          print('📊 Data: ${dataPoint.type} = ${dataPoint.value}');
+        }
+      }
+      
       return true;
     } catch (e) {
+      _lastError = _getUserFriendlyError(e);
       _errorHandler.handleDataError('health_connect_connect', e);
       if (kDebugMode) print('❌ Failed to connect to Health Connect: $e');
+      if (kDebugMode) print('💡 Error type: ${e.runtimeType}');
+      if (kDebugMode) print('💡 Error details: ${e.toString()}');
       if (kDebugMode) print('💡 Make sure Health Connect is installed and permissions are granted');
       return false;
     }
@@ -161,6 +243,109 @@ class GoogleFitService {
       if (kDebugMode) print('🔌 Disconnected from Health Connect');
     } catch (e) {
       _errorHandler.handleDataError('health_connect_disconnect', e);
+    }
+  }
+
+  /// Get user-friendly error message
+  String _getUserFriendlyError(dynamic error) {
+    final errorString = error.toString().toLowerCase();
+    
+    if (kDebugMode) print('🔍 Error details: $error');
+    
+    if (errorString.contains('permission') || errorString.contains('denied')) {
+      return 'Health Connect permissions are required. Please grant permissions in your device settings.';
+    } else if (errorString.contains('not available') || errorString.contains('not found')) {
+      return 'Health Connect is not installed. Please install it from the Play Store.';
+    } else if (errorString.contains('network') || errorString.contains('connection')) {
+      return 'Network connection issue. Please check your internet connection and try again.';
+    } else if (errorString.contains('timeout')) {
+      return 'Connection timed out. Please try again.';
+    } else if (errorString.contains('android')) {
+      return 'This feature is only available on Android devices.';
+    } else if (errorString.contains('security') || errorString.contains('exception')) {
+      return 'Permission denied. Please check Health Connect settings and grant all required permissions.';
+    } else if (errorString.contains('unavailable') || errorString.contains('disabled')) {
+      return 'Health Connect is disabled. Please enable it in your device settings.';
+    } else if (errorString.contains('healthconnect') || errorString.contains('health connect')) {
+      return 'Health Connect is not properly set up. Please open Health Connect app and complete the setup.';
+    } else {
+      return 'Unable to connect to Health Connect. Please install Health Connect app and grant permissions.';
+    }
+  }
+
+  /// Check if Health Connect is properly set up
+  Future<Map<String, dynamic>> getHealthConnectStatus() async {
+    final status = <String, dynamic>{
+      'isAndroid': Platform.isAndroid,
+      'isInitialized': _isInitialized,
+      'isAvailable': _isGoogleFitAvailable,
+      'isConnected': _isConnected,
+      'lastError': _lastError,
+    };
+
+    if (kDebugMode) {
+      print('📊 Health Connect Status:');
+      status.forEach((key, value) {
+        print('   $key: $value');
+      });
+    }
+
+    return status;
+  }
+
+  /// Open Health Connect in Play Store
+  Future<bool> openGoogleFitInPlayStore() async {
+    try {
+      // Try Health Connect first (the new Android health platform)
+      const healthConnectUrl = 'https://play.google.com/store/apps/details?id=com.google.android.apps.healthconnect';
+      final healthConnectUri = Uri.parse(healthConnectUrl);
+      
+      if (await canLaunchUrl(healthConnectUri)) {
+        await launchUrl(healthConnectUri, mode: LaunchMode.externalApplication);
+        if (kDebugMode) print('✅ Opened Health Connect in Play Store');
+        return true;
+      } else {
+        // Fallback to Google Fit
+        const googleFitUrl = 'https://play.google.com/store/apps/details?id=com.google.android.apps.fitness';
+        final googleFitUri = Uri.parse(googleFitUrl);
+        
+        if (await canLaunchUrl(googleFitUri)) {
+          await launchUrl(googleFitUri, mode: LaunchMode.externalApplication);
+          if (kDebugMode) print('✅ Opened Google Fit in Play Store');
+          return true;
+        } else {
+          if (kDebugMode) print('❌ Cannot open Play Store URLs');
+          return false;
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print('❌ Error opening Play Store: $e');
+      return false;
+    }
+  }
+
+  /// Open Health Connect settings
+  Future<bool> openHealthConnectSettings() async {
+    try {
+      const settingsUrl = 'content://com.google.android.apps.healthconnect/settings';
+      final uri = Uri.parse(settingsUrl);
+      
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return true;
+      } else {
+        // Fallback to general settings
+        const generalSettingsUrl = 'android.settings.APPLICATION_DETAILS_SETTINGS';
+        final generalUri = Uri.parse(generalSettingsUrl);
+        if (await canLaunchUrl(generalUri)) {
+          await launchUrl(generalUri, mode: LaunchMode.externalApplication);
+          return true;
+        }
+        return false;
+      }
+    } catch (e) {
+      if (kDebugMode) print('❌ Error opening settings: $e');
+      return false;
     }
   }
 

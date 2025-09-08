@@ -2,9 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../widgets/chat_bubble.dart';
-import '../services/sisir_service.dart';
+import '../services/ai_service.dart';
+import '../services/firebase_service.dart';
 import '../services/real_time_input_service.dart';
 import '../ui/app_colors.dart';
+
+class Message {
+  final String sender;
+  final String text;
+  final DateTime timestamp;
+
+  Message({
+    required this.sender,
+    required this.text,
+    required this.timestamp,
+  });
+}
 
 class AITrainerScreen extends StatefulWidget {
   const AITrainerScreen({super.key});
@@ -64,11 +77,13 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
   final ScrollController _scrollController = ScrollController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseService _firebaseService = FirebaseService();
   
   bool isDark = false;
   bool isLoading = false;
   bool isPremium = false; // Simulated premium status
   bool isLoadingHistory = false;
+  Map<String, dynamic>? _userProfile;
   
   List<Message> messages = [
     Message(sender: 'Sisir', text: 'Hi! I am Trainer Sisir. Ask me anything about fitness or nutrition!', timestamp: DateTime.now()),
@@ -76,12 +91,23 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
   
   List<ChatSession> chatSessions = [];
   String? currentSessionId;
+  DateTime? _lastHistoryLoad;
 
   @override
   void initState() {
     super.initState();
-    _loadChatHistory();
     _checkPremiumStatus();
+    _loadUserProfile();
+    _loadChatHistory();
+  }
+
+  @override
+  void dispose() {
+    // Save current session when leaving the screen
+    if (currentSessionId != null && messages.length > 1) {
+      _saveCurrentSession();
+    }
+    super.dispose();
   }
 
   Future<void> _checkPremiumStatus() async {
@@ -91,30 +117,79 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
     });
   }
 
-  Future<void> _loadChatHistory() async {
+  Future<void> _loadUserProfile() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        final profile = await _firebaseService.getUserProfile(user.uid);
+        setState(() {
+          _userProfile = profile;
+        });
+      }
+    } catch (e) {
+      print('Error loading user profile: $e');
+    }
+  }
+
+  Future<void> _loadChatHistory({bool forceRefresh = false}) async {
     if (!isPremium) return;
     
-    setState(() {
-      isLoadingHistory = true;
-    });
+    // Don't reload if already loading
+    if (isLoadingHistory) return;
+    
+    // Use cache if data is recent (less than 30 seconds old) and not forcing refresh
+    if (!forceRefresh && 
+        _lastHistoryLoad != null && 
+        DateTime.now().difference(_lastHistoryLoad!).inSeconds < 30) {
+      return;
+    }
+    
+    // Only show loading if we have no data
+    if (chatSessions.isEmpty) {
+      setState(() {
+        isLoadingHistory = true;
+      });
+    }
 
     try {
       final user = _auth.currentUser;
-      if (user == null) return;
+      if (user == null) {
+        setState(() {
+          isLoadingHistory = false;
+        });
+        return;
+      }
 
+      // Use a more efficient query with limit
       final querySnapshot = await _firestore
           .collection('chat_sessions')
           .where('userId', isEqualTo: user.uid)
-          .orderBy('timestamp', descending: true)
-          .limit(5)
+          .limit(10) // Get a few extra to account for sorting
           .get();
 
+      // Process data more efficiently
+      final sessions = <ChatSession>[];
+      for (final doc in querySnapshot.docs) {
+        try {
+          final session = ChatSession.fromMap(doc.data());
+          sessions.add(session);
+        } catch (e) {
+          print('Error parsing session ${doc.id}: $e');
+          continue;
+        }
+      }
+
+      // Sort and limit in one operation
+      sessions.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      final limitedSessions = sessions.take(5).toList();
+
       setState(() {
-        chatSessions = querySnapshot.docs
-            .map((doc) => ChatSession.fromMap(doc.data()))
-            .toList();
+        chatSessions = limitedSessions;
         isLoadingHistory = false;
+        _lastHistoryLoad = DateTime.now();
       });
+      
+      print('Chat history loaded: ${limitedSessions.length} sessions');
     } catch (e) {
       print('Error loading chat history: $e');
       setState(() {
@@ -124,17 +199,18 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
   }
 
   Future<void> _saveCurrentSession() async {
-    if (!isPremium || messages.length <= 1) return; // Don't save if only welcome message
+    if (!isPremium) return;
+    
+    // Only save if there are user messages (more than just the welcome message)
+    final userMessages = messages.where((msg) => msg.sender == 'user').toList();
+    if (userMessages.isEmpty) return;
 
     try {
       final user = _auth.currentUser;
       if (user == null) return;
 
       final sessionId = currentSessionId ?? DateTime.now().millisecondsSinceEpoch.toString();
-      final firstUserMessage = messages.firstWhere(
-        (msg) => msg.sender == 'user',
-        orElse: () => Message(sender: 'user', text: 'Chat', timestamp: DateTime.now()),
-      );
+      final firstUserMessage = userMessages.first;
       
       final title = firstUserMessage.text.length > 30 
           ? '${firstUserMessage.text.substring(0, 30)}...'
@@ -162,6 +238,8 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
 
       // Reload history
       await _loadChatHistory();
+      
+      print('Chat session saved successfully: $sessionId');
     } catch (e) {
       print('Error saving chat session: $e');
     }
@@ -175,11 +253,18 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
       final querySnapshot = await _firestore
           .collection('chat_sessions')
           .where('userId', isEqualTo: user.uid)
-          .orderBy('timestamp', descending: true)
           .get();
 
       if (querySnapshot.docs.length > 5) {
-        final docsToDelete = querySnapshot.docs.skip(5);
+        // Sort by timestamp and get the oldest ones to delete
+        final sortedDocs = querySnapshot.docs.toList()
+          ..sort((a, b) {
+            final aTime = a.data()['timestamp'] as int? ?? 0;
+            final bTime = b.data()['timestamp'] as int? ?? 0;
+            return aTime.compareTo(bTime); // Ascending order (oldest first)
+          });
+        
+        final docsToDelete = sortedDocs.skip(5);
         final batch = _firestore.batch();
         
         for (final doc in docsToDelete) {
@@ -230,7 +315,7 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
     
     String reply;
     try {
-      reply = await SisirService.getSisirReply(messages);
+      reply = await AIService.askTrainerSisir(text, userProfile: _userProfile);
     } catch (e) {
       reply = 'Sorry, there was a problem connecting to the AI service.';
     }
@@ -252,6 +337,11 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
   }
 
   void _startNewChat() {
+    // Save current session before starting new one
+    if (currentSessionId != null && messages.length > 1) {
+      _saveCurrentSession();
+    }
+    
     setState(() {
       messages = [
         Message(sender: 'Sisir', text: 'Hi! I am Trainer Sisir. Ask me anything about fitness or nutrition!', timestamp: DateTime.now()),
@@ -261,6 +351,19 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
   }
 
   void _showChatHistory() {
+    // Clear any existing loading state
+    if (isLoadingHistory) {
+      setState(() {
+        isLoadingHistory = false;
+      });
+    }
+    
+    // Only refresh if we don't have recent data
+    if (_lastHistoryLoad == null || 
+        DateTime.now().difference(_lastHistoryLoad!).inSeconds > 30) {
+      _loadChatHistory(forceRefresh: true);
+    }
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -295,7 +398,7 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
             child: Row(
               children: [
                 Icon(
-                  Icons.history,
+                  Icons.chat,
                   color: kAccentBlue,
                   size: 24,
                 ),
@@ -309,6 +412,23 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
                   ),
                 ),
                 const Spacer(),
+                if (isPremium && chatSessions.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: _showDeleteAllDialog,
+                    icon: Icon(
+                      Icons.delete_sweep,
+                      color: Colors.red[600],
+                      size: 18,
+                    ),
+                    label: Text(
+                      'Clear All',
+                      style: TextStyle(
+                        color: Colors.red[600],
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 if (!isPremium)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -341,12 +461,21 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
       return _buildPremiumLockScreen();
     }
 
-    if (isLoadingHistory) {
+    // Show loading only if we have no data and are actually loading
+    if (isLoadingHistory && chatSessions.isEmpty) {
       return const Center(
-        child: CircularProgressIndicator(),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Loading chat history...'),
+          ],
+        ),
       );
     }
 
+    // Show existing data immediately, even if loading more
     if (chatSessions.isEmpty) {
       return Center(
         child: Column(
@@ -373,18 +502,64 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
                 color: Colors.grey[500],
               ),
             ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _startNewChat();
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Start New Chat'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kAccentBlue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(25),
+                ),
+              ),
+            ),
           ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: chatSessions.length,
-      itemBuilder: (context, index) {
-        final session = chatSessions[index];
-        return _buildSessionCard(session);
-      },
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _startNewChat();
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Start New Chat'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kAccentBlue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                elevation: 2,
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: chatSessions.length,
+            itemBuilder: (context, index) {
+              final session = chatSessions[index];
+              return _buildSessionCard(session);
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -452,16 +627,18 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
   }
 
   Widget _buildSessionCard(ChatSession session) {
+    final isCurrentSession = currentSessionId == session.id;
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: isDark ? Colors.grey[800] : Colors.grey[50],
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: currentSessionId == session.id 
+          color: isCurrentSession 
               ? kAccentBlue 
               : Colors.grey.withOpacity(0.3),
-          width: currentSessionId == session.id ? 2 : 1,
+          width: isCurrentSession ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
@@ -500,17 +677,33 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
             fontSize: 12,
           ),
         ),
-        trailing: currentSessionId == session.id
-            ? Icon(
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isCurrentSession)
+              Icon(
                 Icons.check_circle,
                 color: kAccentBlue,
                 size: 20,
               )
-            : Icon(
+            else
+              Icon(
                 Icons.arrow_forward_ios,
                 color: Colors.grey[400],
                 size: 16,
               ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: Icon(
+                Icons.delete_outline,
+                color: Colors.red[400],
+                size: 18,
+              ),
+              onPressed: () => _showDeleteDialog(session),
+              tooltip: 'Delete chat',
+            ),
+          ],
+        ),
         onTap: () {
           Navigator.pop(context);
           _loadSession(session);
@@ -552,6 +745,174 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
     );
   }
 
+  void _showDeleteDialog(ChatSession session) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: isDark ? Colors.grey[800] : Colors.white,
+          title: Text(
+            'Delete Chat',
+            style: TextStyle(
+              color: isDark ? Colors.white : kTextDark,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to delete "${session.title}"? This action cannot be undone.',
+            style: TextStyle(
+              color: isDark ? Colors.grey[300] : Colors.grey[700],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteSession(session);
+              },
+              child: Text(
+                'Delete',
+                style: TextStyle(color: Colors.red[600]),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showDeleteAllDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: isDark ? Colors.grey[800] : Colors.white,
+          title: Text(
+            'Clear All Chats',
+            style: TextStyle(
+              color: isDark ? Colors.white : kTextDark,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to delete all chat history? This action cannot be undone.',
+            style: TextStyle(
+              color: isDark ? Colors.grey[300] : Colors.grey[700],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteAllSessions();
+              },
+              child: Text(
+                'Clear All',
+                style: TextStyle(color: Colors.red[600]),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteSession(ChatSession session) async {
+    try {
+      await _firestore.collection('chat_sessions').doc(session.id).delete();
+      
+      setState(() {
+        chatSessions.removeWhere((s) => s.id == session.id);
+        if (currentSessionId == session.id) {
+          _startNewChat();
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Chat deleted successfully'),
+          backgroundColor: Colors.green[600],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    } catch (e) {
+      print('Error deleting session: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Failed to delete chat'),
+          backgroundColor: Colors.red[600],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteAllSessions() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      final querySnapshot = await _firestore
+          .collection('chat_sessions')
+          .where('userId', isEqualTo: user.uid)
+          .get();
+
+      final batch = _firestore.batch();
+      for (final doc in querySnapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+
+      setState(() {
+        chatSessions.clear();
+        _startNewChat();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('All chats cleared successfully'),
+          backgroundColor: Colors.green[600],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    } catch (e) {
+      print('Error deleting all sessions: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Failed to clear chats'),
+          backgroundColor: Colors.red[600],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = isDark ? ThemeData.dark() : ThemeData.light();
@@ -587,19 +948,9 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
           ),
           actions: [
             IconButton(
-              icon: Icon(Icons.history, color: kAccentBlue),
+              icon: Icon(Icons.chat, color: kAccentBlue),
               tooltip: 'Chat History',
               onPressed: _showChatHistory,
-            ),
-            IconButton(
-              icon: Icon(Icons.refresh, color: kAccentBlue),
-              tooltip: 'New Chat',
-              onPressed: _startNewChat,
-            ),
-            IconButton(
-              icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: kAccentBlue),
-              onPressed: () => setState(() => isDark = !isDark),
-              tooltip: isDark ? 'Light mode' : 'Dark mode',
             ),
           ],
         ),

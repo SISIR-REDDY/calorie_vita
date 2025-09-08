@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,11 +8,13 @@ import 'package:health/health.dart';
 import '../ui/app_colors.dart';
 import '../services/app_state_service.dart';
 import '../services/demo_auth_service.dart';
+import '../services/firebase_service.dart';
 import '../services/real_time_input_service.dart';
 import '../services/health_data_service.dart';
 import '../services/calorie_units_service.dart';
 
 import '../models/user_preferences.dart';
+import '../models/user_goals.dart';
 import '../widgets/health_integration_widget.dart';
 import '../widgets/health_integration_dialog.dart';
 import 'profile_edit_screen.dart';
@@ -42,6 +45,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _userEmail;
   String? _profileImageUrl;
   UserPreferences _userPreferences = const UserPreferences();
+  
+  // Stream subscription for profile data
+  StreamSubscription<DocumentSnapshot>? _profileSubscription;
+  
+  // Settings state variables
+  bool _isDarkMode = false;
 
   @override
   void initState() {
@@ -72,6 +81,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _user = user;
           if (user != null) {
             _loadUserProfileData(user);
+            _setupProfileDataListener(user.uid);
           }
         });
       }
@@ -84,6 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _user = user;
           if (user != null) {
             _loadUserProfileData(user);
+            _setupProfileDataListener(user.uid);
           }
         });
         print('Firebase Auth state changed - User: ${user?.displayName}');
@@ -129,10 +140,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// Load user profile data
   Future<void> _loadUserProfileData(User user) async {
     try {
-      // Load from Firestore first, fallback to Auth data
+      // Load from the correct Firestore path: users/{userId}/profile/userData
       final doc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
+          .collection('profile')
+          .doc('userData')
           .get();
       
       if (mounted) {
@@ -157,7 +170,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Fallback to Auth data
             _userName = user.displayName?.isNotEmpty == true ? user.displayName : 'User';
             _userEmail = user.email ?? 'user@example.com';
-            print('Settings Screen - No Firestore data, using Auth name: ${user.displayName}');
+            print('Settings Screen - No Firestore profile data, using Auth name: ${user.displayName}');
           }
         });
       }
@@ -173,25 +186,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  /// Handle notification toggle
-  void _onNotificationToggle(bool value) async {
-    try {
-      final updatedPreferences = _userPreferences.copyWith(
-        notificationsEnabled: value,
-        lastUpdated: DateTime.now(),
-      );
-      await _appStateService.updateUserPreferences(updatedPreferences);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating notification settings: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+  /// Set up real-time listener for profile data changes
+  void _setupProfileDataListener(String userId) {
+    // Cancel existing subscription
+    _profileSubscription?.cancel();
+    
+    // Set up new subscription to listen for profile data changes
+    _profileSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('profile')
+        .doc('userData')
+        .snapshots()
+        .listen((doc) {
+      if (mounted && doc.exists) {
+        final data = doc.data()!;
+        setState(() {
+          // Update profile data in real-time
+          final firestoreName = data['name']?.toString();
+          final authName = _user?.displayName;
+          
+          _userName = firestoreName?.isNotEmpty == true 
+              ? firestoreName 
+              : authName?.isNotEmpty == true 
+                  ? authName 
+                  : 'User';
+          
+          _profileImageUrl = data['profileImageUrl'];
+          
+          print('Settings Screen - Profile data updated in real-time: $_userName');
+        });
       }
-    }
+    }, onError: (error) {
+      print('Settings Screen - Error listening to profile data: $error');
+    });
   }
+
 
   /// Handle dark mode toggle
   void _onDarkModeToggle(bool value) async {
@@ -229,6 +259,419 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => const TermsConditionsScreen(),
+      ),
+    );
+  }
+
+  /// Navigate to Contact Us
+  void _navigateToContact() {
+    // For now, show a simple dialog. You can replace this with a proper contact screen
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Contact Us',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'For support and feedback, please contact us at:\n\nEmail: support@calorievita.com\nPhone: +1 (555) 123-4567',
+          style: GoogleFonts.poppins(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Close',
+              style: GoogleFonts.poppins(color: kPrimaryColor),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show calorie units selection dialog
+  void _navigateToCalorieUnits() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        // Get current unit from CalorieUnitsService (should be up-to-date)
+        final CalorieUnitsService calorieUnitsService = CalorieUnitsService();
+        String selectedUnit = calorieUnitsService.unitSuffix;
+        
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              elevation: 20,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.9,
+                  maxHeight: MediaQuery.of(context).size.height * 0.7,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    gradient: LinearGradient(
+                      colors: [Colors.white, Colors.white.withValues(alpha: 0.95)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                    // Header with icon and title
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [kAccentGold, kAccentGold.withValues(alpha: 0.8)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: kAccentGold.withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.straighten, color: Colors.white, size: 24),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Select Calorie Unit',
+                            style: GoogleFonts.poppins(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Description
+                    Text(
+                      'Choose your preferred unit for displaying calories throughout the app',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: kTextSecondary,
+                        height: 1.4,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Unit options
+                    _buildEnhancedUnitOption('kcal', 'Kilocalories', 'kcal', 'Most common unit', selectedUnit, () {
+                      setState(() => selectedUnit = 'kcal');
+                    }),
+                    const SizedBox(height: 16),
+                    _buildEnhancedUnitOption('cal', 'Calories', 'cal', 'Small calorie unit', selectedUnit, () {
+                      setState(() => selectedUnit = 'cal');
+                    }),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Action buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(color: kTextSecondary.withValues(alpha: 0.3)),
+                              ),
+                            ),
+                            child: Text(
+                              'Cancel',
+                              style: GoogleFonts.poppins(
+                                color: kTextSecondary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _saveCalorieUnit(selectedUnit);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: kAccentGold,
+                              foregroundColor: Colors.white,
+                              elevation: 8,
+                              shadowColor: kAccentGold.withValues(alpha: 0.4),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            child: Text(
+                              'Save Unit',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Build enhanced unit option for dialog
+  Widget _buildEnhancedUnitOption(String value, String label, String unit, String description, String selectedUnit, VoidCallback onTap) {
+    final isSelected = selectedUnit == value;
+    
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: isSelected 
+              ? LinearGradient(
+                  colors: [kAccentGold.withValues(alpha: 0.1), kAccentGold.withValues(alpha: 0.05)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : LinearGradient(
+                  colors: [Colors.white, Colors.white.withValues(alpha: 0.8)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected 
+                ? kAccentGold
+                : kTextSecondary.withValues(alpha: 0.15),
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: isSelected ? [
+            BoxShadow(
+              color: kAccentGold.withValues(alpha: 0.2),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ] : [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Radio button with animation
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? kAccentGold : kTextSecondary.withValues(alpha: 0.4),
+                  width: isSelected ? 2 : 1.5,
+                ),
+                color: isSelected ? kAccentGold : Colors.transparent,
+                boxShadow: isSelected ? [
+                  BoxShadow(
+                    color: kAccentGold.withValues(alpha: 0.3),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ] : null,
+              ),
+              child: isSelected
+                  ? const Icon(
+                      Icons.check,
+                      color: Colors.white,
+                      size: 12,
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          label,
+                          style: GoogleFonts.poppins(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? kAccentGold : kTextPrimary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          gradient: isSelected 
+                              ? LinearGradient(
+                                  colors: [kAccentGold, kAccentGold.withValues(alpha: 0.8)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )
+                              : LinearGradient(
+                                  colors: [kTextSecondary.withValues(alpha: 0.1), kTextSecondary.withValues(alpha: 0.05)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                          borderRadius: BorderRadius.circular(6),
+                          boxShadow: isSelected ? [
+                            BoxShadow(
+                              color: kAccentGold.withValues(alpha: 0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ] : null,
+                        ),
+                        child: Text(
+                          unit,
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? Colors.white : kTextSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: isSelected ? kAccentGold.withValues(alpha: 0.8) : kTextSecondary,
+                      height: 1.2,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Selection indicator
+            if (isSelected)
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: kAccentGold,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: kAccentGold.withValues(alpha: 0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.check_circle,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Save calorie unit preference
+  void _saveCalorieUnit(String unit) async {
+    try {
+      final calorieUnit = CalorieUnit.values.firstWhere(
+        (u) => u.name == unit,
+        orElse: () => CalorieUnit.kcal,
+      );
+      
+      final updatedPreferences = _userPreferences.copyWith(
+        calorieUnit: calorieUnit,
+        lastUpdated: DateTime.now(),
+      );
+      
+      await _appStateService.updateUserPreferences(updatedPreferences);
+      
+      // Update the global calorie units service
+      final calorieUnitsService = CalorieUnitsService();
+      calorieUnitsService.updateUnit(calorieUnit);
+      
+      // Update local preferences
+      setState(() {
+        _userPreferences = updatedPreferences;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Text('Calorie unit set to $unit'),
+              ],
+            ),
+            backgroundColor: kAccentGold,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating calorie unit: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Navigate to Weight Log
+  void _navigateToWeightLog() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const WeightLogScreen(),
       ),
     );
   }
@@ -508,6 +951,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -544,19 +988,112 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 16),
 
             // Google Health Connection Section
-            _buildGoogleHealthCard(),
-            const SizedBox(height: 16),
+            _buildUniformSettingsCard(
+              icon: Icons.favorite,
+              title: 'Connect Google Health',
+              subtitle: 'to track your steps',
+              color: Colors.red,
+              onTap: _showHealthIntegrationDialog,
+            ),
+            const SizedBox(height: 12),
 
             // Goals & Targets Section
-            _buildGoalsCard(),
-            const SizedBox(height: 16),
+            _buildUniformSettingsCard(
+              icon: Icons.flag,
+              title: 'Goals & Targets',
+              subtitle: 'Set your health goals and targets',
+              color: kAccentPurple,
+              onTap: _navigateToGoals,
+            ),
+            const SizedBox(height: 12),
 
             // Calorie Units Section
-            _buildCalorieUnitsCard(),
-            const SizedBox(height: 24),
+            _buildUniformSettingsCard(
+              icon: Icons.scale,
+              title: 'Calorie Units',
+              subtitle: 'Choose your preferred calorie unit',
+              color: kAccentGold,
+              onTap: _navigateToCalorieUnits,
+            ),
+            const SizedBox(height: 12),
 
-            // Settings Options
-            _buildSettingsCard(),
+            // Weight Log Section
+            _buildUniformSettingsCard(
+              icon: Icons.monitor_weight,
+              title: 'Weight Log',
+              subtitle: 'Track your weight history',
+              color: kAccentGreen,
+              onTap: _navigateToWeightLog,
+            ),
+            const SizedBox(height: 12),
+
+            // Dark Mode Section
+            _buildUniformSettingsCard(
+              icon: Icons.dark_mode,
+              title: 'Dark Mode',
+              subtitle: 'Switch to dark theme',
+              color: kAccentPurple,
+              onTap: () {},
+              trailing: Switch(
+                value: _isDarkMode,
+                onChanged: (value) {
+                  setState(() {
+                    _isDarkMode = value;
+                  });
+                },
+                activeColor: kAccentPurple,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Privacy Policy Section
+            _buildUniformSettingsCard(
+              icon: Icons.privacy_tip,
+              title: 'Privacy Policy',
+              subtitle: 'Read our privacy policy',
+              color: kAccentGreen,
+              onTap: _navigateToPrivacyPolicy,
+            ),
+            const SizedBox(height: 12),
+
+            // Terms & Conditions Section
+            _buildUniformSettingsCard(
+              icon: Icons.description,
+              title: 'Terms & Conditions',
+              subtitle: 'Read our terms and conditions',
+              color: kAccentGold,
+              onTap: _navigateToTerms,
+            ),
+            const SizedBox(height: 12),
+
+            // Share App Section
+            _buildUniformSettingsCard(
+              icon: Icons.share,
+              title: 'Share App',
+              subtitle: 'Share this app with friends',
+              color: kAccentBlue,
+              onTap: _shareApp,
+            ),
+            const SizedBox(height: 12),
+
+            // Rate Us Section
+            _buildUniformSettingsCard(
+              icon: Icons.star,
+              title: 'Rate Us',
+              subtitle: 'Rate our app on the store',
+              color: kAccentGold,
+              onTap: _rateApp,
+            ),
+            const SizedBox(height: 12),
+
+            // Contact Us Section
+            _buildUniformSettingsCard(
+              icon: Icons.contact_support,
+              title: 'Contact Us',
+              subtitle: 'Get help and support',
+              color: kAccentGreen,
+              onTap: _navigateToContact,
+            ),
             const SizedBox(height: 24),
 
             // Logout Section
@@ -566,6 +1103,77 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+
+  /// Build uniform settings card with consistent size
+  Widget _buildUniformSettingsCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+    Widget? trailing,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          height: 80, // Fixed height for all cards
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              // Icon Container
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(width: 16),
+              
+              // Text Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: kTextDark,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: kTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Trailing Widget (Switch or Arrow)
+              if (trailing != null)
+                trailing
+              else
+                const Icon(Icons.arrow_forward_ios, size: 16, color: kTextSecondary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
 
   /// Build Google Health Connection card
   Widget _buildGoogleHealthCard() {
@@ -708,7 +1316,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
-        onTap: _showCalorieUnitsDialog,
+        onTap: _navigateToCalorieUnits,
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(20),
@@ -769,382 +1377,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// Show calorie units selection dialog
-  void _showCalorieUnitsDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        // Get current unit from CalorieUnitsService (should be up-to-date)
-        final CalorieUnitsService calorieUnitsService = CalorieUnitsService();
-        String selectedUnit = calorieUnitsService.unitSuffix;
-        
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-              elevation: 20,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.9,
-                  maxHeight: MediaQuery.of(context).size.height * 0.7,
-                ),
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
-                    gradient: LinearGradient(
-                      colors: [Colors.white, Colors.white.withValues(alpha: 0.95)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                    // Header with icon and title
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [kAccentColor, kAccentColor.withValues(alpha: 0.8)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: kAccentColor.withValues(alpha: 0.3),
-                            blurRadius: 12,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.straighten, color: Colors.white, size: 24),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Select Calorie Unit',
-                            style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    // Description
-                    Text(
-                      'Choose your preferred unit for displaying calories throughout the app',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: kTextSecondary,
-                        height: 1.4,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    // Unit options
-                    _buildEnhancedUnitOption('kcal', 'Kilocalories', 'kcal', 'Most common unit', selectedUnit, () {
-                      setState(() => selectedUnit = 'kcal');
-                    }),
-                    const SizedBox(height: 16),
-                    _buildEnhancedUnitOption('cal', 'Calories', 'cal', 'Small calorie unit', selectedUnit, () {
-                      setState(() => selectedUnit = 'cal');
-                    }),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Action buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: BorderSide(color: kTextSecondary.withValues(alpha: 0.3)),
-                              ),
-                            ),
-                            child: Text(
-                              'Cancel',
-                              style: GoogleFonts.poppins(
-                                color: kTextSecondary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              _saveCalorieUnit(selectedUnit);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: kAccentColor,
-                              foregroundColor: Colors.white,
-                              elevation: 8,
-                              shadowColor: kAccentColor.withValues(alpha: 0.4),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                            ),
-                            child: Text(
-                              'Save Unit',
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
 
-
-  /// Build enhanced unit option for dialog
-  Widget _buildEnhancedUnitOption(String value, String label, String unit, String description, String selectedUnit, VoidCallback onTap) {
-    final isSelected = selectedUnit == value;
-    
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: isSelected 
-              ? LinearGradient(
-                  colors: [kAccentColor.withValues(alpha: 0.1), kAccentColor.withValues(alpha: 0.05)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : LinearGradient(
-                  colors: [Colors.white, Colors.white.withValues(alpha: 0.8)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected 
-                ? kAccentColor
-                : kTextSecondary.withValues(alpha: 0.15),
-            width: isSelected ? 2 : 1,
-          ),
-          boxShadow: isSelected ? [
-            BoxShadow(
-              color: kAccentColor.withValues(alpha: 0.2),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ] : [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // Radio button with animation
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected ? kAccentColor : kTextSecondary.withValues(alpha: 0.4),
-                  width: isSelected ? 2 : 1.5,
-                ),
-                color: isSelected ? kAccentColor : Colors.transparent,
-                boxShadow: isSelected ? [
-                  BoxShadow(
-                    color: kAccentColor.withValues(alpha: 0.3),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ] : null,
-              ),
-              child: isSelected
-                  ? const Icon(
-                      Icons.check,
-                      color: Colors.white,
-                      size: 12,
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          label,
-                          style: GoogleFonts.poppins(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? kAccentColor : kTextPrimary,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          gradient: isSelected 
-                              ? LinearGradient(
-                                  colors: [kAccentColor, kAccentColor.withValues(alpha: 0.8)],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                )
-                              : LinearGradient(
-                                  colors: [kTextSecondary.withValues(alpha: 0.1), kTextSecondary.withValues(alpha: 0.05)],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                          borderRadius: BorderRadius.circular(6),
-                          boxShadow: isSelected ? [
-                            BoxShadow(
-                              color: kAccentColor.withValues(alpha: 0.3),
-                              blurRadius: 4,
-                              offset: const Offset(0, 1),
-                            ),
-                          ] : null,
-                        ),
-                        child: Text(
-                          unit,
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? Colors.white : kTextSecondary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: isSelected ? kAccentColor.withValues(alpha: 0.8) : kTextSecondary,
-                      height: 1.2,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            // Selection indicator
-            if (isSelected)
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: kAccentColor,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: kAccentColor.withValues(alpha: 0.3),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.check_circle,
-                  color: Colors.white,
-                  size: 16,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Save calorie unit preference
-  void _saveCalorieUnit(String unit) async {
-    try {
-      final calorieUnit = CalorieUnit.values.firstWhere(
-        (u) => u.name == unit,
-        orElse: () => CalorieUnit.kcal,
-      );
-      
-      final updatedPreferences = _userPreferences.copyWith(
-        calorieUnit: calorieUnit,
-        lastUpdated: DateTime.now(),
-      );
-      
-      await _appStateService.updateUserPreferences(updatedPreferences);
-      
-      // Update the global calorie units service
-      final calorieUnitsService = CalorieUnitsService();
-      calorieUnitsService.updateUnit(calorieUnit);
-      
-      // Update local preferences
-      setState(() {
-        _userPreferences = updatedPreferences;
-      });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white, size: 20),
-                const SizedBox(width: 12),
-                Text('Calorie unit set to $unit'),
-              ],
-            ),
-            backgroundColor: kAccentColor,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating calorie unit: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
 
   /// Build profile card with user info and edit button
   Widget _buildProfileCard() {
@@ -1219,191 +1452,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// Build settings options card
-  Widget _buildSettingsCard() {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Column(
-        children: [
-          // Notifications
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: kAccentBlue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.notifications_outlined, color: kAccentBlue, size: 20),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Notifications',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                          color: kTextDark,
-                        ),
-                      ),
-                      Text(
-                        'Receive app notifications',
-                        style: GoogleFonts.poppins(
-                          color: kTextSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch(
-                  value: _userPreferences.notificationsEnabled,
-                  onChanged: _onNotificationToggle,
-                  activeColor: kAccentBlue,
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-
-          // Dark Mode
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: kAccentPurple.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.dark_mode_outlined, color: kAccentPurple, size: 20),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Dark Mode',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                          color: kTextDark,
-                        ),
-                      ),
-                      Text(
-                        'Switch to dark theme',
-                        style: GoogleFonts.poppins(
-                          color: kTextSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch(
-                  value: _userPreferences.darkModeEnabled,
-                  onChanged: _onDarkModeToggle,
-                  activeColor: kAccentPurple,
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-
-          // Weight Log
-          ListTile(
-            leading: const Icon(Icons.monitor_weight, color: kAccentGreen),
-            title: Text(
-              'Weight Log',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-            ),
-            subtitle: Text(
-              'Track your weight history',
-              style: GoogleFonts.poppins(
-                color: kTextSecondary,
-                fontSize: 12,
-              ),
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: kTextSecondary),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const WeightLogScreen(),
-                ),
-              );
-            },
-          ),
-          const Divider(height: 1),
-
-          // Privacy Policy
-          ListTile(
-            leading: const Icon(Icons.privacy_tip_outlined, color: kAccentGreen),
-            title: Text(
-              'Privacy Policy',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: kTextSecondary),
-            onTap: _navigateToPrivacyPolicy,
-          ),
-          const Divider(height: 1),
-
-          // Terms & Conditions
-          ListTile(
-            leading: const Icon(Icons.description_outlined, color: kAccentGold),
-            title: Text(
-              'Terms & Conditions',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: kTextSecondary),
-            onTap: _navigateToTerms,
-          ),
-          const Divider(height: 1),
-
-          // Share App
-          ListTile(
-            leading: const Icon(Icons.share_outlined, color: kAccentBlue),
-            title: Text(
-              'Share App',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: kTextSecondary),
-            onTap: _shareApp,
-          ),
-          const Divider(height: 1),
-
-          // Rate Us
-          ListTile(
-            leading: const Icon(Icons.star_outline, color: kAccentGold),
-            title: Text(
-              'Rate Us',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: kTextSecondary),
-            onTap: _rateApp,
-          ),
-          const Divider(height: 1),
-
-          // Contact Us
-          ListTile(
-            leading: const Icon(Icons.contact_support_outlined, color: kAccentGreen),
-            title: Text(
-              'Contact Us',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: kTextSecondary),
-            onTap: _contactUs,
-          ),
-        ],
-      ),
-    );
-  }
 
   /// Build logout card with red styling
   Widget _buildLogoutCard() {
@@ -1434,5 +1482,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         healthDataService: _healthDataService,
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _profileSubscription?.cancel();
+    super.dispose();
   }
 }

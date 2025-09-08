@@ -35,6 +35,7 @@ class AppStateService {
   final StreamController<List<UserAchievement>> _achievementsController = StreamController<List<UserAchievement>>.broadcast();
   final StreamController<HealthData> _healthDataController = StreamController<HealthData>.broadcast();
   final StreamController<bool> _isOnlineController = StreamController<bool>.broadcast();
+  final StreamController<Map<String, dynamic>?> _profileDataController = StreamController<Map<String, dynamic>?>.broadcast();
 
   // Current state
   User? _currentUser;
@@ -45,6 +46,7 @@ class AppStateService {
   MacroBreakdown _macroBreakdown = MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
   List<UserAchievement> _achievements = [];
   HealthData _healthData = HealthData.empty();
+  Map<String, dynamic>? _profileData;
   bool _isOnline = true;
   bool _isInitialized = false;
 
@@ -55,6 +57,7 @@ class AppStateService {
   StreamSubscription<DocumentSnapshot>? _preferencesSubscription;
   StreamSubscription<DocumentSnapshot>? _achievementsSubscription;
   StreamSubscription<HealthData>? _healthDataSubscription;
+  StreamSubscription<DocumentSnapshot>? _profileDataSubscription;
 
   // Getters for streams
   Stream<User?> get userStream => _userController.stream;
@@ -66,6 +69,7 @@ class AppStateService {
   Stream<List<UserAchievement>> get achievementsStream => _achievementsController.stream;
   Stream<HealthData> get healthDataStream => _healthDataController.stream;
   Stream<bool> get isOnlineStream => _isOnlineController.stream;
+  Stream<Map<String, dynamic>?> get profileDataStream => _profileDataController.stream;
 
   // Getters for current state
   User? get currentUser => _currentUser;
@@ -76,6 +80,7 @@ class AppStateService {
   MacroBreakdown get macroBreakdown => _macroBreakdown;
   List<UserAchievement> get achievements => _achievements;
   HealthData get healthData => _healthData;
+  Map<String, dynamic>? get profileData => _profileData;
   bool get isOnline => _isOnline;
   bool get isInitialized => _isInitialized;
   FirebaseService get firebaseService => _firebaseService;
@@ -187,6 +192,27 @@ class AppStateService {
       _achievementsController.add(_achievements);
       _cacheAchievements();
     });
+
+    // Profile data listener (for height, weight, etc.)
+    _profileDataSubscription?.cancel();
+    _profileDataSubscription = _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('profile')
+        .doc('userData')
+        .snapshots()
+        .listen((snapshot) {
+      print('Profile data snapshot received in AppStateService: ${snapshot.exists}');
+      if (snapshot.exists) {
+        _profileData = snapshot.data()!;
+        print('Profile data updated: $_profileData');
+      } else {
+        _profileData = null;
+        print('Profile data document does not exist');
+      }
+      _profileDataController.add(_profileData);
+      _cacheProfileData();
+    });
   }
 
   /// Initialize health service after user authentication
@@ -231,6 +257,8 @@ class AppStateService {
       caloriesGoal: _userGoals?.calorieGoal ?? 2000,
       steps: _healthData.steps, // From health data
       stepsGoal: _userGoals?.stepsPerDayGoal ?? 10000,
+      waterGlasses: 0, // Default value, will be updated from user input
+      waterGlassesGoal: _userGoals?.waterGlassesGoal ?? 8,
       date: today,
     );
 
@@ -376,6 +404,16 @@ class AppStateService {
     }
   }
 
+  /// Cache profile data locally
+  Future<void> _cacheProfileData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cached_profile_data', _profileData?.toString() ?? '');
+    } catch (e) {
+      print('Error caching profile data: $e');
+    }
+  }
+
   /// Save food entry with offline support
   Future<void> saveFoodEntry(FoodEntry entry) async {
     if (_currentUser == null) return;
@@ -425,20 +463,52 @@ class AppStateService {
   Future<void> updateUserGoals(UserGoals goals) async {
     if (_currentUser == null) return;
 
+    print('=== APPSATE SERVICE UPDATE USER GOALS ===');
+    print('Updating goals: ${goals.toMap()}');
+
     try {
       if (_isOnline) {
         await _firebaseService.saveUserGoals(_currentUser!.uid, goals);
+        print('Goals saved to Firestore successfully');
       }
 
       // Update local state immediately
       _userGoals = goals;
       _goalsController.add(_userGoals);
+      print('Goals broadcasted via stream controller');
       _cacheUserGoals();
       updateDailySummary(); // Recalculate daily summary with new goals
+      print('Daily summary updated with new goals');
     } catch (e) {
       print('Error updating goals: $e');
       rethrow;
     }
+    print('=== END APPSATE SERVICE UPDATE USER GOALS ===');
+  }
+
+  /// Force goals update to trigger immediate UI refresh
+  void forceGoalsUpdate(UserGoals goals) {
+    if (_currentUser == null) return;
+    
+    print('=== FORCE GOALS UPDATE ===');
+    print('Forcing goals update: ${goals.toMap()}');
+    
+    // Update local state immediately
+    _userGoals = goals;
+    _goalsController.add(_userGoals);
+    print('Goals broadcasted via stream controller');
+    _cacheUserGoals();
+    updateDailySummary(); // Recalculate daily summary with new goals
+    print('Daily summary updated with new goals');
+    print('=== END FORCE GOALS UPDATE ===');
+  }
+
+  /// Force update profile data
+  void forceProfileDataUpdate(Map<String, dynamic> profileData) {
+    _profileData = profileData;
+    _profileDataController.add(_profileData);
+    _cacheProfileData();
+    print('Profile data force updated: $_profileData');
   }
 
   /// Delete food entry
@@ -495,6 +565,7 @@ class AppStateService {
     _preferencesSubscription?.cancel();
     _achievementsSubscription?.cancel();
     _healthDataSubscription?.cancel();
+    _profileDataSubscription?.cancel();
 
     _userController.close();
     _foodEntriesController.close();
@@ -505,6 +576,7 @@ class AppStateService {
     _achievementsController.close();
     _healthDataController.close();
     _isOnlineController.close();
+    _profileDataController.close();
     
     _healthService?.dispose();
   }

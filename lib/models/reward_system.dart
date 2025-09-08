@@ -27,19 +27,19 @@ enum BadgeCategory {
 
 enum UserLevel {
   beginner('Beginner', 0, Colors.grey, '🌱'),
-  rookie('Rookie', 500, Colors.blue, '🔰'),
-  enthusiast('Enthusiast', 1500, Colors.green, '💪'),
-  champion('Champion', 3000, Colors.orange, '🏆'),
-  master('Master', 5000, Colors.purple, '👑'),
-  legend('Legend', 10000, Colors.amber, '⭐'),
-  titan('Titan', 25000, Colors.red, '⚡'),
-  immortal('Immortal', 50000, Colors.indigo, '🌟'),
-  deity('Deity', 100000, Colors.cyan, '✨');
+  rookie('Rookie', 7, Colors.blue, '🔰'),
+  enthusiast('Enthusiast', 14, Colors.green, '💪'),
+  champion('Champion', 30, Colors.orange, '🏆'),
+  master('Master', 60, Colors.purple, '👑'),
+  legend('Legend', 100, Colors.amber, '⭐'),
+  titan('Titan', 200, Colors.red, '⚡'),
+  immortal('Immortal', 365, Colors.indigo, '🌟'),
+  deity('Deity', 1000, Colors.cyan, '✨');
 
-  const UserLevel(this.title, this.requiredPoints, this.color, this.emoji);
+  const UserLevel(this.title, this.requiredStreakDays, this.color, this.emoji);
   
   final String title;
-  final int requiredPoints;
+  final int requiredStreakDays; // Changed from points to streak days
   final Color color;
   final String emoji;
 }
@@ -61,7 +61,6 @@ class UserReward {
   final String title;
   final String description;
   final String emoji;
-  final int points;
   final RewardType type;
   final BadgeCategory? category;
   final DateTime? earnedAt;
@@ -73,7 +72,6 @@ class UserReward {
     required this.title,
     required this.description,
     required this.emoji,
-    required this.points,
     required this.type,
     this.category,
     this.earnedAt,
@@ -86,7 +84,6 @@ class UserReward {
     String? title,
     String? description,
     String? emoji,
-    int? points,
     RewardType? type,
     BadgeCategory? category,
     DateTime? earnedAt,
@@ -98,7 +95,6 @@ class UserReward {
       title: title ?? this.title,
       description: description ?? this.description,
       emoji: emoji ?? this.emoji,
-      points: points ?? this.points,
       type: type ?? this.type,
       category: category ?? this.category,
       earnedAt: earnedAt ?? this.earnedAt,
@@ -113,7 +109,6 @@ class UserReward {
       'title': title,
       'description': description,
       'emoji': emoji,
-      'points': points,
       'type': type.name,
       'category': category?.name,
       'earnedAt': earnedAt?.millisecondsSinceEpoch,
@@ -128,7 +123,6 @@ class UserReward {
       title: map['title'] ?? '',
       description: map['description'] ?? '',
       emoji: map['emoji'] ?? '🏆',
-      points: map['points']?.toInt() ?? 0,
       type: RewardType.values.firstWhere(
         (e) => e.name == map['type'],
         orElse: () => RewardType.daily,
@@ -149,21 +143,19 @@ class UserReward {
 }
 
 class UserProgress {
-  final int totalPoints;
   final int currentStreak;
   final int longestStreak;
   final UserLevel currentLevel;
-  final int pointsToNextLevel;
+  final int daysToNextLevel;
   final double levelProgress;
   final List<UserReward> unlockedRewards;
   final Map<String, int> categoryProgress;
 
   const UserProgress({
-    required this.totalPoints,
     required this.currentStreak,
     required this.longestStreak,
     required this.currentLevel,
-    required this.pointsToNextLevel,
+    required this.daysToNextLevel,
     required this.levelProgress,
     required this.unlockedRewards,
     required this.categoryProgress,
@@ -171,11 +163,10 @@ class UserProgress {
 
   factory UserProgress.initial() {
     return const UserProgress(
-      totalPoints: 0,
       currentStreak: 0,
       longestStreak: 0,
       currentLevel: UserLevel.beginner,
-      pointsToNextLevel: 500,
+      daysToNextLevel: 7,
       levelProgress: 0.0,
       unlockedRewards: [],
       categoryProgress: {},
@@ -183,21 +174,19 @@ class UserProgress {
   }
 
   UserProgress copyWith({
-    int? totalPoints,
     int? currentStreak,
     int? longestStreak,
     UserLevel? currentLevel,
-    int? pointsToNextLevel,
+    int? daysToNextLevel,
     double? levelProgress,
     List<UserReward>? unlockedRewards,
     Map<String, int>? categoryProgress,
   }) {
     return UserProgress(
-      totalPoints: totalPoints ?? this.totalPoints,
       currentStreak: currentStreak ?? this.currentStreak,
       longestStreak: longestStreak ?? this.longestStreak,
       currentLevel: currentLevel ?? this.currentLevel,
-      pointsToNextLevel: pointsToNextLevel ?? this.pointsToNextLevel,
+      daysToNextLevel: daysToNextLevel ?? this.daysToNextLevel,
       levelProgress: levelProgress ?? this.levelProgress,
       unlockedRewards: unlockedRewards ?? this.unlockedRewards,
       categoryProgress: categoryProgress ?? this.categoryProgress,
@@ -216,7 +205,6 @@ class RewardSystem {
         title: 'Hydration Hero',
         description: '7-day water intake streak',
         emoji: '💧',
-        points: 100,
         type: RewardType.streak,
         category: BadgeCategory.water,
         color: Colors.blue,
@@ -226,7 +214,6 @@ class RewardSystem {
         title: 'Water Champion',
         description: '30-day water intake streak',
         emoji: '🌊',
-        points: 500,
         type: RewardType.streak,
         category: BadgeCategory.water,
         color: Colors.cyan,
@@ -236,7 +223,6 @@ class RewardSystem {
         title: 'Aqua Master',
         description: '100-day water intake streak',
         emoji: '🏊‍♂️',
-        points: 1000,
         type: RewardType.streak,
         category: BadgeCategory.water,
         color: Colors.lightBlue,
@@ -246,7 +232,6 @@ class RewardSystem {
         title: 'Ocean Lord',
         description: '365-day water intake streak',
         emoji: '🌊',
-        points: 2500,
         type: RewardType.streak,
         category: BadgeCategory.water,
         color: Colors.indigo,
@@ -258,7 +243,6 @@ class RewardSystem {
         title: 'Meal Rookie',
         description: '7-day meal logging streak',
         emoji: '🍽️',
-        points: 100,
         type: RewardType.streak,
         category: BadgeCategory.logging,
         color: Colors.green,
@@ -268,7 +252,6 @@ class RewardSystem {
         title: 'Meal Tracker',
         description: '30-day meal logging streak',
         emoji: '📊',
-        points: 500,
         type: RewardType.streak,
         category: BadgeCategory.logging,
         color: Colors.orange,
@@ -278,7 +261,6 @@ class RewardSystem {
         title: 'Meal Pro',
         description: '100-day meal logging streak',
         emoji: '👨‍🍳',
-        points: 1000,
         type: RewardType.streak,
         category: BadgeCategory.logging,
         color: Colors.deepOrange,
@@ -288,7 +270,6 @@ class RewardSystem {
         title: 'Nutrition Legend',
         description: '365-day meal logging streak',
         emoji: '👑',
-        points: 2500,
         type: RewardType.streak,
         category: BadgeCategory.logging,
         color: Colors.purple,
@@ -300,7 +281,6 @@ class RewardSystem {
         title: 'Fitness Rookie',
         description: '7-day exercise streak',
         emoji: '💪',
-        points: 150,
         type: RewardType.streak,
         category: BadgeCategory.exercise,
         color: Colors.red,
@@ -310,7 +290,6 @@ class RewardSystem {
         title: 'Fitness Warrior',
         description: '30-day exercise streak',
         emoji: '🏋️‍♂️',
-        points: 750,
         type: RewardType.streak,
         category: BadgeCategory.exercise,
         color: const Color(0xFFD32F2F),
@@ -320,7 +299,6 @@ class RewardSystem {
         title: 'Iron Body',
         description: '100-day exercise streak',
         emoji: '🏆',
-        points: 1500,
         type: RewardType.streak,
         category: BadgeCategory.exercise,
         color: Colors.amber,
@@ -330,7 +308,6 @@ class RewardSystem {
         title: 'Titan',
         description: '365-day exercise streak',
         emoji: '⚡',
-        points: 3000,
         type: RewardType.streak,
         category: BadgeCategory.exercise,
         color: Colors.orange,
@@ -342,7 +319,6 @@ class RewardSystem {
         title: 'Dream Rookie',
         description: '7-day sleep logging streak',
         emoji: '😴',
-        points: 100,
         type: RewardType.streak,
         category: BadgeCategory.sleep,
         color: Colors.indigo,
@@ -352,7 +328,6 @@ class RewardSystem {
         title: 'Sleep Guardian',
         description: '30-day sleep logging streak',
         emoji: '🌙',
-        points: 500,
         type: RewardType.streak,
         category: BadgeCategory.sleep,
         color: Colors.purple,
@@ -362,7 +337,6 @@ class RewardSystem {
         title: 'Zen Sleeper',
         description: '100-day sleep logging streak',
         emoji: '🧘‍♂️',
-        points: 1000,
         type: RewardType.streak,
         category: BadgeCategory.sleep,
         color: Colors.deepPurple,
@@ -372,7 +346,6 @@ class RewardSystem {
         title: 'Dream Lord',
         description: '365-day sleep logging streak',
         emoji: '✨',
-        points: 2500,
         type: RewardType.streak,
         category: BadgeCategory.sleep,
         color: Colors.cyan,
@@ -385,7 +358,6 @@ class RewardSystem {
         title: 'Meal Beginner',
         description: 'Logged 10 meals',
         emoji: '🍽️',
-        points: 50,
         type: RewardType.milestone,
         category: BadgeCategory.logging,
         color: Colors.green,
@@ -395,7 +367,6 @@ class RewardSystem {
         title: 'Meal Enthusiast',
         description: 'Logged 50 meals',
         emoji: '🥗',
-        points: 200,
         type: RewardType.milestone,
         category: BadgeCategory.logging,
         color: Colors.lightGreen,
@@ -405,7 +376,6 @@ class RewardSystem {
         title: 'Meal Expert',
         description: 'Logged 100 meals',
         emoji: '👨‍🍳',
-        points: 400,
         type: RewardType.milestone,
         category: BadgeCategory.logging,
         color: Colors.orange,
@@ -415,7 +385,6 @@ class RewardSystem {
         title: 'Meal Master',
         description: 'Logged 500 meals',
         emoji: '🏆',
-        points: 1000,
         type: RewardType.milestone,
         category: BadgeCategory.logging,
         color: Colors.amber,
@@ -425,7 +394,6 @@ class RewardSystem {
         title: 'Meal Legend',
         description: 'Logged 1000 meals',
         emoji: '👑',
-        points: 2000,
         type: RewardType.milestone,
         category: BadgeCategory.logging,
         color: Colors.purple,
@@ -435,7 +403,6 @@ class RewardSystem {
         title: 'Meal Deity',
         description: 'Logged 5000 meals',
         emoji: '🌟',
-        points: 5000,
         type: RewardType.milestone,
         category: BadgeCategory.logging,
         color: Colors.cyan,
@@ -447,7 +414,6 @@ class RewardSystem {
         title: 'Water Rookie',
         description: 'Logged 100 glasses of water',
         emoji: '💧',
-        points: 100,
         type: RewardType.milestone,
         category: BadgeCategory.water,
         color: Colors.blue,
@@ -457,7 +423,6 @@ class RewardSystem {
         title: 'Hydration Hero',
         description: 'Logged 1000 glasses of water',
         emoji: '🌊',
-        points: 500,
         type: RewardType.milestone,
         category: BadgeCategory.water,
         color: Colors.cyan,
@@ -467,7 +432,6 @@ class RewardSystem {
         title: 'Ocean Lord',
         description: 'Logged 5000 glasses of water',
         emoji: '🏊‍♂️',
-        points: 1500,
         type: RewardType.milestone,
         category: BadgeCategory.water,
         color: Colors.indigo,
@@ -479,7 +443,6 @@ class RewardSystem {
         title: 'Fitness Starter',
         description: 'Completed 10 workouts',
         emoji: '💪',
-        points: 200,
         type: RewardType.milestone,
         category: BadgeCategory.exercise,
         color: Colors.red,
@@ -489,7 +452,6 @@ class RewardSystem {
         title: 'Iron Body',
         description: 'Completed 100 workouts',
         emoji: '🏋️‍♂️',
-        points: 1000,
         type: RewardType.milestone,
         category: BadgeCategory.exercise,
         color: const Color(0xFFD32F2F),
@@ -499,7 +461,6 @@ class RewardSystem {
         title: 'Titan',
         description: 'Completed 500 workouts',
         emoji: '⚡',
-        points: 3000,
         type: RewardType.milestone,
         category: BadgeCategory.exercise,
         color: Colors.orange,
@@ -511,7 +472,6 @@ class RewardSystem {
         title: 'Step Rookie',
         description: 'Walked 10,000 steps',
         emoji: '🚶‍♂️',
-        points: 50,
         type: RewardType.milestone,
         category: BadgeCategory.steps,
         color: Colors.green,
@@ -521,7 +481,6 @@ class RewardSystem {
         title: 'Step Hero',
         description: 'Walked 100,000 steps',
         emoji: '🏃‍♂️',
-        points: 300,
         type: RewardType.milestone,
         category: BadgeCategory.steps,
         color: Colors.blue,
@@ -531,7 +490,6 @@ class RewardSystem {
         title: 'Marathoner',
         description: 'Walked 1,000,000 steps',
         emoji: '🏃‍♀️',
-        points: 1000,
         type: RewardType.milestone,
         category: BadgeCategory.steps,
         color: Colors.purple,
@@ -543,7 +501,6 @@ class RewardSystem {
         title: 'First Bite',
         description: 'Logged your first meal',
         emoji: '👶',
-        points: 50,
         type: RewardType.special,
         category: BadgeCategory.logging,
         color: Colors.green,
@@ -553,7 +510,6 @@ class RewardSystem {
         title: 'Perfect Week',
         description: 'Hit all daily goals for 7 consecutive days',
         emoji: '⭐',
-        points: 500,
         type: RewardType.special,
         category: BadgeCategory.achievement,
         color: Colors.amber,
@@ -563,7 +519,6 @@ class RewardSystem {
         title: 'Nutrition Master',
         description: 'Perfect nutrition for 7 days',
         emoji: '🥗',
-        points: 300,
         type: RewardType.special,
         category: BadgeCategory.nutrition,
         color: Colors.green,
@@ -573,7 +528,6 @@ class RewardSystem {
         title: 'Calorie Burner',
         description: 'Burned 1000+ calories in workouts',
         emoji: '🔥',
-        points: 200,
         type: RewardType.special,
         category: BadgeCategory.exercise,
         color: Colors.red,
@@ -583,7 +537,6 @@ class RewardSystem {
         title: 'Hot Streak',
         description: '100 days of any streak',
         emoji: '🔥',
-        points: 1000,
         type: RewardType.special,
         category: BadgeCategory.consistency,
         color: Colors.orange,
@@ -593,7 +546,6 @@ class RewardSystem {
         title: 'Year Hero',
         description: 'Logged at least one activity every day for a year',
         emoji: '🌍',
-        points: 5000,
         type: RewardType.special,
         category: BadgeCategory.achievement,
         color: Colors.cyan,
@@ -603,7 +555,6 @@ class RewardSystem {
         title: 'Early Bird',
         description: 'Logged breakfast before 8 AM for 7 days',
         emoji: '🌅',
-        points: 150,
         type: RewardType.special,
         category: BadgeCategory.logging,
         color: Colors.orange,
@@ -613,7 +564,6 @@ class RewardSystem {
         title: 'Night Owl Restraint',
         description: 'No late-night snacks for 7 days',
         emoji: '🦉',
-        points: 200,
         type: RewardType.special,
         category: BadgeCategory.nutrition,
         color: Colors.deepPurple,
@@ -623,7 +573,6 @@ class RewardSystem {
         title: 'Consistency King',
         description: '30-day app usage streak',
         emoji: '👑',
-        points: 1000,
         type: RewardType.special,
         category: BadgeCategory.consistency,
         color: Colors.purple,
@@ -633,7 +582,6 @@ class RewardSystem {
         title: 'Yearly Meal Tracker',
         description: 'Logged 500 meals in a year',
         emoji: '🗓️',
-        points: 2000,
         type: RewardType.special,
         category: BadgeCategory.logging,
         color: Colors.indigo,
@@ -645,7 +593,6 @@ class RewardSystem {
         title: 'Daily Champion',
         description: 'Completed daily challenge',
         emoji: '🏅',
-        points: 100,
         type: RewardType.challenge,
         category: BadgeCategory.achievement,
         color: Colors.amber,
@@ -655,7 +602,6 @@ class RewardSystem {
         title: 'Weekly Warrior',
         description: 'Completed weekly challenge',
         emoji: '🥇',
-        points: 500,
         type: RewardType.challenge,
         category: BadgeCategory.achievement,
         color: Colors.amber,
@@ -665,7 +611,6 @@ class RewardSystem {
         title: 'Monthly Master',
         description: 'Completed monthly challenge',
         emoji: '🏆',
-        points: 2000,
         type: RewardType.challenge,
         category: BadgeCategory.achievement,
         color: Colors.purple,
@@ -673,9 +618,9 @@ class RewardSystem {
     ];
   }
 
-  static UserLevel getCurrentLevel(int points) {
+  static UserLevel getCurrentLevel(int streakDays) {
     for (int i = UserLevel.values.length - 1; i >= 0; i--) {
-      if (points >= UserLevel.values[i].requiredPoints) {
+      if (streakDays >= UserLevel.values[i].requiredStreakDays) {
         return UserLevel.values[i];
       }
     }
@@ -690,18 +635,18 @@ class RewardSystem {
     return currentLevel; // Already at max level
   }
 
-  static int getPointsToNextLevel(int currentPoints, UserLevel currentLevel) {
+  static int getDaysToNextLevel(int currentStreakDays, UserLevel currentLevel) {
     final nextLevel = getNextLevel(currentLevel);
     if (nextLevel == currentLevel) return 0;
-    return nextLevel.requiredPoints - currentPoints;
+    return nextLevel.requiredStreakDays - currentStreakDays;
   }
 
-  static double getLevelProgress(int currentPoints, UserLevel currentLevel) {
+  static double getLevelProgress(int currentStreakDays, UserLevel currentLevel) {
     final nextLevel = getNextLevel(currentLevel);
     if (nextLevel == currentLevel) return 1.0;
     
-    final levelRange = nextLevel.requiredPoints - currentLevel.requiredPoints;
-    final currentProgress = currentPoints - currentLevel.requiredPoints;
+    final levelRange = nextLevel.requiredStreakDays - currentLevel.requiredStreakDays;
+    final currentProgress = currentStreakDays - currentLevel.requiredStreakDays;
     
     return (currentProgress / levelRange).clamp(0.0, 1.0);
   }

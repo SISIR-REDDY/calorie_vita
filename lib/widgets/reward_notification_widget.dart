@@ -260,7 +260,7 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    '+${reward.points} XP',
+                    'Achievement Unlocked!',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 12,

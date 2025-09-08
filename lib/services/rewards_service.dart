@@ -86,10 +86,8 @@ class RewardsService {
     // Update lifetime and yearly totals
     _updateTotals(activityType, activityData);
     
-    // Update progress
-    _currentProgress = _currentProgress.copyWith(
-      totalPoints: _currentProgress.totalPoints + totalXp,
-    );
+    // Update progress based on streaks (no points system)
+    // Streaks are calculated separately in analytics service
     
     // Check for level up
     LevelUpEvent? levelUp = _checkLevelUp();
@@ -235,17 +233,17 @@ class RewardsService {
 
   /// Check for level up
   LevelUpEvent? _checkLevelUp() {
-    final newLevel = RewardSystem.getCurrentLevel(_currentProgress.totalPoints);
+    final newLevel = RewardSystem.getCurrentLevel(_currentProgress.currentStreak);
     if (newLevel != _currentProgress.currentLevel) {
       final oldLevel = _currentProgress.currentLevel;
       _currentProgress = _currentProgress.copyWith(
         currentLevel: newLevel,
-        pointsToNextLevel: RewardSystem.getPointsToNextLevel(
-          _currentProgress.totalPoints,
+        daysToNextLevel: RewardSystem.getDaysToNextLevel(
+          _currentProgress.currentStreak,
           newLevel,
         ),
         levelProgress: RewardSystem.getLevelProgress(
-          _currentProgress.totalPoints,
+          _currentProgress.currentStreak,
           newLevel,
         ),
       );
@@ -253,7 +251,7 @@ class RewardsService {
       return LevelUpEvent(
         oldLevel: oldLevel,
         newLevel: newLevel,
-        totalXp: _currentProgress.totalPoints,
+        totalXp: 0, // No points system
       );
     }
     return null;

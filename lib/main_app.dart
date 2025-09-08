@@ -313,7 +313,7 @@ class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
   final List<Widget> _screens = [
     const PremiumHomeScreen(),
-    const AnalyticsScreen(),
+    AnalyticsScreen(),
     const SizedBox(), // Placeholder for FAB
     const AITrainerScreen(),
     const SettingsScreen(), 

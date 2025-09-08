@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../ui/app_colors.dart';
 import '../services/real_time_input_service.dart';
+import '../services/app_state_service.dart';
 
 /// Comprehensive Profile Editing Screen for Calorie Vita App
 /// Features: Personal info, fitness goals, preferences, profile photo
@@ -42,6 +43,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   
   // Services
   final RealTimeInputService _realTimeInputService = RealTimeInputService();
+  final AppStateService _appStateService = AppStateService();
 
   // Dropdown options
   final List<String> _genderOptions = ['Male', 'Female', 'Other', 'Prefer not to say'];
@@ -162,6 +164,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       final doc = await FirebaseFirestore.instance
           .collection('users')
           .doc(_userId)
+          .collection('profile')
+          .doc('userData')
           .get();
 
       if (doc.exists) {
@@ -201,6 +205,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       setState(() => _isLoading = false);
     }
   }
+
 
 
 
@@ -283,6 +288,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         context,
         userData,
       );
+
+      // Update AppStateService to trigger real-time updates
+      _appStateService.forceProfileDataUpdate(userData);
+      print('Profile data updated in AppStateService: $userData');
 
       // Update Firebase Auth display name if name is provided
       if (_user != null && _nameController.text.trim().isNotEmpty) {
@@ -889,4 +898,5 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       ),
     );
   }
+
 }

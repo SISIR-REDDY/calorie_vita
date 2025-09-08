@@ -21,7 +21,6 @@ class _CameraScreenState extends State<CameraScreen> {
   Map<String, dynamic>? _result;
   String? _error;
   bool _showBarcodeScanner = false;
-  bool _isDark = false;
 
   final ImagePicker _picker = ImagePicker();
 
@@ -36,7 +35,7 @@ class _CameraScreenState extends State<CameraScreen> {
       final picked = await _picker.pickImage(source: ImageSource.camera);
       if (picked != null) {
         setState(() { _imageFile = File(picked.path); });
-        final aiResult = await FoodAIService.detectFoodLabels(_imageFile!);
+        final aiResult = await AIService.detectCaloriesFromImage(_imageFile!);
         setState(() { _result = aiResult; });
       }
     } catch (e) {
@@ -63,7 +62,7 @@ class _CameraScreenState extends State<CameraScreen> {
         _barcode = barcode; 
       });
       try {
-        final barcodeResult = await FoodAIService.fetchBarcodeNutrition(barcode);
+        final barcodeResult = await AIService.detectCaloriesFromImage(_imageFile!);
         setState(() { _result = barcodeResult; });
       } catch (e) {
         setState(() { _error = "Couldn't fetch product info. Try again."; });
@@ -86,19 +85,13 @@ class _CameraScreenState extends State<CameraScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = _isDark ? ThemeData.dark() : ThemeData.light();
-    
-    return Theme(
-      data: theme,
-      child: Scaffold(
-        backgroundColor: _isDark ? Colors.grey[900] : kAppBackground,
+    return Scaffold(
+      backgroundColor: kAppBackground,
         appBar: _buildPremiumAppBar(),
         body: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: _isDark 
-                ? [Colors.grey[900]!, Colors.grey[800]!]
-                : [kAppBackground, kSurfaceLight],
+              colors: [kAppBackground, kSurfaceLight],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -109,13 +102,12 @@ class _CameraScreenState extends State<CameraScreen> {
                 : _buildMainContent(),
           ),
         ),
-      ),
-    );
+      );
   }
 
   PreferredSizeWidget _buildPremiumAppBar() {
     return AppBar(
-      backgroundColor: _isDark ? Colors.grey[900] : Colors.white,
+      backgroundColor: Colors.white,
       elevation: 0,
       title: Row(
         children: [
@@ -132,26 +124,17 @@ class _CameraScreenState extends State<CameraScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          Text(
-            'Food Scanner',
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.bold,
-              color: _isDark ? Colors.white : kTextDark,
-              fontSize: 18,
+            Text(
+              'Food Scanner',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.bold,
+                color: kTextDark,
+                fontSize: 18,
+              ),
             ),
-          ),
         ],
       ),
-      actions: [
-        IconButton(
-          icon: Icon(
-            _isDark ? Icons.light_mode : Icons.dark_mode,
-            color: kAccentBlue,
-          ),
-          onPressed: () => setState(() => _isDark = !_isDark),
-          tooltip: _isDark ? 'Light mode' : 'Dark mode',
-        ),
-      ],
+      actions: [],
     );
   }
 
@@ -235,7 +218,7 @@ class _CameraScreenState extends State<CameraScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: _isDark ? Colors.grey[800] : Colors.white,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(20),
               boxShadow: kCardShadow,
             ),
@@ -251,7 +234,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: _isDark ? Colors.white : kTextDark,
+                    color: kTextDark,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -396,7 +379,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   style: GoogleFonts.poppins(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: _isDark ? Colors.white : kTextDark,
+                    color: kTextDark,
                   ),
                 ),
                 const SizedBox(height: 8),

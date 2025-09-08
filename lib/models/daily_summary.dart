@@ -7,6 +7,8 @@ class DailySummary {
   final int caloriesGoal;
   final int steps;
   final int stepsGoal;
+  final int waterGlasses;
+  final int waterGlassesGoal;
   final DateTime date;
 
   DailySummary({
@@ -15,6 +17,8 @@ class DailySummary {
     required this.caloriesGoal,
     required this.steps,
     required this.stepsGoal,
+    required this.waterGlasses,
+    required this.waterGlassesGoal,
     required this.date,
   });
 
@@ -27,12 +31,15 @@ class DailySummary {
   /// Calculate steps progress percentage
   double get stepsProgress => (steps / stepsGoal).clamp(0.0, 1.0);
 
+  /// Calculate water glasses progress percentage
+  double get waterGlassesProgress => (waterGlasses / waterGlassesGoal).clamp(0.0, 1.0);
+
   /// Check if daily goal is achieved
   bool get isGoalAchieved => caloriesConsumed >= caloriesGoal;
 
   /// Get overall progress score (0-100)
   double get overallProgress {
-    final progress = (calorieProgress + stepsProgress) / 2;
+    final progress = (stepsProgress + waterGlassesProgress) / 2;
     return (progress * 100).clamp(0.0, 100.0);
   }
 
@@ -57,6 +64,8 @@ class DailySummary {
       'caloriesGoal': caloriesGoal,
       'steps': steps,
       'stepsGoal': stepsGoal,
+      'waterGlasses': waterGlasses,
+      'waterGlassesGoal': waterGlassesGoal,
       'date': date.millisecondsSinceEpoch,
     };
   }
@@ -72,6 +81,8 @@ class DailySummary {
       caloriesGoal: json['caloriesGoal'] ?? 2000,
       steps: json['steps'] ?? 0,
       stepsGoal: json['stepsGoal'] ?? 10000,
+      waterGlasses: json['waterGlasses'] ?? 0,
+      waterGlassesGoal: json['waterGlassesGoal'] ?? 8,
       date: DateTime.fromMillisecondsSinceEpoch(json['date'] ?? DateTime.now().millisecondsSinceEpoch),
     );
   }
@@ -86,6 +97,8 @@ class DailySummary {
     int? caloriesGoal,
     int? steps,
     int? stepsGoal,
+    int? waterGlasses,
+    int? waterGlassesGoal,
     DateTime? date,
   }) {
     return DailySummary(
@@ -94,6 +107,8 @@ class DailySummary {
       caloriesGoal: caloriesGoal ?? this.caloriesGoal,
       steps: steps ?? this.steps,
       stepsGoal: stepsGoal ?? this.stepsGoal,
+      waterGlasses: waterGlasses ?? this.waterGlasses,
+      waterGlassesGoal: waterGlassesGoal ?? this.waterGlassesGoal,
       date: date ?? this.date,
     );
   }

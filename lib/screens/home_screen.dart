@@ -1,10 +1,17 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../ui/app_colors.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
 import '../models/simple_streak_system.dart';
+import '../models/health_data.dart';
+import '../models/user_goals.dart';
+import '../models/user_achievement.dart';
 import '../services/app_state_service.dart';
 import '../services/firebase_service.dart';
 import '../services/dynamic_icon_service.dart';
@@ -12,6 +19,13 @@ import '../services/real_time_input_service.dart';
 import '../services/daily_summary_service.dart';
 import '../services/simple_streak_service.dart';
 import '../services/calorie_units_service.dart';
+import '../services/analytics_service.dart';
+import '../services/ai_service.dart';
+import '../services/goals_event_bus.dart';
+import '../services/global_goals_manager.dart';
+import '../services/simple_goals_notifier.dart';
+import '../services/rewards_service.dart';
+import '../models/reward_system.dart';
 import '../widgets/simple_streak_widgets.dart';
 import 'camera_screen.dart';
 import 'trainer_screen.dart';
@@ -32,11 +46,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   late Animation<Offset> _slideAnimation;
 
   // Services
+  final AppStateService _appStateService = AppStateService();
   final FirebaseService _firebaseService = FirebaseService();
   final RealTimeInputService _realTimeInputService = RealTimeInputService();
   final DailySummaryService _dailySummaryService = DailySummaryService();
   final SimpleStreakService _streakService = SimpleStreakService();
   final CalorieUnitsService _calorieUnitsService = CalorieUnitsService();
+  final AnalyticsService _analyticsService = AnalyticsService();
+  final RewardsService _rewardsService = RewardsService();
   
   // Data
   DailySummary? _dailySummary;
@@ -44,7 +61,22 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   UserPreferences _preferences = const UserPreferences();
   String _motivationalQuote = '';
   bool _isLoading = true;
+  
+  // Rewards data
+  UserProgress? _userProgress;
+  List<UserReward> _recentRewards = [];
   bool _isStreakLoading = true;
+  bool _isGoogleFitConnected = false;
+  bool _hasShownGoogleFitPrompt = false;
+  
+  // Stream subscriptions
+  StreamSubscription<DailySummary?>? _dailySummarySubscription;
+  StreamSubscription<MacroBreakdown>? _macroBreakdownSubscription;
+  StreamSubscription<UserPreferences>? _preferencesSubscription;
+  StreamSubscription<HealthData>? _healthDataSubscription;
+  StreamSubscription<UserGoals?>? _goalsSubscription;
+  StreamSubscription<UserGoals>? _goalsEventBusSubscription;
+  Timer? _goalsCheckTimer;
   UserStreakSummary _streakSummary = UserStreakSummary(
     goalStreaks: {},
     totalActiveStreaks: 0,
@@ -52,8 +84,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     lastActivityDate: DateTime.now(),
     totalDaysActive: 0,
   );
+  List<UserAchievement> _achievements = [];
   String? _currentUserId;
   
+
   // Task management
   List<Map<String, dynamic>> _tasks = [
     {
@@ -98,9 +132,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     },
   ];
 
-  // Services
-  final AppStateService _appStateService = AppStateService();
-
   @override
   void initState() {
     super.initState();
@@ -108,6 +139,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _initializeServices();
     _setupStreamListeners();
     _loadData();
+    _loadRewardsData();
   }
 
   Future<void> _initializeServices() async {
@@ -166,6 +198,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       }).onError((error) {
         debugPrint('Preferences stream error: $error');
       });
+
+      // Goals stream listener is now in _setupDataListeners() to ensure AppStateService is initialized
     } catch (e) {
       debugPrint('Stream setup error: $e');
     }
@@ -174,6 +208,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   @override
   void dispose() {
     _animationController.dispose();
+    _dailySummarySubscription?.cancel();
+    _macroBreakdownSubscription?.cancel();
+    _preferencesSubscription?.cancel();
+    _healthDataSubscription?.cancel();
+    _goalsSubscription?.cancel();
+    _goalsEventBusSubscription?.cancel();
+    _goalsCheckTimer?.cancel();
+    GlobalGoalsManager().clearCallback();
     super.dispose();
   }
 
@@ -206,11 +248,28 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     setState(() => _isLoading = true);
 
     try {
-      // Load mock data for demo mode
-      await _loadDailySummary('demo_user');
-      await _loadPreferences('demo_user');
+      // Initialize AppStateService if not already done
+      if (!_appStateService.isInitialized) {
+        await _appStateService.initialize();
+      }
+      
+      // Set up real-time data listeners
+      _setupDataListeners();
+      
+      // Clean up old data and load today's daily summary
+      await _loadTodaysSummary();
+      
+      // Load streak data and motivational quote
       await _loadStreakData();
       _loadMotivationalQuote();
+      
+      // Check Google Fit connection status
+      _checkGoogleFitConnection();
+      
+      // Initialize analytics service and calculate achievements
+      await _analyticsService.initializeRealTimeAnalytics(days: 30);
+      await _analyticsService.calculateStreaksAndAchievements();
+      
     } catch (e) {
       // Handle error silently in production
       debugPrint('Error loading home data: $e');
@@ -219,25 +278,859 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
-  Future<void> _loadDailySummary(String userId) async {
-    // Mock data for now - replace with real data from Firestore
-    _dailySummary = DailySummary(
-      caloriesConsumed: 1450,
-      caloriesBurned: 320,
-      caloriesGoal: 2000,
-      steps: 8500,
-      stepsGoal: 10000,
+  /// Load rewards data
+  Future<void> _loadRewardsData() async {
+    try {
+      await _rewardsService.initialize();
+      
+      // Listen to progress updates
+      _rewardsService.progressStream.listen((progress) {
+        if (mounted) {
+          setState(() {
+            _userProgress = progress;
+          });
+        }
+      });
+      
+      // Listen to new rewards
+      _rewardsService.newRewardsStream.listen((rewards) {
+        if (mounted) {
+          setState(() {
+            _recentRewards = rewards.take(3).toList(); // Show only recent 3
+          });
+        }
+      });
+    } catch (e) {
+      print('Error loading rewards data: $e');
+    }
+  }
+
+  /// Set up real-time data listeners from AppStateService
+  void _setupDataListeners() {
+    // Listen to daily summary updates
+    _dailySummarySubscription?.cancel();
+    _dailySummarySubscription = _appStateService.dailySummaryStream.listen((summary) {
+      if (mounted) {
+        setState(() {
+          _dailySummary = summary;
+        });
+      }
+    });
+
+    // Listen to macro breakdown updates
+    _macroBreakdownSubscription?.cancel();
+    _macroBreakdownSubscription = _appStateService.macroBreakdownStream.listen((breakdown) {
+      if (mounted) {
+        setState(() {
+          _macroBreakdown = breakdown;
+        });
+      }
+    });
+
+    // Listen to preferences updates
+    _preferencesSubscription?.cancel();
+    _preferencesSubscription = _appStateService.preferencesStream.listen((preferences) {
+      if (mounted) {
+        setState(() {
+          _preferences = preferences;
+        });
+      }
+    });
+
+    // Listen to health data updates
+    _healthDataSubscription?.cancel();
+    _healthDataSubscription = _appStateService.healthDataStream.listen((healthData) {
+      if (mounted) {
+        setState(() {
+          _isGoogleFitConnected = healthData.steps > 0 || healthData.caloriesBurned > 0;
+        });
+      }
+    });
+
+    // Listen to goals updates
+    debugPrint('Setting up goals stream listener in _setupDataListeners');
+    _goalsSubscription?.cancel();
+    _goalsSubscription = _appStateService.goalsStream.listen(
+      (goals) async {
+        debugPrint('=== HOME SCREEN GOALS STREAM UPDATE ===');
+        debugPrint('Received goals update: ${goals?.toMap()}');
+        debugPrint('Current daily summary before update: ${_dailySummary?.toMap()}');
+        if (mounted) {
+          // Force a complete refresh of the daily summary
+          await _refreshDailySummaryWithNewGoals(goals);
+          debugPrint('Daily summary after update: ${_dailySummary?.toMap()}');
+          debugPrint('UI should now show updated goals: Calorie=${goals?.calorieGoal}, Steps=${goals?.stepsPerDayGoal}, Water=${goals?.waterGlassesGoal}');
+        }
+        debugPrint('=== END HOME SCREEN GOALS STREAM UPDATE ===');
+      },
+      onError: (error) {
+        debugPrint('Goals stream error: $error');
+      },
+    );
+    debugPrint('Goals stream listener set up successfully');
+
+    // Listen to goals event bus for immediate updates
+    _goalsEventBusSubscription?.cancel();
+    _goalsEventBusSubscription = GoalsEventBus().goalsStream.listen(
+      (goals) async {
+        debugPrint('=== HOME SCREEN GOALS EVENT BUS UPDATE ===');
+        debugPrint('Received goals update via event bus: ${goals.toMap()}');
+        if (mounted) {
+          // Force a complete refresh of the daily summary
+          await _refreshDailySummaryWithNewGoals(goals);
+        }
+        debugPrint('=== END HOME SCREEN GOALS EVENT BUS UPDATE ===');
+      },
+      onError: (error) {
+        debugPrint('Goals event bus error: $error');
+      },
+    );
+    debugPrint('Goals event bus listener set up successfully');
+
+    // Register global callback for immediate goals updates
+    GlobalGoalsManager().setGoalsUpdateCallback((goals) async {
+      debugPrint('=== GLOBAL GOALS CALLBACK TRIGGERED ===');
+      debugPrint('Received goals update via global callback: ${goals.toMap()}');
+      if (mounted) {
+        await _refreshDailySummaryWithNewGoals(goals);
+        // Also force a complete UI refresh
+        forceUIRefresh();
+      }
+      debugPrint('=== END GLOBAL GOALS CALLBACK ===');
+    });
+    debugPrint('Global goals callback registered');
+
+    // Set up periodic goals check
+    _goalsCheckTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      _checkForGoalsUpdate();
+    });
+    debugPrint('Periodic goals check timer set up');
+
+    // Listen to achievements updates
+    _analyticsService.achievementsStream.listen((achievements) {
+      if (mounted) {
+        setState(() {
+          _achievements = achievements;
+        });
+      }
+    });
+  }
+
+  /// Check Google Fit connection status
+  void _checkGoogleFitConnection() async {
+    try {
+      final healthService = _appStateService.healthService;
+      final isConnected = healthService.isConnected;
+      
+      if (mounted) {
+        setState(() {
+          _isGoogleFitConnected = isConnected;
+        });
+        
+        // Show Google Fit prompt if not connected and haven't shown it yet
+        if (!isConnected && !_hasShownGoogleFitPrompt) {
+          _hasShownGoogleFitPrompt = true;
+          _showGoogleFitConnectionPrompt();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking Google Fit connection: $e');
+    }
+  }
+
+  /// Show Google Fit connection prompt
+  void _showGoogleFitConnectionPrompt() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 8,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                colors: [
+                  Colors.white,
+                  Colors.grey[50]!,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Google Fit Icon
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    border: Border.all(color: Colors.grey[300]!, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 50,
+                      height: 50,
+                      child: Image.asset(
+                        'google-fit-png-logo.png',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                
+                // Title
+                Text(
+                  'Connect Google Health',
+                  style: GoogleFonts.poppins(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: kTextDark,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                
+                // Description
+                Text(
+                  'Get accurate step counts and calories burned data by connecting to Google Health. This will help you track your daily activity and fitness goals more effectively.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: kTextSecondary,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                
+                // Benefits
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: kAccentGreen.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: kAccentGreen.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildBenefitItem('📊', 'Real-time step tracking'),
+                      const SizedBox(height: 8),
+                      _buildBenefitItem('🔥', 'Automatic calorie burn calculation'),
+                      const SizedBox(height: 8),
+                      _buildBenefitItem('📈', 'Better progress insights'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: kTextSecondary.withOpacity(0.3)),
+                          ),
+                        ),
+                        child: Text(
+                          'Maybe Later',
+                          style: GoogleFonts.poppins(
+                            color: kTextSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _navigateToSettings();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kAccentGreen,
+                          foregroundColor: Colors.white,
+                          elevation: 4,
+                          shadowColor: kAccentGreen.withOpacity(0.4),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: Text(
+                          'Connect Now',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Build benefit item for Google Fit prompt
+  Widget _buildBenefitItem(String icon, String text) {
+    return Row(
+      children: [
+        Text(
+          icon,
+          style: const TextStyle(fontSize: 16),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              color: kTextDark,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Navigate to settings screen
+  void _navigateToSettings() {
+    Navigator.pushNamed(context, '/settings');
+  }
+
+  /// Get empty daily summary for when no data is available
+  DailySummary _getEmptyDailySummary() {
+    final userGoals = _appStateService.userGoals;
+    debugPrint('Getting empty daily summary with goals: ${userGoals?.toMap()}');
+    return DailySummary(
+      caloriesConsumed: 0,
+      caloriesBurned: 0,
+      caloriesGoal: userGoals?.calorieGoal ?? 2000,
+      steps: 0,
+      stepsGoal: userGoals?.stepsPerDayGoal ?? 10000,
+      waterGlasses: 0,
+      waterGlassesGoal: userGoals?.waterGlassesGoal ?? 8,
       date: DateTime.now(),
     );
+  }
 
-    // Mock macro breakdown
-    _macroBreakdown = MacroBreakdown(
-      carbs: 180.0,
-      protein: 95.0,
-      fat: 65.0,
-      fiber: 25.0,
-      sugar: 45.0,
+  /// Refresh daily summary with new goals
+  Future<void> _refreshDailySummaryWithNewGoals(UserGoals? goals) async {
+    debugPrint('=== REFRESHING DAILY SUMMARY WITH NEW GOALS ===');
+    debugPrint('New goals: ${goals?.toMap()}');
+    debugPrint('Current daily summary before update: ${_dailySummary?.toMap()}');
+    
+    if (mounted) {
+      setState(() {
+        // Goals updated - refresh daily summary with new goals
+        if (_dailySummary != null) {
+          _dailySummary = _dailySummary!.copyWith(
+            caloriesGoal: goals?.calorieGoal ?? 2000,
+            stepsGoal: goals?.stepsPerDayGoal ?? 10000,
+            waterGlassesGoal: goals?.waterGlassesGoal ?? 8,
+          );
+          debugPrint('Updated existing daily summary with new goals');
+        } else {
+          _dailySummary = _getEmptyDailySummary();
+          debugPrint('Created new daily summary with goals');
+        }
+        debugPrint('Daily summary after setState: ${_dailySummary?.toMap()}');
+      });
+      
+      // Save updated daily summary to Firestore with new goals
+      try {
+        await _saveDailySummaryToFirestore();
+        debugPrint('Daily summary saved to Firestore successfully');
+      } catch (e) {
+        debugPrint('Error saving updated daily summary: $e');
+      }
+      
+      // Recalculate streaks and achievements based on new goals
+      try {
+        await _analyticsService.calculateStreaksAndAchievements();
+        debugPrint('Streaks and achievements recalculated successfully');
+      } catch (e) {
+        debugPrint('Error recalculating streaks and achievements: $e');
+      }
+    }
+    debugPrint('=== END REFRESHING DAILY SUMMARY WITH NEW GOALS ===');
+  }
+
+  /// Force refresh the daily summary with current goals from AppStateService
+  Future<void> forceRefreshDailySummary() async {
+    if (mounted) {
+      final currentGoals = _appStateService.userGoals;
+      if (currentGoals != null) {
+        await _refreshDailySummaryWithNewGoals(currentGoals);
+      }
+    }
+  }
+
+  /// Force complete UI refresh
+  void forceUIRefresh() {
+    if (mounted) {
+      setState(() {
+        // Force a complete rebuild of the UI
+        debugPrint('Forcing complete UI refresh');
+      });
+    }
+  }
+
+  /// Check for goals update periodically
+  void _checkForGoalsUpdate() {
+    if (!mounted) return;
+    
+    final simpleGoals = SimpleGoalsNotifier().currentGoals;
+    final appStateGoals = _appStateService.userGoals;
+    
+    // Check if goals have changed
+    if (simpleGoals != null && appStateGoals != null) {
+      if (simpleGoals.calorieGoal != appStateGoals.calorieGoal ||
+          simpleGoals.stepsPerDayGoal != appStateGoals.stepsPerDayGoal ||
+          simpleGoals.waterGlassesGoal != appStateGoals.waterGlassesGoal) {
+        debugPrint('Goals change detected via periodic check');
+        _refreshDailySummaryWithNewGoals(simpleGoals);
+      }
+    }
+  }
+
+  /// Show calorie input dialog for manual entry
+  void _showCalorieInputDialog(String type) {
+    final isConsumed = type == 'consumed';
+    final currentValue = isConsumed 
+        ? (_dailySummary?.caloriesConsumed ?? 0)
+        : (_dailySummary?.caloriesBurned ?? 0);
+    
+    final controller = TextEditingController(text: currentValue.toString());
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            isConsumed ? 'Edit Calories Consumed' : 'Edit Calories Burned',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+              color: kTextDark,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                isConsumed 
+                    ? 'How many calories did you consume today?'
+                    : 'How many calories did you burn today?',
+                style: GoogleFonts.poppins(
+                  color: kTextSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Calories',
+                  hintText: 'Enter calories',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  prefixIcon: Icon(
+                    isConsumed ? Icons.restaurant : Icons.directions_run,
+                    color: isConsumed ? Colors.orange[600] : Colors.red[600],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (_isGoogleFitConnected) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue[600], size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Google Fit data will be used when available',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: Colors.blue[700],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.poppins(
+                  color: kTextSecondary,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final value = int.tryParse(controller.text) ?? 0;
+                _updateCalorieValue(type, value);
+                Navigator.of(context).pop();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isConsumed ? Colors.orange[600] : Colors.red[600],
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                'Update',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
+  }
+
+  /// Update calorie value in the daily summary
+  void _updateCalorieValue(String type, int value) {
+    if (_dailySummary == null) {
+      _dailySummary = _getEmptyDailySummary();
+    }
+    
+    setState(() {
+      if (type == 'consumed') {
+        _dailySummary = _dailySummary!.copyWith(caloriesConsumed: value);
+      } else {
+        _dailySummary = _dailySummary!.copyWith(caloriesBurned: value);
+      }
+    });
+    
+    // Save to Firestore or local storage
+    _saveDailySummaryToFirestore();
+  }
+
+  /// Update water glasses value and save to Firestore
+  Future<void> _updateWaterGlassesValue(int value) async {
+    if (_dailySummary == null) {
+      _dailySummary = _getEmptyDailySummary();
+    }
+    
+    setState(() {
+      _dailySummary = _dailySummary!.copyWith(waterGlasses: value);
+    });
+    
+    await _saveDailySummaryToFirestore();
+  }
+
+  /// Update water target value and save to Firestore
+  Future<void> _updateWaterTargetValue(int value) async {
+    if (_dailySummary == null) {
+      _dailySummary = _getEmptyDailySummary();
+    }
+    
+    setState(() {
+      _dailySummary = _dailySummary!.copyWith(waterGlassesGoal: value);
+    });
+    
+    await _saveDailySummaryToFirestore();
+    
+    // Also update the user goals in AppStateService
+    await _appStateService.updateUserGoals(
+      _appStateService.userGoals?.copyWith(waterGlassesGoal: value) ?? 
+      UserGoals(waterGlassesGoal: 8)
+    );
+  }
+
+  /// Show water glasses input dialog
+  void _showWaterGlassesDialog() {
+    final currentValue = _dailySummary?.waterGlasses ?? 0;
+    final controller = TextEditingController(text: currentValue.toString());
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Update Water Intake',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'How many glasses of water have you had today?',
+              style: GoogleFonts.poppins(),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Glasses',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                suffixText: 'glasses',
+              ),
+            ),
+            if (_isGoogleFitConnected) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info, color: Colors.blue, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Google Fit can also track your hydration',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: Colors.blue[700],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Cancel', style: GoogleFonts.poppins()),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final value = int.tryParse(controller.text) ?? 0;
+              _updateWaterGlassesValue(value);
+              Navigator.of(context).pop();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Update', style: GoogleFonts.poppins()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show water target dialog
+  void _showWaterTargetDialog() {
+    final currentValue = _dailySummary?.waterGlassesGoal ?? 8;
+    final controller = TextEditingController(text: currentValue.toString());
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Update Water Target',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'How many glasses of water do you want to drink daily?',
+              style: GoogleFonts.poppins(),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Target Glasses',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                suffixText: 'glasses',
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info, color: Colors.green, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Recommended: 8 glasses (2 liters) per day',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.green[700],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Cancel', style: GoogleFonts.poppins()),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final value = int.tryParse(controller.text) ?? 8;
+              _updateWaterTargetValue(value);
+              Navigator.of(context).pop();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Update', style: GoogleFonts.poppins()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Save daily summary to Firestore
+  Future<void> _saveDailySummaryToFirestore() async {
+    if (_dailySummary == null) return;
+    
+    try {
+      final user = _appStateService.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('daily_summaries')
+            .doc(DateTime.now().toIso8601String().split('T')[0]) // Today's date as document ID
+            .set(_dailySummary!.toMap());
+      }
+    } catch (e) {
+      debugPrint('Error saving daily summary: $e');
+    }
+  }
+
+  /// Load today's daily summary with daily reset functionality
+  Future<void> _loadTodaysSummary() async {
+    try {
+      final user = _appStateService.currentUser;
+      if (user == null) {
+        _dailySummary = _getEmptyDailySummary();
+        return;
+      }
+
+      // Clean up old data first
+      await _cleanupOldDailySummaries();
+
+      final today = DateTime.now().toIso8601String().split('T')[0];
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('daily_summaries')
+          .doc(today)
+          .get();
+
+      if (doc.exists) {
+        // Load existing data for today
+        _dailySummary = DailySummary.fromMap(doc.data()!);
+      } else {
+        // Create new empty summary for today (daily reset)
+        _dailySummary = _getEmptyDailySummary();
+        await _saveDailySummaryToFirestore();
+      }
+    } catch (e) {
+      debugPrint('Error loading today\'s summary: $e');
+      _dailySummary = _getEmptyDailySummary();
+    }
+  }
+
+  /// Clean up old daily summary data from Firebase
+  Future<void> _cleanupOldDailySummaries() async {
+    try {
+      final user = _appStateService.currentUser;
+      if (user == null) return;
+
+      final today = DateTime.now().toIso8601String().split('T')[0];
+      
+      // Get all daily summary documents
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('daily_summaries')
+          .get();
+
+      // Delete all documents except today's (strict cleanup)
+      final batch = FirebaseFirestore.instance.batch();
+      int deletedCount = 0;
+
+      for (final doc in querySnapshot.docs) {
+        final docId = doc.id;
+        // Only keep today's data, delete everything else
+        if (docId != today) {
+          batch.delete(doc.reference);
+          deletedCount++;
+        }
+      }
+
+      if (deletedCount > 0) {
+        await batch.commit();
+        debugPrint('Cleaned up $deletedCount old daily summary documents');
+      }
+    } catch (e) {
+      debugPrint('Error cleaning up old daily summaries: $e');
+    }
   }
 
 
@@ -248,7 +1141,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       _streakSummary = _getDefaultStreakData();
       setState(() => _isStreakLoading = false);
       
-      // Load actual streak data from the service in background
+      // Load actual streak data from the analytics service (real-time data)
       _streakSummary = _streakService.currentStreaks;
       if (mounted) {
         setState(() => _isStreakLoading = false);
@@ -284,18 +1177,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-  Future<void> _loadPreferences(String userId) async {
-    try {
-      final preferences = await _firebaseService.getUserPreferences(userId);
-      if (preferences != null) {
-        setState(() {
-          _preferences = preferences;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading preferences: $e');
-    }
-  }
+  // Preferences are now loaded via real-time stream from AppStateService
 
 
   void _loadMotivationalQuote() {
@@ -310,6 +1192,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
   // ========== INPUT HANDLING METHODS ==========
+
+
 
 
   /// Handle exercise input
@@ -493,6 +1377,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   ),
                   
                   
+                  
                   // Bottom padding
                   const SliverToBoxAdapter(
                     child: SizedBox(height: 100),
@@ -642,7 +1527,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
   Widget _buildDailySummarySection() {
-    if (_dailySummary == null) return const SliverToBoxAdapter(child: SizedBox.shrink());
+    // Always show the summary cards, even when empty
+    final summary = _dailySummary ?? _getEmptyDailySummary();
 
     return SliverToBoxAdapter(
       child: Container(
@@ -651,20 +1537,20 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              kPrimaryColor.withValues(alpha: 0.1),
-              kPrimaryColor.withValues(alpha: 0.05),
+              Colors.blue[50]!,
+              Colors.blue[100]!,
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: kPrimaryColor.withValues(alpha: 0.2),
+            color: Colors.blue[200]!,
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: kPrimaryColor.withValues(alpha: 0.1),
+              color: Colors.blue.withValues(alpha: 0.1),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -680,14 +1566,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [kPrimaryColor, kPrimaryColor.withValues(alpha: 0.8)],
+                      colors: [Colors.blue[600]!, Colors.blue[700]!],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: kPrimaryColor.withValues(alpha: 0.3),
+                        color: Colors.blue.withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 4),
                       ),
@@ -751,24 +1637,30 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             Row(
               children: [
                 Expanded(
+                  child: GestureDetector(
+                    onTap: () => _showCalorieInputDialog('consumed'),
                   child: _buildEnhancedSummaryCard(
                     'Consumed',
-                    _calorieUnitsService.formatCaloriesShort(_dailySummary!.caloriesConsumed.toDouble()),
+                      _calorieUnitsService.formatCaloriesShort(summary.caloriesConsumed.toDouble()),
                     _calorieUnitsService.unitSuffix,
                     Icons.restaurant,
-                    kAccentColor,
-                    'Calories eaten today',
+                      Colors.green[600]!,
+                      'Tap to edit calories consumed',
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
+                  child: GestureDetector(
+                    onTap: () => _showCalorieInputDialog('burned'),
                   child: _buildEnhancedSummaryCard(
                     'Burned',
-                    _calorieUnitsService.formatCaloriesShort(_dailySummary!.caloriesBurned.toDouble()),
+                      _calorieUnitsService.formatCaloriesShort(summary.caloriesBurned.toDouble()),
                     _calorieUnitsService.unitSuffix,
                     Icons.directions_run,
-                    kSecondaryColor,
-                    'Calories burned today',
+                      Colors.red[600]!,
+                      'Tap to edit calories burned',
+                    ),
                   ),
                 ),
               ],
@@ -874,7 +1766,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   Widget _buildCaloriesToTargetCard() {
     final caloriesToTarget = _dailySummary!.caloriesGoal - _dailySummary!.caloriesConsumed;
     final isReached = caloriesToTarget <= 0;
-    final color = isReached ? const Color(0xFF2196F3) : const Color(0xFF2196F3); // Always blue
+    final color = isReached ? const Color(0xFF2196F3) : Colors.orange[600]!; // Blue when reached, yellowish orange when not reached
     final icon = isReached ? Icons.check_circle : Icons.flag;
     final status = isReached ? 'Goal Reached!' : 'To Reach Goal';
     
@@ -1016,6 +1908,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
   Widget _buildDailyGoalsSection() {
+    
     return SliverToBoxAdapter(
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -1076,22 +1969,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             ),
             const SizedBox(height: 20),
             
-            // Main Goals Grid
+            // Main Goals Grid - Single Row: Steps and Water (Always show)
             Row(
               children: [
-                Expanded(
-                  child: _buildGoalCard(
-                    'Calories',
-                    _calorieUnitsService.formatCaloriesShort(_dailySummary?.caloriesConsumed.toDouble() ?? 0),
-                    _calorieUnitsService.formatCaloriesShort(_dailySummary?.caloriesGoal.toDouble() ?? 2000),
-                    _calorieUnitsService.unitSuffix,
-                    Icons.local_fire_department,
-                    kAccentColor,
-                    (_dailySummary?.calorieProgress ?? 0.0) * 100,
-                    () => _showCalorieGoalDialog(),
-                  ),
-                ),
-                const SizedBox(width: 12),
                 Expanded(
                   child: _buildGoalCard(
                     'Steps',
@@ -1101,7 +1981,20 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     Icons.directions_walk,
                     kSecondaryColor,
                     (_dailySummary?.stepsProgress ?? 0.0) * 100,
-                    () => _handleSteps(),
+                    null, // No tap functionality - only from Google Fit
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildGoalCard(
+                    'Water',
+                    '${_dailySummary?.waterGlasses ?? 0}',
+                    '${_dailySummary?.waterGlassesGoal ?? 8}',
+                    'glasses',
+                    Icons.water_drop,
+                    Colors.blue,
+                    (_dailySummary?.waterGlassesProgress ?? 0.0) * 100,
+                    () => _showWaterGlassesDialog(),
                   ),
                 ),
               ],
@@ -1179,13 +2072,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-  Widget _buildGoalCard(String title, String current, String target, String unit, IconData icon, Color color, double progress, VoidCallback onTap) {
+  Widget _buildGoalCard(String title, String current, String target, String unit, IconData icon, Color color, double progress, VoidCallback? onTap) {
     final isCompleted = progress >= 100;
     final progressColor = isCompleted ? kSuccessColor : color; // Use original colors
     
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
+    Widget cardContent = Container(
         height: 180, // Fixed height for consistent sizing
         padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -1306,9 +2197,18 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         ],
             ),
           ],
-        ),
       ),
     );
+
+    // Return with or without GestureDetector based on onTap
+    if (onTap != null) {
+      return GestureDetector(
+        onTap: onTap,
+        child: cardContent,
+      );
+    } else {
+      return cardContent;
+    }
   }
 
 
@@ -1384,6 +2284,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       ),
     );
   }
+
+
 
   Widget _buildTaskItem(String emoji, String task, bool isCompleted, String priority, String taskId) {
     Color priorityColor;
@@ -1564,6 +2466,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
+
+
+
   /// Show rewards details dialog
   void _showRewardsDetails() {
     showModalBottomSheet(
@@ -1644,18 +2549,44 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   /// Build goal streaks section
   Widget _buildGoalStreaksSection() {
-    return Column(
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: kAccentColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.trending_up, color: kAccentColor, size: 24),
+              ),
+              const SizedBox(width: 12),
         Text(
           'Daily Goal Streaks',
           style: GoogleFonts.poppins(
-            fontSize: 18,
+                  fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
-        const SizedBox(height: 16),
+            ],
+          ),
+          const SizedBox(height: 20),
         if (_isStreakLoading)
           ...List.generate(4, (index) => 
             Padding(
@@ -1680,6 +2611,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           ),
         ).toList(),
       ],
+      ),
     );
   }
 
@@ -1710,20 +2642,39 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           children: [
             // Header Section
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: kPrimaryColor.withValues(alpha: 0.1),
+                gradient: LinearGradient(
+                  colors: [
+                    kPrimaryColor.withValues(alpha: 0.1),
+                    kPrimaryColor.withValues(alpha: 0.05),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
                 borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(24),
-                  bottomRight: Radius.circular(24),
+                  bottomLeft: Radius.circular(32),
+                  bottomRight: Radius.circular(32),
                 ),
               ),
               child: Column(
                 children: [
                   const SizedBox(height: 20),
-                  // Profile Avatar
-                    CircleAvatar(
-                      radius: 50,
+                  
+                  // Profile Avatar with enhanced design
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: kPrimaryColor.withValues(alpha: 0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: CircleAvatar(
+                      radius: 60,
                       backgroundColor: kPrimaryColor,
                       backgroundImage: user?.photoURL != null 
                           ? NetworkImage(user!.photoURL!) 
@@ -1734,37 +2685,38 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                                   ? user!.displayName!.substring(0, 1).toUpperCase() 
                                   : 'U',
                               style: GoogleFonts.poppins(
-                                fontSize: 40,
+                                fontSize: 48,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),
                             )
                           : null,
                     ),
-                    const SizedBox(height: 20),
+                  ),
+                  const SizedBox(height: 16),
                     
                     // User Name
                     Text(
                       user?.displayName ?? 'User',
                       style: GoogleFonts.poppins(
-                        fontSize: 24,
+                      fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color: kTextDark,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     
                     // User Email
                     Text(
                       user?.email ?? 'user@example.com',
                       style: GoogleFonts.poppins(
-                        fontSize: 14,
+                      fontSize: 14,
                         color: kTextSecondary,
                       ),
                     ),
-                    const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                     
-                    // Quick Stats
+                  // Streak Card
                     _buildSimpleQuickStats(),
                 ],
               ),
@@ -1772,25 +2724,25 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             
             // Content Sections
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 32),
                   
                   // Weekly Streak Calendar Section
                   _buildWeeklyStreakCalendarSection(),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
                   
                   // Current Streaks Section
                   _buildGoalStreaksSection(),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
                   
                   // Streak Motivation
                   StreakMotivationWidget(
                     streakSummary: _streakSummary,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 40),
                 ],
               ),
             ),
@@ -1801,13 +2753,90 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
   Widget _buildSimpleQuickStats() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    return Center(
+      child: _buildStreakCard(),
+    );
+  }
+
+  Widget _buildStreakCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.orange.withValues(alpha: 0.15),
+            Colors.deepOrange.withValues(alpha: 0.08),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.orange.withValues(alpha: 0.3),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.orange.withValues(alpha: 0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
       children: [
-        _buildSimpleStatCard('7', 'Day Streak', Icons.local_fire_department, kPrimaryColor),
-        _buildSimpleStatCard('12', 'Achievements', Icons.emoji_events, kAccentColor),
-        _buildSimpleStatCard('1,250', 'Points', Icons.stars, kSecondaryColor),
-      ],
+          // Streak Icon
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.local_fire_department,
+              color: Colors.deepOrange,
+              size: 24,
+            ),
+          ),
+          const SizedBox(height: 12),
+          
+          // Streak Number
+          Text(
+            '${_streakSummary.longestOverallStreak}',
+            style: GoogleFonts.poppins(
+              fontSize: 36,
+              fontWeight: FontWeight.bold,
+              color: Colors.deepOrange,
+            ),
+          ),
+          const SizedBox(height: 4),
+          
+          // Streak Label
+          Text(
+            'Day Streak',
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: kTextDark,
+            ),
+          ),
+          const SizedBox(height: 2),
+          
+          // Motivational Text
+          Text(
+            _streakSummary.longestOverallStreak > 0 
+                ? 'Keep the momentum going! 🔥'
+                : 'Start your journey today! 🌟',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: kTextSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 
@@ -1850,11 +2879,17 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   Widget _buildWeeklyStreakCalendarSection() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: kCardShadow,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

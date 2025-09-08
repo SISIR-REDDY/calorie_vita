@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../ui/app_colors.dart';
 import '../services/health_data_service.dart';
 import '../services/google_fit_service.dart';
+import 'google_fit_integration_dialog.dart';
 
 /// Health Integration Dialog for connecting to health data sources
 class HealthIntegrationDialog extends StatefulWidget {
@@ -69,21 +70,16 @@ class _HealthIntegrationDialogState extends State<HealthIntegrationDialog> {
 
   /// Connect to Google Fit
   Future<void> _connectGoogleFit() async {
-    setState(() => _isLoading = true);
-
-    try {
-      final connected = await _healthDataService.connectGoogleFit();
-      if (connected) {
-        _showSuccess('Connected to Google Fit! 🎉');
-        _updateSourceStatus();
-      } else {
-        _showError('Failed to connect to Google Fit');
-      }
-    } catch (e) {
-      _showError('Error connecting to Google Fit: $e');
-    } finally {
-      setState(() => _isLoading = false);
-    }
+    // Show the new Google Fit integration dialog
+    await showDialog(
+      context: context,
+      builder: (context) => GoogleFitIntegrationDialog(
+        googleFitService: _googleFitService,
+        onSuccess: () {
+          _updateSourceStatus();
+        },
+      ),
+    );
   }
 
 

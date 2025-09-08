@@ -363,6 +363,8 @@ class FirebaseService {
           caloriesGoal: 2000, // Should come from user profile
           steps: 5000, // Default - should be tracked separately
           stepsGoal: 10000,
+          waterGlasses: 0, // Default value
+          waterGlassesGoal: 8, // Default value
           date: date,
         ));
       }
@@ -758,6 +760,8 @@ class FirebaseService {
           caloriesGoal: 2000,
           steps: 0,
           stepsGoal: 10000,
+          waterGlasses: 0,
+          waterGlassesGoal: 8,
           date: today,
         );
       }
@@ -769,6 +773,8 @@ class FirebaseService {
         caloriesGoal: 2000,
         steps: 0,
         stepsGoal: 10000,
+        waterGlasses: 0,
+        waterGlassesGoal: 8,
         date: today,
       );
     });
@@ -879,14 +885,16 @@ class FirebaseService {
           .collection('dailySummary')
           .doc(dateKey);
 
-      await docRef.set({
+      final updateData = {
         'caloriesGoal': goals.calorieGoal ?? 2000,
-        'waterGoal': goals.waterGlassesGoal ?? 8,
+        'waterGlassesGoal': goals.waterGlassesGoal ?? 8,
         'stepsGoal': goals.stepsPerDayGoal ?? 10000,
         'sleepGoal': 8.0,
         'lastUpdated': FieldValue.serverTimestamp(),
         'date': Timestamp.fromDate(today),
-      }, SetOptions(merge: true));
+      };
+
+      await docRef.set(updateData, SetOptions(merge: true));
     } catch (e) {
       print('Error updating user goals in daily summary: $e');
       rethrow;

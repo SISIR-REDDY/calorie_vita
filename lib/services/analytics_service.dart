@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
 import '../models/user_achievement.dart';
@@ -46,7 +47,7 @@ class AnalyticsService {
   StreamSubscription<DocumentSnapshot>? _achievementsSubscription;
   StreamSubscription<QuerySnapshot>? _weightHistorySubscription;
 
-  /// Initialize real-time analytics
+  /// Initialize real-time analytics with automated data tracking
   Future<void> initializeRealTimeAnalytics({int days = 7}) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
@@ -128,6 +129,8 @@ class AnalyticsService {
         caloriesGoal: 2000, // Should come from user profile
         steps: 5000, // Default - should be tracked separately
         stepsGoal: 10000,
+        waterGlasses: 0, // Default value
+        waterGlassesGoal: 8, // Default value
         date: date,
       ));
     }
@@ -340,6 +343,190 @@ class AnalyticsService {
     if (userId == null) return;
 
     await _firebaseService.saveUserAchievement(userId, achievement);
+  }
+
+  /// Calculate streaks and achievements based on automated tracking
+  Future<void> calculateStreaksAndAchievements() async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) return;
+
+      // Get daily summaries for streak calculation
+      final summaries = await _firebaseService.getDailySummaries(userId, days: 30);
+      
+      // Calculate streaks based on automated data
+      final streaks = _calculateStreaks(summaries);
+      
+      // Calculate achievements based on automated data
+      final achievements = _calculateAchievements(summaries);
+      
+      // Update cached data
+      _cachedAchievements = achievements;
+      _achievementsController.add(achievements);
+      
+      // Save to Firebase
+      await _saveStreaksAndAchievements(userId, streaks, achievements);
+      
+    } catch (e) {
+      print('Error calculating streaks and achievements: $e');
+    }
+  }
+
+  /// Calculate streaks from daily summaries
+  Map<String, int> _calculateStreaks(List<DailySummary> summaries) {
+    final streaks = <String, int>{
+      'calorieGoal': 0,
+      'stepsGoal': 0,
+      'waterGoal': 0,
+      'overall': 0,
+    };
+
+    // Sort summaries by date (newest first)
+    summaries.sort((a, b) => b.date.compareTo(a.date));
+    
+    // Calculate streaks for each goal
+    for (final goal in streaks.keys) {
+      int currentStreak = 0;
+      final today = DateTime.now();
+      
+      for (int i = 0; i < summaries.length; i++) {
+        final summary = summaries[i];
+        final summaryDate = summary.date;
+        final daysDiff = today.difference(summaryDate).inDays;
+        
+        // Only count consecutive days
+        if (daysDiff != i) break;
+        
+        bool goalMet = false;
+        switch (goal) {
+          case 'calorieGoal':
+            goalMet = summary.caloriesConsumed >= summary.caloriesGoal;
+            break;
+          case 'stepsGoal':
+            goalMet = summary.steps >= summary.stepsGoal;
+            break;
+          case 'waterGoal':
+            goalMet = summary.waterGlasses >= summary.waterGlassesGoal;
+            break;
+          case 'overall':
+            goalMet = summary.overallProgress >= 0.8; // 80% of all goals
+            break;
+        }
+        
+        if (goalMet) {
+          currentStreak++;
+        } else {
+          break;
+        }
+      }
+      
+      streaks[goal] = currentStreak;
+    }
+    
+    return streaks;
+  }
+
+  /// Calculate achievements based on automated data
+  List<UserAchievement> _calculateAchievements(List<DailySummary> summaries) {
+    final achievements = <UserAchievement>[];
+    
+    // Calculate total stats
+    final totalCaloriesConsumed = summaries.fold(0, (sum, s) => sum + s.caloriesConsumed);
+    final totalSteps = summaries.fold(0, (sum, s) => sum + s.steps);
+    final totalWaterGlasses = summaries.fold(0, (sum, s) => sum + s.waterGlasses);
+    final daysWithFoodLogged = summaries.where((s) => s.caloriesConsumed > 0).length;
+    final daysWithSteps = summaries.where((s) => s.steps > 0).length;
+    
+    // Define achievement criteria
+    final achievementCriteria = [
+      {
+        'id': 'first_meal',
+        'title': 'First Meal Logged',
+        'description': 'Logged your first meal',
+        'condition': daysWithFoodLogged >= 1,
+        'icon': '🍽️',
+      },
+      {
+        'id': 'calorie_tracker',
+        'title': 'Calorie Tracker',
+        'description': 'Logged 7 days of meals',
+        'condition': daysWithFoodLogged >= 7,
+        'icon': '📊',
+      },
+      {
+        'id': 'step_master',
+        'title': 'Step Master',
+        'description': 'Walked 10,000 steps in a day',
+        'condition': summaries.any((s) => s.steps >= 10000),
+        'icon': '🚶‍♂️',
+      },
+      {
+        'id': 'water_warrior',
+        'title': 'Water Warrior',
+        'description': 'Drank 8 glasses of water in a day',
+        'condition': summaries.any((s) => s.waterGlasses >= 8),
+        'icon': '💧',
+      },
+      {
+        'id': 'week_warrior',
+        'title': 'Week Warrior',
+        'description': 'Met your goals for 7 consecutive days',
+        'condition': _calculateStreaks(summaries)['overall']! >= 7,
+        'icon': '🏆',
+      },
+      {
+        'id': 'month_master',
+        'title': 'Month Master',
+        'description': 'Met your goals for 30 consecutive days',
+        'condition': _calculateStreaks(summaries)['overall']! >= 30,
+        'icon': '👑',
+      },
+    ];
+    
+    // Check each achievement
+    for (final criteria in achievementCriteria) {
+      if (criteria['condition'] as bool) {
+        achievements.add(UserAchievement(
+          id: criteria['id'] as String,
+          title: criteria['title'] as String,
+          description: criteria['description'] as String,
+          icon: criteria['icon'] as String,
+          color: Colors.blue,
+          points: 0, // No points system
+          type: AchievementType.bronze,
+          isUnlocked: true,
+          unlockedAt: DateTime.now(),
+          requirements: {},
+        ));
+      }
+    }
+    
+    return achievements;
+  }
+
+  /// Save streaks and achievements to Firebase
+  Future<void> _saveStreaksAndAchievements(String userId, Map<String, int> streaks, List<UserAchievement> achievements) async {
+    try {
+      final batch = _firestore.batch();
+      
+      // Save streaks
+      final streaksRef = _firestore.collection('users').doc(userId).collection('progress').doc('streaks');
+      batch.set(streaksRef, {
+        'streaks': streaks,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+      
+      // Save achievements
+      final achievementsRef = _firestore.collection('users').doc(userId).collection('progress').doc('achievements');
+      batch.set(achievementsRef, {
+        'achievements': achievements.map((a) => a.toJson()).toList(),
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+      
+      await batch.commit();
+    } catch (e) {
+      print('Error saving streaks and achievements: $e');
+    }
   }
 
   /// Dispose resources

@@ -493,6 +493,8 @@ class OptimizedFirebaseService {
           caloriesGoal: 2000, // Should come from user profile
           steps: 5000, // Default - should be tracked separately
           stepsGoal: 10000,
+          waterGlasses: 0, // Default value
+          waterGlassesGoal: 8, // Default value
           date: date,
         ));
       }

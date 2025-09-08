@@ -35,6 +35,10 @@ dependencies:
   # HTTP for API calls (for future food detection)
   http: ^1.1.0
   
+  # AI and API integrations
+  googleapis: ^13.0.0
+  googleapis_auth: ^1.6.0
+  
   # New dependencies
   camera: ^0.10.5+9
   fl_chart: ^0.66.2
