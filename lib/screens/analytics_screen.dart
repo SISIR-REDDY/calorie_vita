@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../ui/app_colors.dart';
 import '../services/analytics_service.dart';
 import '../services/firebase_service.dart';
@@ -99,6 +100,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       });
     }
   }
+
 
   /// Load user profile data for BMI calculation
   Future<void> _loadUserProfileData() async {
@@ -872,6 +874,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       ),
     );
   }
+
 
   Widget _buildMacroBreakdown() {
     return Container(

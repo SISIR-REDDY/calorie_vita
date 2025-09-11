@@ -15,6 +15,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
+    tasks.withType<JavaCompile> {
+        options.compilerArgs.addAll(listOf("-Xlint:-options"))
+    }
+
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
@@ -41,4 +45,10 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
+    implementation("com.google.android.gms:play-services-location:21.0.1")
+    implementation("androidx.health.connect:connect-client:1.1.0-alpha07")
 }

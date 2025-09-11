@@ -4,19 +4,16 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:health/health.dart';
+// import 'package:health/health.dart';  // Temporarily disabled
 import '../ui/app_colors.dart';
 import '../services/app_state_service.dart';
 import '../services/demo_auth_service.dart';
 import '../services/firebase_service.dart';
 import '../services/real_time_input_service.dart';
-import '../services/health_data_service.dart';
 import '../services/calorie_units_service.dart';
 
 import '../models/user_preferences.dart';
 import '../models/user_goals.dart';
-import '../widgets/health_integration_widget.dart';
-import '../widgets/health_integration_dialog.dart';
 import 'profile_edit_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'terms_conditions_screen.dart';
@@ -36,7 +33,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final AppStateService _appStateService = AppStateService();
   final DemoAuthService _demoAuth = DemoAuthService();
   final RealTimeInputService _realTimeInputService = RealTimeInputService();
-  final HealthDataService _healthDataService = HealthDataService();
   
   // User data
   User? _user;
@@ -136,6 +132,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _userEmail = _demoUser!.email;
     }
   }
+
 
   /// Load user profile data
   Future<void> _loadUserProfileData(User user) async {
@@ -988,13 +985,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 16),
 
             // Google Health Connection Section
-            _buildUniformSettingsCard(
-              icon: Icons.favorite,
-              title: 'Connect Google Health',
-              subtitle: 'to track your steps',
-              color: Colors.red,
-              onTap: _showHealthIntegrationDialog,
-            ),
+        _buildGoogleHealthCard(),
+            const SizedBox(height: 12),
+
             const SizedBox(height: 12),
 
             // Goals & Targets Section
@@ -1104,7 +1097,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// Build uniform settings card with consistent size
+
   Widget _buildUniformSettingsCard({
     required IconData icon,
     required String title,
@@ -1177,69 +1170,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   /// Build Google Health Connection card
   Widget _buildGoogleHealthCard() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: _showHealthIntegrationDialog,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              // Google Fit Icon
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                  border: Border.all(color: Colors.grey[300]!, width: 1),
-                ),
-                child: Center(
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    child: Image.asset(
-                      'google-fit-png-logo.png',
-                      fit: BoxFit.contain,
+    return StreamBuilder<bool>(
+      stream: Stream.value(false), // Google Fit removed
+      builder: (context, snapshot) {
+        final isConnected = false; // Google Fit removed
+        
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: InkWell(
+            onTap: null, // Google Fit removed
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  // Health Icon (Google Fit removed)
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.grey[100],
+                      border: Border.all(
+                        color: Colors.grey[300]!, 
+                        width: 1
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.fitness_center,
+                        color: Colors.grey[600],
+                        size: 24,
+                      ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Connect Google Health',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: kTextDark,
-                      ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Health Integration (Disabled)',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: kTextDark,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isConnected 
+                            ? 'Tap to disconnect' 
+                            : 'to track your steps and fitness data',
+                          style: GoogleFonts.poppins(
+                            color: kTextSecondary,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'to track your steps',
-                      style: GoogleFonts.poppins(
-                        color: kTextSecondary,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  const Icon(
+                    Icons.arrow_forward_ios,
+                    color: kTextSecondary,
+                    size: 16,
+                  ),
+                ],
               ),
-              const Icon(
-                Icons.arrow_forward_ios,
-                color: kTextSecondary,
-                size: 16,
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1472,17 +1474,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// Show health integration dialog
+
+  /// Show health integration dialog (disabled - Google Fit removed)
   void _showHealthIntegrationDialog() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => HealthIntegrationDialog(
-        healthDataService: _healthDataService,
+    // Health integration disabled - Google Fit removed
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Health integration is currently disabled'),
+        backgroundColor: Colors.orange,
       ),
     );
   }
+
 
   @override
   void dispose() {

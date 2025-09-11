@@ -50,19 +50,17 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'YOUR_FIREBASE_WEB_API_KEY_HERE',
-    appId: 'YOUR_FIREBASE_WEB_APP_ID_HERE',
-    messagingSenderId: 'YOUR_FIREBASE_MESSAGING_SENDER_ID_HERE',
-    projectId: 'YOUR_FIREBASE_PROJECT_ID_HERE',
-    authDomain: 'YOUR_FIREBASE_AUTH_DOMAIN_HERE',
-    storageBucket: 'YOUR_FIREBASE_STORAGE_BUCKET_HERE',
-    measurementId: 'YOUR_FIREBASE_MEASUREMENT_ID_HERE',
-    databaseURL: 'YOUR_FIREBASE_DATABASE_URL_HERE',
+    apiKey: 'AIzaSyBPwqX7mpf757PbTYn29dy8tw510XFuhF0',
+    appId: '1:868343457049:web:your_web_app_id',
+    messagingSenderId: '868343457049',
+    projectId: 'calorie-vita',
+    authDomain: 'calorie-vita.firebaseapp.com',
+    storageBucket: 'calorie-vita.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBPwqX7mpf757PbTYn29dy8tw510XFuhF0',
-    appId: '1:868343457049:android:771373959459a135831188',
+    appId: '1:868343457049:android:9978d2edd9035acd831188',
     messagingSenderId: '868343457049',
     projectId: 'calorie-vita',
     storageBucket: 'calorie-vita.firebasestorage.app',

@@ -12,7 +12,18 @@ class AuthService {
   AuthService._internal();
 
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: [
+      'email',
+      'profile',
+      'openid', // Required for Firebase authentication
+      'https://www.googleapis.com/auth/fitness.activity.read',
+      'https://www.googleapis.com/auth/fitness.body.read',
+      'https://www.googleapis.com/auth/fitness.nutrition.read',
+      'https://www.googleapis.com/auth/fitness.sleep.read',
+    ],
+    // Let Google Sign-In use the default configuration from google-services.json
+  );
   final DemoAuthService _demoAuth = DemoAuthService();
   final LocalStorageService _localStorage = LocalStorageService();
   
@@ -21,6 +32,7 @@ class AuthService {
   AuthUser? _currentUser;
   bool _isInitialized = false;
   bool _isFirebaseAvailable = false;
+  String? _verificationId; // For phone authentication
 
   // Stream for user authentication state
   Stream<AuthUser?> get userStream => _userController.stream;
@@ -33,6 +45,9 @@ class AuthService {
     if (_isInitialized) return;
     
     print('Auth service initialization started...');
+    print('🔧 Google Sign-In configuration check...');
+    print('🔧 Package name: com.sisirlabs.calorievita');
+    print('🔧 SHA-1 fingerprint: fc8f2fd7b4c4072afe837b115676feaf70fc7cfd');
     
     try {
       // Quick Firebase check with very short timeout
@@ -293,6 +308,8 @@ class AuthService {
     try {
       if (_isFirebaseAvailable) {
         await _firebaseAuth.signOut();
+        // Also sign out from Google Sign-In
+        await _googleSignIn.signOut();
       } else {
         await _demoAuth.signOut();
       }
@@ -325,36 +342,59 @@ class AuthService {
   /// Sign in with Google
   Future<AuthUser?> signInWithGoogle() async {
     try {
-      print('Attempting Google sign in');
+      print('🔐 Attempting Google sign in...');
+      print('🔧 Firebase available: $_isFirebaseAvailable');
+      print('🔧 Google Sign-In scopes: ${_googleSignIn.scopes}');
+      print('🔧 Package name: com.sisirlabs.calorievita');
+      print('🔧 SHA-1 fingerprint: fc8f2fd7b4c4072afe837b115676feaf70fc7cfd');
       
       if (_isFirebaseAvailable) {
-        print('Using Firebase for Google sign in');
+        print('🔧 Using Firebase for Google sign in');
+        
+        // Sign out first to ensure clean state
+        try {
+          await _googleSignIn.signOut();
+          print('🔧 Signed out from previous Google session');
+        } catch (e) {
+          print('⚠️ Sign out failed (this is normal if not signed in): $e');
+        }
+        
         // Trigger the authentication flow
+        print('🔧 Starting Google Sign-In flow...');
         final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
         
         if (googleUser == null) {
-          print('Google sign in cancelled by user');
+          print('❌ Google sign in cancelled by user');
           return null;
         }
 
-        print('Google user obtained: ${googleUser.email}');
+        print('✅ Google user obtained: ${googleUser.email}');
+        print('🔧 User ID: ${googleUser.id}');
+        print('🔧 Display name: ${googleUser.displayName}');
         
         // Obtain the auth details from the request
+        print('🔧 Getting Google authentication details...');
         final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+        
+        print('🔧 Access token available: ${googleAuth.accessToken != null}');
+        print('🔧 ID token available: ${googleAuth.idToken != null}');
 
         // Create a new credential
+        print('🔧 Creating Firebase credential...');
         final credential = GoogleAuthProvider.credential(
           accessToken: googleAuth.accessToken,
           idToken: googleAuth.idToken,
         );
 
         // Sign in to Firebase with the Google credential
+        print('🔧 Signing in to Firebase with Google credential...');
         final UserCredential userCredential = await _firebaseAuth.signInWithCredential(credential);
         
         if (userCredential.user != null) {
           _currentUser = AuthUser.fromFirebaseUser(userCredential.user!);
           _userController.add(_currentUser);
-          print('Firebase Google sign in successful: ${_currentUser!.email}');
+          print('✅ Firebase Google sign in successful: ${_currentUser!.email}');
+          print('🔧 User UID: ${_currentUser!.uid}');
           return _currentUser;
         }
       } else {
@@ -374,15 +414,118 @@ class AuthService {
       print('Google sign in failed: No user returned');
       return null;
     } catch (e) {
-      print('Google sign in error: $e');
-      // Provide more specific error messages
-      if (e.toString().contains('network_error')) {
+      print('❌ Google sign in error: $e');
+      print('❌ Error type: ${e.runtimeType}');
+      print('❌ Error details: ${e.toString()}');
+      
+      // Check for specific Google Sign-In errors
+      if (e.toString().contains('ApiException: 10')) {
+        throw Exception('Google Sign-In configuration error. Please check your Firebase Console setup and SHA-1 fingerprint.');
+      } else if (e.toString().contains('ApiException: 7')) {
+        throw Exception('Network error. Please check your internet connection and try again.');
+      } else if (e.toString().contains('ApiException: 12500')) {
+        throw Exception('Google Sign-In was cancelled by user.');
+      } else if (e.toString().contains('ApiException: 8')) {
+        throw Exception('Google Sign-In internal error. Please try again.');
+      } else if (e.toString().contains('network_error')) {
         throw Exception('Network error. Please check your internet connection and try again.');
       } else if (e.toString().contains('sign_in_failed')) {
         throw Exception('Google sign in failed. Please try again.');
+      } else if (e.toString().contains('sign_in_canceled')) {
+        throw Exception('Google sign in was cancelled.');
+      } else if (e.toString().contains('sign_in_required')) {
+        throw Exception('Google sign in is required. Please try again.');
       } else {
         throw Exception('Google sign in failed: ${e.toString()}');
       }
+    }
+  }
+
+  /// Send OTP to phone number
+  Future<void> sendOTPToPhone(String phoneNumber) async {
+    try {
+      if (_isFirebaseAvailable) {
+        print('Sending OTP to phone: $phoneNumber');
+        await _firebaseAuth.verifyPhoneNumber(
+          phoneNumber: phoneNumber,
+          verificationCompleted: (PhoneAuthCredential credential) async {
+            // Auto-verification completed
+            final userCredential = await _firebaseAuth.signInWithCredential(credential);
+            if (userCredential.user != null) {
+              _currentUser = AuthUser.fromFirebaseUser(userCredential.user!);
+              _userController.add(_currentUser);
+              print('Phone verification completed automatically: ${_currentUser!.email}');
+            }
+          },
+          verificationFailed: (FirebaseAuthException e) {
+            print('Phone verification failed: $e');
+            throw Exception('Phone verification failed: ${e.message}');
+          },
+          codeSent: (String verificationId, int? resendToken) {
+            print('OTP sent successfully. Verification ID: $verificationId');
+            // Store verification ID for later use
+            _verificationId = verificationId;
+          },
+          codeAutoRetrievalTimeout: (String verificationId) {
+            print('Auto-retrieval timeout: $verificationId');
+            _verificationId = verificationId;
+          },
+        );
+      } else {
+        // Demo mode - simulate OTP sending
+        print('Demo mode: OTP would be sent to $phoneNumber');
+        _verificationId = 'demo_verification_id';
+      }
+    } catch (e) {
+      print('Send OTP error: $e');
+      rethrow;
+    }
+  }
+
+  /// Verify OTP and sign in
+  Future<AuthUser?> verifyOTPAndSignIn(String otp) async {
+    try {
+      if (_isFirebaseAvailable) {
+        if (_verificationId == null) {
+          throw Exception('No verification ID found. Please request OTP first.');
+        }
+
+        print('Verifying OTP: $otp');
+        final credential = PhoneAuthProvider.credential(
+          verificationId: _verificationId!,
+          smsCode: otp,
+        );
+
+        final userCredential = await _firebaseAuth.signInWithCredential(credential);
+        
+        if (userCredential.user != null) {
+          _currentUser = AuthUser.fromFirebaseUser(userCredential.user!);
+          _userController.add(_currentUser);
+          print('Phone sign in successful: ${_currentUser!.email}');
+          return _currentUser;
+        }
+      } else {
+        // Demo mode - accept any OTP
+        print('Demo mode: Verifying OTP: $otp');
+        if (otp.length >= 4) {
+          final demoUser = await _demoAuth.createDemoUser(
+            email: 'demo.phone@example.com',
+            displayName: 'Demo Phone User',
+          );
+          if (demoUser != null) {
+            _currentUser = AuthUser.fromDemoUser(demoUser);
+            _userController.add(_currentUser);
+            print('Demo phone sign in successful: ${_currentUser!.email}');
+            return _currentUser;
+          }
+        } else {
+          throw Exception('Invalid OTP. Please enter a valid 4+ digit code.');
+        }
+      }
+      return null;
+    } catch (e) {
+      print('OTP verification error: $e');
+      rethrow;
     }
   }
 

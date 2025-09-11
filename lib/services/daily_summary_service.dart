@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/daily_summary.dart';
 import '../models/food_entry.dart';
-import '../models/health_data.dart';
 import '../models/user_goals.dart';
 import '../models/reward_system.dart';
 import '../services/firebase_service.dart';

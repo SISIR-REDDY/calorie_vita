@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'screens/home_screen.dart';
 import 'screens/analytics_screen.dart';
 import 'screens/camera_screen.dart';
@@ -53,6 +54,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
       // Initialize the centralized app state manager
       await _appStateManager.initialize();
       
+      
       // Listen to app state changes
       _appStateManager.stateStream.listen((state) {
         print('AppStateManager state change: userId=${state.currentUserId}, initialized=${state.isInitialized}');
@@ -64,6 +66,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
       });
       
       print('✅ AppStateManager initialization completed');
+      
     } catch (e) {
       print('❌ AppStateManager initialization error: $e');
     }
@@ -71,7 +74,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Handle app lifecycle state if needed
+    print('App lifecycle state changed: $state');
   }
 
   @override
@@ -298,6 +301,23 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
       home: RewardNotificationWidget(
         child: _buildHomeScreen(),
       ),
+      routes: {
+        '/welcome': (context) => const WelcomeScreen(),
+        '/home': (context) => const MainNavigation(),
+      },
+      onGenerateRoute: (settings) {
+        if (settings.name == '/welcome') {
+          return MaterialPageRoute(
+            builder: (context) => const WelcomeScreen(),
+          );
+        }
+        return null;
+      },
+      onUnknownRoute: (settings) {
+        return MaterialPageRoute(
+          builder: (context) => const WelcomeScreen(),
+        );
+      },
     );
   }
 }

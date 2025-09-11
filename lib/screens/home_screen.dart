@@ -9,7 +9,6 @@ import '../ui/app_colors.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
 import '../models/simple_streak_system.dart';
-import '../models/health_data.dart';
 import '../models/user_goals.dart';
 import '../models/user_achievement.dart';
 import '../services/app_state_service.dart';
@@ -62,18 +61,17 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   String _motivationalQuote = '';
   bool _isLoading = true;
   
+  
   // Rewards data
   UserProgress? _userProgress;
   List<UserReward> _recentRewards = [];
   bool _isStreakLoading = true;
-  bool _isGoogleFitConnected = false;
-  bool _hasShownGoogleFitPrompt = false;
+  
   
   // Stream subscriptions
   StreamSubscription<DailySummary?>? _dailySummarySubscription;
   StreamSubscription<MacroBreakdown>? _macroBreakdownSubscription;
   StreamSubscription<UserPreferences>? _preferencesSubscription;
-  StreamSubscription<HealthData>? _healthDataSubscription;
   StreamSubscription<UserGoals?>? _goalsSubscription;
   StreamSubscription<UserGoals>? _goalsEventBusSubscription;
   Timer? _goalsCheckTimer;
@@ -150,6 +148,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _currentUserId = _realTimeInputService.getCurrentUserId();
   }
 
+
+
   void _setupStreamListeners() {
     // Listen to real-time data updates (non-blocking)
     try {
@@ -200,6 +200,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       });
 
       // Goals stream listener is now in _setupDataListeners() to ensure AppStateService is initialized
+
     } catch (e) {
       debugPrint('Stream setup error: $e');
     }
@@ -211,7 +212,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _dailySummarySubscription?.cancel();
     _macroBreakdownSubscription?.cancel();
     _preferencesSubscription?.cancel();
-    _healthDataSubscription?.cancel();
     _goalsSubscription?.cancel();
     _goalsEventBusSubscription?.cancel();
     _goalsCheckTimer?.cancel();
@@ -263,8 +263,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       await _loadStreakData();
       _loadMotivationalQuote();
       
-      // Check Google Fit connection status
-      _checkGoogleFitConnection();
       
       // Initialize analytics service and calculate achievements
       await _analyticsService.initializeRealTimeAnalytics(days: 30);
@@ -305,6 +303,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
+
   /// Set up real-time data listeners from AppStateService
   void _setupDataListeners() {
     // Listen to daily summary updates
@@ -337,15 +336,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       }
     });
 
-    // Listen to health data updates
-    _healthDataSubscription?.cancel();
-    _healthDataSubscription = _appStateService.healthDataStream.listen((healthData) {
-      if (mounted) {
-        setState(() {
-          _isGoogleFitConnected = healthData.steps > 0 || healthData.caloriesBurned > 0;
-        });
-      }
-    });
+    // Health data functionality removed
+
 
     // Listen to goals updates
     debugPrint('Setting up goals stream listener in _setupDataListeners');
@@ -416,209 +408,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     });
   }
 
-  /// Check Google Fit connection status
-  void _checkGoogleFitConnection() async {
-    try {
-      final healthService = _appStateService.healthService;
-      final isConnected = healthService.isConnected;
-      
-      if (mounted) {
-        setState(() {
-          _isGoogleFitConnected = isConnected;
-        });
-        
-        // Show Google Fit prompt if not connected and haven't shown it yet
-        if (!isConnected && !_hasShownGoogleFitPrompt) {
-          _hasShownGoogleFitPrompt = true;
-          _showGoogleFitConnectionPrompt();
-        }
-      }
-    } catch (e) {
-      debugPrint('Error checking Google Fit connection: $e');
-    }
-  }
 
-  /// Show Google Fit connection prompt
-  void _showGoogleFitConnectionPrompt() {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          elevation: 8,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                colors: [
-                  Colors.white,
-                  Colors.grey[50]!,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Google Fit Icon
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                    border: Border.all(color: Colors.grey[300]!, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.2),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Container(
-                      width: 50,
-                      height: 50,
-                      child: Image.asset(
-                        'google-fit-png-logo.png',
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                
-                // Title
-                Text(
-                  'Connect Google Health',
-                  style: GoogleFonts.poppins(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: kTextDark,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                
-                // Description
-                Text(
-                  'Get accurate step counts and calories burned data by connecting to Google Health. This will help you track your daily activity and fitness goals more effectively.',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: kTextSecondary,
-                    height: 1.5,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                
-                // Benefits
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: kAccentGreen.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: kAccentGreen.withOpacity(0.3)),
-                  ),
-                  child: Column(
-                    children: [
-                      _buildBenefitItem('📊', 'Real-time step tracking'),
-                      const SizedBox(height: 8),
-                      _buildBenefitItem('🔥', 'Automatic calorie burn calculation'),
-                      const SizedBox(height: 8),
-                      _buildBenefitItem('📈', 'Better progress insights'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                
-                // Action Buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: kTextSecondary.withOpacity(0.3)),
-                          ),
-                        ),
-                        child: Text(
-                          'Maybe Later',
-                          style: GoogleFonts.poppins(
-                            color: kTextSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          _navigateToSettings();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: kAccentGreen,
-                          foregroundColor: Colors.white,
-                          elevation: 4,
-                          shadowColor: kAccentGreen.withOpacity(0.4),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        child: Text(
-                          'Connect Now',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 
-  /// Build benefit item for Google Fit prompt
-  Widget _buildBenefitItem(String icon, String text) {
-    return Row(
-      children: [
-        Text(
-          icon,
-          style: const TextStyle(fontSize: 16),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            text,
-            style: GoogleFonts.poppins(
-              fontSize: 13,
-              color: kTextDark,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+
 
   /// Navigate to settings screen
   void _navigateToSettings() {
@@ -772,31 +564,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 ),
               ),
               const SizedBox(height: 12),
-              if (_isGoogleFitConnected) ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue[200]!),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.blue[600], size: 16),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Google Fit data will be used when available',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: Colors.blue[700],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ],
           ),
           actions: [
@@ -916,31 +683,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 suffixText: 'glasses',
               ),
             ),
-            if (_isGoogleFitConnected) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info, color: Colors.blue, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Google Fit can also track your hydration',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: Colors.blue[700],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ],
         ),
         actions: [
@@ -1350,6 +1092,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   // Greeting Section
                   _buildGreetingSection(),
                   
+                  
                   // Daily Summary Cards
                   _buildDailySummarySection(),
                   
@@ -1525,6 +1268,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       ),
     );
   }
+
 
   Widget _buildDailySummarySection() {
     // Always show the summary cards, even when empty
@@ -1855,10 +1599,12 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               ],
             ),
           ),
+          
         ],
       ),
     );
   }
+
 
   Widget _buildSummaryCard(String label, int value, IconData icon, Color color, String unit) {
     return Container(
@@ -1906,6 +1652,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       ),
     );
   }
+
 
   Widget _buildDailyGoalsSection() {
     
@@ -1981,7 +1728,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     Icons.directions_walk,
                     kSecondaryColor,
                     (_dailySummary?.stepsProgress ?? 0.0) * 100,
-                    null, // No tap functionality - only from Google Fit
+                    null, // No tap functionality
                   ),
                 ),
                 const SizedBox(width: 12),

@@ -9,9 +9,7 @@ import '../models/user_preferences.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
 import '../models/user_achievement.dart';
-import '../models/health_data.dart';
 import 'firebase_service.dart';
-import 'health_service.dart';
 
 /// Centralized app state management service
 /// Handles real-time data synchronization, caching, and offline support
@@ -21,7 +19,6 @@ class AppStateService {
   AppStateService._internal();
 
   final FirebaseService _firebaseService = FirebaseService();
-  HealthService? _healthService;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -33,7 +30,6 @@ class AppStateService {
   final StreamController<DailySummary?> _dailySummaryController = StreamController<DailySummary?>.broadcast();
   final StreamController<MacroBreakdown> _macroBreakdownController = StreamController<MacroBreakdown>.broadcast();
   final StreamController<List<UserAchievement>> _achievementsController = StreamController<List<UserAchievement>>.broadcast();
-  final StreamController<HealthData> _healthDataController = StreamController<HealthData>.broadcast();
   final StreamController<bool> _isOnlineController = StreamController<bool>.broadcast();
   final StreamController<Map<String, dynamic>?> _profileDataController = StreamController<Map<String, dynamic>?>.broadcast();
 
@@ -45,7 +41,6 @@ class AppStateService {
   DailySummary? _dailySummary;
   MacroBreakdown _macroBreakdown = MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
   List<UserAchievement> _achievements = [];
-  HealthData _healthData = HealthData.empty();
   Map<String, dynamic>? _profileData;
   bool _isOnline = true;
   bool _isInitialized = false;
@@ -56,7 +51,6 @@ class AppStateService {
   StreamSubscription<DocumentSnapshot>? _goalsSubscription;
   StreamSubscription<DocumentSnapshot>? _preferencesSubscription;
   StreamSubscription<DocumentSnapshot>? _achievementsSubscription;
-  StreamSubscription<HealthData>? _healthDataSubscription;
   StreamSubscription<DocumentSnapshot>? _profileDataSubscription;
 
   // Getters for streams
@@ -67,7 +61,6 @@ class AppStateService {
   Stream<DailySummary?> get dailySummaryStream => _dailySummaryController.stream;
   Stream<MacroBreakdown> get macroBreakdownStream => _macroBreakdownController.stream;
   Stream<List<UserAchievement>> get achievementsStream => _achievementsController.stream;
-  Stream<HealthData> get healthDataStream => _healthDataController.stream;
   Stream<bool> get isOnlineStream => _isOnlineController.stream;
   Stream<Map<String, dynamic>?> get profileDataStream => _profileDataController.stream;
 
@@ -79,12 +72,10 @@ class AppStateService {
   DailySummary? get dailySummary => _dailySummary;
   MacroBreakdown get macroBreakdown => _macroBreakdown;
   List<UserAchievement> get achievements => _achievements;
-  HealthData get healthData => _healthData;
   Map<String, dynamic>? get profileData => _profileData;
   bool get isOnline => _isOnline;
   bool get isInitialized => _isInitialized;
   FirebaseService get firebaseService => _firebaseService;
-  HealthService get healthService => _healthService ??= HealthService();
 
   /// Initialize the app state service
   Future<void> initialize() async {
@@ -98,8 +89,6 @@ class AppStateService {
         
         if (user != null) {
           _setupUserDataListeners(user.uid);
-          // Initialize health service after user is authenticated
-          _initializeHealthService();
         } else {
           _clearUserData();
         }
@@ -215,25 +204,6 @@ class AppStateService {
     });
   }
 
-  /// Initialize health service after user authentication
-  Future<void> _initializeHealthService() async {
-    try {
-      await healthService.initialize();
-      _setupHealthDataListener();
-    } catch (e) {
-      print('Error initializing health service: $e');
-    }
-  }
-
-  /// Set up health data listener
-  void _setupHealthDataListener() {
-    _healthDataSubscription?.cancel();
-    _healthDataSubscription = healthService.healthDataStream.listen((healthData) {
-      _healthData = healthData;
-      _healthDataController.add(_healthData);
-      updateDailySummary();
-    });
-  }
 
   /// Update daily summary based on current food entries and health data
   void updateDailySummary() {
@@ -253,9 +223,9 @@ class AppStateService {
 
     _dailySummary = DailySummary(
       caloriesConsumed: caloriesConsumed,
-      caloriesBurned: _healthData.caloriesBurned.round(), // From health data
+      caloriesBurned: 0, // Health data removed
       caloriesGoal: _userGoals?.calorieGoal ?? 2000,
-      steps: _healthData.steps, // From health data
+      steps: 0, // Health data removed
       stepsGoal: _userGoals?.stepsPerDayGoal ?? 10000,
       waterGlasses: 0, // Default value, will be updated from user input
       waterGlassesGoal: _userGoals?.waterGlassesGoal ?? 8,
@@ -539,7 +509,6 @@ class AppStateService {
     _dailySummary = null;
     _macroBreakdown = MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
     _achievements = [];
-    _healthData = HealthData.empty();
 
     _foodEntriesController.add(_foodEntries);
     _goalsController.add(_userGoals);
@@ -547,14 +516,13 @@ class AppStateService {
     _dailySummaryController.add(_dailySummary);
     _macroBreakdownController.add(_macroBreakdown);
     _achievementsController.add(_achievements);
-    _healthDataController.add(_healthData);
+    // Health data removed
 
     // Cancel all subscriptions
     _foodEntriesSubscription?.cancel();
     _goalsSubscription?.cancel();
     _preferencesSubscription?.cancel();
     _achievementsSubscription?.cancel();
-    _healthDataSubscription?.cancel();
   }
 
   /// Dispose resources
@@ -564,7 +532,6 @@ class AppStateService {
     _goalsSubscription?.cancel();
     _preferencesSubscription?.cancel();
     _achievementsSubscription?.cancel();
-    _healthDataSubscription?.cancel();
     _profileDataSubscription?.cancel();
 
     _userController.close();
@@ -574,10 +541,8 @@ class AppStateService {
     _dailySummaryController.close();
     _macroBreakdownController.close();
     _achievementsController.close();
-    _healthDataController.close();
     _isOnlineController.close();
     _profileDataController.close();
     
-    _healthService?.dispose();
   }
 }

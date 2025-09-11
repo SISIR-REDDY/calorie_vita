@@ -7,22 +7,22 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:868343457049:android:771373959459a135831188",
+        "mobilesdk_app_id": "1:868343457049:android:72b956e1195f7f4f831188",
         "android_client_info": {
           "package_name": "com.sisirlabs.calorievita"
         }
       },
       "oauth_client": [
         {
-          "client_id": "868343457049-j2i12qnbupsenf5rvme7h05m366t9jmk.apps.googleusercontent.com",
+          "client_id": "868343457049-ferbh43bj0pahp1b1ghh8hkkerakic9i.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.sisirlabs.calorievita",
-            "certificate_hash": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+            "certificate_hash": "fc8f2fd7b4c4072afe837b115676feaf70fc7cfd"
           }
         },
         {
-          "client_id": "868343457049-sd90cbg505lpnu7e5cnkskusm7q57kvb.apps.googleusercontent.com",
+          "client_id": "868343457049-pbua5cqj3qre9qsnkerr23hvkt850o1e.apps.googleusercontent.com",
           "client_type": 3
         }
       ],

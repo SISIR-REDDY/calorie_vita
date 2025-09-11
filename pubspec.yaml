@@ -10,8 +10,8 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.2
-  
-  # Firebase - Updated to latest compatible versions
+
+  # Firebase - latest compatible
   firebase_core: ^3.14.0
   firebase_auth: ^5.6.0
   cloud_firestore: ^5.6.9
@@ -19,36 +19,33 @@ dependencies:
   firebase_crashlytics: ^4.1.3
   firebase_analytics: ^11.3.3
   firebase_messaging: ^15.1.3
-  
+
   # Image handling
   image_picker: ^1.0.4
   mobile_scanner: ^3.5.2
   cached_network_image: ^3.3.0
   image: ^4.1.3
-  
-  # UI and utilities
+
+  # UI + utilities
   google_fonts: ^6.1.0
   intl: ^0.18.1
   provider: ^6.1.1
-  google_sign_in: ^6.1.5
-  
-  # HTTP for API calls (for future food detection)
+  google_sign_in: ^6.1.5   # ✅ Google Sign-In
+
+  # HTTP (for food detection API later)
   http: ^1.1.0
-  
-  # AI and API integrations
-  googleapis: ^13.0.0
-  googleapis_auth: ^1.6.0
-  
-  # New dependencies
+
+
+  # Extra dependencies
   camera: ^0.10.5+9
   fl_chart: ^0.66.2
   animated_bottom_navigation_bar: ^1.2.0
   shared_preferences: ^2.5.3
   url_launcher: ^6.2.4
-  
-  # Production dependencies
+
+  # Production utils
   connectivity_plus: ^6.0.5
-  device_info_plus: ^10.1.2
+  device_info_plus: ^9.1.2
   package_info_plus: ^8.0.2
   path_provider: ^2.1.4
   sqflite: ^2.3.3+1
@@ -57,19 +54,19 @@ dependencies:
   uuid: ^4.5.1
   dio: ^5.7.0
   logger: ^2.4.0
+
+  # Bluetooth / Fitness devices
+  permission_handler: ^11.3.1
   
   # Health & Fitness Integration
-  health: ^13.1.4
-  
-  # Bluetooth connectivity for fitness devices
-  permission_handler: ^11.3.1
+  # Using Google Fit REST API for real-time data
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-  
-  # Testing dependencies
+
+  # Testing
   integration_test:
     sdk: flutter
   mockito: ^5.4.4
@@ -77,10 +74,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  
+
   assets:
     - assets/images/
-    - assets/icons/ 
+    - assets/icons/
     - assets/calorie_data.json
     - calorie_logo.png
-    - google-fit-png-logo.png 

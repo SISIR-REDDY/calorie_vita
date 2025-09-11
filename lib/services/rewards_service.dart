@@ -5,7 +5,6 @@ import '../models/reward_system.dart';
 import '../models/user_achievement.dart';
 import '../models/daily_summary.dart';
 import '../models/food_entry.dart';
-import '../models/health_data.dart';
 
 /// Comprehensive rewards and achievements service
 class RewardsService {

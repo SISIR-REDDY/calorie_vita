@@ -18,6 +18,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  bool _isGoogleSigningIn = false;
 
   @override
   void initState() {
@@ -55,6 +56,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 
   Future<void> _signInWithGoogle() async {
+    if (_isGoogleSigningIn) return; // Prevent multiple taps
+    
+    setState(() {
+      _isGoogleSigningIn = true;
+    });
+    
     try {
       final user = await _authService.signInWithGoogle();
       if (user != null && mounted) {
@@ -83,6 +90,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             ),
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGoogleSigningIn = false;
+        });
       }
     }
   }
@@ -646,33 +659,85 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 
   Widget _buildProfessionalGoogleButton() {
-    return SizedBox(
+    return Container(
       width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: _signInWithGoogle,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF3C4043),
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: Color(0xFFDADCE0), width: 1),
+      height: 56,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFFDADCE0),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 1,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _isGoogleSigningIn ? null : _signInWithGoogle,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_isGoogleSigningIn) ...[
+                  // Loading indicator
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        const Color(0xFF3C4043),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Signing in...',
+                    style: GoogleFonts.roboto(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF3C4043),
+                      letterSpacing: 0.25,
+                    ),
+                  ),
+                ] else ...[
+                  // Google Logo - Custom SVG-like icon
+                  _buildGoogleLogo(),
+                  const SizedBox(width: 12),
+                  // Google Text
+                  Text(
+                    'Sign in with Google',
+                    style: GoogleFonts.roboto(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF3C4043),
+                      letterSpacing: 0.25,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
-        icon: const Icon(
-          Icons.g_mobiledata,
-          color: Color(0xFF4285F4),
-          size: 24,
-        ),
-        label: Text(
-          'Continue with Google',
-          style: GoogleFonts.roboto(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: const Color(0xFF3C4043),
-          ),
-        ),
+      ),
+    );
+  }
+
+  Widget _buildGoogleLogo() {
+    return Container(
+      width: 20,
+      height: 20,
+      child: CustomPaint(
+        painter: GoogleLogoPainter(),
       ),
     );
   }
@@ -710,4 +775,91 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       ),
     );
   }
+}
+
+/// Custom painter for Google logo - More accurate implementation
+class GoogleLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint();
+    
+    // Google "G" logo colors (official Google brand colors)
+    const blue = Color(0xFF4285F4);
+    const red = Color(0xFFEA4335);
+    const yellow = Color(0xFFFBBC05);
+    const green = Color(0xFF34A853);
+    
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width * 0.35;
+    
+    // Set up paint properties
+    paint.style = PaintingStyle.fill;
+    
+    // Create the "G" shape using filled arcs and rectangles
+    
+    // Blue section (top-right quarter)
+    paint.color = blue;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -1.57, // -90 degrees (top)
+      1.57,  // 90 degrees
+      true,
+      paint,
+    );
+    
+    // Red section (right quarter)
+    paint.color = red;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      0,     // 0 degrees (right)
+      1.57,  // 90 degrees
+      true,
+      paint,
+    );
+    
+    // Yellow section (bottom quarter)
+    paint.color = yellow;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      1.57,  // 90 degrees (bottom)
+      1.57,  // 90 degrees
+      true,
+      paint,
+    );
+    
+    // Green section (left quarter)
+    paint.color = green;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      3.14,  // 180 degrees (left)
+      1.57,  // 90 degrees
+      true,
+      paint,
+    );
+    
+    // Draw the inner circle (white background for the "G")
+    paint.color = Colors.white;
+    canvas.drawCircle(center, radius * 0.6, paint);
+    
+    // Draw the "G" cutout - blue section with opening
+    paint.color = blue;
+    final path = Path();
+    path.moveTo(center.dx, center.dy - radius * 0.6);
+    path.arcTo(
+      Rect.fromCircle(center: center, radius: radius * 0.6),
+      -1.57, // -90 degrees
+      4.71,  // 270 degrees (3/4 circle)
+      false,
+    );
+    path.lineTo(center.dx + radius * 0.3, center.dy);
+    path.lineTo(center.dx + radius * 0.6, center.dy);
+    path.lineTo(center.dx + radius * 0.6, center.dy + radius * 0.1);
+    path.lineTo(center.dx + radius * 0.3, center.dy + radius * 0.1);
+    path.lineTo(center.dx + radius * 0.3, center.dy);
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+  
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
