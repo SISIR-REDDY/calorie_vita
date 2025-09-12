@@ -66,15 +66,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Refresh user data when screen becomes visible
+    // Refresh user data and Google Fit status without re-authentication
     _loadUserData();
+    _refreshGoogleFitStatus();
   }
 
   @override
   void didUpdateWidget(SettingsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Refresh user data when widget is updated
+    // Refresh user data and Google Fit status without re-authentication
     _loadUserData();
+    _refreshGoogleFitStatus();
   }
 
   void _setupStreamListeners() {
@@ -1179,6 +1181,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// Initialize Google Fit service (with persistence check)
   Future<void> _initializeGoogleFit() async {
     try {
+      // Check if already connected without triggering re-authentication
+      if (_googleFitService.isConnected) {
+        setState(() {
+          _isGoogleFitConnected = true;
+          _lastGoogleFitSync = DateTime.now();
+        });
+        print('Google Fit already connected, skipping initialization');
+        return;
+      }
+      
+      // Only initialize if not already connected
       await _googleFitService.initialize();
       final isAuthenticated = await _googleFitService.validateAuthentication();
       setState(() {
@@ -1187,8 +1200,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _lastGoogleFitSync = DateTime.now();
         }
       });
+      
+      print('Google Fit initialization completed. Connected: $_isGoogleFitConnected');
     } catch (e) {
       print('Error initializing Google Fit: $e');
+      setState(() {
+        _isGoogleFitConnected = false;
+      });
+    }
+  }
+
+  /// Refresh Google Fit connection status without re-authentication
+  void _refreshGoogleFitStatus() {
+    if (_googleFitService.isConnected) {
+      setState(() {
+        _isGoogleFitConnected = true;
+        _lastGoogleFitSync = DateTime.now();
+      });
+    } else {
+      setState(() {
+        _isGoogleFitConnected = false;
+      });
     }
   }
 

@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../services/ai_service.dart';
+import '../services/app_state_service.dart';
+import '../models/food_entry.dart';
 import '../widgets/food_result_card.dart';
 import '../ui/app_colors.dart';
 
@@ -23,6 +25,18 @@ class _CameraScreenState extends State<CameraScreen> {
   bool _showBarcodeScanner = false;
 
   final ImagePicker _picker = ImagePicker();
+
+  /// Parse macro value from string (e.g., "15g" -> 15.0)
+  double _parseMacroValue(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      // Remove 'g' suffix and parse
+      final cleanValue = value.replaceAll(RegExp(r'[^\d\.]'), '');
+      return double.tryParse(cleanValue) ?? 0.0;
+    }
+    return 0.0;
+  }
 
   Future<void> _pickImage() async {
     setState(() { 
@@ -298,21 +312,84 @@ class _CameraScreenState extends State<CameraScreen> {
                   fontSize: 16,
                 ),
               ),
-              onPressed: () {
-                // TODO: Save result to history
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Food saved to history!',
-                      style: GoogleFonts.poppins(),
+              onPressed: () async {
+                if (_result != null) {
+                  try {
+                    // Parse macro values from AI result
+                    final protein = _parseMacroValue(_result!['protein']);
+                    final carbs = _parseMacroValue(_result!['carbs']);
+                    final fat = _parseMacroValue(_result!['fat']);
+                    final fiber = _parseMacroValue(_result!['fiber']);
+                    final sugar = _parseMacroValue(_result!['sugar']);
+                    
+                    // Create food entry
+                    final foodEntry = FoodEntry(
+                      id: DateTime.now().millisecondsSinceEpoch.toString(),
+                      name: _result!['food'] ?? 'Unknown Food',
+                      calories: (_result!['calories'] as num?)?.round() ?? 0,
+                      timestamp: DateTime.now(),
+                      imageUrl: null, // TODO: Upload image to Firebase Storage if needed
+                      protein: protein,
+                      carbs: carbs,
+                      fat: fat,
+                      fiber: fiber,
+                      sugar: sugar,
+                    );
+                    
+                    // Save to app state (which will sync to Firestore)
+                    await AppStateService().saveFoodEntry(foodEntry);
+                    
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Food saved to history! Calories: ${foodEntry.calories}, Protein: ${protein.toStringAsFixed(1)}g, Carbs: ${carbs.toStringAsFixed(1)}g, Fat: ${fat.toStringAsFixed(1)}g',
+                            style: GoogleFonts.poppins(),
+                          ),
+                          backgroundColor: kSuccessColor,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          duration: const Duration(seconds: 4),
+                        ),
+                      );
+                      
+                      // Navigate back or reset the camera
+                      _reset();
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Error saving food entry: $e',
+                            style: GoogleFonts.poppins(),
+                          ),
+                          backgroundColor: Colors.red,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      );
+                    }
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'No food data to save!',
+                        style: GoogleFonts.poppins(),
+                      ),
+                      backgroundColor: Colors.orange,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
-                    backgroundColor: kSuccessColor,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                );
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.transparent,

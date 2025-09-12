@@ -186,15 +186,15 @@ Be extremely specific with numbers, measurements, and actionable steps. Consider
         print('Error parsing JSON from AI response: $e');
       }
       
-      // Fallback: return basic info if JSON parsing fails
+      // Fallback: return zero values if JSON parsing fails
       return {
         'food': 'Food detected',
-        'calories': 300, // Default estimate
-        'protein': '15g',
-        'carbs': '45g',
-        'fat': '10g',
+        'calories': 0, // No default estimate - user must verify
+        'protein': '0g',
+        'carbs': '0g',
+        'fat': '0g',
         'serving_size': '1 serving',
-        'confidence': 0.5,
+        'confidence': 0.0,
         'note': 'AI analysis completed but couldn\'t parse detailed nutrition info.',
       };
     } catch (e) {

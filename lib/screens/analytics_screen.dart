@@ -32,7 +32,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   final GoogleFitService _googleFitService = GoogleFitService();
   
   // State management
-  bool _isLoading = true;
+  bool _isLoading = false; // Start with false to show UI immediately
   bool _isRefreshing = false;
   String? _error;
   bool _isGeneratingInsights = false;
@@ -73,69 +73,266 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     super.dispose();
   }
 
-  /// Initialize real-time analytics (optimized for faster loading)
+  /// Initialize real-time analytics (optimized for instant UI display)
   Future<void> _initializeAnalytics() async {
     try {
       setState(() {
-        _isLoading = true;
         _error = null;
       });
 
-      // Load all data in parallel for faster initialization
-      final futures = <Future>[];
-      
-      // Initialize services in parallel
-      futures.add(_appStateService.initialize());
-      futures.add(_loadUserProfileData());
-      
-      // Wait for basic services to initialize
-      await Future.wait(futures);
-      print('AppStateService initialized in analytics screen');
+      print('Starting instant analytics initialization...');
 
-      // Initialize analytics service with current period (fast)
-      final days = _getDaysForPeriod(_selectedPeriod);
-      await _analyticsService.initializeRealTimeAnalytics(days: days);
-      
-      // Set up real-time listeners (non-blocking)
+      // Show cached/default data immediately
+      _showCachedDataImmediate();
+
+      // Set up listeners first (fastest operation)
       _setupRealTimeListeners();
       
-      // Show UI immediately for faster response
-      setState(() {
-        _isLoading = false;
-      });
-      
-      // Load Google Fit data asynchronously (non-blocking)
-      _loadGoogleFitDataAsync();
-
-      // Calculate achievements in background (non-blocking)
-      _analyticsService.calculateStreaksAndAchievements();
-      
+      // Load fresh data in background without blocking UI
+      _loadFreshAnalyticsData();
+        
     } catch (e) {
+      print('Analytics initialization error: $e');
       setState(() {
-        _isLoading = false;
-        _error = 'Failed to load analytics: ${e.toString()}';
+        _error = '⚠️ Loading error. Tap to retry.';
       });
     }
   }
 
-  /// Load Google Fit data asynchronously without blocking UI (optimized for RAM clearing)
-  Future<void> _loadGoogleFitDataAsync() async {
+  /// Show cached or default data immediately for instant UI display
+  void _showCachedDataImmediate() {
     try {
-      // Initialize Google Fit service with persistence check
-      await _googleFitService.initialize();
+      // Show default/empty state instead of null to prevent UI issues
+      if (_dailySummaries.isEmpty) {
+        _dailySummaries = _generateDefaultSummaries();
+      }
       
-      // Load Google Fit data immediately
-      await _loadGoogleFitData();
+      if (_macroBreakdown.totalCalories == 0) {
+        _macroBreakdown = MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
+      }
       
-      // Start live sync if connected
-      if (_isGoogleFitConnected) {
-        _googleFitService.startLiveSync();
-        _setupGoogleFitLiveStream();
-        print('Analytics: Google Fit live sync started');
+      // Initialize empty Google Fit data to show placeholders
+      _todayGoogleFitData ??= GoogleFitData(
+        date: DateTime.now(),
+        steps: 0,
+        caloriesBurned: 0.0,
+        distance: 0.0,
+        weight: null,
+      );
+      _weeklyGoogleFitData = _weeklyGoogleFitData.isEmpty ? _generateDefaultWeeklyGoogleFitData() : _weeklyGoogleFitData;
+      
+      print('Cached data displayed, UI should be responsive now');
+    } catch (e) {
+      print('Error showing cached data: $e');
+    }
+  }
+
+  /// Generate default summaries to show immediate UI
+  List<DailySummary> _generateDefaultSummaries() {
+    final now = DateTime.now();
+    return List.generate(7, (index) {
+      return DailySummary(
+        caloriesConsumed: 0,
+        caloriesBurned: 0,
+        caloriesGoal: 2000,
+        steps: 0,
+        stepsGoal: 10000,
+        waterGlasses: 0,
+        waterGlassesGoal: 8,
+        date: now.subtract(Duration(days: 6 - index)),
+      );
+    });
+  }
+
+  /// Generate default weekly Google Fit data
+  List<GoogleFitData> _generateDefaultWeeklyGoogleFitData() {
+    final now = DateTime.now();
+    return List.generate(7, (index) {
+      return GoogleFitData(
+        date: now.subtract(Duration(days: 6 - index)),
+        steps: 0,
+        caloriesBurned: 0.0,
+        distance: 0.0,
+        weight: null,
+      );
+    });
+  }
+
+  /// Load fresh analytics data in background
+  Future<void> _loadFreshAnalyticsData() async {
+    setState(() => _isRefreshing = true);
+    
+    try {
+      print('Loading fresh analytics data in background...');
+      
+      // Initialize services with short timeouts (non-blocking)
+      await Future.wait([
+        _initializeAppStateService(),
+        _initializeAnalyticsService(),
+      ]).timeout(const Duration(seconds: 4));
+      
+      // Load Google Fit data in background (lowest priority)
+      _loadGoogleFitDataAsync();
+      
+    } catch (e) {
+      print('Background data loading error: $e');
+      // Don't show error to user, just log it
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+    }
+  }
+
+  /// Initialize app state service with timeout
+  Future<void> _initializeAppStateService() async {
+    try {
+      if (!_appStateService.isInitialized) {
+        await _appStateService.initialize().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => print('App state service initialization timed out')
+        );
+        print('App state service initialized');
       }
     } catch (e) {
-      print('Error loading Google Fit data asynchronously: $e');
+      print('Error initializing app state service: $e');
+    }
+  }
+
+  /// Initialize analytics service with timeout
+  Future<void> _initializeAnalyticsService() async {
+    try {
+      final days = _getDaysForPeriod(_selectedPeriod);
+      await _analyticsService.initializeRealTimeAnalytics(days: days).timeout(
+        const Duration(seconds: 4),
+        onTimeout: () => print('Analytics service initialization timed out')
+      );
+      print('Analytics service initialized');
+    } catch (e) {
+      print('Error initializing analytics service: $e');
+    }
+  }
+
+  /// Load Google Fit data asynchronously (lowest priority)
+  Future<void> _loadGoogleFitDataAsync() async {
+    try {
+      await _googleFitService.initialize().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => print('Google Fit initialization timed out')
+      );
+      
+      // Load Google Fit data in background
+      _loadGoogleFitData().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => print('Google Fit data loading timed out')
+      ).catchError((e) => print('Google Fit loading error: $e'));
+      
+    } catch (e) {
+      print('Google Fit async initialization error: $e');
+    }
+  }
+
+
+  /// Load additional data in background
+  Future<void> _loadBackgroundData() async {
+    try {
+      print('Loading Google Fit data in background...');
+      // Load Google Fit data asynchronously (non-blocking)
+      _loadGoogleFitDataAsync();
+
+      print('Calculating achievements in background...');
+      // Calculate achievements in background (non-blocking)
+      _analyticsService.calculateStreaksAndAchievements();
+      
+    } catch (e) {
+      print('Error loading background data: $e');
       // Don't show error to user as this is background loading
+    }
+  }
+
+  /// Set up real-time listeners
+  void _setupRealTimeListeners() {
+    try {
+      // Listen to daily summaries with error handling
+      _analyticsService.dailySummariesStream.listen((summaries) {
+        if (mounted) {
+          setState(() {
+            _dailySummaries = summaries;
+          });
+        }
+      }).onError((error) => print('Daily summaries stream error: $error'));
+
+      // Listen to macro breakdown with error handling
+      _analyticsService.macroBreakdownStream.listen((breakdown) {
+        if (mounted) {
+          setState(() {
+            _macroBreakdown = breakdown;
+          });
+        }
+      }).onError((error) => print('Macro breakdown stream error: $error'));
+
+      // Listen to achievements with error handling
+      _analyticsService.achievementsStream.listen((achievements) {
+        if (mounted) {
+          setState(() {
+            _achievements = achievements;
+          });
+        }
+      }).onError((error) => print('Achievements stream error: $error'));
+
+      // Listen to profile data changes (for BMI updates)
+      _profileDataSubscription?.cancel();
+      _profileDataSubscription = _appStateService.profileDataStream.listen((profileData) {
+        print('Profile data stream received in analytics: $profileData');
+        if (mounted && profileData != null) {
+          setState(() {
+            // Update height and weight from profile data
+            final heightCm = profileData['height']?.toDouble();
+            _userHeight = heightCm != null ? heightCm / 100.0 : null;
+            _userWeight = profileData['weight']?.toDouble();
+            _userGender = profileData['gender']?.toString();
+            _userAge = profileData['age']?.toInt();
+          });
+          print('Profile data updated in analytics: Height=${_userHeight}m, Weight=${_userWeight}kg');
+          print('BMI will be recalculated with new values');
+        } else {
+          print('Profile data is null or widget not mounted');
+        }
+      });
+
+      // Listen to insights
+      _analyticsService.insightsStream.listen((insights) {
+        if (mounted) {
+          setState(() {
+            _insights = insights;
+          });
+        }
+      });
+
+      // Listen to recommendations
+      _analyticsService.recommendationsStream.listen((recommendations) {
+        if (mounted) {
+          setState(() {
+            _recommendations = recommendations;
+          });
+        }
+      });
+    } catch (e) {
+      print('Error setting up real-time listeners: $e');
+    }
+  }
+
+  /// Get number of days for selected period
+  int _getDaysForPeriod(String period) {
+    switch (period) {
+      case 'Daily':
+        return 1;
+      case 'Weekly':
+        return 7;
+      case 'Monthly':
+        return 30;
+      default:
+        return 7;
     }
   }
 
@@ -143,37 +340,88 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   /// Load Google Fit data
   Future<void> _loadGoogleFitData() async {
     try {
-      final isAuthenticated = await _googleFitService.validateAuthentication();
+      // Check authentication with network timeout
+      final isAuthenticated = await _googleFitService.validateAuthentication().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          print('Google Fit authentication check timed out');
+          return false;
+        }
+      );
+      
       setState(() {
         _isGoogleFitConnected = isAuthenticated;
       });
       
       if (_isGoogleFitConnected) {
-        // Load today's data with batched API calls for faster response
-        final today = DateTime.now();
-        final futures = await Future.wait([
-          _googleFitService.getDailySteps(today),
-          _googleFitService.getDailyCaloriesBurned(today),
-          _googleFitService.getDailyDistance(today),
-          _googleFitService.getCurrentWeight(),
-        ]);
-        
+        try {
+          // Load today's data with network timeouts to prevent hanging
+          final today = DateTime.now();
+          
+          final futures = await Future.wait([
+            _googleFitService.getDailySteps(today).timeout(
+              const Duration(seconds: 2),
+              onTimeout: () => 0
+            ),
+            _googleFitService.getDailyCaloriesBurned(today).timeout(
+              const Duration(seconds: 2),
+              onTimeout: () => 0.0
+            ),
+            _googleFitService.getDailyDistance(today).timeout(
+              const Duration(seconds: 2),
+              onTimeout: () => 0.0
+            ),
+            _googleFitService.getCurrentWeight().timeout(
+              const Duration(seconds: 2),
+              onTimeout: () => null
+            ),
+          ]);
+          
+          setState(() {
+            _todayGoogleFitData = GoogleFitData(
+              date: today,
+              steps: futures[0] as int? ?? 0,
+              caloriesBurned: futures[1] as double? ?? 0.0,
+              distance: futures[2] as double? ?? 0.0,
+              weight: futures[3] as double?,
+            );
+          });
+          
+          print('Google Fit today data loaded: ${_todayGoogleFitData?.steps} steps');
+          
+          // Load weekly data in background (don't wait for it)
+          _loadWeeklyGoogleFitData().catchError((error) {
+            print('Weekly Google Fit data loading failed: $error');
+          });
+          
+        } catch (dataError) {
+          print('Error loading Google Fit data details: $dataError');
+          // Set connected but with empty data
+          setState(() {
+            _todayGoogleFitData = GoogleFitData(
+              date: DateTime.now(),
+              steps: 0,
+              caloriesBurned: 0.0,
+              distance: 0.0,
+              weight: null,
+            );
+          });
+        }
+      } else {
+        // Not connected, set empty data
         setState(() {
-          _todayGoogleFitData = GoogleFitData(
-            date: today,
-            steps: futures[0] as int? ?? 0,
-            caloriesBurned: futures[1] as double? ?? 0.0,
-            distance: futures[2] as double? ?? 0.0,
-            weight: futures[3] as double?,
-          );
+          _todayGoogleFitData = null;
+          _weeklyGoogleFitData = [];
         });
-        
-        // Load weekly data for better analytics
-        await _loadWeeklyGoogleFitData();
       }
     } catch (e) {
-      print('Error loading Google Fit data: $e');
-      // Don't set error state for Google Fit as it's optional
+      print('Error in Google Fit data loading: $e');
+      // Set offline mode
+      setState(() {
+        _isGoogleFitConnected = false;
+        _todayGoogleFitData = null;
+        _weeklyGoogleFitData = [];
+      });
     }
   }
 
@@ -333,89 +581,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         _userGender = null;
         _userAge = null;
       });
-    }
-  }
-
-
-  /// Set up real-time data listeners
-  void _setupRealTimeListeners() {
-    // Listen to daily summaries
-    _analyticsService.dailySummariesStream.listen((summaries) {
-      if (mounted) {
-        setState(() {
-          _dailySummaries = summaries;
-        });
-      }
-    });
-
-    // Listen to macro breakdown
-    _analyticsService.macroBreakdownStream.listen((breakdown) {
-      if (mounted) {
-        setState(() {
-          _macroBreakdown = breakdown;
-        });
-      }
-    });
-
-    // Listen to achievements
-    _analyticsService.achievementsStream.listen((achievements) {
-      if (mounted) {
-        setState(() {
-          _achievements = achievements;
-        });
-      }
-    });
-
-    // Listen to profile data changes (for BMI updates)
-    _profileDataSubscription?.cancel();
-    _profileDataSubscription = _appStateService.profileDataStream.listen((profileData) {
-      print('Profile data stream received in analytics: $profileData');
-      if (mounted && profileData != null) {
-        setState(() {
-          // Update height and weight from profile data
-          final heightCm = profileData['height']?.toDouble();
-          _userHeight = heightCm != null ? heightCm / 100.0 : null;
-          _userWeight = profileData['weight']?.toDouble();
-          _userGender = profileData['gender']?.toString();
-          _userAge = profileData['age']?.toInt();
-        });
-        print('Profile data updated in analytics: Height=${_userHeight}m, Weight=${_userWeight}kg');
-        print('BMI will be recalculated with new values');
-      } else {
-        print('Profile data is null or widget not mounted');
-      }
-    });
-
-    // Listen to insights
-    _analyticsService.insightsStream.listen((insights) {
-      if (mounted) {
-        setState(() {
-          _insights = insights;
-        });
-      }
-    });
-
-    // Listen to recommendations
-    _analyticsService.recommendationsStream.listen((recommendations) {
-      if (mounted) {
-        setState(() {
-          _recommendations = recommendations;
-        });
-      }
-    });
-  }
-
-  /// Get number of days for selected period
-  int _getDaysForPeriod(String period) {
-    switch (period) {
-      case 'Daily':
-        return 1;
-      case 'Weekly':
-        return 7;
-      case 'Monthly':
-        return 30;
-      default:
-        return 7;
     }
   }
 
@@ -740,6 +905,77 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
+  /// Build loading summary cards to prevent showing wrong data
+  Widget _buildLoadingSummaryCards() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildLoadingSummaryCard('Calories', 'kcal'),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: _buildLoadingSummaryCard('Steps', 'steps'),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: _buildLoadingSummaryCard('Workouts', 'times'),
+        ),
+      ],
+    );
+  }
+
+  /// Build individual loading summary card
+  Widget _buildLoadingSummaryCard(String title, String unit) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        color: kSurfaceColor,
+        borderRadius: BorderRadius.all(Radius.circular(16)),
+        boxShadow: kCardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: kTextSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 24,
+            width: 60,
+            decoration: BoxDecoration(
+              color: kTextSecondary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Center(
+              child: SizedBox(
+                height: 12,
+                width: 12,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(kTextSecondary),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            unit,
+            style: TextStyle(
+              fontSize: 12,
+              color: kTextSecondary.withOpacity(0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Build error state
   Widget _buildErrorState() {
     return Center(
@@ -945,6 +1181,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildSummaryCards() {
+    // Don't show data if still loading to prevent wrong values
+    if (_isLoading || _dailySummaries.isEmpty) {
+      return _buildLoadingSummaryCards();
+    }
+    
     // Calculate real-time data with Google Fit integration based on selected period
     int totalCalories = 0;
     int totalSteps = 0;
@@ -953,18 +1194,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     // Get data based on selected period
     switch (_selectedPeriod) {
       case 'Daily':
-        // Use today's data from Google Fit and app data
+        // Use today's data from app data first
         totalCalories = _dailySummaries.isNotEmpty ? _dailySummaries.last.caloriesConsumed : 0;
         totalSteps = _dailySummaries.isNotEmpty ? _dailySummaries.last.steps : 0;
         
-        // Use Google Fit data if available (don't add to app data to avoid confusion)
+        // Use Google Fit data if available and higher (don't replace with lower values)
         if (_isGoogleFitConnected && _todayGoogleFitData != null) {
           final todayData = _todayGoogleFitData!;
-          if (todayData.caloriesBurned != null && todayData.caloriesBurned! > 0) {
-            totalCalories = todayData.caloriesBurned!.round(); // Use Google Fit data instead of app data
+          if (todayData.caloriesBurned != null && todayData.caloriesBurned! > totalCalories) {
+            totalCalories = todayData.caloriesBurned!.round();
           }
-          if (todayData.steps != null && todayData.steps! > 0) {
-            totalSteps = todayData.steps!; // Use Google Fit data instead of app data
+          if (todayData.steps != null && todayData.steps! > totalSteps) {
+            totalSteps = todayData.steps!;
           }
         }
         

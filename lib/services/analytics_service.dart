@@ -16,24 +16,55 @@ class AnalyticsService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseService _firebaseService = FirebaseService();
 
-  // Stream controllers for real-time updates
-  final StreamController<List<DailySummary>> _dailySummariesController = 
-      StreamController<List<DailySummary>>.broadcast();
-  final StreamController<MacroBreakdown> _macroBreakdownController = 
-      StreamController<MacroBreakdown>.broadcast();
-  final StreamController<List<UserAchievement>> _achievementsController = 
-      StreamController<List<UserAchievement>>.broadcast();
-  final StreamController<List<Map<String, dynamic>>> _insightsController = 
-      StreamController<List<Map<String, dynamic>>>.broadcast();
-  final StreamController<List<Map<String, dynamic>>> _recommendationsController = 
-      StreamController<List<Map<String, dynamic>>>.broadcast();
+  // Stream controllers for real-time updates (recreated if closed)
+  StreamController<List<DailySummary>>? _dailySummariesController;
+  StreamController<MacroBreakdown>? _macroBreakdownController;
+  StreamController<List<UserAchievement>>? _achievementsController;
+  StreamController<List<Map<String, dynamic>>>? _insightsController;
+  StreamController<List<Map<String, dynamic>>>? _recommendationsController;
+
+  // Getter methods that ensure controllers exist and are not closed
+  StreamController<List<DailySummary>> get _ensureDailySummariesController {
+    if (_dailySummariesController?.isClosed != false) {
+      _dailySummariesController = StreamController<List<DailySummary>>.broadcast();
+    }
+    return _dailySummariesController!;
+  }
+
+  StreamController<MacroBreakdown> get _ensureMacroBreakdownController {
+    if (_macroBreakdownController?.isClosed != false) {
+      _macroBreakdownController = StreamController<MacroBreakdown>.broadcast();
+    }
+    return _macroBreakdownController!;
+  }
+
+  StreamController<List<UserAchievement>> get _ensureAchievementsController {
+    if (_achievementsController?.isClosed != false) {
+      _achievementsController = StreamController<List<UserAchievement>>.broadcast();
+    }
+    return _achievementsController!;
+  }
+
+  StreamController<List<Map<String, dynamic>>> get _ensureInsightsController {
+    if (_insightsController?.isClosed != false) {
+      _insightsController = StreamController<List<Map<String, dynamic>>>.broadcast();
+    }
+    return _insightsController!;
+  }
+
+  StreamController<List<Map<String, dynamic>>> get _ensureRecommendationsController {
+    if (_recommendationsController?.isClosed != false) {
+      _recommendationsController = StreamController<List<Map<String, dynamic>>>.broadcast();
+    }
+    return _recommendationsController!;
+  }
 
   // Streams for real-time data
-  Stream<List<DailySummary>> get dailySummariesStream => _dailySummariesController.stream;
-  Stream<MacroBreakdown> get macroBreakdownStream => _macroBreakdownController.stream;
-  Stream<List<UserAchievement>> get achievementsStream => _achievementsController.stream;
-  Stream<List<Map<String, dynamic>>> get insightsStream => _insightsController.stream;
-  Stream<List<Map<String, dynamic>>> get recommendationsStream => _recommendationsController.stream;
+  Stream<List<DailySummary>> get dailySummariesStream => _ensureDailySummariesController.stream;
+  Stream<MacroBreakdown> get macroBreakdownStream => _ensureMacroBreakdownController.stream;
+  Stream<List<UserAchievement>> get achievementsStream => _ensureAchievementsController.stream;
+  Stream<List<Map<String, dynamic>>> get insightsStream => _ensureInsightsController.stream;
+  Stream<List<Map<String, dynamic>>> get recommendationsStream => _ensureRecommendationsController.stream;
 
   // Cache for offline support
   List<DailySummary> _cachedDailySummaries = [];
@@ -47,19 +78,84 @@ class AnalyticsService {
   StreamSubscription<DocumentSnapshot>? _achievementsSubscription;
   StreamSubscription<QuerySnapshot>? _weightHistorySubscription;
 
-  /// Initialize real-time analytics with automated data tracking
+  /// Check if service is properly initialized
+  bool get isInitialized => _foodEntriesSubscription != null || 
+                           _achievementsSubscription != null || 
+                           _weightHistorySubscription != null;
+
+  /// Initialize real-time analytics with automated data tracking (with network timeouts)
   Future<void> initializeRealTimeAnalytics({int days = 7}) async {
     final userId = _auth.currentUser?.uid;
-    if (userId == null) return;
+    if (userId == null) {
+      print('No authenticated user for analytics initialization');
+      return;
+    }
 
-    // Set up real-time listeners
-    await _setupFoodEntriesListener(userId, days);
-    await _setupAchievementsListener(userId);
-    await _setupWeightHistoryListener(userId);
-    
-    // Generate initial insights and recommendations
-    await _generateInsights(userId);
-    await _generateRecommendations(userId);
+    // Cancel existing listeners to prevent duplicates
+    await _cancelExistingListeners();
+
+    try {
+      print('Setting up analytics listeners for user: $userId');
+      
+      // Ensure stream controllers are available
+      _ensureDailySummariesController;
+      _ensureMacroBreakdownController;
+      _ensureAchievementsController;
+      _ensureInsightsController;
+      _ensureRecommendationsController;
+      
+      // Set up real-time listeners with timeouts
+      await Future.wait([
+        _setupFoodEntriesListener(userId, days).timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => print('Food entries listener setup timed out')
+        ),
+        _setupAchievementsListener(userId).timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => print('Achievements listener setup timed out')
+        ),
+        _setupWeightHistoryListener(userId).timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => print('Weight history listener setup timed out')
+        ),
+      ]);
+      
+      print('Analytics listeners set up successfully');
+      
+      // Generate initial insights and recommendations with timeout (non-blocking)
+      _generateInsights(userId).timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => print('Insights generation timed out')
+      ).catchError((error) => print('Error generating insights: $error'));
+      
+      _generateRecommendations(userId).timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => print('Recommendations generation timed out')
+      ).catchError((error) => print('Error generating recommendations: $error'));
+      
+      print('Analytics initialization completed');
+      
+    } catch (e) {
+      print('Error during analytics initialization: $e');
+      // Don't throw - let the app continue with empty data
+    }
+  }
+
+  /// Cancel existing listeners to prevent duplicates
+  Future<void> _cancelExistingListeners() async {
+    try {
+      await _foodEntriesSubscription?.cancel();
+      await _achievementsSubscription?.cancel();
+      await _weightHistorySubscription?.cancel();
+      
+      _foodEntriesSubscription = null;
+      _achievementsSubscription = null;
+      _weightHistorySubscription = null;
+      
+      print('Existing analytics listeners cancelled');
+    } catch (e) {
+      print('Error cancelling existing listeners: $e');
+    }
   }
 
   /// Set up real-time food entries listener
@@ -123,20 +219,30 @@ class AnalyticsService {
         },
       );
 
+      // Get actual user data instead of hardcoded values
+      final actualCaloriesBurned = await _getActualCaloriesBurned(userId, date);
+      final actualSteps = await _getActualSteps(userId, date);
+      final userGoals = await _getUserGoals(userId);
+      
       summaries.add(DailySummary(
         caloriesConsumed: caloriesConsumed,
-        caloriesBurned: 300, // Default - should be tracked separately
-        caloriesGoal: 2000, // Should come from user profile
-        steps: 5000, // Default - should be tracked separately
-        stepsGoal: 10000,
-        waterGlasses: 0, // Default value
-        waterGlassesGoal: 8, // Default value
+        caloriesBurned: actualCaloriesBurned,
+        caloriesGoal: userGoals['caloriesGoal'] ?? 2000,
+        steps: actualSteps,
+        stepsGoal: userGoals['stepsGoal'] ?? 10000,
+        waterGlasses: 0, // This should be tracked from user input
+        waterGlassesGoal: userGoals['waterGlassesGoal'] ?? 8,
         date: date,
+        macroBreakdown: macros, // Pass the calculated macro data
       ));
     }
 
     _cachedDailySummaries = summaries;
-    _dailySummariesController.add(summaries);
+    try {
+      _ensureDailySummariesController.add(summaries);
+    } catch (e) {
+      print('Error broadcasting daily summaries: $e');
+    }
 
     // Update macro breakdown
     final totalMacros = summaries.fold(
@@ -144,7 +250,11 @@ class AnalyticsService {
       (sum, day) => sum + day.macroBreakdown,
     );
     _cachedMacroBreakdown = totalMacros;
-    _macroBreakdownController.add(totalMacros);
+    try {
+      _ensureMacroBreakdownController.add(totalMacros);
+    } catch (e) {
+      print('Error broadcasting macro breakdown: $e');
+    }
 
     // Regenerate insights and recommendations
     await _generateInsights(userId);
@@ -169,12 +279,20 @@ class AnalyticsService {
         }
         
         _cachedAchievements = achievements;
-        _achievementsController.add(achievements);
+        try {
+          _ensureAchievementsController.add(achievements);
+        } catch (e) {
+          print('Error broadcasting achievements: $e');
+        }
       } else {
         // Return default achievements if none exist
         final defaultAchievements = Achievements.defaultAchievements;
         _cachedAchievements = defaultAchievements;
-        _achievementsController.add(defaultAchievements);
+        try {
+          _ensureAchievementsController.add(defaultAchievements);
+        } catch (e) {
+          print('Error broadcasting default achievements: $e');
+        }
       }
     });
   }
@@ -248,7 +366,11 @@ class AnalyticsService {
       }
       
       _cachedInsights = insights;
-      _insightsController.add(insights);
+      try {
+        _ensureInsightsController.add(insights);
+      } catch (e) {
+        print('Error broadcasting insights: $e');
+      }
     } catch (e) {
       print('Error generating insights: $e');
     }
@@ -304,7 +426,11 @@ class AnalyticsService {
       recommendations.sort((a, b) => (a['priority'] ?? 999).compareTo(b['priority'] ?? 999));
       
       _cachedRecommendations = recommendations;
-      _recommendationsController.add(recommendations);
+      try {
+        _ensureRecommendationsController.add(recommendations);
+      } catch (e) {
+        print('Error broadcasting recommendations: $e');
+      }
     } catch (e) {
       print('Error generating recommendations: $e');
     }
@@ -362,7 +488,11 @@ class AnalyticsService {
       
       // Update cached data
       _cachedAchievements = achievements;
-      _achievementsController.add(achievements);
+      try {
+        _ensureAchievementsController.add(achievements);
+      } catch (e) {
+        print('Error broadcasting calculated achievements: $e');
+      }
       
       // Save to Firebase
       await _saveStreaksAndAchievements(userId, streaks, achievements);
@@ -529,16 +659,105 @@ class AnalyticsService {
     }
   }
 
+  /// Get actual calories burned for a specific date
+  Future<int> _getActualCaloriesBurned(String userId, DateTime date) async {
+    try {
+      // Try to get from daily summary first
+      final summaryDoc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('daily_summaries')
+          .doc('${date.year}-${date.month}-${date.day}')
+          .get();
+      
+      if (summaryDoc.exists) {
+        final data = summaryDoc.data()!;
+        return data['caloriesBurned'] ?? 0;
+      }
+      
+      // If no data found, return 0 instead of fake data
+      return 0;
+    } catch (e) {
+      print('Error getting actual calories burned: $e');
+      return 0;
+    }
+  }
+
+  /// Get actual steps for a specific date
+  Future<int> _getActualSteps(String userId, DateTime date) async {
+    try {
+      // Try to get from daily summary first
+      final summaryDoc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('daily_summaries')
+          .doc('${date.year}-${date.month}-${date.day}')
+          .get();
+      
+      if (summaryDoc.exists) {
+        final data = summaryDoc.data()!;
+        return data['steps'] ?? 0;
+      }
+      
+      // If no data found, return 0 instead of fake data
+      return 0;
+    } catch (e) {
+      print('Error getting actual steps: $e');
+      return 0;
+    }
+  }
+
+  /// Get user goals from profile
+  Future<Map<String, int>> _getUserGoals(String userId) async {
+    try {
+      final goalsDoc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('goals')
+          .doc('current')
+          .get();
+      
+      if (goalsDoc.exists) {
+        final data = goalsDoc.data()!;
+        return {
+          'caloriesGoal': data['dailyCalorieGoal'] ?? 2000,
+          'stepsGoal': data['dailyStepGoal'] ?? 10000,
+          'waterGlassesGoal': data['dailyWaterGoal'] ?? 8,
+        };
+      }
+      
+      // Return reasonable defaults if no goals set
+      return {
+        'caloriesGoal': 2000,
+        'stepsGoal': 10000,
+        'waterGlassesGoal': 8,
+      };
+    } catch (e) {
+      print('Error getting user goals: $e');
+      return {
+        'caloriesGoal': 2000,
+        'stepsGoal': 10000,
+        'waterGlassesGoal': 8,
+      };
+    }
+  }
+
   /// Dispose resources
+  /// Clean up resources (but don't close controllers for singleton)
+  Future<void> cleanup() async {
+    try {
+      print('Cleaning up analytics service...');
+      await _cancelExistingListeners();
+      print('Analytics service cleaned up');
+    } catch (e) {
+      print('Error during analytics cleanup: $e');
+    }
+  }
+
+  /// Dispose method for singleton - only cancel listeners, don't close controllers
   void dispose() {
-    _foodEntriesSubscription?.cancel();
-    _achievementsSubscription?.cancel();
-    _weightHistorySubscription?.cancel();
-    
-    _dailySummariesController.close();
-    _macroBreakdownController.close();
-    _achievementsController.close();
-    _insightsController.close();
-    _recommendationsController.close();
+    print('Analytics service dispose called - cleaning up listeners only');
+    cleanup();
+    // Don't close controllers since this is a singleton that may be reused
   }
 }

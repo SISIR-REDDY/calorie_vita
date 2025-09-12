@@ -10,6 +10,7 @@ class DailySummary {
   final int waterGlasses;
   final int waterGlassesGoal;
   final DateTime date;
+  final MacroBreakdown _macroBreakdown;
 
   DailySummary({
     required this.caloriesConsumed,
@@ -20,7 +21,8 @@ class DailySummary {
     required this.waterGlasses,
     required this.waterGlassesGoal,
     required this.date,
-  });
+    MacroBreakdown? macroBreakdown,
+  }) : _macroBreakdown = macroBreakdown ?? MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
 
   /// Calculate remaining calories
   int get caloriesRemaining => caloriesGoal - caloriesConsumed + caloriesBurned;
@@ -43,18 +45,8 @@ class DailySummary {
     return (progress * 100).clamp(0.0, 100.0);
   }
 
-  /// Get macro breakdown for this day (placeholder - should be calculated from food entries)
-  MacroBreakdown get macroBreakdown {
-    // This should be calculated from actual food entries for this day
-    // For now, return a default breakdown
-    return MacroBreakdown(
-      carbs: 250,
-      protein: 120,
-      fat: 80,
-      fiber: 25,
-      sugar: 45,
-    );
-  }
+  /// Get macro breakdown for this day (calculated from actual food entries)
+  MacroBreakdown get macroBreakdown => _macroBreakdown;
 
   /// Convert to JSON
   Map<String, dynamic> toJson() {
@@ -100,6 +92,7 @@ class DailySummary {
     int? waterGlasses,
     int? waterGlassesGoal,
     DateTime? date,
+    MacroBreakdown? macroBreakdown,
   }) {
     return DailySummary(
       caloriesConsumed: caloriesConsumed ?? this.caloriesConsumed,
@@ -110,6 +103,7 @@ class DailySummary {
       waterGlasses: waterGlasses ?? this.waterGlasses,
       waterGlassesGoal: waterGlassesGoal ?? this.waterGlassesGoal,
       date: date ?? this.date,
+      macroBreakdown: macroBreakdown ?? _macroBreakdown,
     );
   }
 }

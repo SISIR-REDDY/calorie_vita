@@ -59,6 +59,12 @@ class GoogleFitService {
     try {
       if (_googleSignIn == null) return;
       
+      // If already authenticated and client exists, skip re-authentication
+      if (_isAuthenticated && _authClient != null && _googleSignIn!.currentUser != null) {
+        _logger.d('Google Fit already authenticated, skipping re-authentication');
+        return;
+      }
+      
       // Try silent sign-in first
       final currentUser = await _googleSignIn!.signInSilently();
       if (currentUser != null) {
@@ -159,6 +165,9 @@ class GoogleFitService {
   
   /// Check if user is authenticated
   bool get isAuthenticated => _isAuthenticated;
+  
+  /// Get current connection status without triggering authentication
+  bool get isConnected => _isAuthenticated && _authClient != null && _googleSignIn?.currentUser != null;
   
   /// Sign out from Google Fit
   Future<void> signOut() async {
@@ -478,6 +487,12 @@ class GoogleFitService {
   /// Initialize HTTP client with authentication
   Future<void> _initializeAuthClient() async {
     try {
+      // Don't recreate client if it already exists and is valid
+      if (_authClient != null && _googleSignIn?.currentUser != null) {
+        _logger.d('HTTP client already exists and is valid');
+        return;
+      }
+      
       if (_googleSignIn?.currentUser == null) {
         _logger.w('No authenticated user for HTTP client initialization');
         return;
@@ -508,7 +523,22 @@ class GoogleFitService {
     if (_googleSignIn == null) return false;
     
     try {
-      final currentUser = await _googleSignIn!.signInSilently();
+      // First check if we're already authenticated with valid client
+      if (_isAuthenticated && _authClient != null && _googleSignIn!.currentUser != null) {
+        _logger.d('Google Fit authentication already validated');
+        return true;
+      }
+      
+      // Check if user is signed in without triggering new authentication
+      final isSignedIn = await _googleSignIn!.isSignedIn();
+      if (!isSignedIn) {
+        _isAuthenticated = false;
+        _authClient = null;
+        return false;
+      }
+      
+      // Get current user without forcing sign-in
+      final currentUser = _googleSignIn!.currentUser;
       if (currentUser != null) {
         _isAuthenticated = true;
         // Ensure HTTP client is initialized
@@ -517,14 +547,25 @@ class GoogleFitService {
         }
         return true;
       } else {
-        _isAuthenticated = false;
-        _authClient = null;
-        return false;
+        // Try silent sign-in as last resort
+        final silentUser = await _googleSignIn!.signInSilently();
+        if (silentUser != null) {
+          _isAuthenticated = true;
+          if (_authClient == null) {
+            await _initializeAuthClient();
+          }
+          return true;
+        }
       }
-    } catch (e) {
+      
       _isAuthenticated = false;
       _authClient = null;
       return false;
+    } catch (e) {
+      _logger.e('Authentication validation error: $e');
+      // Don't immediately invalidate authentication on error
+      // Return current state if we were authenticated before
+      return _isAuthenticated && _authClient != null;
     }
   }
   

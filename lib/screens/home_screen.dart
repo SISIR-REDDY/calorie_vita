@@ -61,7 +61,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   MacroBreakdown? _macroBreakdown;
   UserPreferences _preferences = const UserPreferences();
   String _motivationalQuote = '';
-  bool _isLoading = true;
+  bool _isLoading = false; // Start with false to show UI immediately
+  bool _isRefreshing = false; // Track background data loading
   
   
   // Rewards data
@@ -147,11 +148,28 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   void initState() {
     super.initState();
     _setupAnimations();
-    _initializeServices();
+    
+    // Initialize immediately without waiting
+    _initializeServicesAsync();
     _setupStreamListeners();
     _loadData();
-    _loadRewardsData();
-    _initializeGoogleFit();
+    _loadRewardsDataAsync();
+    _initializeGoogleFitAsync();
+  }
+
+  /// Initialize services asynchronously to not block UI
+  Future<void> _initializeServicesAsync() async {
+    _initializeServices().catchError((e) => debugPrint('Services initialization error: $e'));
+  }
+
+  /// Load rewards data asynchronously
+  Future<void> _loadRewardsDataAsync() async {
+    _loadRewardsData().catchError((e) => debugPrint('Rewards data loading error: $e'));
+  }
+
+  /// Initialize Google Fit asynchronously
+  Future<void> _initializeGoogleFitAsync() async {
+    _initializeGoogleFit().catchError((e) => debugPrint('Google Fit initialization error: $e'));
   }
 
   Future<void> _initializeServices() async {
@@ -262,34 +280,100 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-
     try {
-      // Initialize AppStateService if not already done
-      if (!_appStateService.isInitialized) {
-        await _appStateService.initialize();
-      }
+      // Load cached data first (non-blocking)
+      _loadCachedDataImmediate();
       
-      // Set up real-time data listeners
+      // Set up real-time data listeners immediately
       _setupDataListeners();
       
-      // Clean up old data and load today's daily summary
-      await _loadTodaysSummary();
+      // Initialize AppStateService with timeout (non-blocking)
+      _initializeAppStateAsync();
       
-      // Load streak data and motivational quote
-      await _loadStreakData();
-      _loadMotivationalQuote();
-      
-      
-      // Initialize analytics service and calculate achievements (optimized)
-      await _analyticsService.initializeRealTimeAnalytics(days: 30);
-      await _analyticsService.calculateStreaksAndAchievements();
+      // Load fresh data in background (non-blocking)
+      _loadFreshDataAsync();
       
     } catch (e) {
       // Handle error silently in production
       debugPrint('Error loading home data: $e');
+    }
+  }
+
+  /// Load cached data immediately to show something to user
+  void _loadCachedDataImmediate() {
+    try {
+      // Load cached summary if available
+      if (_dailySummary == null) {
+        _dailySummary = DailySummary(
+          caloriesConsumed: 0,
+          caloriesBurned: 0,
+          caloriesGoal: 2000,
+          steps: 0,
+          stepsGoal: 10000,
+          waterGlasses: 0,
+          waterGlassesGoal: 8,
+          date: DateTime.now(),
+        );
+      }
+      
+      // Load default motivational quote
+      if (_motivationalQuote.isEmpty) {
+        _loadMotivationalQuote();
+      }
+    } catch (e) {
+      debugPrint('Error loading cached data: $e');
+    }
+  }
+
+  /// Initialize AppStateService asynchronously
+  Future<void> _initializeAppStateAsync() async {
+    try {
+      if (!_appStateService.isInitialized) {
+        await _appStateService.initialize().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => debugPrint('AppStateService initialization timed out')
+        );
+      }
+    } catch (e) {
+      debugPrint('Error initializing AppStateService: $e');
+    }
+  }
+
+  /// Load fresh data in background without blocking UI
+  Future<void> _loadFreshDataAsync() async {
+    setState(() => _isRefreshing = true);
+    
+    try {
+      // Load critical data with short timeouts
+      await Future.wait([
+        _loadTodaysSummary().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => debugPrint('Today summary load timed out')
+        ),
+        _loadStreakData().timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => debugPrint('Streak data load timed out')
+        ),
+      ]).timeout(const Duration(seconds: 5));
+      
+      // Initialize analytics service in background (lower priority)
+      _analyticsService.initializeRealTimeAnalytics(days: 30).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => debugPrint('Analytics service initialization timed out')
+      ).then((_) {
+        // Calculate achievements after analytics is ready
+        return _analyticsService.calculateStreaksAndAchievements().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => debugPrint('Achievements calculation timed out')
+        );
+      }).catchError((e) => debugPrint('Analytics background loading error: $e'));
+      
+    } catch (e) {
+      debugPrint('Error loading fresh data: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
     }
   }
 
