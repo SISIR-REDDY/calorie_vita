@@ -51,4 +51,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:20.7.0")
     implementation("com.google.android.gms:play-services-location:21.0.1")
     implementation("androidx.health.connect:connect-client:1.1.0-alpha07")
+    // Google Fit dependencies
+    implementation("com.google.android.gms:play-services-fitness:21.1.0")
+    implementation("com.google.android.gms:play-services-identity:18.0.1")
 }

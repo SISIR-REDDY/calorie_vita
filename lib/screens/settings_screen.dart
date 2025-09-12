@@ -11,6 +11,7 @@ import '../services/demo_auth_service.dart';
 import '../services/firebase_service.dart';
 import '../services/real_time_input_service.dart';
 import '../services/calorie_units_service.dart';
+import '../services/google_fit_service.dart';
 
 import '../models/user_preferences.dart';
 import '../models/user_goals.dart';
@@ -33,6 +34,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final AppStateService _appStateService = AppStateService();
   final DemoAuthService _demoAuth = DemoAuthService();
   final RealTimeInputService _realTimeInputService = RealTimeInputService();
+  final GoogleFitService _googleFitService = GoogleFitService();
   
   // User data
   User? _user;
@@ -47,12 +49,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   
   // Settings state variables
   bool _isDarkMode = false;
+  
+  // Google Fit state
+  bool _isGoogleFitConnected = false;
+  bool _isConnectingToGoogleFit = false;
+  DateTime? _lastGoogleFitSync;
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
     _setupStreamListeners();
+    _initializeGoogleFit();
   }
 
   @override
@@ -1168,80 +1176,190 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
 
-  /// Build Google Health Connection card
-  Widget _buildGoogleHealthCard() {
-    return StreamBuilder<bool>(
-      stream: Stream.value(false), // Google Fit removed
-      builder: (context, snapshot) {
-        final isConnected = false; // Google Fit removed
+  /// Initialize Google Fit service (with persistence check)
+  Future<void> _initializeGoogleFit() async {
+    try {
+      await _googleFitService.initialize();
+      final isAuthenticated = await _googleFitService.validateAuthentication();
+      setState(() {
+        _isGoogleFitConnected = isAuthenticated;
+        if (_isGoogleFitConnected) {
+          _lastGoogleFitSync = DateTime.now();
+        }
+      });
+    } catch (e) {
+      print('Error initializing Google Fit: $e');
+    }
+  }
+
+  /// Connect to Google Fit
+  Future<void> _connectToGoogleFit() async {
+    if (_isConnectingToGoogleFit) return;
+
+    setState(() {
+      _isConnectingToGoogleFit = true;
+    });
+
+    try {
+      final success = await _googleFitService.authenticate();
+      if (success) {
+        setState(() {
+          _isGoogleFitConnected = true;
+          _lastGoogleFitSync = DateTime.now();
+        });
         
-        return Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: InkWell(
-            onTap: null, // Google Fit removed
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  // Health Icon (Google Fit removed)
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.grey[100],
-                      border: Border.all(
-                        color: Colors.grey[300]!, 
-                        width: 1
-                      ),
-                    ),
-                    child: Center(
-                      child: Icon(
-                        Icons.fitness_center,
-                        color: Colors.grey[600],
-                        size: 24,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Health Integration (Disabled)',
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: kTextDark,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          isConnected 
-                            ? 'Tap to disconnect' 
-                            : 'to track your steps and fitness data',
-                          style: GoogleFonts.poppins(
-                            color: kTextSecondary,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(
-                    Icons.arrow_forward_ios,
-                    color: kTextSecondary,
-                    size: 16,
-                  ),
-                ],
-              ),
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Successfully connected to Google Fit!'),
+              backgroundColor: kSuccessColor,
             ),
+          );
+        }
+      } else {
+        throw Exception('Authentication failed');
+      }
+    } catch (e) {
+      print('Error connecting to Google Fit: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to connect to Google Fit: ${e.toString()}'),
+            backgroundColor: Colors.red,
           ),
         );
-      },
+      }
+    } finally {
+      setState(() {
+        _isConnectingToGoogleFit = false;
+      });
+    }
+  }
+
+  /// Disconnect from Google Fit
+  Future<void> _disconnectFromGoogleFit() async {
+    try {
+      await _googleFitService.signOut();
+      setState(() {
+        _isGoogleFitConnected = false;
+        _lastGoogleFitSync = null;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Disconnected from Google Fit'),
+            backgroundColor: kInfoColor,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error disconnecting from Google Fit: $e');
+    }
+  }
+
+  /// Format last sync time
+  String _formatLastSyncTime() {
+    if (_lastGoogleFitSync == null) return 'Never';
+    final now = DateTime.now();
+    final difference = now.difference(_lastGoogleFitSync!);
+    
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else {
+      return '${difference.inDays}d ago';
+    }
+  }
+
+  /// Build Google Health Connection card
+  Widget _buildGoogleHealthCard() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: _isGoogleFitConnected ? _disconnectFromGoogleFit : _connectToGoogleFit,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              // Health Icon
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _isGoogleFitConnected ? kSuccessColor.withValues(alpha: 0.1) : Colors.grey[100],
+                  border: Border.all(
+                    color: _isGoogleFitConnected ? kSuccessColor : Colors.grey[300]!, 
+                    width: 1
+                  ),
+                ),
+                child: Center(
+                  child: _isConnectingToGoogleFit
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
+                          ),
+                        )
+                      : Image.asset(
+                          'google-fit-png-logo.png',
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.contain,
+                        ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Google Fit',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: kTextDark,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _isGoogleFitConnected 
+                          ? 'Connected - Last sync: ${_formatLastSyncTime()}'
+                          : 'Connect to sync fitness data',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: _isGoogleFitConnected ? kSuccessColor : kTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Status indicator
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _isGoogleFitConnected ? kSuccessColor : Colors.grey[400],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

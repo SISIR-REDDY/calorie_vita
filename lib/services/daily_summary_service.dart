@@ -325,6 +325,42 @@ class DailySummaryService {
     }
   }
 
+  /// Update daily summary with Google Fit data
+  Future<void> updateDailySummary(DailySummary updatedSummary) async {
+    try {
+      final userId = getCurrentUserId();
+      if (userId == null) return;
+
+      final today = DateTime.now();
+      final dateKey = _getDateKey(today);
+      final docRef = _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('dailySummary')
+          .doc(dateKey);
+
+      await docRef.set({
+        'caloriesConsumed': updatedSummary.caloriesConsumed,
+        'caloriesBurned': updatedSummary.caloriesBurned,
+        'steps': updatedSummary.steps,
+        'caloriesGoal': updatedSummary.caloriesGoal,
+        'stepsGoal': updatedSummary.stepsGoal,
+        'waterGlasses': updatedSummary.waterGlasses,
+        'waterGlassesGoal': updatedSummary.waterGlassesGoal,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // Update local cache
+      _currentDailySummary = updatedSummary;
+      _dailySummaryController.add(updatedSummary);
+
+      _errorHandler.handleBusinessError('updateDailySummary', 'Daily summary updated successfully');
+    } catch (e) {
+      _errorHandler.handleFirebaseError('updateDailySummary', e);
+      rethrow;
+    }
+  }
+
   /// Update local summary cache
   Future<void> _updateLocalSummary(String userId, Map<String, dynamic> updates) async {
     if (_currentDailySummary == null) return;

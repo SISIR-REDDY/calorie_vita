@@ -244,10 +244,10 @@ class AppStateService {
     _macroBreakdownController.add(_macroBreakdown);
   }
 
-  /// Set up connectivity monitoring
+  /// Set up connectivity monitoring (optimized)
   void _setupConnectivityMonitoring() {
-    // Simple connectivity check - in a real app, you'd use connectivity_plus package
-    Timer.periodic(const Duration(seconds: 30), (timer) {
+    // Simple connectivity check - reduced frequency to 2 minutes
+    Timer.periodic(const Duration(minutes: 2), (timer) {
       _checkConnectivity();
     });
   }

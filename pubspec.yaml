@@ -60,6 +60,8 @@ dependencies:
   
   # Health & Fitness Integration
   # Using Google Fit REST API for real-time data
+  googleapis_auth: ^1.4.1
+  googleapis: ^11.4.0
 
 dev_dependencies:
   flutter_test:
@@ -80,3 +82,4 @@ flutter:
     - assets/icons/
     - assets/calorie_data.json
     - calorie_logo.png
+    - google-fit-png-logo.png
