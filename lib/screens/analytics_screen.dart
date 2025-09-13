@@ -208,6 +208,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       await Future.wait([
         _initializeAppStateService(),
         _initializeAnalyticsService(),
+        _loadUserProfileData(), // Load user profile data for BMI calculation
       ]).timeout(const Duration(seconds: 4));
       
       // Load Google Fit data in background (lowest priority)

@@ -39,7 +39,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.2),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
+    ).animate(
+        CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
 
     // Start animations
     _fadeController.forward();
@@ -56,12 +57,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 
   Future<void> _signInWithGoogle() async {
-    if (_isGoogleSigningIn) return; // Prevent multiple taps
-    
+    if (_isGoogleSigningIn) return;
+
     setState(() {
       _isGoogleSigningIn = true;
     });
-    
+
     try {
       final user = await _authService.signInWithGoogle();
       if (user != null && mounted) {
@@ -75,8 +76,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             ),
           ),
         );
-        // Let AppStateManager handle the navigation
-        // The state change will trigger the main app to show MainNavigation
       }
     } catch (e) {
       if (mounted) {
@@ -100,262 +99,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     }
   }
 
-  Future<void> _signInWithFacebook() async {
-    try {
-      // For now, simulate Facebook sign-in with demo user
-      final user = await _authService.signInWithFacebook();
-      if (user != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Signed in with Facebook successfully!'),
-            backgroundColor: kSuccessColor,
-            behavior: SnackBarBehavior.floating,
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(12)),
-            ),
-          ),
-        );
-        // Let AppStateManager handle the navigation
-        // The state change will trigger the main app to show MainNavigation
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Facebook sign-in is not available yet. Please use Google or Email sign-in.'),
-            backgroundColor: kWarningColor,
-            behavior: SnackBarBehavior.floating,
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(12)),
-            ),
-          ),
-        );
-      }
-    }
-  }
-
-  void _showAuthDialog({required bool isSignUp}) {
-    final emailController = TextEditingController();
-    final passwordController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    bool loading = false;
-    
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Material(
-          type: MaterialType.transparency,
-          child: Center(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.8,
-              ),
-              decoration: const BoxDecoration(
-                color: kSurfaceColor,
-                borderRadius: BorderRadius.all(Radius.circular(24)),
-              ),
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: StatefulBuilder(
-                    builder: (context, setState) {
-                      return Form(
-                        key: formKey,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Header with logo
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    gradient: isSignUp ? kSecondaryGradient : kPrimaryGradient,
-                                    borderRadius: BorderRadius.circular(16),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: (isSignUp ? kSecondaryColor : kPrimaryColor).withOpacity(0.3),
-                                        blurRadius: 12,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Icon(
-                                    isSignUp ? Icons.person_add_rounded : Icons.login_rounded,
-                                    color: Colors.white,
-                                    size: 24,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Text(
-                                  isSignUp ? 'Create Account' : 'Welcome Back',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w700,
-                                    color: kTextPrimary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 32),
-                            
-                            // Email field
-                            TextFormField(
-                              controller: emailController,
-                              decoration: InputDecoration(
-                                labelText: 'Email',
-                                hintText: 'Enter your email address',
-                                prefixIcon: const Icon(Icons.email_outlined, color: kTextTertiary),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: const BorderSide(color: kBorderColor),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: const BorderSide(color: kBorderColor),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: const BorderSide(color: kPrimaryColor, width: 2),
-                                ),
-                                filled: true,
-                                fillColor: kSurfaceLight,
-                              ),
-                              validator: (v) => v != null && v.contains('@') ? null : 'Enter a valid email',
-                            ),
-                            const SizedBox(height: 20),
-                            
-                            // Password field
-                            TextFormField(
-                              controller: passwordController,
-                              obscureText: true,
-                              decoration: InputDecoration(
-                                labelText: 'Password',
-                                hintText: 'Enter your password',
-                                prefixIcon: const Icon(Icons.lock_outline, color: kTextTertiary),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: const BorderSide(color: kBorderColor),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: const BorderSide(color: kBorderColor),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: const BorderSide(color: kPrimaryColor, width: 2),
-                                ),
-                                filled: true,
-                                fillColor: kSurfaceLight,
-                              ),
-                              validator: (v) => v != null && v.length >= 6 ? null : 'Min 6 characters',
-                            ),
-                            const SizedBox(height: 32),
-                            
-                            // Submit button
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: isSignUp ? kSecondaryColor : kPrimaryColor,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(vertical: 18),
-                                ),
-                                onPressed: loading
-                                    ? null
-                                    : () async {
-                                        if (!formKey.currentState!.validate()) return;
-                                        setState(() => loading = true);
-                                        
-                                        try {
-                                          AuthUser? user;
-                                          if (isSignUp) {
-                                            user = await _authService.createUserWithEmailAndPassword(
-                                              emailController.text.trim(),
-                                              passwordController.text.trim(),
-                                            );
-                                          } else {
-                                            user = await _authService.signInWithEmailAndPassword(
-                                              emailController.text.trim(),
-                                              passwordController.text.trim(),
-                                            );
-                                          }
-                                          
-                                          if (user != null && mounted) {
-                                            final authMethod = _authService.authMethod;
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                content: Text('Signed in successfully${authMethod == 'Demo' ? ' (Demo Mode)' : ''}'),
-                                                backgroundColor: kSuccessColor,
-                                                behavior: SnackBarBehavior.floating,
-                                                shape: const RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                                                ),
-                                              ),
-                                            );
-                                            Navigator.of(context).pop(); // Close dialog
-                                            Navigator.pushReplacement(
-                                              context,
-                                              MaterialPageRoute(builder: (_) => const PremiumHomeScreen()),
-                                            );
-                                          }
-                                        } catch (e) {
-                                          if (mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                content: Text('Authentication failed: ${e.toString()}'),
-                                                backgroundColor: kErrorColor,
-                                                behavior: SnackBarBehavior.floating,
-                                                shape: const RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                                                ),
-                                              ),
-                                            );
-                                          }
-                                        } finally {
-                                          if (mounted) {
-                                            setState(() => loading = false);
-                                          }
-                                        }
-                                      },
-                                child: loading
-                                    ? const SizedBox(
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                        ),
-                                      )
-                                    : Text(
-                                        isSignUp ? 'Create Account' : 'Sign In',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -367,16 +110,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             position: _slideAnimation,
             child: CustomScrollView(
               slivers: [
-                // Header Section
                 _buildHeaderSection(),
-                
-                // Authentication Section
                 _buildAuthenticationSection(),
-                
-                // Features Section
                 _buildFeaturesSection(),
-                
-                // Footer spacing
                 const SliverToBoxAdapter(
                   child: SizedBox(height: 40),
                 ),
@@ -394,7 +130,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
         child: Column(
           children: [
-            // Logo Section
             Image.asset(
               'calorie_logo.png',
               width: 100,
@@ -402,8 +137,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               fit: BoxFit.contain,
             ),
             const SizedBox(height: 24),
-            
-            // Title
             Text(
               'Welcome to Calorie Vita',
               style: GoogleFonts.inter(
@@ -415,8 +148,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            
-            // Subtitle
             Text(
               'Track your nutrition, achieve your goals with AI-powered insights',
               style: GoogleFonts.inter(
@@ -448,7 +179,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               ),
             ),
             const SizedBox(height: 16),
-            
             _buildFeatureCard(
               icon: Icons.camera_alt_rounded,
               title: 'AI Food Recognition',
@@ -456,7 +186,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               color: kAccentBlue,
             ),
             const SizedBox(height: 12),
-            
             _buildFeatureCard(
               icon: Icons.track_changes_rounded,
               title: 'Smart Tracking',
@@ -464,7 +193,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               color: kAccentGreen,
             ),
             const SizedBox(height: 12),
-            
             _buildFeatureCard(
               icon: Icons.psychology_rounded,
               title: 'AI Coach',
@@ -551,106 +279,16 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               ),
             ),
             const SizedBox(height: 16),
-            
-            // Google Sign In - Professional Design
             _buildProfessionalGoogleButton(),
-            const SizedBox(height: 16),
-            
-            // Facebook Sign In
-            _buildAuthButton(
-              onPressed: _signInWithFacebook,
-              icon: Icons.facebook,
-              label: 'Continue with Facebook',
-              backgroundColor: const Color(0xFF1877F2),
-              textColor: Colors.white,
-            ),
-            const SizedBox(height: 16),
-            
-            // Email Sign In
-            _buildAuthButton(
-              onPressed: () => _showAuthDialog(isSignUp: false),
-              icon: Icons.email_outlined,
-              label: 'Sign in with Email',
-              backgroundColor: Colors.transparent,
-              textColor: kPrimaryColor,
-              borderColor: kPrimaryColor,
-            ),
             const SizedBox(height: 24),
-            
-            // Divider
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    height: 1,
-                    color: kBorderColor,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    'or',
-                    style: GoogleFonts.inter(
-                      color: kTextTertiary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Container(
-                    height: 1,
-                    color: kBorderColor,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            
-            // Create Account - Enhanced UI
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                gradient: kPrimaryGradient,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: kPrimaryColor.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+            Text(
+              'Sign in with your Google account to start tracking your nutrition journey',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: kTextSecondary,
+                height: 1.4,
               ),
-              child: ElevatedButton(
-                onPressed: () => _showAuthDialog(isSignUp: true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.person_add_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Create New Account',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -658,13 +296,14 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     );
   }
 
+  /// Professional Google Sign-In Button following Google Brand Guidelines
   Widget _buildProfessionalGoogleButton() {
     return Container(
       width: double.infinity,
-      height: 56,
+      height: 48,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(4),
         border: Border.all(
           color: const Color(0xFFDADCE0),
           width: 1,
@@ -681,7 +320,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         color: Colors.transparent,
         child: InkWell(
           onTap: _isGoogleSigningIn ? null : _signInWithGoogle,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(4),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -710,7 +349,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     ),
                   ),
                 ] else ...[
-                  // Google Logo - Custom SVG-like icon
+                  // Google Logo using official colors
                   _buildGoogleLogo(),
                   const SizedBox(width: 12),
                   // Google Text
@@ -732,6 +371,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     );
   }
 
+  /// Official Google Logo using proper brand colors
   Widget _buildGoogleLogo() {
     return Container(
       width: 20,
@@ -741,121 +381,84 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       ),
     );
   }
-
-  Widget _buildAuthButton({
-    required VoidCallback onPressed,
-    required IconData icon,
-    required String label,
-    required Color backgroundColor,
-    required Color textColor,
-    Color? borderColor,
-  }) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: backgroundColor,
-          foregroundColor: textColor,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: borderColor != null ? BorderSide(color: borderColor, width: 1.5) : BorderSide.none,
-          ),
-        ),
-        icon: Icon(icon, size: 20),
-        label: Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-  }
 }
 
-/// Custom painter for Google logo - More accurate implementation
+/// Official Google Logo Painter following Google Brand Guidelines
 class GoogleLogoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint();
     
-    // Google "G" logo colors (official Google brand colors)
+    // Official Google brand colors
     const blue = Color(0xFF4285F4);
     const red = Color(0xFFEA4335);
     const yellow = Color(0xFFFBBC05);
     const green = Color(0xFF34A853);
     
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width * 0.35;
+    final radius = size.width * 0.4;
     
-    // Set up paint properties
     paint.style = PaintingStyle.fill;
     
-    // Create the "G" shape using filled arcs and rectangles
-    
-    // Blue section (top-right quarter)
+    // Blue section (top-right)
     paint.color = blue;
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      -1.57, // -90 degrees (top)
+      -1.57, // -90 degrees
       1.57,  // 90 degrees
       true,
       paint,
     );
     
-    // Red section (right quarter)
+    // Red section (right)
     paint.color = red;
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      0,     // 0 degrees (right)
+      0,     // 0 degrees
       1.57,  // 90 degrees
       true,
       paint,
     );
     
-    // Yellow section (bottom quarter)
+    // Yellow section (bottom)
     paint.color = yellow;
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      1.57,  // 90 degrees (bottom)
+      1.57,  // 90 degrees
       1.57,  // 90 degrees
       true,
       paint,
     );
     
-    // Green section (left quarter)
+    // Green section (left)
     paint.color = green;
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      3.14,  // 180 degrees (left)
+      3.14,  // 180 degrees
       1.57,  // 90 degrees
       true,
       paint,
     );
     
-    // Draw the inner circle (white background for the "G")
+    // White center circle
     paint.color = Colors.white;
-    canvas.drawCircle(center, radius * 0.6, paint);
+    canvas.drawCircle(center, radius * 0.65, paint);
     
-    // Draw the "G" cutout - blue section with opening
+    // Blue "G" cutout
     paint.color = blue;
     final path = Path();
-    path.moveTo(center.dx, center.dy - radius * 0.6);
+    path.moveTo(center.dx, center.dy - radius * 0.65);
     path.arcTo(
-      Rect.fromCircle(center: center, radius: radius * 0.6),
+      Rect.fromCircle(center: center, radius: radius * 0.65),
       -1.57, // -90 degrees
-      4.71,  // 270 degrees (3/4 circle)
+      4.71,  // 270 degrees
       false,
     );
-    path.lineTo(center.dx + radius * 0.3, center.dy);
-    path.lineTo(center.dx + radius * 0.6, center.dy);
-    path.lineTo(center.dx + radius * 0.6, center.dy + radius * 0.1);
-    path.lineTo(center.dx + radius * 0.3, center.dy + radius * 0.1);
-    path.lineTo(center.dx + radius * 0.3, center.dy);
+    path.lineTo(center.dx + radius * 0.25, center.dy);
+    path.lineTo(center.dx + radius * 0.65, center.dy);
+    path.lineTo(center.dx + radius * 0.65, center.dy + radius * 0.1);
+    path.lineTo(center.dx + radius * 0.25, center.dy + radius * 0.1);
+    path.lineTo(center.dx + radius * 0.25, center.dy);
     path.close();
     canvas.drawPath(path, paint);
   }
