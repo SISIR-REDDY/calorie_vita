@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/google_fit_service.dart';
+import '../services/google_fit_cache_service.dart';
 import '../models/google_fit_data.dart';
 import '../ui/app_colors.dart';
+import 'enhanced_loading_widgets.dart';
 
 /// Widget for displaying Google Fit integration
 class GoogleFitWidget extends StatefulWidget {
@@ -13,9 +15,11 @@ class GoogleFitWidget extends StatefulWidget {
 
 class _GoogleFitWidgetState extends State<GoogleFitWidget> {
   final GoogleFitService _googleFitService = GoogleFitService();
+  final GoogleFitCacheService _cacheService = GoogleFitCacheService();
   
   bool _isLoading = false;
   bool _isAuthenticated = false;
+  bool _isRefreshing = false;
   GoogleFitData? _todayData;
   String? _error;
 
@@ -65,6 +69,30 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
   }
 
   Future<void> _loadTodayData() async {
+    if (!_isAuthenticated) return;
+
+    setState(() {
+      _isRefreshing = true;
+      _error = null;
+    });
+
+    try {
+      // Use cache service for faster loading
+      final data = await _cacheService.getTodayData(forceRefresh: true);
+      
+      setState(() {
+        _todayData = data;
+        _isRefreshing = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load fitness data: ${e.toString()}';
+        _isRefreshing = false;
+      });
+    }
+  }
+
+  Future<void> _loadTodayDataFallback() async {
     if (!_isAuthenticated) return;
 
     setState(() {
@@ -177,24 +205,16 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
   }
 
   Widget _buildLoadingState() {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          children: [
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
+        padding: const EdgeInsets.all(20),
+        child: _isRefreshing 
+          ? GoogleFitShimmerCard(height: 100)
+          : EnhancedLoadingWidget(
+              text: 'Syncing with Google Fit...',
+              color: AppColors.primary,
+              size: 32,
             ),
-            SizedBox(height: 12),
-            Text(
-              'Loading fitness data...',
-              style: TextStyle(
-                fontSize: 14,
-                color: kTextSecondary,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -296,30 +316,32 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
   }
 
   Widget _buildFitnessData() {
-    return Column(
-      children: [
-        // Steps and Calories Row
-        Row(
-          children: [
-            Expanded(
-              child: _buildMetricCard(
-                'Steps',
-                _todayData!.formattedSteps,
-                Icons.directions_walk,
-                Colors.green,
+    return SmoothDataTransition(
+      isLoading: _isLoading || _isRefreshing,
+      child: Column(
+        children: [
+          // Steps and Calories Row
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetricCard(
+                  'Steps',
+                  _todayData!.formattedSteps,
+                  Icons.directions_walk,
+                  Colors.green,
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildMetricCard(
-                'Calories Burned',
-                _todayData!.formattedCalories,
-                Icons.local_fire_department,
-                Colors.orange,
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildMetricCard(
+                  'Calories Burned',
+                  _todayData!.formattedCalories,
+                  Icons.local_fire_department,
+                  Colors.orange,
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         const SizedBox(height: 12),
         
         // Distance and Activity Level Row
@@ -363,7 +385,8 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
             label: const Text('Refresh Data'),
           ),
         ),
-      ],
+        ],
+      ),
     );
   }
 

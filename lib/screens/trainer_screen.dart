@@ -6,6 +6,7 @@ import '../services/ai_service.dart';
 import '../services/firebase_service.dart';
 import '../services/real_time_input_service.dart';
 import '../ui/app_colors.dart';
+import '../mixins/google_fit_sync_mixin.dart';
 
 class Message {
   final String sender;
@@ -72,7 +73,7 @@ class ChatSession {
   }
 }
 
-class _AITrainerScreenState extends State<AITrainerScreen> {
+class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMixin {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -92,6 +93,7 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
   List<ChatSession> chatSessions = [];
   String? currentSessionId;
   DateTime? _lastHistoryLoad;
+  Map<String, dynamic>? _currentFitnessData;
 
   @override
   void initState() {
@@ -99,6 +101,24 @@ class _AITrainerScreenState extends State<AITrainerScreen> {
     _checkPremiumStatus();
     _loadUserProfile();
     _loadChatHistory();
+    initializeGoogleFitSync();
+  }
+
+  /// Override mixin method to handle Google Fit data updates
+  @override
+  void onGoogleFitDataUpdate(Map<String, dynamic> syncData) {
+    super.onGoogleFitDataUpdate(syncData);
+    
+    // Store fitness data for AI trainer to use in recommendations
+    _currentFitnessData = syncData;
+    print('Trainer screen: Updated with Google Fit data - Steps: ${syncData['steps']}');
+  }
+
+  /// Override mixin method to handle Google Fit connection changes
+  @override
+  void onGoogleFitConnectionChanged(bool isConnected) {
+    super.onGoogleFitConnectionChanged(isConnected);
+    print('Trainer screen: Google Fit connection changed - Connected: $isConnected');
   }
 
   @override

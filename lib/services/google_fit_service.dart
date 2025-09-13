@@ -456,15 +456,15 @@ class GoogleFitService {
     _isLiveSyncing = true;
     _liveDataController = StreamController<Map<String, dynamic>>.broadcast();
     
-    // Sync every 30 seconds for faster updates
-    _liveSyncTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    // Sync every 10 seconds for faster updates
+    _liveSyncTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
       _performLiveSync();
     });
     
     // Initial sync
     _performLiveSync();
     
-    _logger.i('Live sync started with 30-second intervals for faster updates');
+    _logger.i('Live sync started with 10-second intervals for faster updates');
   }
   
   /// Stop live sync
@@ -576,12 +576,12 @@ class GoogleFitService {
     try {
       final today = DateTime.now();
       
-      // Batch API calls for faster response
+      // Batch API calls for faster response with longer timeout
       final futures = await Future.wait([
         getDailySteps(today),
         getDailyCaloriesBurned(today),
         getDailyDistance(today),
-      ]);
+      ]).timeout(const Duration(seconds: 8)); // Increased timeout for reliability
       
       final steps = futures[0] as int? ?? 0;
       final calories = futures[1] as double? ?? 0.0;
@@ -595,6 +595,7 @@ class GoogleFitService {
         'distance': distance,
         'activityLevel': _calculateActivityLevel(steps),
         'isLive': true,
+        'cached': false, // Mark as fresh data
       };
       
       // Emit live data immediately
@@ -606,12 +607,12 @@ class GoogleFitService {
     } catch (e) {
       _logger.e('Live sync failed: $e');
       
-      // Emit error data
+      // Emit error data but don't mark as live to avoid UI disruption
       if (!_liveDataController!.isClosed) {
         _liveDataController!.add({
           'timestamp': DateTime.now().toIso8601String(),
           'error': e.toString(),
-          'isLive': true,
+          'isLive': false, // Don't disrupt UI on error
         });
       }
     }
@@ -631,5 +632,49 @@ class GoogleFitService {
   Map<String, dynamic>? getCurrentLiveData() {
     // This could be enhanced to cache the last live data
     return null;
+  }
+
+  /// Get all fitness data for today in a single optimized call
+  Future<Map<String, dynamic>?> getTodayFitnessDataBatch() async {
+    if (!_isAuthenticated || _authClient == null) {
+      _logger.w('Not authenticated with Google Fit for batch request');
+      return null;
+    }
+
+    try {
+      final today = DateTime.now();
+      
+      // Use Future.wait with individual error handling to prevent one failure from stopping all
+      final results = await Future.wait([
+        getDailySteps(today).catchError((e) {
+          _logger.w('Steps fetch failed: $e');
+          return null;
+        }),
+        getDailyCaloriesBurned(today).catchError((e) {
+          _logger.w('Calories fetch failed: $e');
+          return null;
+        }),
+        getDailyDistance(today).catchError((e) {
+          _logger.w('Distance fetch failed: $e');
+          return null;
+        }),
+        getCurrentWeight().catchError((e) {
+          _logger.w('Weight fetch failed: $e');
+          return null;
+        }),
+      ], eagerError: false);
+
+      return {
+        'timestamp': today.toIso8601String(),
+        'steps': results[0] as int?,
+        'caloriesBurned': results[1] as double?,
+        'distance': results[2] as double?,
+        'weight': results[3] as double?,
+        'activityLevel': _calculateActivityLevel(results[0] as int?),
+      };
+    } catch (e) {
+      _logger.e('Batch fitness data fetch failed: $e');
+      return null;
+    }
   }
 }

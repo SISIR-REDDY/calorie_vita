@@ -9,6 +9,7 @@ import 'screens/settings_screen.dart';
 import 'widgets/reward_notification_widget.dart';
 import 'ui/app_theme.dart';
 import 'services/app_state_manager.dart';
+import 'services/global_google_fit_manager.dart';
 import 'firebase_options.dart';
 
 class MainApp extends StatefulWidget {
@@ -22,6 +23,7 @@ class MainApp extends StatefulWidget {
 
 class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   final AppStateManager _appStateManager = AppStateManager();
+  final GlobalGoogleFitManager _googleFitManager = GlobalGoogleFitManager();
   bool _isInitialized = false;
 
   @override
@@ -45,6 +47,9 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
     
     // Initialize app state manager in background (non-blocking)
     _initializeAppStateManager();
+    
+    // Initialize global Google Fit manager
+    _initializeGoogleFitManager();
   }
 
   void _initializeAppStateManager() async {
@@ -69,6 +74,20 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
       
     } catch (e) {
       print('❌ AppStateManager initialization error: $e');
+    }
+  }
+
+  void _initializeGoogleFitManager() async {
+    try {
+      print('Initializing GlobalGoogleFitManager in background...');
+      
+      // Initialize Google Fit manager for global sync
+      await _googleFitManager.initialize();
+      
+      print('✅ GlobalGoogleFitManager initialization completed');
+      
+    } catch (e) {
+      print('❌ GlobalGoogleFitManager initialization error: $e');
     }
   }
 
@@ -331,6 +350,7 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
+  final GlobalGoogleFitManager _googleFitManager = GlobalGoogleFitManager();
   final List<Widget> _screens = [
     const PremiumHomeScreen(),
     AnalyticsScreen(),
@@ -343,6 +363,12 @@ class _MainNavigationState extends State<MainNavigation> {
 
   void _onTabSelected(int index) {
     print('Tab selected: $index'); // Debug log
+    
+    // Trigger Google Fit sync whenever a screen is opened
+    _googleFitManager.ensureSync().catchError((e) {
+      print('Failed to ensure Google Fit sync on screen change: $e');
+    });
+    
     if (index == 2) {
       // Open camera
       Navigator.of(context).push(
