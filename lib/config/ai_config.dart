@@ -5,7 +5,7 @@
 class AIConfig {
   /// OpenRouter API Key
   /// Get your free API key from: https://openrouter.ai/
-  static const String apiKey = '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';
+  static const String apiKey = '';
   
   /// OpenRouter API Base URL
   static const String baseUrl = 'https://openrouter.ai/api/v1/chat/completions';
