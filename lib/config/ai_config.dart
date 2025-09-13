@@ -12,11 +12,16 @@ class AIConfig {
   
   /// Model configurations
   static const String chatModel = 'openai/gpt-3.5-turbo';
-  static const String visionModel = 'nousresearch/nous-hermes-2-vision';
+  static const String visionModel = 'openai/gpt-4o'; // Best vision model for food analysis
+  static const String backupVisionModel = 'google/gemini-pro-1.5'; // Backup option
   
   /// API request settings
   static const int maxTokens = 1000;
+  static const int chatMaxTokens = 300; // Shorter responses for chat
+  static const int analyticsMaxTokens = 400; // Medium length for analytics
+  static const int visionMaxTokens = 2000; // More tokens for detailed food analysis
   static const double temperature = 0.7;
+  static const double visionTemperature = 0.3; // Lower temperature for more consistent food analysis
   
   /// App identification for OpenRouter
   static const String appName = 'Calorie Vita';

@@ -335,7 +335,20 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
     
     String reply;
     try {
-      reply = await AIService.askTrainerSisir(text, userProfile: _userProfile);
+      // Convert messages to conversation history format
+      final conversationHistory = messages
+          .where((msg) => msg.sender != 'Sisir' || msg.text != 'Hi! I am Trainer Sisir. Ask me anything about fitness or nutrition!')
+          .map((msg) => {
+            'role': msg.sender == 'user' ? 'user' : 'assistant',
+            'content': msg.text,
+          })
+          .toList();
+      
+      reply = await AIService.askTrainerSisir(
+        text, 
+        userProfile: _userProfile,
+        conversationHistory: conversationHistory,
+      );
     } catch (e) {
       reply = 'Sorry, there was a problem connecting to the AI service.';
     }

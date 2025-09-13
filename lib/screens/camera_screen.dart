@@ -76,7 +76,8 @@ class _CameraScreenState extends State<CameraScreen> {
         _barcode = barcode; 
       });
       try {
-        final barcodeResult = await AIService.detectCaloriesFromImage(_imageFile!);
+        // Use the correct barcode method instead of image analysis
+        final barcodeResult = await AIService.getNutritionFromBarcode(barcode);
         setState(() { _result = barcodeResult; });
       } catch (e) {
         setState(() { _error = "Couldn't fetch product info. Try again."; });
