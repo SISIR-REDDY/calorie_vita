@@ -65,4 +65,4 @@ class DefaultFirebaseOptions {
     projectId: 'calorie-vita',
     storageBucket: 'calorie-vita.firebasestorage.app',
   );
-} 
+}

@@ -39,50 +39,64 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _pickImage() async {
-    setState(() { 
-      _loading = true; 
-      _error = null; 
-      _result = null; 
+    setState(() {
+      _loading = true;
+      _error = null;
+      _result = null;
     });
-    
+
     try {
       final picked = await _picker.pickImage(source: ImageSource.camera);
       if (picked != null) {
-        setState(() { _imageFile = File(picked.path); });
+        setState(() {
+          _imageFile = File(picked.path);
+        });
         final aiResult = await AIService.detectCaloriesFromImage(_imageFile!);
-        setState(() { _result = aiResult; });
+        setState(() {
+          _result = aiResult;
+        });
       }
     } catch (e) {
-      setState(() { _error = "Couldn't capture or analyze image. Try again."; });
+      setState(() {
+        _error = "Couldn't capture or analyze image. Try again.";
+      });
     } finally {
-      setState(() { _loading = false; });
+      setState(() {
+        _loading = false;
+      });
     }
   }
 
   Future<void> _scanBarcode() async {
-    setState(() { 
-      _showBarcodeScanner = true; 
-      _error = null; 
-      _result = null; 
+    setState(() {
+      _showBarcodeScanner = true;
+      _error = null;
+      _result = null;
     });
   }
 
   void _onBarcodeDetected(BarcodeCapture capture) async {
     final barcode = capture.barcodes.firstOrNull?.rawValue;
     if (barcode != null) {
-      setState(() { 
-        _showBarcodeScanner = false; 
-        _loading = true; 
-        _barcode = barcode; 
+      setState(() {
+        _showBarcodeScanner = false;
+        _loading = true;
+        _barcode = barcode;
       });
       try {
         // Use the correct barcode method instead of image analysis
         final barcodeResult = await AIService.getNutritionFromBarcode(barcode);
-        setState(() { _result = barcodeResult; });
+        setState(() {
+          _result = barcodeResult;
+        });
       } catch (e) {
-        setState(() { _error = "Couldn't fetch product info. Try again."; });
+        setState(() {
+          _error = "Couldn't fetch product info. Try again.";
+        });
       } finally {
-        setState(() { _loading = false; });
+        setState(() {
+          _loading = false;
+        });
       }
     }
   }
@@ -102,22 +116,22 @@ class _CameraScreenState extends State<CameraScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kAppBackground,
-        appBar: _buildPremiumAppBar(),
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [kAppBackground, kSurfaceLight],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-          child: SafeArea(
-            child: _showBarcodeScanner
-                ? _buildBarcodeScanner()
-                : _buildMainContent(),
+      appBar: _buildPremiumAppBar(),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [kAppBackground, kSurfaceLight],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
         ),
-      );
+        child: SafeArea(
+          child: _showBarcodeScanner
+              ? _buildBarcodeScanner()
+              : _buildMainContent(),
+        ),
+      ),
+    );
   }
 
   PreferredSizeWidget _buildPremiumAppBar() {
@@ -139,14 +153,14 @@ class _CameraScreenState extends State<CameraScreen> {
             ),
           ),
           const SizedBox(width: 12),
-            Text(
-              'Food Scanner',
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.bold,
-                color: kTextDark,
-                fontSize: 18,
-              ),
+          Text(
+            'Food Scanner',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+              color: kTextDark,
+              fontSize: 18,
             ),
+          ),
         ],
       ),
       actions: const [],
@@ -322,24 +336,25 @@ class _CameraScreenState extends State<CameraScreen> {
                     final fat = _parseMacroValue(_result!['fat']);
                     final fiber = _parseMacroValue(_result!['fiber']);
                     final sugar = _parseMacroValue(_result!['sugar']);
-                    
+
                     // Create food entry
                     final foodEntry = FoodEntry(
                       id: DateTime.now().millisecondsSinceEpoch.toString(),
                       name: _result!['food'] ?? 'Unknown Food',
                       calories: (_result!['calories'] as num?)?.round() ?? 0,
                       timestamp: DateTime.now(),
-                      imageUrl: null, // TODO: Upload image to Firebase Storage if needed
+                      imageUrl:
+                          null, // TODO: Upload image to Firebase Storage if needed
                       protein: protein,
                       carbs: carbs,
                       fat: fat,
                       fiber: fiber,
                       sugar: sugar,
                     );
-                    
+
                     // Save to app state (which will sync to Firestore)
                     await AppStateService().saveFoodEntry(foodEntry);
-                    
+
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -355,7 +370,7 @@ class _CameraScreenState extends State<CameraScreen> {
                           duration: const Duration(seconds: 4),
                         ),
                       );
-                      
+
                       // Navigate back or reset the camera
                       _reset();
                     }
@@ -473,7 +488,7 @@ class _CameraScreenState extends State<CameraScreen> {
               ],
             ),
           ),
-          
+
           // Action Buttons - Equally Spaced
           Column(
             children: [

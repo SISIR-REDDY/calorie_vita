@@ -14,7 +14,7 @@ enum DailyGoalType {
   calorieGoal('Calorie Goal', '🔥', Colors.red);
 
   const DailyGoalType(this.displayName, this.emoji, this.color);
-  
+
   final String displayName;
   final String emoji;
   final Color color;
@@ -75,7 +75,8 @@ class GoalStreak {
       ),
       currentStreak: map['currentStreak'] ?? 0,
       longestStreak: map['longestStreak'] ?? 0,
-      lastAchievedDate: DateTime.fromMillisecondsSinceEpoch(map['lastAchievedDate'] ?? 0),
+      lastAchievedDate:
+          DateTime.fromMillisecondsSinceEpoch(map['lastAchievedDate'] ?? 0),
       achievedToday: map['achievedToday'] ?? false,
       totalDaysAchieved: map['totalDaysAchieved'] ?? 0,
     );
@@ -125,7 +126,7 @@ enum StreakLevel {
   legendary('Legendary', Colors.amber, '⭐');
 
   const StreakLevel(this.name, this.color, this.emoji);
-  
+
   final String name;
   final Color color;
   final String emoji;
@@ -150,10 +151,11 @@ class UserStreakSummary {
   /// Get the most impressive streak
   GoalStreak? get mostImpressiveStreak {
     if (goalStreaks.isEmpty) return null;
-    
+
     return goalStreaks.values.reduce((a, b) {
       if (a.currentStreak > b.currentStreak) return a;
-      if (a.currentStreak == b.currentStreak && a.longestStreak > b.longestStreak) return a;
+      if (a.currentStreak == b.currentStreak &&
+          a.longestStreak > b.longestStreak) return a;
       return b;
     });
   }
@@ -165,16 +167,16 @@ class UserStreakSummary {
 
   /// Get streaks that need attention (not achieved today but have a streak)
   List<GoalStreak> get streaksNeedingAttention {
-    return goalStreaks.values.where((streak) => 
-      !streak.achievedToday && streak.currentStreak > 0
-    ).toList();
+    return goalStreaks.values
+        .where((streak) => !streak.achievedToday && streak.currentStreak > 0)
+        .toList();
   }
 
   /// Get overall motivation message
   String get motivationMessage {
     final activeCount = activeStreaks.length;
     final totalCount = goalStreaks.length;
-    
+
     if (activeCount == totalCount) {
       return 'Perfect day! All goals achieved! 🎉';
     } else if (activeCount > totalCount / 2) {
@@ -188,7 +190,8 @@ class UserStreakSummary {
 
   Map<String, dynamic> toMap() {
     return {
-      'goalStreaks': goalStreaks.map((key, value) => MapEntry(key.name, value.toMap())),
+      'goalStreaks':
+          goalStreaks.map((key, value) => MapEntry(key.name, value.toMap())),
       'totalActiveStreaks': totalActiveStreaks,
       'longestOverallStreak': longestOverallStreak,
       'lastActivityDate': lastActivityDate.millisecondsSinceEpoch,
@@ -212,7 +215,8 @@ class UserStreakSummary {
       goalStreaks: goalStreaksMap,
       totalActiveStreaks: map['totalActiveStreaks'] ?? 0,
       longestOverallStreak: map['longestOverallStreak'] ?? 0,
-      lastActivityDate: DateTime.fromMillisecondsSinceEpoch(map['lastActivityDate'] ?? 0),
+      lastActivityDate:
+          DateTime.fromMillisecondsSinceEpoch(map['lastActivityDate'] ?? 0),
       totalDaysActive: map['totalDaysActive'] ?? 0,
     );
   }

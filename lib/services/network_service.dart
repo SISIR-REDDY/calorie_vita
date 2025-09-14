@@ -9,8 +9,9 @@ class NetworkService {
   NetworkService._internal();
 
   final Connectivity _connectivity = Connectivity();
-  final StreamController<bool> _connectivityController = StreamController<bool>.broadcast();
-  
+  final StreamController<bool> _connectivityController =
+      StreamController<bool>.broadcast();
+
   bool _isOnline = true;
   List<ConnectivityResult> _currentConnectivity = [ConnectivityResult.none];
   Timer? _connectivityCheckTimer;
@@ -26,14 +27,15 @@ class NetworkService {
       // Get initial connectivity state
       _currentConnectivity = await _connectivity.checkConnectivity();
       _isOnline = !_currentConnectivity.contains(ConnectivityResult.none);
-      
+
       // Listen to connectivity changes
       _connectivity.onConnectivityChanged.listen(_onConnectivityChanged);
-      
+
       // Start periodic connectivity checks
       _startConnectivityChecks();
-      
-      print('NetworkService initialized. Online: $_isOnline, Type: $_currentConnectivity');
+
+      print(
+          'NetworkService initialized. Online: $_isOnline, Type: $_currentConnectivity');
     } catch (e) {
       print('Error initializing NetworkService: $e');
     }
@@ -44,16 +46,18 @@ class NetworkService {
     _currentConnectivity = results;
     final wasOnline = _isOnline;
     _isOnline = !results.contains(ConnectivityResult.none);
-    
+
     if (wasOnline != _isOnline) {
       _connectivityController.add(_isOnline);
-      print('Connectivity changed: ${_isOnline ? 'Online' : 'Offline'} ($results)');
+      print(
+          'Connectivity changed: ${_isOnline ? 'Online' : 'Offline'} ($results)');
     }
   }
 
   /// Start periodic connectivity checks
   void _startConnectivityChecks() {
-    _connectivityCheckTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    _connectivityCheckTimer =
+        Timer.periodic(const Duration(seconds: 30), (timer) {
       _checkConnectivity();
     });
   }
@@ -66,10 +70,10 @@ class NetworkService {
         Uri.parse('https://www.google.com'),
         headers: {'Cache-Control': 'no-cache'},
       ).timeout(const Duration(seconds: 10));
-      
+
       final wasOnline = _isOnline;
       _isOnline = response.statusCode == 200;
-      
+
       if (wasOnline != _isOnline) {
         _connectivityController.add(_isOnline);
         print('Connectivity check: ${_isOnline ? 'Online' : 'Offline'}');
@@ -77,7 +81,7 @@ class NetworkService {
     } catch (e) {
       final wasOnline = _isOnline;
       _isOnline = false;
-      
+
       if (wasOnline != _isOnline) {
         _connectivityController.add(_isOnline);
         print('Connectivity check failed: Offline');
@@ -92,7 +96,7 @@ class NetworkService {
         Uri.parse(url),
         headers: {'Cache-Control': 'no-cache'},
       ).timeout(const Duration(seconds: 10));
-      
+
       return response.statusCode == 200;
     } catch (e) {
       return false;
@@ -107,8 +111,9 @@ class NetworkService {
         Uri.parse('https://identitytoolkit.googleapis.com'),
         headers: {'Cache-Control': 'no-cache'},
       ).timeout(const Duration(seconds: 10));
-      
-      return response.statusCode < 500; // Any response < 500 means Firebase is reachable
+
+      return response.statusCode <
+          500; // Any response < 500 means Firebase is reachable
     } catch (e) {
       return false;
     }
@@ -118,15 +123,15 @@ class NetworkService {
   Future<NetworkQuality> getNetworkQuality() async {
     try {
       final stopwatch = Stopwatch()..start();
-      
+
       final response = await http.get(
         Uri.parse('https://www.google.com'),
         headers: {'Cache-Control': 'no-cache'},
       ).timeout(const Duration(seconds: 15));
-      
+
       stopwatch.stop();
       final responseTime = stopwatch.elapsedMilliseconds;
-      
+
       if (response.statusCode == 200) {
         if (responseTime < 500) {
           return NetworkQuality.excellent;
@@ -148,7 +153,7 @@ class NetworkService {
   /// Get detailed network information
   Future<Map<String, dynamic>> getNetworkInfo() async {
     final quality = await getNetworkQuality();
-    
+
     return {
       'is_online': _isOnline,
       'connectivity_type': _currentConnectivity.toString(),
@@ -159,13 +164,14 @@ class NetworkService {
   }
 
   /// Wait for network to become available
-  Future<void> waitForNetwork({Duration timeout = const Duration(minutes: 5)}) async {
+  Future<void> waitForNetwork(
+      {Duration timeout = const Duration(minutes: 5)}) async {
     if (_isOnline) return;
-    
+
     final completer = Completer<void>();
     late StreamSubscription subscription;
     Timer? timeoutTimer;
-    
+
     subscription = _connectivityController.stream.listen((isOnline) {
       if (isOnline) {
         subscription.cancel();
@@ -173,12 +179,13 @@ class NetworkService {
         completer.complete();
       }
     });
-    
+
     timeoutTimer = Timer(timeout, () {
       subscription.cancel();
-      completer.completeError(TimeoutException('Network did not become available within timeout', timeout));
+      completer.completeError(TimeoutException(
+          'Network did not become available within timeout', timeout));
     });
-    
+
     return completer.future;
   }
 
@@ -201,9 +208,10 @@ enum NetworkQuality {
 class TimeoutException implements Exception {
   final String message;
   final Duration timeout;
-  
+
   TimeoutException(this.message, this.timeout);
-  
+
   @override
-  String toString() => 'TimeoutException: $message (timeout: ${timeout.inSeconds}s)';
+  String toString() =>
+      'TimeoutException: $message (timeout: ${timeout.inSeconds}s)';
 }

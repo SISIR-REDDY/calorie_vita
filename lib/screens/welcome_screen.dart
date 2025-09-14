@@ -387,62 +387,62 @@ class GoogleLogoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint();
-    
+
     // Official Google brand colors
     const blue = Color(0xFF4285F4);
     const red = Color(0xFFEA4335);
     const yellow = Color(0xFFFBBC05);
     const green = Color(0xFF34A853);
-    
+
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width * 0.4;
-    
+
     paint.style = PaintingStyle.fill;
-    
+
     // Blue section (top-right)
     paint.color = blue;
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       -1.57, // -90 degrees
-      1.57,  // 90 degrees
+      1.57, // 90 degrees
       true,
       paint,
     );
-    
+
     // Red section (right)
     paint.color = red;
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      0,     // 0 degrees
-      1.57,  // 90 degrees
+      0, // 0 degrees
+      1.57, // 90 degrees
       true,
       paint,
     );
-    
+
     // Yellow section (bottom)
     paint.color = yellow;
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      1.57,  // 90 degrees
-      1.57,  // 90 degrees
+      1.57, // 90 degrees
+      1.57, // 90 degrees
       true,
       paint,
     );
-    
+
     // Green section (left)
     paint.color = green;
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      3.14,  // 180 degrees
-      1.57,  // 90 degrees
+      3.14, // 180 degrees
+      1.57, // 90 degrees
       true,
       paint,
     );
-    
+
     // White center circle
     paint.color = Colors.white;
     canvas.drawCircle(center, radius * 0.65, paint);
-    
+
     // Blue "G" cutout
     paint.color = blue;
     final path = Path();
@@ -450,7 +450,7 @@ class GoogleLogoPainter extends CustomPainter {
     path.arcTo(
       Rect.fromCircle(center: center, radius: radius * 0.65),
       -1.57, // -90 degrees
-      4.71,  // 270 degrees
+      4.71, // 270 degrees
       false,
     );
     path.lineTo(center.dx + radius * 0.25, center.dy);
@@ -461,7 +461,7 @@ class GoogleLogoPainter extends CustomPainter {
     path.close();
     canvas.drawPath(path, paint);
   }
-  
+
   @override
   bool shouldRepaint(CustomPainter oldDelegate) => false;
 }

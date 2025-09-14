@@ -5,15 +5,15 @@ import '../models/google_fit_data.dart';
 /// Mixin to add automatic Google Fit sync to any screen
 mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
   final GlobalGoogleFitManager _googleFitManager = GlobalGoogleFitManager();
-  
+
   // Override these in your widget to handle Google Fit data
   void onGoogleFitDataUpdate(Map<String, dynamic> syncData) {
     // Default implementation - override in your screen
     print('GoogleFitSyncMixin: Data updated - Steps: ${syncData['steps']}');
   }
-  
+
   void onGoogleFitConnectionChanged(bool isConnected) {
-    // Default implementation - override in your screen  
+    // Default implementation - override in your screen
     print('GoogleFitSyncMixin: Connection changed - Connected: $isConnected');
   }
 
@@ -21,34 +21,34 @@ mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
   Future<void> initializeGoogleFitSync() async {
     try {
       print('GoogleFitSyncMixin: Initializing sync for ${widget.runtimeType}');
-      
+
       // Ensure sync is active
       await _googleFitManager.ensureSync();
-      
+
       // Listen to sync data updates
       _googleFitManager.syncDataStream.listen((syncData) {
         if (mounted) {
           onGoogleFitDataUpdate(syncData);
         }
       });
-      
+
       // Listen to connection state changes
       _googleFitManager.connectionStateStream.listen((isConnected) {
         if (mounted) {
           onGoogleFitConnectionChanged(isConnected);
         }
       });
-      
+
       // Get current data immediately
       final currentData = await _googleFitManager.getCurrentData();
       if (currentData != null && mounted) {
         onGoogleFitDataUpdate(currentData);
       }
-      
+
       print('GoogleFitSyncMixin: Sync initialized for ${widget.runtimeType}');
-      
     } catch (e) {
-      print('GoogleFitSyncMixin: Sync initialization failed for ${widget.runtimeType}: $e');
+      print(
+          'GoogleFitSyncMixin: Sync initialization failed for ${widget.runtimeType}: $e');
     }
   }
 
@@ -88,7 +88,8 @@ mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
 }
 
 /// Widget mixin for screens that display Google Fit data
-mixin GoogleFitDataDisplayMixin<T extends StatefulWidget> on State<T>, GoogleFitSyncMixin<T> {
+mixin GoogleFitDataDisplayMixin<T extends StatefulWidget>
+    on State<T>, GoogleFitSyncMixin<T> {
   GoogleFitData? _currentGoogleFitData;
   bool _isGoogleFitConnected = false;
   DateTime? _lastSyncTime;
@@ -116,16 +117,16 @@ mixin GoogleFitDataDisplayMixin<T extends StatefulWidget> on State<T>, GoogleFit
         _isGoogleFitConnected = isConnected;
       });
     }
-    // Display mixin handles connection display - base sync already handled by GoogleFitSyncMixin  
+    // Display mixin handles connection display - base sync already handled by GoogleFitSyncMixin
   }
 
   /// Get formatted sync time for display
   String get formattedLastSyncTime {
     if (_lastSyncTime == null) return 'Never';
-    
+
     final now = DateTime.now();
     final difference = now.difference(_lastSyncTime!);
-    
+
     if (difference.inSeconds < 60) {
       return 'Just now';
     } else if (difference.inMinutes < 60) {

@@ -6,7 +6,8 @@ import '../models/google_fit_data.dart';
 
 /// Enhanced Google Fit service with Firebase caching and real-time updates
 class GoogleFitCacheService {
-  static final GoogleFitCacheService _instance = GoogleFitCacheService._internal();
+  static final GoogleFitCacheService _instance =
+      GoogleFitCacheService._internal();
   factory GoogleFitCacheService() => _instance;
   GoogleFitCacheService._internal();
 
@@ -15,14 +16,14 @@ class GoogleFitCacheService {
   final GoogleFitService _googleFitService = GoogleFitService();
 
   // Cache controllers
-  final StreamController<GoogleFitData> _liveDataController = 
+  final StreamController<GoogleFitData> _liveDataController =
       StreamController<GoogleFitData>.broadcast();
-  
+
   Timer? _refreshTimer;
   Timer? _backgroundSyncTimer;
   GoogleFitData? _cachedTodayData;
   DateTime? _lastCacheUpdate;
-  
+
   // Cache configuration
   static const Duration _cacheExpiry = Duration(minutes: 5);
   static const Duration _liveUpdateInterval = Duration(seconds: 10);
@@ -50,8 +51,9 @@ class GoogleFitCacheService {
     try {
       // Check Firebase cache
       GoogleFitData? firebaseData = await _getFromFirebaseCache(userId);
-      
-      if (!forceRefresh && firebaseData != null && 
+
+      if (!forceRefresh &&
+          firebaseData != null &&
           _isDataRecent(firebaseData.date)) {
         _cachedTodayData = firebaseData;
         _lastCacheUpdate = DateTime.now();
@@ -60,19 +62,19 @@ class GoogleFitCacheService {
 
       // Fetch from Google Fit API
       GoogleFitData? freshData = await _fetchFreshData();
-      
+
       if (freshData != null) {
         // Cache in memory and Firebase
         _cachedTodayData = freshData;
         _lastCacheUpdate = DateTime.now();
-        
+
         // Save to Firebase (fire and forget)
         _saveToFirebaseCache(userId, freshData);
-        
+
         // Emit to live stream
         _liveDataController.add(freshData);
       }
-      
+
       return freshData;
     } catch (e) {
       print('Error getting today data: $e');
@@ -89,7 +91,7 @@ class GoogleFitCacheService {
 
     try {
       final today = DateTime.now();
-      
+
       // Use the optimized batch API call from GoogleFitService
       final futures = await Future.wait([
         _googleFitService.getDailySteps(today),
@@ -115,8 +117,9 @@ class GoogleFitCacheService {
   Future<GoogleFitData?> _getFromFirebaseCache(String userId) async {
     try {
       final today = DateTime.now();
-      final dateKey = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-      
+      final dateKey =
+          '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
       final doc = await _firestore
           .collection('users')
           .doc(userId)
@@ -143,8 +146,9 @@ class GoogleFitCacheService {
   /// Save data to Firebase cache
   Future<void> _saveToFirebaseCache(String userId, GoogleFitData data) async {
     try {
-      final dateKey = '${data.date.year}-${data.date.month.toString().padLeft(2, '0')}-${data.date.day.toString().padLeft(2, '0')}';
-      
+      final dateKey =
+          '${data.date.year}-${data.date.month.toString().padLeft(2, '0')}-${data.date.day.toString().padLeft(2, '0')}';
+
       await _firestore
           .collection('users')
           .doc(userId)
@@ -169,7 +173,7 @@ class GoogleFitCacheService {
     _backgroundSyncTimer = Timer.periodic(_backgroundSyncInterval, (timer) {
       _performBackgroundSync();
     });
-    
+
     // Initial sync
     _performBackgroundSync();
   }
@@ -177,7 +181,7 @@ class GoogleFitCacheService {
   /// Perform background sync
   Future<void> _performBackgroundSync() async {
     if (!_googleFitService.isAuthenticated) return;
-    
+
     try {
       final data = await getTodayData(forceRefresh: true);
       if (data != null) {
@@ -216,19 +220,19 @@ class GoogleFitCacheService {
   /// Check if cached data is valid
   bool _isCacheValid() {
     if (_cachedTodayData == null || _lastCacheUpdate == null) return false;
-    
+
     final now = DateTime.now();
     final cacheAge = now.difference(_lastCacheUpdate!);
-    
+
     return cacheAge < _cacheExpiry && _isToday(_cachedTodayData!.date);
   }
 
   /// Check if date is today
   bool _isToday(DateTime date) {
     final now = DateTime.now();
-    return date.year == now.year && 
-           date.month == now.month && 
-           date.day == now.day;
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
   }
 
   /// Check if data is recent (within last hour)
@@ -250,11 +254,12 @@ class GoogleFitCacheService {
     try {
       final weeklyData = <GoogleFitData>[];
       final now = DateTime.now();
-      
+
       for (int i = 6; i >= 0; i--) {
         final date = now.subtract(Duration(days: i));
-        final dateKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-        
+        final dateKey =
+            '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
         // Try cache first
         final doc = await _firestore
             .collection('users')
@@ -274,23 +279,25 @@ class GoogleFitCacheService {
           ));
         } else {
           // Fetch from API if not cached
-          final fitnessData = await _googleFitService.getFitnessData(date, date);
+          final fitnessData =
+              await _googleFitService.getFitnessData(date, date);
           if (fitnessData != null) {
             final googleFitData = GoogleFitData(
               date: date,
               steps: fitnessData['steps'] as int?,
-              caloriesBurned: (fitnessData['caloriesBurned'] as num?)?.toDouble(),
+              caloriesBurned:
+                  (fitnessData['caloriesBurned'] as num?)?.toDouble(),
               distance: (fitnessData['distance'] as num?)?.toDouble(),
               weight: null,
             );
             weeklyData.add(googleFitData);
-            
+
             // Cache it
             _saveToFirebaseCache(userId, googleFitData);
           }
         }
       }
-      
+
       return weeklyData;
     } catch (e) {
       print('Error getting weekly data: $e');
@@ -305,7 +312,7 @@ class GoogleFitCacheService {
 
     try {
       final oneWeekAgo = DateTime.now().subtract(const Duration(days: 7));
-      
+
       final query = await _firestore
           .collection('users')
           .doc(userId)

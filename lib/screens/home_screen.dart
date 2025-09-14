@@ -40,7 +40,10 @@ class PremiumHomeScreen extends StatefulWidget {
 }
 
 class _PremiumHomeScreenState extends State<PremiumHomeScreen>
-    with TickerProviderStateMixin, GoogleFitSyncMixin, GoogleFitDataDisplayMixin {
+    with
+        TickerProviderStateMixin,
+        GoogleFitSyncMixin,
+        GoogleFitDataDisplayMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -56,8 +59,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   final RewardsService _rewardsService = RewardsService();
   final GoogleFitService _googleFitService = GoogleFitService();
   final GoogleFitCacheService _googleFitCacheService = GoogleFitCacheService();
-  final GlobalGoogleFitManager _globalGoogleFitManager = GlobalGoogleFitManager();
-  
+  final GlobalGoogleFitManager _globalGoogleFitManager =
+      GlobalGoogleFitManager();
+
   // Data
   DailySummary? _dailySummary;
   MacroBreakdown? _macroBreakdown;
@@ -65,13 +69,12 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   String _motivationalQuote = '';
   final bool _isLoading = false; // Start with false to show UI immediately
   bool _isRefreshing = false; // Track background data loading
-  
-  
+
   // Rewards data
   UserProgress? _userProgress;
   List<UserReward> _recentRewards = [];
   bool _isStreakLoading = true;
-  
+
   // Google Fit data
   bool _isGoogleFitConnected = false;
   int? _googleFitSteps;
@@ -81,8 +84,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   bool _isLiveSyncing = false;
   bool _isGoogleFitLoading = false;
   DateTime? _lastSyncTime;
-  
-  
+
   // Stream subscriptions
   StreamSubscription<DailySummary?>? _dailySummarySubscription;
   StreamSubscription<MacroBreakdown>? _macroBreakdownSubscription;
@@ -102,7 +104,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   );
   List<UserAchievement> _achievements = [];
   String? _currentUserId;
-  
 
   // Task management
   final List<Map<String, dynamic>> _tasks = [
@@ -124,7 +125,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     },
     {
       'id': 'task_3',
-      'emoji': DynamicIconService().generateIcon('Eat 5 servings of vegetables'),
+      'emoji':
+          DynamicIconService().generateIcon('Eat 5 servings of vegetables'),
       'title': 'Eat 5 servings of vegetables',
       'isCompleted': false,
       'priority': 'High',
@@ -152,7 +154,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   void initState() {
     super.initState();
     _setupAnimations();
-    
+
     // Initialize immediately without waiting
     _initializeServicesAsync();
     _setupStreamListeners();
@@ -164,18 +166,22 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   /// Initialize services asynchronously to not block UI
   Future<void> _initializeServicesAsync() async {
-    _initializeServices().catchError((e) => debugPrint('Services initialization error: $e'));
+    _initializeServices()
+        .catchError((e) => debugPrint('Services initialization error: $e'));
   }
 
   /// Load rewards data asynchronously
   Future<void> _loadRewardsDataAsync() async {
-    _loadRewardsData().catchError((e) => debugPrint('Rewards data loading error: $e'));
+    _loadRewardsData()
+        .catchError((e) => debugPrint('Rewards data loading error: $e'));
   }
 
   /// Initialize Google Fit asynchronously
   Future<void> _initializeGoogleFitAsync() async {
-    _initializeGoogleFit().catchError((e) => debugPrint('Google Fit initialization error: $e'));
-    _initializeGoogleFitCache().catchError((e) => debugPrint('Google Fit cache initialization error: $e'));
+    _initializeGoogleFit()
+        .catchError((e) => debugPrint('Google Fit initialization error: $e'));
+    _initializeGoogleFitCache().catchError(
+        (e) => debugPrint('Google Fit cache initialization error: $e'));
   }
 
   Future<void> _initializeServices() async {
@@ -186,33 +192,33 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _currentUserId = _realTimeInputService.getCurrentUserId();
   }
 
-
-
   void _setupStreamListeners() {
     // Listen to real-time data updates (non-blocking)
     try {
       // Listen to daily summary updates from real-time service
       if (_currentUserId != null) {
-        _realTimeInputService.getTodaySummary(_currentUserId!).listen((summary) {
-        if (mounted) {
-          setState(() {
-            _dailySummary = summary;
-          });
-        }
-      }).onError((error) {
-        debugPrint('Daily summary stream error: $error');
-      });
+        _realTimeInputService
+            .getTodaySummary(_currentUserId!)
+            .listen((summary) {
+          if (mounted) {
+            setState(() {
+              _dailySummary = summary;
+            });
+          }
+        }).onError((error) {
+          debugPrint('Daily summary stream error: $error');
+        });
 
         // Listen to streak updates
         _streakService.streakStream.listen((streakSummary) {
-        if (mounted) {
-          setState(() {
+          if (mounted) {
+            setState(() {
               _streakSummary = streakSummary;
-          });
-        }
-      }).onError((error) {
+            });
+          }
+        }).onError((error) {
           debugPrint('Streak stream error: $error');
-      });
+        });
       }
 
       // Keep existing app state service listeners for backward compatibility
@@ -226,7 +232,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         debugPrint('Macro breakdown stream error: $error');
       });
 
-
       _appStateService.preferencesStream.listen((preferences) {
         if (mounted) {
           setState(() {
@@ -238,7 +243,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       });
 
       // Goals stream listener is now in _setupDataListeners() to ensure AppStateService is initialized
-
     } catch (e) {
       debugPrint('Stream setup error: $e');
     }
@@ -292,16 +296,15 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     try {
       // Load cached data first (non-blocking)
       _loadCachedDataImmediate();
-      
+
       // Set up real-time data listeners immediately
       _setupDataListeners();
-      
+
       // Initialize AppStateService with timeout (non-blocking)
       _initializeAppStateAsync();
-      
+
       // Load fresh data in background (non-blocking)
       _loadFreshDataAsync();
-      
     } catch (e) {
       // Handle error silently in production
       debugPrint('Error loading home data: $e');
@@ -313,16 +316,16 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     try {
       // Load cached summary if available
       _dailySummary ??= DailySummary(
-          caloriesConsumed: 0,
-          caloriesBurned: 0,
-          caloriesGoal: 2000,
-          steps: 0,
-          stepsGoal: 10000,
-          waterGlasses: 0,
-          waterGlassesGoal: 8,
-          date: DateTime.now(),
-        );
-      
+        caloriesConsumed: 0,
+        caloriesBurned: 0,
+        caloriesGoal: 2000,
+        steps: 0,
+        stepsGoal: 10000,
+        waterGlasses: 0,
+        waterGlassesGoal: 8,
+        date: DateTime.now(),
+      );
+
       // Load default motivational quote
       if (_motivationalQuote.isEmpty) {
         _loadMotivationalQuote();
@@ -336,10 +339,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   Future<void> _initializeAppStateAsync() async {
     try {
       if (!_appStateService.isInitialized) {
-        await _appStateService.initialize().timeout(
-          const Duration(seconds: 3),
-          onTimeout: () => debugPrint('AppStateService initialization timed out')
-        );
+        await _appStateService.initialize().timeout(const Duration(seconds: 3),
+            onTimeout: () =>
+                debugPrint('AppStateService initialization timed out'));
       }
     } catch (e) {
       debugPrint('Error initializing AppStateService: $e');
@@ -349,32 +351,29 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Load fresh data in background without blocking UI
   Future<void> _loadFreshDataAsync() async {
     setState(() => _isRefreshing = true);
-    
+
     try {
       // Load critical data with short timeouts
       await Future.wait([
-        _loadTodaysSummary().timeout(
-          const Duration(seconds: 3),
-          onTimeout: () => debugPrint('Today summary load timed out')
-        ),
-        _loadStreakData().timeout(
-          const Duration(seconds: 2),
-          onTimeout: () => debugPrint('Streak data load timed out')
-        ),
+        _loadTodaysSummary().timeout(const Duration(seconds: 3),
+            onTimeout: () => debugPrint('Today summary load timed out')),
+        _loadStreakData().timeout(const Duration(seconds: 2),
+            onTimeout: () => debugPrint('Streak data load timed out')),
       ]).timeout(const Duration(seconds: 5));
-      
+
       // Initialize analytics service in background (lower priority)
-      _analyticsService.initializeRealTimeAnalytics(days: 30).timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => debugPrint('Analytics service initialization timed out')
-      ).then((_) {
+      _analyticsService
+          .initializeRealTimeAnalytics(days: 30)
+          .timeout(const Duration(seconds: 5),
+              onTimeout: () =>
+                  debugPrint('Analytics service initialization timed out'))
+          .then((_) {
         // Calculate achievements after analytics is ready
         return _analyticsService.calculateStreaksAndAchievements().timeout(
-          const Duration(seconds: 3),
-          onTimeout: () => debugPrint('Achievements calculation timed out')
-        );
-      }).catchError((e) => debugPrint('Analytics background loading error: $e'));
-      
+            const Duration(seconds: 3),
+            onTimeout: () => debugPrint('Achievements calculation timed out'));
+      }).catchError(
+              (e) => debugPrint('Analytics background loading error: $e'));
     } catch (e) {
       debugPrint('Error loading fresh data: $e');
     } finally {
@@ -388,7 +387,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   Future<void> _loadRewardsData() async {
     try {
       await _rewardsService.initialize();
-      
+
       // Listen to progress updates
       _rewardsService.progressStream.listen((progress) {
         if (mounted) {
@@ -397,7 +396,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           });
         }
       });
-      
+
       // Listen to new rewards
       _rewardsService.newRewardsStream.listen((rewards) {
         if (mounted) {
@@ -415,21 +414,21 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   Future<void> _initializeGoogleFit() async {
     try {
       await _googleFitService.initialize();
-      
+
       // Check authentication status immediately
       final isAuthenticated = await _googleFitService.validateAuthentication();
       setState(() {
         _isGoogleFitConnected = isAuthenticated;
       });
-      
+
       if (_isGoogleFitConnected) {
         // Load Google Fit data immediately for instant UI update
         await _loadGoogleFitData();
-        
+
         // Start live sync for real-time updates
         _startLiveSync();
         _startGoogleFitRefreshTimer();
-        
+
         print('Google Fit initialized and connected - UI updated instantly');
       } else {
         print('Google Fit not connected - user needs to authenticate');
@@ -446,9 +445,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   Future<void> _initializeGoogleFitCache() async {
     try {
       await _googleFitCacheService.initialize();
-      
+
       // Listen to cached data stream for real-time updates
-      _googleFitCacheStreamSubscription = _googleFitCacheService.liveDataStream.listen((data) {
+      _googleFitCacheStreamSubscription =
+          _googleFitCacheService.liveDataStream.listen((data) {
         if (mounted) {
           setState(() {
             _googleFitSteps = data.steps ?? 0;
@@ -457,17 +457,17 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             _activityLevel = _calculateActivityLevel(data.steps);
             _lastSyncTime = DateTime.now();
           });
-          
+
           // Update daily summary if available
           if (_dailySummary != null) {
             _updateDailySummaryWithGoogleFitData();
           }
         }
       });
-      
+
       // Start live updates for enhanced real-time experience
       _googleFitCacheService.startLiveUpdates();
-      
+
       print('Google Fit cache service initialized with real-time updates');
     } catch (e) {
       print('Error initializing Google Fit cache service: $e');
@@ -478,22 +478,24 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   @override
   void onGoogleFitDataUpdate(Map<String, dynamic> syncData) {
     super.onGoogleFitDataUpdate(syncData);
-    
+
     if (mounted) {
       setState(() {
         _googleFitSteps = syncData['steps'] as int? ?? 0;
-        _googleFitCaloriesBurned = (syncData['caloriesBurned'] as num?)?.toDouble() ?? 0.0;
+        _googleFitCaloriesBurned =
+            (syncData['caloriesBurned'] as num?)?.toDouble() ?? 0.0;
         _googleFitDistance = (syncData['distance'] as num?)?.toDouble() ?? 0.0;
         _activityLevel = _calculateActivityLevel(syncData['steps'] as int?);
         _lastSyncTime = DateTime.now();
       });
-      
+
       // Update daily summary if available
       if (_dailySummary != null) {
         _updateDailySummaryWithGoogleFitData();
       }
-      
-      print('Home screen: Updated with global Google Fit data - Steps: ${syncData['steps']}');
+
+      print(
+          'Home screen: Updated with global Google Fit data - Steps: ${syncData['steps']}');
     }
   }
 
@@ -501,12 +503,12 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   @override
   void onGoogleFitConnectionChanged(bool isConnected) {
     super.onGoogleFitConnectionChanged(isConnected);
-    
+
     if (mounted) {
       setState(() {
         _isGoogleFitConnected = isConnected;
       });
-      
+
       if (isConnected) {
         print('Home screen: Google Fit connected via global manager');
         _loadGoogleFitData();
@@ -540,12 +542,12 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     try {
       // Use the batch method for faster response
       final batchData = await _googleFitService.getTodayFitnessDataBatch();
-      
+
       if (batchData != null) {
         final steps = batchData['steps'] as int? ?? 0;
         final calories = batchData['caloriesBurned'] as double? ?? 0.0;
         final distance = batchData['distance'] as double? ?? 0.0;
-        
+
         setState(() {
           _googleFitSteps = steps;
           _googleFitCaloriesBurned = calories;
@@ -553,13 +555,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           _activityLevel = batchData['activityLevel'] ?? 'Unknown';
           _lastSyncTime = DateTime.now();
         });
-        
+
         // Update daily summary with Google Fit data if available
         if (_dailySummary != null) {
           await _updateDailySummaryWithGoogleFitData();
         }
-        
-        print('Google Fit data loaded (batch): Steps=$steps, Calories=$calories, Distance=$distance');
+
+        print(
+            'Google Fit data loaded (batch): Steps=$steps, Calories=$calories, Distance=$distance');
       } else {
         // Fallback to individual calls if batch fails
         await _loadGoogleFitDataFallback();
@@ -579,23 +582,29 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   Future<void> _loadGoogleFitDataFallback() async {
     try {
       final today = DateTime.now();
-      
+
       // Individual API calls with error handling
-      final steps = await _googleFitService.getDailySteps(today).catchError((e) {
-        print('Steps fetch failed: $e');
-        return 0;
-      }) ?? 0;
-      
-      final calories = await _googleFitService.getDailyCaloriesBurned(today).catchError((e) {
-        print('Calories fetch failed: $e');
-        return 0.0;
-      }) ?? 0.0;
-      
-      final distance = await _googleFitService.getDailyDistance(today).catchError((e) {
-        print('Distance fetch failed: $e');
-        return 0.0;
-      }) ?? 0.0;
-      
+      final steps =
+          await _googleFitService.getDailySteps(today).catchError((e) {
+                print('Steps fetch failed: $e');
+                return 0;
+              }) ??
+              0;
+
+      final calories =
+          await _googleFitService.getDailyCaloriesBurned(today).catchError((e) {
+                print('Calories fetch failed: $e');
+                return 0.0;
+              }) ??
+              0.0;
+
+      final distance =
+          await _googleFitService.getDailyDistance(today).catchError((e) {
+                print('Distance fetch failed: $e');
+                return 0.0;
+              }) ??
+              0.0;
+
       setState(() {
         _googleFitSteps = steps;
         _googleFitCaloriesBurned = calories;
@@ -603,12 +612,13 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         _activityLevel = _calculateActivityLevel(steps);
         _lastSyncTime = DateTime.now();
       });
-      
+
       if (_dailySummary != null) {
         await _updateDailySummaryWithGoogleFitData();
       }
-      
-      print('Google Fit data loaded (fallback): Steps=$steps, Calories=$calories, Distance=$distance');
+
+      print(
+          'Google Fit data loaded (fallback): Steps=$steps, Calories=$calories, Distance=$distance');
     } catch (e) {
       print('Fallback Google Fit loading failed: $e');
       setState(() {
@@ -624,7 +634,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Calculate activity level based on steps
   String _calculateActivityLevel(int? steps) {
     if (steps == null) return 'Unknown';
-    
+
     if (steps < 5000) return 'Low';
     if (steps < 10000) return 'Moderate';
     if (steps < 15000) return 'Active';
@@ -640,7 +650,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       final updatedSummary = DailySummary(
         date: _dailySummary!.date,
         caloriesConsumed: _dailySummary!.caloriesConsumed,
-        caloriesBurned: _googleFitCaloriesBurned?.round() ?? _dailySummary!.caloriesBurned,
+        caloriesBurned:
+            _googleFitCaloriesBurned?.round() ?? _dailySummary!.caloriesBurned,
         caloriesGoal: _dailySummary!.caloriesGoal,
         steps: _googleFitSteps ?? _dailySummary!.steps,
         stepsGoal: _dailySummary!.stepsGoal,
@@ -650,7 +661,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
       // Update the daily summary service
       await _dailySummaryService.updateDailySummary(updatedSummary);
-      
+
       setState(() {
         _dailySummary = updatedSummary;
       });
@@ -669,12 +680,13 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         });
         await _loadGoogleFitData();
         _startLiveSync();
-        
+
         // Show success message
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Google Fit connected successfully! Your data will sync automatically.'),
+              content: Text(
+                  'Google Fit connected successfully! Your data will sync automatically.'),
               backgroundColor: Colors.green,
             ),
           );
@@ -703,30 +715,34 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Start live sync for Google Fit data (optimized for speed)
   void _startLiveSync() {
     if (!_isGoogleFitConnected) return;
-    
+
     _googleFitService.startLiveSync();
-    
+
     // Listen to live data stream with immediate updates
     _googleFitLiveStreamSubscription?.cancel();
-    _googleFitLiveStreamSubscription = _googleFitService.liveDataStream?.listen((liveData) {
+    _googleFitLiveStreamSubscription =
+        _googleFitService.liveDataStream?.listen((liveData) {
       if (mounted && liveData['isLive'] == true) {
         // Immediate UI update for faster response
         setState(() {
           _isLiveSyncing = true;
           _lastSyncTime = DateTime.now();
-          
+
           // Update data immediately
           if (liveData['steps'] != null) _googleFitSteps = liveData['steps'];
-          if (liveData['caloriesBurned'] != null) _googleFitCaloriesBurned = liveData['caloriesBurned'];
-          if (liveData['distance'] != null) _googleFitDistance = liveData['distance'];
-          if (liveData['activityLevel'] != null) _activityLevel = liveData['activityLevel'];
+          if (liveData['caloriesBurned'] != null)
+            _googleFitCaloriesBurned = liveData['caloriesBurned'];
+          if (liveData['distance'] != null)
+            _googleFitDistance = liveData['distance'];
+          if (liveData['activityLevel'] != null)
+            _activityLevel = liveData['activityLevel'];
         });
-        
+
         // Update daily summary immediately
         if (_dailySummary != null) {
           _updateDailySummaryWithGoogleFitData();
         }
-        
+
         // Quick reset of live sync indicator
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted) {
@@ -750,7 +766,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Start periodic refresh timer for Google Fit data (backup)
   void _startGoogleFitRefreshTimer() {
     _googleFitRefreshTimer?.cancel();
-    _googleFitRefreshTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+    _googleFitRefreshTimer =
+        Timer.periodic(const Duration(minutes: 5), (timer) {
       _refreshGoogleFitData();
     });
   }
@@ -765,7 +782,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   String _formatLastSyncTime(DateTime syncTime) {
     final now = DateTime.now();
     final difference = now.difference(syncTime);
-    
+
     if (difference.inSeconds < 60) {
       return '${difference.inSeconds}s ago';
     } else if (difference.inMinutes < 60) {
@@ -779,7 +796,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   void _setupDataListeners() {
     // Listen to daily summary updates
     _dailySummarySubscription?.cancel();
-    _dailySummarySubscription = _appStateService.dailySummaryStream.listen((summary) {
+    _dailySummarySubscription =
+        _appStateService.dailySummaryStream.listen((summary) {
       if (mounted) {
         setState(() {
           _dailySummary = summary;
@@ -789,7 +807,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
     // Listen to macro breakdown updates
     _macroBreakdownSubscription?.cancel();
-    _macroBreakdownSubscription = _appStateService.macroBreakdownStream.listen((breakdown) {
+    _macroBreakdownSubscription =
+        _appStateService.macroBreakdownStream.listen((breakdown) {
       if (mounted) {
         setState(() {
           _macroBreakdown = breakdown;
@@ -799,7 +818,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
     // Listen to preferences updates
     _preferencesSubscription?.cancel();
-    _preferencesSubscription = _appStateService.preferencesStream.listen((preferences) {
+    _preferencesSubscription =
+        _appStateService.preferencesStream.listen((preferences) {
       if (mounted) {
         setState(() {
           _preferences = preferences;
@@ -809,7 +829,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
     // Health data functionality removed
 
-
     // Listen to goals updates
     debugPrint('Setting up goals stream listener in _setupDataListeners');
     _goalsSubscription?.cancel();
@@ -817,12 +836,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       (goals) async {
         debugPrint('=== HOME SCREEN GOALS STREAM UPDATE ===');
         debugPrint('Received goals update: ${goals?.toMap()}');
-        debugPrint('Current daily summary before update: ${_dailySummary?.toMap()}');
+        debugPrint(
+            'Current daily summary before update: ${_dailySummary?.toMap()}');
         if (mounted) {
           // Force a complete refresh of the daily summary
           await _refreshDailySummaryWithNewGoals(goals);
           debugPrint('Daily summary after update: ${_dailySummary?.toMap()}');
-          debugPrint('UI should now show updated goals: Calorie=${goals?.calorieGoal}, Steps=${goals?.stepsPerDayGoal}, Water=${goals?.waterGlassesGoal}');
+          debugPrint(
+              'UI should now show updated goals: Calorie=${goals?.calorieGoal}, Steps=${goals?.stepsPerDayGoal}, Water=${goals?.waterGlassesGoal}');
         }
         debugPrint('=== END HOME SCREEN GOALS STREAM UPDATE ===');
       },
@@ -879,10 +900,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     });
   }
 
-
-
-
-
   /// Navigate to settings screen
   void _navigateToSettings() {
     Navigator.pushNamed(context, '/settings');
@@ -908,8 +925,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   Future<void> _refreshDailySummaryWithNewGoals(UserGoals? goals) async {
     debugPrint('=== REFRESHING DAILY SUMMARY WITH NEW GOALS ===');
     debugPrint('New goals: ${goals?.toMap()}');
-    debugPrint('Current daily summary before update: ${_dailySummary?.toMap()}');
-    
+    debugPrint(
+        'Current daily summary before update: ${_dailySummary?.toMap()}');
+
     if (mounted) {
       setState(() {
         // Goals updated - refresh daily summary with new goals
@@ -926,7 +944,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         }
         debugPrint('Daily summary after setState: ${_dailySummary?.toMap()}');
       });
-      
+
       // Save updated daily summary to Firestore with new goals
       try {
         await _saveDailySummaryToFirestore();
@@ -934,7 +952,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       } catch (e) {
         debugPrint('Error saving updated daily summary: $e');
       }
-      
+
       // Recalculate streaks and achievements based on new goals
       try {
         await _analyticsService.calculateStreaksAndAchievements();
@@ -969,10 +987,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Check for goals update periodically
   void _checkForGoalsUpdate() {
     if (!mounted) return;
-    
+
     final simpleGoals = SimpleGoalsNotifier().currentGoals;
     final appStateGoals = _appStateService.userGoals;
-    
+
     // Check if goals have changed
     if (simpleGoals != null && appStateGoals != null) {
       if (simpleGoals.calorieGoal != appStateGoals.calorieGoal ||
@@ -987,12 +1005,12 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Show calorie input dialog for manual entry
   void _showCalorieInputDialog(String type) {
     final isConsumed = type == 'consumed';
-    final currentValue = isConsumed 
+    final currentValue = isConsumed
         ? (_dailySummary?.caloriesConsumed ?? 0)
         : (_dailySummary?.caloriesBurned ?? 0);
-    
+
     final controller = TextEditingController(text: currentValue.toString());
-    
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -1011,7 +1029,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                isConsumed 
+                isConsumed
                     ? 'How many calories did you consume today?'
                     : 'How many calories did you burn today?',
                 style: GoogleFonts.poppins(
@@ -1054,7 +1072,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 Navigator.of(context).pop();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: isConsumed ? Colors.orange[600] : Colors.red[600],
+                backgroundColor:
+                    isConsumed ? Colors.orange[600] : Colors.red[600],
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -1076,7 +1095,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Update calorie value in the daily summary
   void _updateCalorieValue(String type, int value) {
     _dailySummary ??= _getEmptyDailySummary();
-    
+
     setState(() {
       if (type == 'consumed') {
         _dailySummary = _dailySummary!.copyWith(caloriesConsumed: value);
@@ -1084,7 +1103,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         _dailySummary = _dailySummary!.copyWith(caloriesBurned: value);
       }
     });
-    
+
     // Save to Firestore or local storage
     _saveDailySummaryToFirestore();
   }
@@ -1092,36 +1111,35 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Update water glasses value and save to Firestore
   Future<void> _updateWaterGlassesValue(int value) async {
     _dailySummary ??= _getEmptyDailySummary();
-    
+
     setState(() {
       _dailySummary = _dailySummary!.copyWith(waterGlasses: value);
     });
-    
+
     await _saveDailySummaryToFirestore();
   }
 
   /// Update water target value and save to Firestore
   Future<void> _updateWaterTargetValue(int value) async {
     _dailySummary ??= _getEmptyDailySummary();
-    
+
     setState(() {
       _dailySummary = _dailySummary!.copyWith(waterGlassesGoal: value);
     });
-    
+
     await _saveDailySummaryToFirestore();
-    
+
     // Also update the user goals in AppStateService
     await _appStateService.updateUserGoals(
-      _appStateService.userGoals?.copyWith(waterGlassesGoal: value) ?? 
-      const UserGoals(waterGlassesGoal: 8)
-    );
+        _appStateService.userGoals?.copyWith(waterGlassesGoal: value) ??
+            const UserGoals(waterGlassesGoal: 8));
   }
 
   /// Show water glasses input dialog
   void _showWaterGlassesDialog() {
     final currentValue = _dailySummary?.waterGlasses ?? 0;
     final controller = TextEditingController(text: currentValue.toString());
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1176,7 +1194,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   void _showWaterTargetDialog() {
     final currentValue = _dailySummary?.waterGlassesGoal ?? 8;
     final controller = TextEditingController(text: currentValue.toString());
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1253,7 +1271,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Save daily summary to Firestore
   Future<void> _saveDailySummaryToFirestore() async {
     if (_dailySummary == null) return;
-    
+
     try {
       final user = _appStateService.currentUser;
       if (user != null) {
@@ -1261,7 +1279,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             .collection('users')
             .doc(user.uid)
             .collection('daily_summaries')
-            .doc(DateTime.now().toIso8601String().split('T')[0]) // Today's date as document ID
+            .doc(DateTime.now()
+                .toIso8601String()
+                .split('T')[0]) // Today's date as document ID
             .set(_dailySummary!.toMap());
       }
     } catch (e) {
@@ -1310,7 +1330,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       if (user == null) return;
 
       final today = DateTime.now().toIso8601String().split('T')[0];
-      
+
       // Get all daily summary documents
       final querySnapshot = await FirebaseFirestore.instance
           .collection('users')
@@ -1340,14 +1360,12 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
-
-
   Future<void> _loadStreakData() async {
     try {
       // Provide immediate fallback data for better UX
       _streakSummary = _getDefaultStreakData();
       setState(() => _isStreakLoading = false);
-      
+
       // Load actual streak data from the analytics service (real-time data)
       _streakSummary = _streakService.currentStreaks;
       if (mounted) {
@@ -1363,7 +1381,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   UserStreakSummary _getDefaultStreakData() {
     final goalStreaks = <DailyGoalType, GoalStreak>{};
-    
+
     for (final goalType in DailyGoalType.values) {
       goalStreaks[goalType] = GoalStreak(
         goalType: goalType,
@@ -1386,7 +1404,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   // Preferences are now loaded via real-time stream from AppStateService
 
-
   void _loadMotivationalQuote() {
     final quotes = [
       "Every meal is a chance to nourish your body! 🌟",
@@ -1399,9 +1416,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
   // ========== INPUT HANDLING METHODS ==========
-
-
-
 
   /// Handle exercise input
   Future<void> _handleExercise() async {
@@ -1462,7 +1476,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 final calories = int.tryParse(caloriesController.text);
                 final duration = int.tryParse(durationController.text);
                 final type = typeController.text.trim();
-                
+
                 if (calories != null && duration != null && type.isNotEmpty) {
                   Navigator.pop(context, {
                     'calories': calories,
@@ -1536,7 +1550,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -1556,35 +1569,31 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 slivers: [
                   // Greeting Section
                   _buildGreetingSection(),
-                  
-                  
+
                   // Daily Summary Cards
                   _buildDailySummarySection(),
-                  
+
                   // Spacing between sections
                   const SliverToBoxAdapter(
                     child: SizedBox(height: 20),
                   ),
-                  
+
                   // Daily Goals
                   _buildDailyGoalsSection(),
-                  
+
                   // Spacing between sections
                   const SliverToBoxAdapter(
                     child: SizedBox(height: 20),
                   ),
-                  
-                  
+
                   // Tasks & To-Do
                   _buildTasksSection(),
-                  
+
                   // Spacing between sections
                   const SliverToBoxAdapter(
                     child: SizedBox(height: 20),
                   ),
-                  
-                  
-                  
+
                   // Bottom padding
                   const SliverToBoxAdapter(
                     child: SizedBox(height: 100),
@@ -1643,7 +1652,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     final user = FirebaseAuth.instance.currentUser;
     final now = DateTime.now();
     final greeting = _getGreeting(now.hour);
-    
+
     return SliverToBoxAdapter(
       child: Container(
         margin: const EdgeInsets.all(20),
@@ -1687,16 +1696,18 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   child: Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
+                      border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.3), width: 2),
                     ),
                     child: CircleAvatar(
                       radius: 28,
                       backgroundColor: Colors.white.withValues(alpha: 0.2),
-                      backgroundImage: user?.photoURL != null 
-                          ? NetworkImage(user!.photoURL!) 
+                      backgroundImage: user?.photoURL != null
+                          ? NetworkImage(user!.photoURL!)
                           : null,
-                      child: user?.photoURL == null 
-                          ? const Icon(Icons.person, color: Colors.white, size: 28)
+                      child: user?.photoURL == null
+                          ? const Icon(Icons.person,
+                              color: Colors.white, size: 28)
                           : null,
                     ),
                   ),
@@ -1732,7 +1743,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       ),
     );
   }
-
 
   Widget _buildDailySummarySection() {
     // Always show the summary cards, even when empty
@@ -1795,23 +1805,26 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Today\'s Summary',
-              style: GoogleFonts.poppins(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Today\'s Summary',
+                        style: GoogleFonts.poppins(
                           fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         'Track your daily progress',
                         style: GoogleFonts.poppins(
                           fontSize: 14,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.7),
                         ),
                       ),
                     ],
@@ -1819,7 +1832,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 ),
                 // Date badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: kSuccessColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
@@ -1840,18 +1854,19 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               ],
             ),
             const SizedBox(height: 24),
-            
+
             // Main summary cards
             Row(
               children: [
                 Expanded(
                   child: GestureDetector(
                     onTap: () => _showCalorieInputDialog('consumed'),
-                  child: _buildEnhancedSummaryCard(
-                    'Consumed',
-                      _calorieUnitsService.formatCaloriesShort(summary.caloriesConsumed.toDouble()),
-                    _calorieUnitsService.unitSuffix,
-                    Icons.restaurant,
+                    child: _buildEnhancedSummaryCard(
+                      'Consumed',
+                      _calorieUnitsService.formatCaloriesShort(
+                          summary.caloriesConsumed.toDouble()),
+                      _calorieUnitsService.unitSuffix,
+                      Icons.restaurant,
                       Colors.green[600]!,
                       'Tap to edit calories consumed',
                     ),
@@ -1861,11 +1876,12 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 Expanded(
                   child: GestureDetector(
                     onTap: () => _showCalorieInputDialog('burned'),
-                  child: _buildEnhancedSummaryCard(
-                    'Burned',
-                      _calorieUnitsService.formatCaloriesShort(summary.caloriesBurned.toDouble()),
-                    _calorieUnitsService.unitSuffix,
-                    Icons.directions_run,
+                    child: _buildEnhancedSummaryCard(
+                      'Burned',
+                      _calorieUnitsService.formatCaloriesShort(
+                          summary.caloriesBurned.toDouble()),
+                      _calorieUnitsService.unitSuffix,
+                      Icons.directions_run,
                       Colors.red[600]!,
                       'Tap to edit calories burned',
                     ),
@@ -1874,7 +1890,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               ],
             ),
             const SizedBox(height: 16),
-            
+
             // Calories to target card (full width)
             _buildCaloriesToTargetCard(),
           ],
@@ -1883,8 +1899,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-
-  Widget _buildEnhancedSummaryCard(String label, String value, String unit, IconData icon, Color color, String description) {
+  Widget _buildEnhancedSummaryCard(String label, String value, String unit,
+      IconData icon, Color color, String description) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1934,7 +1950,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 child: Icon(icon, color: Colors.white, size: 16),
               ),
               const SizedBox(width: 10),
-                Expanded(
+              Expanded(
                 child: Text(
                   label,
                   style: GoogleFonts.poppins(
@@ -1944,10 +1960,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
-                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           Text(
             '$value $unit',
@@ -1963,7 +1979,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             description,
             style: GoogleFonts.poppins(
               fontSize: 11,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.7),
             ),
             textAlign: TextAlign.left,
           ),
@@ -1973,12 +1992,16 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
   Widget _buildCaloriesToTargetCard() {
-    final caloriesToTarget = _dailySummary!.caloriesGoal - _dailySummary!.caloriesConsumed;
+    final caloriesToTarget =
+        _dailySummary!.caloriesGoal - _dailySummary!.caloriesConsumed;
     final isReached = caloriesToTarget <= 0;
-    final color = isReached ? const Color(0xFF2196F3) : Colors.orange[600]!; // Blue when reached, yellowish orange when not reached
+    final color = isReached
+        ? const Color(0xFF2196F3)
+        : Colors.orange[
+            600]!; // Blue when reached, yellowish orange when not reached
     final icon = isReached ? Icons.check_circle : Icons.flag;
     final status = isReached ? 'Goal Reached!' : 'To Reach Goal';
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -2040,9 +2063,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  isReached 
-                    ? 'Congratulations! 🎉'
-                    : '${_calorieUnitsService.formatCaloriesShort(caloriesToTarget.abs().toDouble())} ${_calorieUnitsService.unitSuffix} remaining',
+                  isReached
+                      ? 'Congratulations! 🎉'
+                      : '${_calorieUnitsService.formatCaloriesShort(caloriesToTarget.abs().toDouble())} ${_calorieUnitsService.unitSuffix} remaining',
                   style: GoogleFonts.poppins(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -2052,26 +2075,28 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  isReached 
-                    ? 'You have successfully reached your daily calorie goal! 🏆'
-                    : 'Keep going to reach your daily target! 💪',
+                  isReached
+                      ? 'You have successfully reached your daily calorie goal! 🏆'
+                      : 'Keep going to reach your daily target! 💪',
                   style: GoogleFonts.poppins(
                     fontSize: 11,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.7),
                   ),
                   textAlign: TextAlign.left,
                 ),
               ],
             ),
           ),
-          
         ],
       ),
     );
   }
 
-
-  Widget _buildSummaryCard(String label, int value, IconData icon, Color color, String unit) {
+  Widget _buildSummaryCard(
+      String label, int value, IconData icon, Color color, String unit) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -2109,7 +2134,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             label,
             style: GoogleFonts.poppins(
               fontSize: 12,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.7),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -2118,16 +2146,17 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-
   Widget _buildDailyGoalsSection() {
-    
     return SliverToBoxAdapter(
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20),
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [kPrimaryColor.withValues(alpha: 0.1), kPrimaryColor.withValues(alpha: 0.05)],
+            colors: [
+              kPrimaryColor.withValues(alpha: 0.1),
+              kPrimaryColor.withValues(alpha: 0.05)
+            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -2155,15 +2184,16 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 Expanded(
                   child: Text(
                     'Daily Goals',
-                  style: GoogleFonts.poppins(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
+                    style: GoogleFonts.poppins(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: kPrimaryColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
@@ -2180,7 +2210,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               ],
             ),
             const SizedBox(height: 20),
-            
+
             // Main Goals Grid - Single Row: Steps and Water (Always show)
             Row(
               children: [
@@ -2212,7 +2242,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               ],
             ),
             const SizedBox(height: 16),
-            
+
             // Progress Summary
             Container(
               padding: const EdgeInsets.all(16),
@@ -2232,7 +2262,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                       color: kSuccessColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.trending_up, color: kSuccessColor, size: 20),
+                    child: const Icon(Icons.trending_up,
+                        color: kSuccessColor, size: 20),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -2241,18 +2272,21 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                       children: [
                         Text(
                           'Daily Progress',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
                             fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           _getDailyProgressMessage(),
                           style: GoogleFonts.poppins(
                             fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.7),
                           ),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 2,
@@ -2261,7 +2295,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: kPrimaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
@@ -2284,44 +2319,55 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-  Widget _buildGoalCard(String title, String current, String target, String unit, IconData icon, Color color, double progress, VoidCallback? onTap) {
+  Widget _buildGoalCard(
+      String title,
+      String current,
+      String target,
+      String unit,
+      IconData icon,
+      Color color,
+      double progress,
+      VoidCallback? onTap) {
     final isCompleted = progress >= 100;
-    final progressColor = isCompleted ? kSuccessColor : color; // Use original colors
-    
+    final progressColor =
+        isCompleted ? kSuccessColor : color; // Use original colors
+
     Widget cardContent = Container(
-        height: 180, // Fixed height for consistent sizing
-        padding: const EdgeInsets.all(18),
+      height: 180, // Fixed height for consistent sizing
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-          color: Colors.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isCompleted ? kSuccessColor.withValues(alpha: 0.4) : color.withValues(alpha: 0.3),
-            width: 1.5,
+        border: Border.all(
+          color: isCompleted
+              ? kSuccessColor.withValues(alpha: 0.4)
+              : color.withValues(alpha: 0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.15),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.15),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-            // Header with icon and title
+          // Header with icon and title
           Row(
             children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: progressColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, color: progressColor, size: 20),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: progressColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(width: 10),
+                child: Icon(icon, color: progressColor, size: 20),
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   title,
@@ -2330,85 +2376,88 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     fontWeight: FontWeight.w600,
                     color: Theme.of(context).colorScheme.onSurface,
                   ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+              if (isCompleted)
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: kSuccessColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.check,
+                    color: Colors.white,
+                    size: 14,
                   ),
                 ),
-                if (isCompleted)
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: kSuccessColor,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.check,
-                      color: Colors.white,
-                      size: 14,
+            ],
+          ),
+
+          // Values section with better spacing
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Current value - larger and more prominent
+              Text(
+                current,
+                style: GoogleFonts.poppins(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: progressColor,
+                  height: 1.1,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+              const SizedBox(height: 4),
+              // Target value with unit
+              Text(
+                'of $target $unit',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.7),
+                  height: 1.2,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ],
+          ),
+
+          // Progress section
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: progress / 100,
+                  minHeight: 8,
+                  backgroundColor: progressColor.withValues(alpha: 0.1),
+                  valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                isCompleted
+                    ? 'Goal Reached! 🎉'
+                    : '${progress.round()}% complete',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: progressColor,
                 ),
               ),
             ],
           ),
-            
-            // Values section with better spacing
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Current value - larger and more prominent
-                Text(
-                    current,
-                    style: GoogleFonts.poppins(
-                    fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: progressColor,
-                    height: 1.1,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                const SizedBox(height: 4),
-                // Target value with unit
-                Text(
-                  'of $target $unit',
-                    style: GoogleFonts.poppins(
-                    fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                    height: 1.2,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                ),
-              ],
-          ),
-            
-            // Progress section
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-          ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: progress / 100,
-                    minHeight: 8,
-                backgroundColor: progressColor.withValues(alpha: 0.1),
-                valueColor: AlwaysStoppedAnimation<Color>(progressColor),
-              ),
-            ),
-                const SizedBox(height: 6),
-            Text(
-              isCompleted 
-                ? 'Goal Reached! 🎉'
-                : '${progress.round()}% complete',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: progressColor,
-            ),
-          ),
         ],
-            ),
-          ],
       ),
     );
 
@@ -2422,9 +2471,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       return cardContent;
     }
   }
-
-
-
 
   Widget _buildTasksSection() {
     return SliverToBoxAdapter(
@@ -2447,7 +2493,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     color: kAccentColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.task_alt, color: kAccentColor, size: 24),
+                  child:
+                      const Icon(Icons.task_alt, color: kAccentColor, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Text(
@@ -2477,29 +2524,28 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               ],
             ),
             const SizedBox(height: 20),
-            
+
             // Today's Tasks
             ..._tasks.map((task) => Column(
-              children: [
-                _buildTaskItem(
-                  task['emoji'],
-                  task['title'],
-                  task['isCompleted'],
-                  task['priority'],
-                  task['id'],
-                ),
-                const SizedBox(height: 12),
-              ],
-            )),
+                  children: [
+                    _buildTaskItem(
+                      task['emoji'],
+                      task['title'],
+                      task['isCompleted'],
+                      task['priority'],
+                      task['id'],
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                )),
           ],
         ),
       ),
     );
   }
 
-
-
-  Widget _buildTaskItem(String emoji, String task, bool isCompleted, String priority, String taskId) {
+  Widget _buildTaskItem(String emoji, String task, bool isCompleted,
+      String priority, String taskId) {
     Color priorityColor;
     switch (priority.toLowerCase()) {
       case 'high':
@@ -2518,12 +2564,15 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isCompleted 
+        color: isCompleted
             ? kSuccessColor.withValues(alpha: 0.1)
-            : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            : Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest
+                .withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isCompleted 
+          color: isCompleted
               ? kSuccessColor.withValues(alpha: 0.3)
               : priorityColor.withValues(alpha: 0.2),
           width: 1,
@@ -2555,7 +2604,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             ),
           ),
           const SizedBox(width: 16),
-          
+
           // Task emoji
           Container(
             padding: const EdgeInsets.all(8),
@@ -2566,7 +2615,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             child: Text(emoji, style: const TextStyle(fontSize: 20)),
           ),
           const SizedBox(width: 16),
-          
+
           // Task details
           Expanded(
             child: Column(
@@ -2577,8 +2626,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: isCompleted 
-                        ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
+                    color: isCompleted
+                        ? Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6)
                         : Theme.of(context).colorScheme.onSurface,
                     decoration: isCompleted ? TextDecoration.lineThrough : null,
                   ),
@@ -2591,7 +2643,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   runSpacing: 4,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: priorityColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
@@ -2607,7 +2660,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     ),
                     if (isCompleted)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: kSuccessColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
@@ -2626,7 +2680,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               ],
             ),
           ),
-          
+
           // Delete button
           GestureDetector(
             onTap: () => _showDeleteTaskConfirmation(taskId, task),
@@ -2648,10 +2702,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-
-
-
-
   // Helper methods
   String _getGreeting(int hour) {
     if (hour < 12) return 'Good Morning';
@@ -2661,11 +2711,16 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'red': return kErrorColor;
-      case 'orange': return kWarningColor;
-      case 'blue': return kInfoColor;
-      case 'green': return kSuccessColor;
-      default: return kTextSecondary;
+      case 'red':
+        return kErrorColor;
+      case 'orange':
+        return kWarningColor;
+      case 'blue':
+        return kInfoColor;
+      case 'green':
+        return kSuccessColor;
+      default:
+        return kTextSecondary;
     }
   }
 
@@ -2677,9 +2732,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       ),
     );
   }
-
-
-
 
   /// Show rewards details dialog
   void _showRewardsDetails() {
@@ -2711,7 +2763,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
+
           // Header
           Padding(
             padding: const EdgeInsets.all(20),
@@ -2721,8 +2773,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 Text(
                   'Rewards & Achievements',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
@@ -2731,7 +2783,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               ],
             ),
           ),
-          
+
           // Content
           Expanded(
             child: SingleChildScrollView(
@@ -2739,14 +2791,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  
                   // Weekly Streak Calendar
                   WeeklyStreakCalendar(
                     goalStreaks: _streakSummary.goalStreaks,
-                    weekStart: DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1)),
+                    weekStart: DateTime.now()
+                        .subtract(Duration(days: DateTime.now().weekday - 1)),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Goal Streaks
                   _buildGoalStreaksSection(),
                 ],
@@ -2757,7 +2809,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       ),
     );
   }
-
 
   /// Build goal streaks section
   Widget _buildGoalStreaksSection() {
@@ -2775,8 +2826,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         ],
       ),
       child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(
             children: [
               Container(
@@ -2785,53 +2836,53 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   color: kAccentColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.trending_up, color: kAccentColor, size: 24),
+                child: const Icon(Icons.trending_up,
+                    color: kAccentColor, size: 24),
               ),
               const SizedBox(width: 12),
-        Text(
-          'Daily Goal Streaks',
-          style: GoogleFonts.poppins(
+              Text(
+                'Daily Goal Streaks',
+                style: GoogleFonts.poppins(
                   fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),
-        if (_isStreakLoading)
-          ...List.generate(4, (index) => 
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: GoalStreakCard(
-                streak: _streakSummary.goalStreaks.values.first,
-                isLoading: true,
-                onTap: () {},
+          if (_isStreakLoading)
+            ...List.generate(
+              4,
+              (index) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: GoalStreakCard(
+                  streak: _streakSummary.goalStreaks.values.first,
+                  isLoading: true,
+                  onTap: () {},
+                ),
+              ),
+            )
+          else
+            ..._streakSummary.goalStreaks.values.map(
+              (streak) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: GoalStreakCard(
+                  streak: streak,
+                  onTap: () {
+                    // Handle goal tap if needed
+                  },
+                ),
               ),
             ),
-          )
-        else
-        ..._streakSummary.goalStreaks.values.map((streak) => 
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: GoalStreakCard(
-              streak: streak,
-              onTap: () {
-                // Handle goal tap if needed
-              },
-            ),
-          ),
-        ),
-      ],
+        ],
       ),
     );
   }
 
-
-
   Widget _buildProfileScreen() {
     final user = FirebaseAuth.instance.currentUser;
-    
+
     return Scaffold(
       backgroundColor: kAppBackground,
       appBar: AppBar(
@@ -2872,7 +2923,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               child: Column(
                 children: [
                   const SizedBox(height: 20),
-                  
+
                   // Profile Avatar with enhanced design
                   Container(
                     decoration: BoxDecoration(
@@ -2888,13 +2939,15 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     child: CircleAvatar(
                       radius: 60,
                       backgroundColor: kPrimaryColor,
-                      backgroundImage: user?.photoURL != null 
-                          ? NetworkImage(user!.photoURL!) 
+                      backgroundImage: user?.photoURL != null
+                          ? NetworkImage(user!.photoURL!)
                           : null,
                       child: user?.photoURL == null
                           ? Text(
-                              user?.displayName?.isNotEmpty == true 
-                                  ? user!.displayName!.substring(0, 1).toUpperCase() 
+                              user?.displayName?.isNotEmpty == true
+                                  ? user!.displayName!
+                                      .substring(0, 1)
+                                      .toUpperCase()
                                   : 'U',
                               style: GoogleFonts.poppins(
                                 fontSize: 48,
@@ -2906,34 +2959,34 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     ),
                   ),
                   const SizedBox(height: 16),
-                    
-                    // User Name
-                    Text(
-                      user?.displayName ?? 'User',
-                      style: GoogleFonts.poppins(
+
+                  // User Name
+                  Text(
+                    user?.displayName ?? 'User',
+                    style: GoogleFonts.poppins(
                       fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: kTextDark,
-                      ),
+                      fontWeight: FontWeight.bold,
+                      color: kTextDark,
                     ),
-                    const SizedBox(height: 4),
-                    
-                    // User Email
-                    Text(
-                      user?.email ?? 'user@example.com',
-                      style: GoogleFonts.poppins(
+                  ),
+                  const SizedBox(height: 4),
+
+                  // User Email
+                  Text(
+                    user?.email ?? 'user@example.com',
+                    style: GoogleFonts.poppins(
                       fontSize: 14,
-                        color: kTextSecondary,
-                      ),
+                      color: kTextSecondary,
                     ),
+                  ),
                   const SizedBox(height: 20),
-                    
+
                   // Streak Card
-                    _buildSimpleQuickStats(),
+                  _buildSimpleQuickStats(),
                 ],
               ),
             ),
-            
+
             // Content Sections
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -2941,15 +2994,15 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 32),
-                  
+
                   // Weekly Streak Calendar Section
                   _buildWeeklyStreakCalendarSection(),
                   const SizedBox(height: 32),
-                  
+
                   // Current Streaks Section
                   _buildGoalStreaksSection(),
                   const SizedBox(height: 32),
-                  
+
                   // Streak Motivation
                   StreakMotivationWidget(
                     streakSummary: _streakSummary,
@@ -2997,7 +3050,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         ],
       ),
       child: Column(
-      children: [
+        children: [
           // Streak Icon
           Container(
             padding: const EdgeInsets.all(12),
@@ -3012,7 +3065,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             ),
           ),
           const SizedBox(height: 12),
-          
+
           // Streak Number
           Text(
             '${_streakSummary.longestOverallStreak}',
@@ -3023,7 +3076,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             ),
           ),
           const SizedBox(height: 4),
-          
+
           // Streak Label
           Text(
             'Day Streak',
@@ -3034,10 +3087,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             ),
           ),
           const SizedBox(height: 2),
-          
+
           // Motivational Text
           Text(
-            _streakSummary.longestOverallStreak > 0 
+            _streakSummary.longestOverallStreak > 0
                 ? 'Keep the momentum going! 🔥'
                 : 'Start your journey today! 🌟',
             style: GoogleFonts.poppins(
@@ -3052,7 +3105,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-  Widget _buildSimpleStatCard(String value, String label, IconData icon, Color color) {
+  Widget _buildSimpleStatCard(
+      String value, String label, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -3087,8 +3141,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-
-
   Widget _buildWeeklyStreakCalendarSection() {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -3114,7 +3166,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   color: kPrimaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.calendar_month, color: kPrimaryColor, size: 24),
+                child: const Icon(Icons.calendar_month,
+                    color: kPrimaryColor, size: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -3128,7 +3181,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: kSuccessColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -3145,11 +3199,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             ],
           ),
           const SizedBox(height: 20),
-          
+
           // Weekly Calendar Grid
           _buildImprovedWeeklyCalendar(),
           const SizedBox(height: 16),
-          
+
           // Legend
           _buildSimpleCalendarLegend(),
         ],
@@ -3157,37 +3211,35 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-
-
-
-
   Widget _buildImprovedWeeklyCalendar() {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
     final weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    
+
     return Column(
       children: [
         // Week day headers
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(
-            children: weekDays.map((day) => Expanded(
-              child: Center(
-                child: Text(
-                  day,
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: kTextSecondary,
-                  ),
-                ),
-              ),
-            )).toList(),
+            children: weekDays
+                .map((day) => Expanded(
+                      child: Center(
+                        child: Text(
+                          day,
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: kTextSecondary,
+                          ),
+                        ),
+                      ),
+                    ))
+                .toList(),
           ),
         ),
         const SizedBox(height: 16),
-        
+
         // Week calendar grid
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -3197,11 +3249,12 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               final isToday = date.day == now.day && date.month == now.month;
               const hasStreak = false; // Simplified for streak system
               const hasReward = false; // Simplified for streak system
-              
+
               return Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: _buildBeautifulCalendarDay(date.day, isToday, hasStreak, hasReward),
+                  child: _buildBeautifulCalendarDay(
+                      date.day, isToday, hasStreak, hasReward),
                 ),
               );
             }),
@@ -3211,12 +3264,13 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-  Widget _buildBeautifulCalendarDay(int day, bool isToday, bool hasStreak, bool hasReward) {
+  Widget _buildBeautifulCalendarDay(
+      int day, bool isToday, bool hasStreak, bool hasReward) {
     Color backgroundColor = Theme.of(context).colorScheme.surface;
     Color textColor = kTextSecondary;
     Color borderColor = Colors.transparent;
     Widget? indicator;
-    
+
     if (isToday) {
       backgroundColor = kPrimaryColor;
       textColor = Colors.white;
@@ -3246,7 +3300,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         ),
       );
     }
-    
+
     return Container(
       height: 48,
       decoration: BoxDecoration(
@@ -3310,10 +3364,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   // Removed reward/achievement methods - replaced with streak system
 
-
-
-
-
   void _showDeleteConfirmation(String entryId, String title) {
     showDialog(
       context: context,
@@ -3375,7 +3425,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         await _firebaseService.deleteFoodEntry(user.uid, entryId);
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -3424,14 +3474,15 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   void _showAddTaskDialog() {
     final TextEditingController taskController = TextEditingController();
     String selectedPriority = 'Medium';
-    
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               title: Text(
                 'Add New Task',
                 style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
@@ -3458,28 +3509,34 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     children: [
                       Expanded(
                         child: RadioListTile<String>(
-                          title: Text('High', style: GoogleFonts.poppins(fontSize: 12)),
+                          title: Text('High',
+                              style: GoogleFonts.poppins(fontSize: 12)),
                           value: 'High',
                           groupValue: selectedPriority,
-                          onChanged: (value) => setState(() => selectedPriority = value!),
+                          onChanged: (value) =>
+                              setState(() => selectedPriority = value!),
                           activeColor: kErrorColor,
                         ),
                       ),
                       Expanded(
                         child: RadioListTile<String>(
-                          title: Text('Medium', style: GoogleFonts.poppins(fontSize: 12)),
+                          title: Text('Medium',
+                              style: GoogleFonts.poppins(fontSize: 12)),
                           value: 'Medium',
                           groupValue: selectedPriority,
-                          onChanged: (value) => setState(() => selectedPriority = value!),
+                          onChanged: (value) =>
+                              setState(() => selectedPriority = value!),
                           activeColor: Colors.orange,
                         ),
                       ),
                       Expanded(
                         child: RadioListTile<String>(
-                          title: Text('Low', style: GoogleFonts.poppins(fontSize: 12)),
+                          title: Text('Low',
+                              style: GoogleFonts.poppins(fontSize: 12)),
                           value: 'Low',
                           groupValue: selectedPriority,
-                          onChanged: (value) => setState(() => selectedPriority = value!),
+                          onChanged: (value) =>
+                              setState(() => selectedPriority = value!),
                           activeColor: kSuccessColor,
                         ),
                       ),
@@ -3490,7 +3547,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text('Cancel', style: GoogleFonts.poppins(color: kTextSecondary)),
+                  child: Text('Cancel',
+                      style: GoogleFonts.poppins(color: kTextSecondary)),
                 ),
                 ElevatedButton(
                   onPressed: () {
@@ -3501,9 +3559,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kAccentColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: Text('Add Task', style: GoogleFonts.poppins(color: Colors.white)),
+                  child: Text('Add Task',
+                      style: GoogleFonts.poppins(color: Colors.white)),
                 ),
               ],
             );
@@ -3518,8 +3578,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       // Create new task with improved icon generation
       final dynamicIconService = DynamicIconService();
       final bestCategory = dynamicIconService.getBestCategory(taskTitle);
-      final confidence = dynamicIconService.getCategoryConfidence(taskTitle, bestCategory);
-      
+      final confidence =
+          dynamicIconService.getCategoryConfidence(taskTitle, bestCategory);
+
       final newTask = {
         'id': 'task_${DateTime.now().millisecondsSinceEpoch}',
         'emoji': _getTaskEmoji(taskTitle),
@@ -3530,11 +3591,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         'category': bestCategory,
         'confidence': confidence,
       };
-      
+
       // Add to the beginning of the list
       _tasks.insert(0, newTask);
     });
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Task added: $taskTitle'),
@@ -3552,17 +3613,18 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       if (taskIndex != -1) {
         final task = _tasks[taskIndex];
         final wasCompleted = task['isCompleted'] as bool;
-        
+
         // Toggle completion status
         _tasks[taskIndex]['isCompleted'] = !wasCompleted;
-        
+
         if (!wasCompleted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Task completed: ${task['title']}'),
               backgroundColor: kSuccessColor,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
           );
         } else {
@@ -3571,7 +3633,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               content: Text('Task marked as incomplete: ${task['title']}'),
               backgroundColor: Colors.orange,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
           );
         }
@@ -3582,12 +3645,15 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   String _getTaskEmoji(String task) {
     // Use the enhanced dynamic icon service with contextual awareness
     final dynamicIconService = DynamicIconService();
-    
+
     // Get contextual icons based on current time
-    final contextualIcons = dynamicIconService.getContextualIcons(task, timeOfDay: DateTime.now());
-    
+    final contextualIcons =
+        dynamicIconService.getContextualIcons(task, timeOfDay: DateTime.now());
+
     // Return the first contextual icon if available, otherwise use the best match
-    return contextualIcons.isNotEmpty ? contextualIcons.first : dynamicIconService.generateIcon(task);
+    return contextualIcons.isNotEmpty
+        ? contextualIcons.first
+        : dynamicIconService.generateIcon(task);
   }
 
   void _showDeleteTaskConfirmation(String taskId, String taskTitle) {
@@ -3595,7 +3661,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Text(
             'Delete Task',
             style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
@@ -3607,7 +3674,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Cancel', style: GoogleFonts.poppins(color: kTextSecondary)),
+              child: Text('Cancel',
+                  style: GoogleFonts.poppins(color: kTextSecondary)),
             ),
             ElevatedButton(
               onPressed: () {
@@ -3616,9 +3684,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: kErrorColor,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
-              child: Text('Delete', style: GoogleFonts.poppins(color: Colors.white)),
+              child: Text('Delete',
+                  style: GoogleFonts.poppins(color: Colors.white)),
             ),
           ],
         );
@@ -3631,7 +3701,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       // Remove task from the list
       _tasks.removeWhere((task) => task['id'] == taskId);
     });
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Task deleted: $taskTitle'),
@@ -3646,10 +3716,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   String _getDailyProgressMessage() {
     final calorieProgress = (_dailySummary?.calorieProgress ?? 0.0) * 100;
     final stepsProgress = (_dailySummary?.stepsProgress ?? 0.0) * 100;
-    
+
     final completedGoals = [calorieProgress, stepsProgress]
-        .where((progress) => progress >= 100).length;
-    
+        .where((progress) => progress >= 100)
+        .length;
+
     if (completedGoals == 2) {
       return 'Amazing! You\'ve completed all your daily goals! 🎉';
     } else if (completedGoals >= 1) {
@@ -3662,7 +3733,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   double _getOverallProgressPercentage() {
     final calorieProgress = (_dailySummary?.calorieProgress ?? 0.0) * 100;
     final stepsProgress = (_dailySummary?.stepsProgress ?? 0.0) * 100;
-    
+
     return (calorieProgress + stepsProgress) / 2;
   }
 
@@ -3671,7 +3742,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Calorie Goal'),
-        content: const Text('Your calorie goal is set to 2000 calories. You can adjust this in the Goals & Targets screen.'),
+        content: const Text(
+            'Your calorie goal is set to 2000 calories. You can adjust this in the Goals & Targets screen.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),

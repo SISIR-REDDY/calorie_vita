@@ -12,7 +12,7 @@ import 'services/global_google_fit_manager.dart';
 
 class MainApp extends StatefulWidget {
   final bool firebaseInitialized;
-  
+
   const MainApp({super.key, this.firebaseInitialized = false});
 
   @override
@@ -28,24 +28,24 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    
+
     // Immediate initialization - no waiting
     _initializeAppImmediately();
   }
 
   void _initializeAppImmediately() {
     print('Starting immediate app initialization...');
-    
+
     // Set initialized immediately - no waiting
     setState(() {
       _isInitialized = true;
     });
-    
+
     print('App initialized immediately - showing welcome screen');
-    
+
     // Initialize app state manager in background (non-blocking)
     _initializeAppStateManager();
-    
+
     // Initialize global Google Fit manager
     _initializeGoogleFitManager();
   }
@@ -53,23 +53,22 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   void _initializeAppStateManager() async {
     try {
       print('Initializing AppStateManager in background...');
-      
+
       // Initialize the centralized app state manager
       await _appStateManager.initialize();
-      
-      
+
       // Listen to app state changes
       _appStateManager.stateStream.listen((state) {
-        print('AppStateManager state change: userId=${state.currentUserId}, initialized=${state.isInitialized}');
+        print(
+            'AppStateManager state change: userId=${state.currentUserId}, initialized=${state.isInitialized}');
         if (mounted) {
           setState(() {
             // Update UI based on app state changes
           });
         }
       });
-      
+
       print('✅ AppStateManager initialization completed');
-      
     } catch (e) {
       print('❌ AppStateManager initialization error: $e');
     }
@@ -78,12 +77,11 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   void _initializeGoogleFitManager() async {
     try {
       print('Initializing GlobalGoogleFitManager in background...');
-      
+
       // Initialize Google Fit manager for global sync
       await _googleFitManager.initialize();
-      
+
       print('✅ GlobalGoogleFitManager initialization completed');
-      
     } catch (e) {
       print('❌ GlobalGoogleFitManager initialization error: $e');
     }
@@ -104,26 +102,28 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
     return StreamBuilder<AppState>(
       stream: _appStateManager.stateStream,
       builder: (context, snapshot) {
-        print('App state snapshot: ${snapshot.connectionState}, data: ${snapshot.data}');
-        
+        print(
+            'App state snapshot: ${snapshot.connectionState}, data: ${snapshot.data}');
+
         if (snapshot.hasError) {
           print('App state error: ${snapshot.error}');
           return const WelcomeScreen();
         }
-        
+
         if (snapshot.connectionState == ConnectionState.waiting) {
           print('App state waiting...');
           return const Center(child: CircularProgressIndicator());
         }
-        
+
         final appState = snapshot.data;
-        print('App state data: isInitialized=${appState?.isInitialized}, userId=${appState?.currentUserId}');
-        
+        print(
+            'App state data: isInitialized=${appState?.isInitialized}, userId=${appState?.currentUserId}');
+
         if (appState == null || appState.currentUserId.isEmpty) {
           print('No user authenticated, showing welcome screen');
           return const WelcomeScreen();
         }
-        
+
         print('User authenticated, showing main navigation');
         return const MainNavigation();
       },
@@ -226,7 +226,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
                     },
                   ),
                   const SizedBox(height: 40),
-                  
+
                   // App Title
                   TweenAnimationBuilder<double>(
                     duration: const Duration(milliseconds: 1200),
@@ -254,7 +254,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
                     },
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Loading indicator
                   TweenAnimationBuilder<double>(
                     duration: const Duration(milliseconds: 1000),
@@ -269,7 +269,8 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
                               height: 30,
                               child: CircularProgressIndicator(
                                 strokeWidth: 3,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
                             ),
                             const SizedBox(height: 20),
@@ -354,19 +355,17 @@ class _MainNavigationState extends State<MainNavigation> {
     const AnalyticsScreen(),
     const SizedBox(), // Placeholder for FAB
     const AITrainerScreen(),
-    const SettingsScreen(), 
+    const SettingsScreen(),
   ];
-
-
 
   void _onTabSelected(int index) {
     print('Tab selected: $index'); // Debug log
-    
+
     // Trigger Google Fit sync whenever a screen is opened
     _googleFitManager.ensureSync().catchError((e) {
       print('Failed to ensure Google Fit sync on screen change: $e');
     });
-    
+
     if (index == 2) {
       // Open camera
       Navigator.of(context).push(
@@ -382,7 +381,8 @@ class _MainNavigationState extends State<MainNavigation> {
       print('Setting current index to: $index'); // Debug log
       setState(() => _currentIndex = index);
     } else {
-      print('Invalid index: $index, screens length: ${_screens.length}'); // Debug log
+      print(
+          'Invalid index: $index, screens length: ${_screens.length}'); // Debug log
     }
   }
 
@@ -394,7 +394,7 @@ class _MainNavigationState extends State<MainNavigation> {
         duration: const Duration(milliseconds: 400),
         child: _screens[_currentIndex],
       ),
-      
+
       // Custom Bottom Navigation with Large Center Button
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -420,7 +420,7 @@ class _MainNavigationState extends State<MainNavigation> {
                   isSelected: _currentIndex == 0,
                   onTap: () => _onTabSelected(0),
                 ),
-                
+
                 // Analytics Tab
                 _buildNavItem(
                   icon: Icons.bar_chart_rounded,
@@ -428,10 +428,10 @@ class _MainNavigationState extends State<MainNavigation> {
                   isSelected: _currentIndex == 1,
                   onTap: () => _onTabSelected(1),
                 ),
-                
+
                 // Center Camera Button (Larger)
                 _buildCenterCameraButton(),
-                
+
                 // AI Trainer Tab
                 _buildNavItem(
                   icon: Icons.auto_awesome_rounded,
@@ -439,7 +439,7 @@ class _MainNavigationState extends State<MainNavigation> {
                   isSelected: _currentIndex == 3,
                   onTap: () => _onTabSelected(3),
                 ),
-                
+
                 // Settings Tab
                 _buildNavItem(
                   icon: Icons.settings_rounded,
@@ -469,16 +469,19 @@ class _MainNavigationState extends State<MainNavigation> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: isSelected 
-                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
-                : Colors.transparent,
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(
               icon,
-              color: isSelected 
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6),
               size: 24,
             ),
           ),
@@ -488,9 +491,12 @@ class _MainNavigationState extends State<MainNavigation> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              color: isSelected 
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6),
             ),
           ),
         ],
@@ -527,4 +533,4 @@ class _MainNavigationState extends State<MainNavigation> {
       ),
     );
   }
-} 
+}

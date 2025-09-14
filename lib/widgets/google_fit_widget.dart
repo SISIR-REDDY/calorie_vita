@@ -16,7 +16,7 @@ class GoogleFitWidget extends StatefulWidget {
 class _GoogleFitWidgetState extends State<GoogleFitWidget> {
   final GoogleFitService _googleFitService = GoogleFitService();
   final GoogleFitCacheService _cacheService = GoogleFitCacheService();
-  
+
   bool _isLoading = false;
   bool _isAuthenticated = false;
   bool _isRefreshing = false;
@@ -33,7 +33,7 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
     setState(() {
       _isAuthenticated = _googleFitService.isAuthenticated;
     });
-    
+
     if (_isAuthenticated) {
       await _loadTodayData();
     }
@@ -79,7 +79,7 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
     try {
       // Use cache service for faster loading
       final data = await _cacheService.getTodayData(forceRefresh: true);
-      
+
       setState(() {
         _todayData = data;
         _isRefreshing = false;
@@ -88,41 +88,6 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
       setState(() {
         _error = 'Failed to load fitness data: ${e.toString()}';
         _isRefreshing = false;
-      });
-    }
-  }
-
-  Future<void> _loadTodayDataFallback() async {
-    if (!_isAuthenticated) return;
-
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      final today = DateTime.now();
-      final steps = await _googleFitService.getDailySteps(today);
-      final calories = await _googleFitService.getDailyCaloriesBurned(today);
-      final distance = await _googleFitService.getDailyDistance(today);
-      final weight = await _googleFitService.getCurrentWeight();
-
-      setState(() {
-        _todayData = GoogleFitData(
-          date: today,
-          steps: steps,
-          caloriesBurned: calories,
-          distance: distance,
-          weight: weight,
-        );
-      });
-    } catch (e) {
-      setState(() {
-        _error = 'Error loading fitness data: ${e.toString()}';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
       });
     }
   }
@@ -208,13 +173,13 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: _isRefreshing 
-          ? const GoogleFitShimmerCard(height: 100)
-          : EnhancedLoadingWidget(
-              text: 'Syncing with Google Fit...',
-              color: AppColors.primary,
-              size: 32,
-            ),
+        child: _isRefreshing
+            ? const GoogleFitShimmerCard(height: 100)
+            : EnhancedLoadingWidget(
+                text: 'Syncing with Google Fit...',
+                color: kPrimaryColor,
+                size: 32,
+              ),
       ),
     );
   }
@@ -342,49 +307,49 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
               ),
             ],
           ),
-        const SizedBox(height: 12),
-        
-        // Distance and Activity Level Row
-        Row(
-          children: [
-            Expanded(
-              child: _buildMetricCard(
-                'Distance',
-                _todayData!.formattedDistance,
-                Icons.straighten,
-                Colors.blue,
+          const SizedBox(height: 12),
+
+          // Distance and Activity Level Row
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetricCard(
+                  'Distance',
+                  _todayData!.formattedDistance,
+                  Icons.straighten,
+                  Colors.blue,
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildMetricCard(
-                'Activity Level',
-                _todayData!.activityLevel,
-                Icons.trending_up,
-                _getActivityLevelColor(_todayData!.activityLevel),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildMetricCard(
+                  'Activity Level',
+                  _todayData!.activityLevel,
+                  Icons.trending_up,
+                  _getActivityLevelColor(_todayData!.activityLevel),
+                ),
               ),
-            ),
-          ],
-        ),
-        
-        // Refresh button
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: _loadTodayData,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: kPrimaryColor,
-              side: BorderSide(color: kPrimaryColor.withValues(alpha: 0.3)),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            icon: const Icon(Icons.refresh, size: 16),
-            label: const Text('Refresh Data'),
+            ],
           ),
-        ),
+
+          // Refresh button
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _loadTodayData,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: kPrimaryColor,
+                side: BorderSide(color: kPrimaryColor.withValues(alpha: 0.3)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Refresh Data'),
+            ),
+          ),
         ],
       ),
     );
@@ -430,7 +395,8 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
     );
   }
 
-  Widget _buildMetricCard(String title, String value, IconData icon, Color color) {
+  Widget _buildMetricCard(
+      String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(

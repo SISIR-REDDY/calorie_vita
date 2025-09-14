@@ -15,7 +15,8 @@ class SimpleStreakService {
   final ErrorHandler _errorHandler = ErrorHandler();
 
   // Stream controllers for real-time updates
-  final StreamController<UserStreakSummary> _streakController = StreamController<UserStreakSummary>.broadcast();
+  final StreamController<UserStreakSummary> _streakController =
+      StreamController<UserStreakSummary>.broadcast();
 
   // Getters
   Stream<UserStreakSummary> get streakStream => _streakController.stream;
@@ -78,7 +79,7 @@ class SimpleStreakService {
   /// Initialize default streaks for all goal types
   UserStreakSummary _initializeDefaultStreaks() {
     final goalStreaks = <DailyGoalType, GoalStreak>{};
-    
+
     for (final goalType in DailyGoalType.values) {
       goalStreaks[goalType] = GoalStreak(
         goalType: goalType,
@@ -121,16 +122,17 @@ class SimpleStreakService {
     try {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      
+
       // Get current streak for this goal
-      final currentStreak = _currentStreaks.goalStreaks[goalType] ?? GoalStreak(
-        goalType: goalType,
-        currentStreak: 0,
-        longestStreak: 0,
-        lastAchievedDate: today.subtract(const Duration(days: 1)),
-        achievedToday: false,
-        totalDaysAchieved: 0,
-      );
+      final currentStreak = _currentStreaks.goalStreaks[goalType] ??
+          GoalStreak(
+            goalType: goalType,
+            currentStreak: 0,
+            longestStreak: 0,
+            lastAchievedDate: today.subtract(const Duration(days: 1)),
+            achievedToday: false,
+            totalDaysAchieved: 0,
+          );
 
       // Check if already achieved today
       if (currentStreak.achievedToday) return;
@@ -138,11 +140,13 @@ class SimpleStreakService {
       // Calculate new streak
       int newCurrentStreak = currentStreak.currentStreak;
       int newLongestStreak = currentStreak.longestStreak;
-      
-      if (currentStreak.lastAchievedDate.isBefore(today.subtract(const Duration(days: 1)))) {
+
+      if (currentStreak.lastAchievedDate
+          .isBefore(today.subtract(const Duration(days: 1)))) {
         // Streak was broken, reset to 1
         newCurrentStreak = 1;
-      } else if (currentStreak.lastAchievedDate.isAtSameMomentAs(today.subtract(const Duration(days: 1)))) {
+      } else if (currentStreak.lastAchievedDate
+          .isAtSameMomentAs(today.subtract(const Duration(days: 1)))) {
         // Continuing streak
         newCurrentStreak = currentStreak.currentStreak + 1;
       } else {
@@ -165,14 +169,18 @@ class SimpleStreakService {
       );
 
       // Update the streaks map
-      final updatedGoalStreaks = Map<DailyGoalType, GoalStreak>.from(_currentStreaks.goalStreaks);
+      final updatedGoalStreaks =
+          Map<DailyGoalType, GoalStreak>.from(_currentStreaks.goalStreaks);
       updatedGoalStreaks[goalType] = updatedStreak;
 
       // Update overall summary
       _currentStreaks = _currentStreaks.copyWith(
         goalStreaks: updatedGoalStreaks,
-        totalActiveStreaks: updatedGoalStreaks.values.where((s) => s.achievedToday).length,
-        longestOverallStreak: updatedGoalStreaks.values.map((s) => s.longestStreak).reduce((a, b) => a > b ? a : b),
+        totalActiveStreaks:
+            updatedGoalStreaks.values.where((s) => s.achievedToday).length,
+        longestOverallStreak: updatedGoalStreaks.values
+            .map((s) => s.longestStreak)
+            .reduce((a, b) => a > b ? a : b),
         lastActivityDate: today,
         totalDaysActive: _currentStreaks.totalDaysActive + 1,
       );
@@ -197,13 +205,15 @@ class SimpleStreakService {
       );
 
       // Update the streaks map
-      final updatedGoalStreaks = Map<DailyGoalType, GoalStreak>.from(_currentStreaks.goalStreaks);
+      final updatedGoalStreaks =
+          Map<DailyGoalType, GoalStreak>.from(_currentStreaks.goalStreaks);
       updatedGoalStreaks[goalType] = updatedStreak;
 
       // Update overall summary
       _currentStreaks = _currentStreaks.copyWith(
         goalStreaks: updatedGoalStreaks,
-        totalActiveStreaks: updatedGoalStreaks.values.where((s) => s.achievedToday).length,
+        totalActiveStreaks:
+            updatedGoalStreaks.values.where((s) => s.achievedToday).length,
       );
 
       // Save to Firestore and notify listeners

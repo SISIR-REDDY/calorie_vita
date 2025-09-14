@@ -24,8 +24,8 @@ class UserGoals {
       bmiGoal: map['bmiGoal']?.toDouble(),
       waterGlassesGoal: map['waterGlassesGoal']?.toInt(),
       stepsPerDayGoal: map['stepsPerDayGoal']?.toInt(),
-      macroGoals: map['macroGoals'] != null 
-          ? MacroGoals.fromMap(map['macroGoals']) 
+      macroGoals: map['macroGoals'] != null
+          ? MacroGoals.fromMap(map['macroGoals'])
           : null,
       lastUpdated: map['lastUpdated']?.toDate(),
     );
@@ -105,8 +105,8 @@ class MacroGoals {
 
   // Default macro goals (balanced diet for 2000 calories)
   static const MacroGoals defaultMacros = MacroGoals(
-    carbsCalories: 900,  // 45% of 2000 calories
+    carbsCalories: 900, // 45% of 2000 calories
     proteinCalories: 500, // 25% of 2000 calories
-    fatCalories: 600,    // 30% of 2000 calories
+    fatCalories: 600, // 30% of 2000 calories
   );
 }

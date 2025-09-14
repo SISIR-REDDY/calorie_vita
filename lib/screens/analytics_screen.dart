@@ -22,47 +22,50 @@ class AnalyticsScreen extends StatefulWidget {
   State<AnalyticsScreen> createState() => _AnalyticsScreenState();
 }
 
-class _AnalyticsScreenState extends State<AnalyticsScreen> 
-    with TickerProviderStateMixin, GoogleFitSyncMixin, GoogleFitDataDisplayMixin {
+class _AnalyticsScreenState extends State<AnalyticsScreen>
+    with
+        TickerProviderStateMixin,
+        GoogleFitSyncMixin,
+        GoogleFitDataDisplayMixin {
   String _selectedPeriod = 'Daily';
   final List<String> _periods = ['Daily', 'Weekly'];
-  
+
   // Services
   final AnalyticsService _analyticsService = AnalyticsService();
   final FirebaseService _firebaseService = FirebaseService();
   final AppStateService _appStateService = AppStateService();
   final GoogleFitService _googleFitService = GoogleFitService();
   final GlobalGoogleFitManager _googleFitManager = GlobalGoogleFitManager();
-  
+
   // State management
   bool _isLoading = false; // Start with false to show UI immediately
   bool _isRefreshing = false;
   String? _error;
   bool _isGeneratingInsights = false;
   String _aiInsights = '';
-  
+
   // Stream subscriptions
   StreamSubscription<Map<String, dynamic>?>? _profileDataSubscription;
-  
+
   // Real-time data
   List<DailySummary> _dailySummaries = [];
-  MacroBreakdown _macroBreakdown = MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
+  MacroBreakdown _macroBreakdown =
+      MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
   List<UserAchievement> _achievements = [];
   List<Map<String, dynamic>> _insights = [];
   List<Map<String, dynamic>> _recommendations = [];
-  
+
   // Google Fit data
   GoogleFitData? _todayGoogleFitData;
   List<GoogleFitData> _weeklyGoogleFitData = [];
   bool _isGoogleFitConnected = false;
   bool _isGoogleFitLoading = false; // Track loading state for Google Fit
-  
+
   // User profile data for BMI calculation
   double? _userHeight; // in meters
   double? _userWeight; // in kg
   String? _userGender;
   int? _userAge;
-  
 
   @override
   void initState() {
@@ -78,19 +81,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     super.dispose();
   }
 
-
-
   /// Override mixin method to handle Google Fit data updates
   @override
   void onGoogleFitDataUpdate(Map<String, dynamic> syncData) {
     super.onGoogleFitDataUpdate(syncData);
-    
+
     final todayData = syncDataToGoogleFitData(syncData);
     if (todayData != null && mounted) {
       setState(() {
         _todayGoogleFitData = todayData;
       });
-      print('Analytics screen: Updated with Google Fit data - Steps: ${todayData.steps}');
+      print(
+          'Analytics screen: Updated with Google Fit data - Steps: ${todayData.steps}');
     }
   }
 
@@ -98,12 +100,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   @override
   void onGoogleFitConnectionChanged(bool isConnected) {
     super.onGoogleFitConnectionChanged(isConnected);
-    
+
     if (mounted) {
       setState(() {
         _isGoogleFitConnected = isConnected;
       });
-      
+
       if (isConnected) {
         print('Analytics screen: Google Fit connected - loading data');
         _loadGoogleFitData();
@@ -125,10 +127,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
       // Set up listeners first (fastest operation)
       _setupRealTimeListeners();
-      
+
       // Load fresh data in background without blocking UI
       _loadFreshAnalyticsData();
-        
     } catch (e) {
       print('Analytics initialization error: $e');
       setState(() {
@@ -144,11 +145,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       if (_dailySummaries.isEmpty) {
         _dailySummaries = _generateDefaultSummaries();
       }
-      
+
       if (_macroBreakdown.totalCalories == 0) {
-        _macroBreakdown = MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
+        _macroBreakdown =
+            MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
       }
-      
+
       // Initialize empty Google Fit data to show placeholders
       _todayGoogleFitData ??= GoogleFitData(
         date: DateTime.now(),
@@ -157,8 +159,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         distance: 0.0,
         weight: null,
       );
-      _weeklyGoogleFitData = _weeklyGoogleFitData.isEmpty ? _generateDefaultWeeklyGoogleFitData() : _weeklyGoogleFitData;
-      
+      _weeklyGoogleFitData = _weeklyGoogleFitData.isEmpty
+          ? _generateDefaultWeeklyGoogleFitData()
+          : _weeklyGoogleFitData;
+
       print('Cached data displayed, UI should be responsive now');
     } catch (e) {
       print('Error showing cached data: $e');
@@ -199,23 +203,22 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   /// Load fresh analytics data in background
   Future<void> _loadFreshAnalyticsData() async {
     setState(() => _isRefreshing = true);
-    
+
     try {
       print('Loading fresh analytics data in background...');
-      
+
       // Initialize services with short timeouts (non-blocking)
       await Future.wait([
         _initializeAppStateService(),
         _initializeAnalyticsService(),
         _loadUserProfileData(), // Load user profile data for BMI calculation
       ]).timeout(const Duration(seconds: 4));
-      
+
       // Load Google Fit data in background (lowest priority)
       _loadGoogleFitDataAsync();
-      
+
       // Generate AI insights after data is loaded
       _generateAIInsights();
-      
     } catch (e) {
       print('Background data loading error: $e');
       // Don't show error to user, just log it
@@ -230,10 +233,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   Future<void> _initializeAppStateService() async {
     try {
       if (!_appStateService.isInitialized) {
-        await _appStateService.initialize().timeout(
-          const Duration(seconds: 3),
-          onTimeout: () => print('App state service initialization timed out')
-        );
+        await _appStateService.initialize().timeout(const Duration(seconds: 3),
+            onTimeout: () =>
+                print('App state service initialization timed out'));
         print('App state service initialized');
       }
     } catch (e) {
@@ -246,9 +248,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     try {
       final days = _getDaysForPeriod(_selectedPeriod);
       await _analyticsService.initializeRealTimeAnalytics(days: days).timeout(
-        const Duration(seconds: 4),
-        onTimeout: () => print('Analytics service initialization timed out')
-      );
+          const Duration(seconds: 4),
+          onTimeout: () => print('Analytics service initialization timed out'));
       print('Analytics service initialized');
     } catch (e) {
       print('Error initializing analytics service: $e');
@@ -258,22 +259,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   /// Load Google Fit data asynchronously (lowest priority)
   Future<void> _loadGoogleFitDataAsync() async {
     try {
-      await _googleFitService.initialize().timeout(
-        const Duration(seconds: 3),
-        onTimeout: () => print('Google Fit initialization timed out')
-      );
-      
+      await _googleFitService.initialize().timeout(const Duration(seconds: 3),
+          onTimeout: () => print('Google Fit initialization timed out'));
+
       // Load Google Fit data in background
-      _loadGoogleFitData().timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => print('Google Fit data loading timed out')
-      ).catchError((e) => print('Google Fit loading error: $e'));
-      
+      _loadGoogleFitData()
+          .timeout(const Duration(seconds: 5),
+              onTimeout: () => print('Google Fit data loading timed out'))
+          .catchError((e) => print('Google Fit loading error: $e'));
     } catch (e) {
       print('Google Fit async initialization error: $e');
     }
   }
-
 
   /// Load additional data in background
   Future<void> _loadBackgroundData() async {
@@ -285,7 +282,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       print('Calculating achievements in background...');
       // Calculate achievements in background (non-blocking)
       _analyticsService.calculateStreaksAndAchievements();
-      
     } catch (e) {
       print('Error loading background data: $e');
       // Don't show error to user as this is background loading
@@ -324,7 +320,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
       // Listen to profile data changes (for BMI updates)
       _profileDataSubscription?.cancel();
-      _profileDataSubscription = _appStateService.profileDataStream.listen((profileData) {
+      _profileDataSubscription =
+          _appStateService.profileDataStream.listen((profileData) {
         print('Profile data stream received in analytics: $profileData');
         if (mounted && profileData != null) {
           setState(() {
@@ -384,29 +381,28 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     }
   }
 
-
   /// Load Google Fit data
   Future<void> _loadGoogleFitData() async {
     try {
-      setState(() { _isGoogleFitLoading = true; });
+      setState(() {
+        _isGoogleFitLoading = true;
+      });
       // Check authentication with network timeout
-      final isAuthenticated = await _googleFitService.validateAuthentication().timeout(
-        const Duration(seconds: 3),
-        onTimeout: () {
-          print('Google Fit authentication check timed out');
-          return false;
-        }
-      );
+      final isAuthenticated = await _googleFitService
+          .validateAuthentication()
+          .timeout(const Duration(seconds: 3), onTimeout: () {
+        print('Google Fit authentication check timed out');
+        return false;
+      });
       setState(() {
         _isGoogleFitConnected = isAuthenticated;
       });
       if (_isGoogleFitConnected) {
         try {
           final today = DateTime.now();
-          final batchData = await _googleFitService.getTodayFitnessDataBatch().timeout(
-            const Duration(seconds: 8),
-            onTimeout: () => null
-          );
+          final batchData = await _googleFitService
+              .getTodayFitnessDataBatch()
+              .timeout(const Duration(seconds: 8), onTimeout: () => null);
           GoogleFitData todayData;
           if (batchData != null) {
             todayData = GoogleFitData(
@@ -418,22 +414,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             );
           } else {
             final futures = await Future.wait([
-              _googleFitService.getDailySteps(today).timeout(
-                const Duration(seconds: 5),
-                onTimeout: () => 0
-              ),
-              _googleFitService.getDailyCaloriesBurned(today).timeout(
-                const Duration(seconds: 5),
-                onTimeout: () => 0.0
-              ),
-              _googleFitService.getDailyDistance(today).timeout(
-                const Duration(seconds: 5),
-                onTimeout: () => 0.0
-              ),
-              _googleFitService.getCurrentWeight().timeout(
-                const Duration(seconds: 5),
-                onTimeout: () => null
-              ),
+              _googleFitService
+                  .getDailySteps(today)
+                  .timeout(const Duration(seconds: 5), onTimeout: () => 0),
+              _googleFitService
+                  .getDailyCaloriesBurned(today)
+                  .timeout(const Duration(seconds: 5), onTimeout: () => 0.0),
+              _googleFitService
+                  .getDailyDistance(today)
+                  .timeout(const Duration(seconds: 5), onTimeout: () => 0.0),
+              _googleFitService
+                  .getCurrentWeight()
+                  .timeout(const Duration(seconds: 5), onTimeout: () => null),
             ]);
             todayData = GoogleFitData(
               date: today,
@@ -447,7 +439,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             _todayGoogleFitData = todayData;
             _isGoogleFitLoading = false;
           });
-          print('Google Fit today data loaded: ${_todayGoogleFitData?.steps} steps');
+          print(
+              'Google Fit today data loaded: ${_todayGoogleFitData?.steps} steps');
           _loadWeeklyGoogleFitData().catchError((error) {
             print('Weekly Google Fit data loading failed: $error');
           });
@@ -490,19 +483,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         final now = DateTime.now();
         final weeklyData = <GoogleFitData>[];
         final futures = <Future>[];
-        
+
         // Load data for each day of the week in parallel
         for (int i = 0; i < 7; i++) {
           final date = now.subtract(Duration(days: i));
           futures.add(_loadSingleDayGoogleFitData(date, weeklyData));
         }
-        
+
         await Future.wait(futures);
-        
+
         setState(() {
           _weeklyGoogleFitData = weeklyData;
         });
-        print('Loaded ${_weeklyGoogleFitData.length} days of Google Fit data in parallel');
+        print(
+            'Loaded ${_weeklyGoogleFitData.length} days of Google Fit data in parallel');
       }
     } catch (e) {
       print('Error loading weekly Google Fit data: $e');
@@ -510,18 +504,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   }
 
   /// Load single day Google Fit data (helper method for parallel loading)
-  Future<void> _loadSingleDayGoogleFitData(DateTime date, List<GoogleFitData> weeklyData) async {
+  Future<void> _loadSingleDayGoogleFitData(
+      DateTime date, List<GoogleFitData> weeklyData) async {
     try {
       final futures = await Future.wait([
         _googleFitService.getDailySteps(date),
         _googleFitService.getDailyCaloriesBurned(date),
         _googleFitService.getDailyDistance(date),
       ]);
-      
+
       final steps = futures[0] as int? ?? 0;
       final calories = futures[1] as double? ?? 0.0;
       final distance = futures[2] as double? ?? 0.0;
-      
+
       weeklyData.add(GoogleFitData(
         date: date,
         steps: steps,
@@ -577,7 +572,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         final newSteps = liveData['steps'];
         final newCalories = liveData['caloriesBurned'];
         final newDistance = liveData['distance'];
-        
+
         // Update today's data with live data immediately
         if (_todayGoogleFitData != null) {
           final updatedData = GoogleFitData(
@@ -587,10 +582,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             distance: newDistance ?? _todayGoogleFitData!.distance,
             weight: _todayGoogleFitData!.weight,
           );
-          
+
           // Only update if data has actually changed
           if (updatedData.steps != _todayGoogleFitData!.steps ||
-              updatedData.caloriesBurned != _todayGoogleFitData!.caloriesBurned ||
+              updatedData.caloriesBurned !=
+                  _todayGoogleFitData!.caloriesBurned ||
               updatedData.distance != _todayGoogleFitData!.distance) {
             setState(() {
               _todayGoogleFitData = updatedData;
@@ -624,7 +620,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             _userGender = data['gender']?.toString();
             _userAge = data['age']?.toInt();
           });
-          print('Parsed Profile Data - Height: $_userHeight, Weight: $_userWeight, Gender: $_userGender, Age: $_userAge');
+          print(
+              'Parsed Profile Data - Height: $_userHeight, Weight: $_userWeight, Gender: $_userGender, Age: $_userAge');
         } else {
           print('Profile document does not exist');
         }
@@ -644,44 +641,59 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   /// Calculate percentage change for metrics (no hardcoded values)
   String _calculatePercentageChange(String metric) {
     if (_dailySummaries.length < 2) return '0%';
-    
-    final currentPeriod = _dailySummaries.take(_getDaysForPeriod(_selectedPeriod));
-    final previousPeriod = _dailySummaries.skip(_getDaysForPeriod(_selectedPeriod)).take(_getDaysForPeriod(_selectedPeriod));
-    
+
+    final currentPeriod =
+        _dailySummaries.take(_getDaysForPeriod(_selectedPeriod));
+    final previousPeriod = _dailySummaries
+        .skip(_getDaysForPeriod(_selectedPeriod))
+        .take(_getDaysForPeriod(_selectedPeriod));
+
     if (previousPeriod.isEmpty || currentPeriod.isEmpty) return '0%';
-    
+
     double currentValue = 0;
     double previousValue = 0;
-    
+
     switch (metric) {
       case 'calories':
-        currentValue = currentPeriod.fold(0, (sum, s) => sum + s.caloriesConsumed).toDouble();
-        previousValue = previousPeriod.fold(0, (sum, s) => sum + s.caloriesConsumed).toDouble();
+        currentValue = currentPeriod
+            .fold(0, (sum, s) => sum + s.caloriesConsumed)
+            .toDouble();
+        previousValue = previousPeriod
+            .fold(0, (sum, s) => sum + s.caloriesConsumed)
+            .toDouble();
         break;
       case 'steps':
-        currentValue = currentPeriod.fold(0, (sum, s) => sum + s.steps).toDouble();
-        previousValue = previousPeriod.fold(0, (sum, s) => sum + s.steps).toDouble();
+        currentValue =
+            currentPeriod.fold(0, (sum, s) => sum + s.steps).toDouble();
+        previousValue =
+            previousPeriod.fold(0, (sum, s) => sum + s.steps).toDouble();
         break;
     }
-    
+
     if (previousValue == 0) return '0%';
-    
-    final change = ((currentValue - previousValue) / previousValue * 100).round();
+
+    final change =
+        ((currentValue - previousValue) / previousValue * 100).round();
     return change >= 0 ? '+$change%' : '$change%';
   }
 
   /// Calculate workout change (no hardcoded values)
   String _calculateWorkoutChange() {
     if (_dailySummaries.length < 2) return '0';
-    
-    final currentPeriod = _dailySummaries.take(_getDaysForPeriod(_selectedPeriod));
-    final previousPeriod = _dailySummaries.skip(_getDaysForPeriod(_selectedPeriod)).take(_getDaysForPeriod(_selectedPeriod));
-    
+
+    final currentPeriod =
+        _dailySummaries.take(_getDaysForPeriod(_selectedPeriod));
+    final previousPeriod = _dailySummaries
+        .skip(_getDaysForPeriod(_selectedPeriod))
+        .take(_getDaysForPeriod(_selectedPeriod));
+
     if (previousPeriod.isEmpty || currentPeriod.isEmpty) return '0';
-    
-    final currentWorkouts = currentPeriod.where((s) => s.caloriesBurned > 0).length;
-    final previousWorkouts = previousPeriod.where((s) => s.caloriesBurned > 0).length;
-    
+
+    final currentWorkouts =
+        currentPeriod.where((s) => s.caloriesBurned > 0).length;
+    final previousWorkouts =
+        previousPeriod.where((s) => s.caloriesBurned > 0).length;
+
     final change = currentWorkouts - previousWorkouts;
     return change >= 0 ? '+$change' : '$change';
   }
@@ -698,26 +710,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     try {
       // Refresh all data in parallel for faster response
       final futures = <Future>[];
-      
+
       // Refresh analytics data
       final days = _getDaysForPeriod(_selectedPeriod);
       futures.add(_analyticsService.updatePeriod(days));
       futures.add(_analyticsService.calculateStreaksAndAchievements());
-      
+
       // Refresh Google Fit data if connected
       if (_isGoogleFitConnected) {
         futures.add(_loadGoogleFitDataForPeriod(_selectedPeriod));
       }
-      
+
       // Refresh user profile data
       futures.add(_loadUserProfileData());
-      
+
       // Wait for all refreshes to complete
       await Future.wait(futures);
-      
+
       // Generate fresh AI insights after data refresh
       _generateAIInsights();
-      
+
       print('Analytics data refreshed successfully');
     } catch (e) {
       setState(() {
@@ -743,14 +755,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     try {
       // Load Google Fit data and refresh analytics in parallel for faster response
       final futures = <Future>[];
-      
+
       if (_isGoogleFitConnected) {
         futures.add(_loadGoogleFitDataForPeriod(period));
       }
       futures.add(_refreshAnalyticsForPeriod());
-      
+
       await Future.wait(futures);
-      
+
       // Generate fresh AI insights for the new period
       _generateAIInsights();
     } catch (e) {
@@ -777,7 +789,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             _googleFitService.getDailyDistance(today),
             _googleFitService.getCurrentWeight(),
           ]);
-          
+
           setState(() {
             _todayGoogleFitData = GoogleFitData(
               date: today,
@@ -788,7 +800,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             );
           });
           break;
-          
+
         case 'Weekly':
           // Load weekly data in parallel
           await _loadWeeklyGoogleFitData();
@@ -798,7 +810,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       print('Error loading Google Fit data for period $period: $e');
     }
   }
-
 
   /// Generate AI insights based on current data
   Future<void> _generateAIInsights() async {
@@ -820,18 +831,22 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       final userData = {
         // Profile data
         if (userProfile != null) ...userProfile,
-        
+
         // Recent activity data
-        'recent_calories': _dailySummaries.map((summary) => {
-          'date': summary.date.toIso8601String().split('T')[0],
-          'calories': summary.caloriesConsumed,
-        }).toList(),
-        'recent_steps': _dailySummaries.map((summary) => {
-          'date': summary.date.toIso8601String().split('T')[0],
-          'steps': summary.steps,
-        }).toList(),
+        'recent_calories': _dailySummaries
+            .map((summary) => {
+                  'date': summary.date.toIso8601String().split('T')[0],
+                  'calories': summary.caloriesConsumed,
+                })
+            .toList(),
+        'recent_steps': _dailySummaries
+            .map((summary) => {
+                  'date': summary.date.toIso8601String().split('T')[0],
+                  'steps': summary.steps,
+                })
+            .toList(),
         // Note: Weight and BMI data would need to be fetched separately from user profile
-        
+
         // Macro breakdown
         'macro_breakdown': {
           'carbs': _macroBreakdown.carbs,
@@ -840,22 +855,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           'fiber': _macroBreakdown.fiber,
           'sugar': _macroBreakdown.sugar,
         },
-        
+
         // Analysis period
         'period': _selectedPeriod,
-        
+
         // Additional metrics
         'total_days_analyzed': _dailySummaries.length,
-        'average_calories': _dailySummaries.isNotEmpty 
-            ? _dailySummaries.map((s) => s.caloriesConsumed).reduce((a, b) => a + b) / _dailySummaries.length
+        'average_calories': _dailySummaries.isNotEmpty
+            ? _dailySummaries
+                    .map((s) => s.caloriesConsumed)
+                    .reduce((a, b) => a + b) /
+                _dailySummaries.length
             : 0,
-        'average_steps': _dailySummaries.isNotEmpty 
-            ? _dailySummaries.map((s) => s.steps).reduce((a, b) => a + b) / _dailySummaries.length
+        'average_steps': _dailySummaries.isNotEmpty
+            ? _dailySummaries.map((s) => s.steps).reduce((a, b) => a + b) /
+                _dailySummaries.length
             : 0,
       };
 
       final insights = await AIService.getAnalyticsInsights(userData);
-      
+
       setState(() {
         _aiInsights = insights;
         _isGeneratingInsights = false;
@@ -1045,7 +1064,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimaryColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1123,9 +1143,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   Row(
                     children: [
                       // Live sync indicator
-                      if (_isGoogleFitConnected && _googleFitService.isLiveSyncing)
+                      if (_isGoogleFitConnected &&
+                          _googleFitService.isLiveSyncing)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.green.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(12),
@@ -1138,7 +1160,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                                 height: 12,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 1.5,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.green),
                                 ),
                               ),
                               SizedBox(width: 4),
@@ -1153,7 +1176,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                             ],
                           ),
                         ),
-                      if (_isGoogleFitConnected && _googleFitService.isLiveSyncing)
+                      if (_isGoogleFitConnected &&
+                          _googleFitService.isLiveSyncing)
                         const SizedBox(width: 8),
                       IconButton(
                         onPressed: _refreshData,
@@ -1217,38 +1241,49 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     if (_isLoading || _dailySummaries.isEmpty || _isGoogleFitLoading) {
       return _buildLoadingSummaryCards();
     }
-    
+
     // Calculate real-time data with Google Fit integration based on selected period
     int totalCalories = 0;
     int totalSteps = 0;
     int totalWorkouts = 0;
-    
+
     // Get data based on selected period
     switch (_selectedPeriod) {
       case 'Daily':
         // Use today's data from app data first
-        totalCalories = _dailySummaries.isNotEmpty ? _dailySummaries.last.caloriesConsumed : 0;
-        totalSteps = _dailySummaries.isNotEmpty ? _dailySummaries.last.steps : 0;
-        
+        totalCalories = _dailySummaries.isNotEmpty
+            ? _dailySummaries.last.caloriesConsumed
+            : 0;
+        totalSteps =
+            _dailySummaries.isNotEmpty ? _dailySummaries.last.steps : 0;
+
         // Use Google Fit data if available and higher (don't replace with lower values)
         if (_isGoogleFitConnected && _todayGoogleFitData != null) {
           final todayData = _todayGoogleFitData!;
-          if (todayData.caloriesBurned != null && todayData.caloriesBurned! > totalCalories) {
+          if (todayData.caloriesBurned != null &&
+              todayData.caloriesBurned! > totalCalories) {
             totalCalories = todayData.caloriesBurned!.round();
           }
           if (todayData.steps != null && todayData.steps! > totalSteps) {
             totalSteps = todayData.steps!;
           }
         }
-        
-        totalWorkouts = _dailySummaries.isNotEmpty && _dailySummaries.last.caloriesBurned > 0 ? 1 : 0;
+
+        totalWorkouts = _dailySummaries.isNotEmpty &&
+                _dailySummaries.last.caloriesBurned > 0
+            ? 1
+            : 0;
         break;
-        
+
       case 'Weekly':
         // Sum up last 7 days
-        totalCalories = _dailySummaries.take(7).fold(0, (sum, summary) => sum + summary.caloriesConsumed);
-        totalSteps = _dailySummaries.take(7).fold(0, (sum, summary) => sum + summary.steps);
-        
+        totalCalories = _dailySummaries
+            .take(7)
+            .fold(0, (sum, summary) => sum + summary.caloriesConsumed);
+        totalSteps = _dailySummaries
+            .take(7)
+            .fold(0, (sum, summary) => sum + summary.steps);
+
         // Use Google Fit weekly data if available (don't add to app data to avoid confusion)
         if (_isGoogleFitConnected && _weeklyGoogleFitData.isNotEmpty) {
           int fitCalories = 0;
@@ -1265,11 +1300,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           if (fitCalories > totalCalories) totalCalories = fitCalories;
           if (fitSteps > totalSteps) totalSteps = fitSteps;
         }
-        
-        totalWorkouts = _dailySummaries.take(7).where((summary) => summary.caloriesBurned > 0).length;
+
+        totalWorkouts = _dailySummaries
+            .take(7)
+            .where((summary) => summary.caloriesBurned > 0)
+            .length;
         break;
     }
-    
+
     // Calculate actual changes (no hardcoded demo values)
     final caloriesChange = _calculatePercentageChange('calories');
     final stepsChange = _calculatePercentageChange('steps');
@@ -1319,14 +1357,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   /// Format numbers with commas
   String _formatNumber(int number) {
     return number.toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]},',
-    );
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]},',
+        );
   }
 
   /// Calculate macro percentage
   int _calculateMacroPercentage(double value) {
-    final total = _macroBreakdown.carbs + _macroBreakdown.protein + _macroBreakdown.fat;
+    final total =
+        _macroBreakdown.carbs + _macroBreakdown.protein + _macroBreakdown.fat;
     if (total == 0) return 0;
     return ((value / total) * 100).round();
   }
@@ -1434,7 +1473,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     );
   }
 
-  Widget _buildSummaryCard(String title, String value, String unit, IconData icon, Color color, String change, Color changeColor) {
+  Widget _buildSummaryCard(String title, String value, String unit,
+      IconData icon, Color color, String change, Color changeColor) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
@@ -1458,9 +1498,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               ),
               Text(
                 change,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
                   color: changeColor,
                 ),
               ),
@@ -1501,8 +1541,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     );
   }
 
-
-
   Widget _buildMacroBreakdown() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1516,25 +1554,37 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         children: [
           const Text(
             'Macronutrient Breakdown',
-                style: TextStyle(
+            style: TextStyle(
               fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: kTextPrimary,
-                ),
+              fontWeight: FontWeight.w600,
+              color: kTextPrimary,
+            ),
           ),
           const SizedBox(height: 20),
           Row(
             children: [
               Expanded(
-                child: _buildMacroItem('Carbs', '${_macroBreakdown.carbs}g', '${_calculateMacroPercentage(_macroBreakdown.carbs)}%', kAccentColor),
+                child: _buildMacroItem(
+                    'Carbs',
+                    '${_macroBreakdown.carbs}g',
+                    '${_calculateMacroPercentage(_macroBreakdown.carbs)}%',
+                    kAccentColor),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildMacroItem('Protein', '${_macroBreakdown.protein}g', '${_calculateMacroPercentage(_macroBreakdown.protein)}%', kSecondaryColor),
+                child: _buildMacroItem(
+                    'Protein',
+                    '${_macroBreakdown.protein}g',
+                    '${_calculateMacroPercentage(_macroBreakdown.protein)}%',
+                    kSecondaryColor),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildMacroItem('Fat', '${_macroBreakdown.fat}g', '${_calculateMacroPercentage(_macroBreakdown.fat)}%', kInfoColor),
+                child: _buildMacroItem(
+                    'Fat',
+                    '${_macroBreakdown.fat}g',
+                    '${_calculateMacroPercentage(_macroBreakdown.fat)}%',
+                    kInfoColor),
               ),
             ],
           ),
@@ -1571,28 +1621,29 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     );
   }
 
-  Widget _buildMacroItem(String label, String value, String percentage, Color color) {
+  Widget _buildMacroItem(
+      String label, String value, String percentage, Color color) {
     return Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         children: [
-        Text(
-          value,
-          style: TextStyle(
+          Text(
+            value,
+            style: TextStyle(
               fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: color,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
           ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
               color: kTextPrimary,
             ),
           ),
@@ -1662,16 +1713,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         ),
       );
     }
-    
+
     // Calculate BMI from real user profile data only
     final bmi = _userWeight! / (_userHeight! * _userHeight!);
     final bmiCategory = _getBMICategory(bmi);
     final bmiColor = _getBMIColor(bmi);
-    
+
     // Debug logging
     print('BMI Debug - Weight: $_userWeight, Height: $_userHeight');
     print('BMI Debug - Calculated BMI: $bmi');
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
@@ -1708,13 +1759,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // BMI Value and Category
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [bmiColor.withValues(alpha: 0.1), bmiColor.withValues(alpha: 0.05)],
+                colors: [
+                  bmiColor.withValues(alpha: 0.1),
+                  bmiColor.withValues(alpha: 0.05)
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -1769,7 +1823,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                         ),
                       ] else ...[
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.orange.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(6),
@@ -1790,9 +1845,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               ],
             ),
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           // BMI Range Information
           Container(
             padding: const EdgeInsets.all(12),
@@ -1829,9 +1884,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               ],
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Health Recommendations
           Container(
             padding: const EdgeInsets.all(16),
@@ -1929,26 +1984,28 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     final hasRealData = _userWeight != null && _userHeight != null;
     final gender = _userGender ?? 'Unknown';
     final age = _userAge ?? 25;
-    
+
     String baseRecommendation;
     if (bmi < 18.5) {
-      baseRecommendation = 'Consider increasing your calorie intake with healthy foods and strength training to build muscle mass.';
+      baseRecommendation =
+          'Consider increasing your calorie intake with healthy foods and strength training to build muscle mass.';
     } else if (bmi < 25.0) {
-      baseRecommendation = 'Great job! Maintain your current healthy lifestyle with balanced nutrition and regular exercise.';
+      baseRecommendation =
+          'Great job! Maintain your current healthy lifestyle with balanced nutrition and regular exercise.';
     } else if (bmi < 30.0) {
-      baseRecommendation = 'Focus on creating a moderate calorie deficit through healthy eating and increased physical activity.';
+      baseRecommendation =
+          'Focus on creating a moderate calorie deficit through healthy eating and increased physical activity.';
     } else {
-      baseRecommendation = 'Consider consulting with a healthcare professional for a personalized weight management plan.';
+      baseRecommendation =
+          'Consider consulting with a healthcare professional for a personalized weight management plan.';
     }
-    
+
     if (hasRealData) {
       return '$baseRecommendation Based on your profile ($gender, $age years old), this recommendation is personalized for you.';
     } else {
       return '$baseRecommendation Update your profile in settings for more personalized recommendations.';
     }
   }
-
-
 
   Widget _buildAIInsights() {
     return Container(
@@ -1988,7 +2045,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               ),
               IconButton(
                 onPressed: _generateAIInsights,
-                icon: _isGeneratingInsights 
+                icon: _isGeneratingInsights
                     ? const SizedBox(
                         width: 20,
                         height: 20,
@@ -2000,7 +2057,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             ],
           ),
           const SizedBox(height: 16),
-          
           if (_aiInsights.isEmpty && !_isGeneratingInsights)
             _buildEmptyInsights()
           else if (_isGeneratingInsights)
@@ -2165,27 +2221,30 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             ],
           ),
           const SizedBox(height: 16),
-          
           if (_recommendations.isEmpty)
             _buildEmptyRecommendations()
           else
             ..._recommendations.map((recommendation) => Column(
-              children: [
-                _buildRecommendationItem(
-                  recommendation['title']?.toString() ?? 'Recommendation',
-                  recommendation['description']?.toString() ?? 'No description available',
-                  _getRecommendationIcon(recommendation['type']?.toString() ?? 'general'),
-                  _getRecommendationColor(recommendation['priority']?.toString() ?? 'medium'),
-                ),
-                const SizedBox(height: 8),
-              ],
-            )),
+                  children: [
+                    _buildRecommendationItem(
+                      recommendation['title']?.toString() ?? 'Recommendation',
+                      recommendation['description']?.toString() ??
+                          'No description available',
+                      _getRecommendationIcon(
+                          recommendation['type']?.toString() ?? 'general'),
+                      _getRecommendationColor(
+                          recommendation['priority']?.toString() ?? 'medium'),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                )),
         ],
       ),
     );
   }
 
-  Widget _buildRecommendationItem(String title, String description, IconData icon, Color color) {
+  Widget _buildRecommendationItem(
+      String title, String description, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -2222,25 +2281,23 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 2,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                description,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: kTextSecondary,
-                  height: 1.3,
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: kTextSecondary,
+                    height: 1.3,
+                  ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 3,
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
       ),
     );
   }
-
-
-} 
+}

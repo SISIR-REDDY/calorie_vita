@@ -87,4 +87,4 @@ const BoxDecoration kElevatedCardDecoration = BoxDecoration(
   color: kSurfaceColor,
   borderRadius: BorderRadius.all(Radius.circular(20)),
   boxShadow: kElevatedShadow,
-); 
+);

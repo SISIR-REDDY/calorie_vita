@@ -87,7 +87,7 @@ class FoodResultCard extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Content
           Padding(
             padding: const EdgeInsets.all(20),
@@ -99,7 +99,7 @@ class FoodResultCard extends StatelessWidget {
                   _buildMacrosSection(macros!),
                   const SizedBox(height: 20),
                 ],
-                
+
                 // Comment section
                 if (comment != null && comment!.isNotEmpty) ...[
                   Container(
@@ -135,7 +135,7 @@ class FoodResultCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
                 ],
-                
+
                 // Action buttons
                 Row(
                   children: [
@@ -147,7 +147,8 @@ class FoodResultCard extends StatelessWidget {
                           label: const Text('Retry'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: kPrimaryColor,
-                            side: const BorderSide(color: kPrimaryColor, width: 1.5),
+                            side: const BorderSide(
+                                color: kPrimaryColor, width: 1.5),
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -187,20 +188,24 @@ class FoodResultCard extends StatelessWidget {
 
   Widget _buildMacrosSection(Map<String, dynamic> macros) {
     final macroItems = <Widget>[];
-    
+
     if (macros.containsKey('protein')) {
-      macroItems.add(_buildMacroItem('Protein', macros['protein'], kSuccessColor, Icons.fitness_center));
+      macroItems.add(_buildMacroItem(
+          'Protein', macros['protein'], kSuccessColor, Icons.fitness_center));
     }
     if (macros.containsKey('carbs')) {
-      macroItems.add(_buildMacroItem('Carbs', macros['carbs'], kAccentColor, Icons.grain));
+      macroItems.add(
+          _buildMacroItem('Carbs', macros['carbs'], kAccentColor, Icons.grain));
     }
     if (macros.containsKey('fat')) {
-      macroItems.add(_buildMacroItem('Fat', macros['fat'], kWarningColor, Icons.water_drop));
+      macroItems.add(_buildMacroItem(
+          'Fat', macros['fat'], kWarningColor, Icons.water_drop));
     }
     if (macros.containsKey('fiber')) {
-      macroItems.add(_buildMacroItem('Fiber', macros['fiber'], kInfoColor, Icons.eco));
+      macroItems.add(
+          _buildMacroItem('Fiber', macros['fiber'], kInfoColor, Icons.eco));
     }
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -239,7 +244,8 @@ class FoodResultCard extends StatelessWidget {
     );
   }
 
-  Widget _buildMacroItem(String label, dynamic value, Color color, IconData icon) {
+  Widget _buildMacroItem(
+      String label, dynamic value, Color color, IconData icon) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -284,4 +290,4 @@ class FoodResultCard extends StatelessWidget {
       ),
     );
   }
-} 
+}

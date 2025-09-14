@@ -14,7 +14,8 @@ import '../services/error_handler.dart';
 
 /// Comprehensive real-time input service that handles all user inputs with Firestore integration
 class RealTimeInputService {
-  static final RealTimeInputService _instance = RealTimeInputService._internal();
+  static final RealTimeInputService _instance =
+      RealTimeInputService._internal();
   factory RealTimeInputService() => _instance;
   RealTimeInputService._internal();
 
@@ -25,10 +26,14 @@ class RealTimeInputService {
   final ErrorHandler _errorHandler = ErrorHandler();
 
   // Stream controllers for real-time updates
-  final StreamController<DailySummary> _dailySummaryController = StreamController<DailySummary>.broadcast();
-  final StreamController<UserProgress> _progressController = StreamController<UserProgress>.broadcast();
-  final StreamController<List<UserReward>> _rewardsController = StreamController<List<UserReward>>.broadcast();
-  final StreamController<String> _notificationController = StreamController<String>.broadcast();
+  final StreamController<DailySummary> _dailySummaryController =
+      StreamController<DailySummary>.broadcast();
+  final StreamController<UserProgress> _progressController =
+      StreamController<UserProgress>.broadcast();
+  final StreamController<List<UserReward>> _rewardsController =
+      StreamController<List<UserReward>>.broadcast();
+  final StreamController<String> _notificationController =
+      StreamController<String>.broadcast();
 
   // Getters for streams
   Stream<DailySummary> get dailySummaryStream => _dailySummaryController.stream;
@@ -59,13 +64,15 @@ class RealTimeInputService {
     _rewardsService.newRewardsStream.listen((rewards) {
       _rewardsController.add(rewards);
       if (rewards.isNotEmpty) {
-        _notificationController.add('🎉 New reward unlocked: ${rewards.first.title}');
+        _notificationController
+            .add('🎉 New reward unlocked: ${rewards.first.title}');
       }
     });
 
     // Listen to level up events
     _rewardsService.levelUpStream.listen((levelUp) {
-      _notificationController.add('🚀 Level up! You are now ${levelUp.newLevel.title}');
+      _notificationController
+          .add('🚀 Level up! You are now ${levelUp.newLevel.title}');
     });
   }
 
@@ -74,9 +81,9 @@ class RealTimeInputService {
     return _auth.currentUser?.uid;
   }
 
-
   /// Handle exercise input
-  Future<bool> handleExercise(BuildContext context, {
+  Future<bool> handleExercise(
+    BuildContext context, {
     required int caloriesBurned,
     required int durationMinutes,
     required String exerciseType,
@@ -88,8 +95,10 @@ class RealTimeInputService {
     }
 
     // Validate inputs
-    final caloriesValidation = InputValidationService.validateCaloriesBurned(caloriesBurned);
-    final durationValidation = InputValidationService.validateExerciseDuration(durationMinutes);
+    final caloriesValidation =
+        InputValidationService.validateCaloriesBurned(caloriesBurned);
+    final durationValidation =
+        InputValidationService.validateExerciseDuration(durationMinutes);
 
     if (!caloriesValidation.isValid) {
       InputValidationService.showValidationResult(context, caloriesValidation);
@@ -118,10 +127,12 @@ class RealTimeInputService {
 
       // Show warnings if any
       if (caloriesValidation.warningMessage != null) {
-        InputValidationService.showValidationResult(context, caloriesValidation);
+        InputValidationService.showValidationResult(
+            context, caloriesValidation);
       }
       if (durationValidation.warningMessage != null) {
-        InputValidationService.showValidationResult(context, durationValidation);
+        InputValidationService.showValidationResult(
+            context, durationValidation);
       }
 
       _showSuccess(context, 'Exercise logged: $exerciseType');
@@ -167,9 +178,9 @@ class RealTimeInputService {
     }
   }
 
-
   /// Handle weight input
-  Future<bool> handleWeight(BuildContext context, double weight, double bmi) async {
+  Future<bool> handleWeight(
+      BuildContext context, double weight, double bmi) async {
     final userId = getCurrentUserId();
     if (userId == null) {
       _showError(context, 'User not authenticated');
@@ -213,7 +224,8 @@ class RealTimeInputService {
   }
 
   /// Handle meal logging
-  Future<bool> handleMealLogging(BuildContext context, FoodEntry foodEntry) async {
+  Future<bool> handleMealLogging(
+      BuildContext context, FoodEntry foodEntry) async {
     final userId = getCurrentUserId();
     if (userId == null) {
       _showError(context, 'User not authenticated');
@@ -221,9 +233,12 @@ class RealTimeInputService {
     }
 
     // Validate food entry
-    final nameValidation = InputValidationService.validateFoodName(foodEntry.name);
-    final caloriesValidation = InputValidationService.validateCalories(foodEntry.calories);
-    final portionValidation = InputValidationService.validatePortionSize(1.0); // Default portion since FoodEntry doesn't have this property
+    final nameValidation =
+        InputValidationService.validateFoodName(foodEntry.name);
+    final caloriesValidation =
+        InputValidationService.validateCalories(foodEntry.calories);
+    final portionValidation = InputValidationService.validatePortionSize(
+        1.0); // Default portion since FoodEntry doesn't have this property
 
     if (!nameValidation.isValid) {
       InputValidationService.showValidationResult(context, nameValidation);
@@ -243,7 +258,7 @@ class RealTimeInputService {
     try {
       // Save food entry to Firestore
       await _firebaseService.saveFoodEntry(userId, foodEntry);
-      
+
       // Update daily summary
       await _dailySummaryService.onMealLogged(userId, foodEntry);
 
@@ -252,7 +267,8 @@ class RealTimeInputService {
         InputValidationService.showValidationResult(context, nameValidation);
       }
       if (caloriesValidation.warningMessage != null) {
-        InputValidationService.showValidationResult(context, caloriesValidation);
+        InputValidationService.showValidationResult(
+            context, caloriesValidation);
       }
       if (portionValidation.warningMessage != null) {
         InputValidationService.showValidationResult(context, portionValidation);
@@ -268,7 +284,8 @@ class RealTimeInputService {
   }
 
   /// Handle user goals update
-  Future<bool> handleUserGoalsUpdate(BuildContext context, UserGoals goals) async {
+  Future<bool> handleUserGoalsUpdate(
+      BuildContext context, UserGoals goals) async {
     final userId = getCurrentUserId();
     if (userId == null) {
       _showError(context, 'User not authenticated');
@@ -277,7 +294,8 @@ class RealTimeInputService {
 
     // Validate goals
     if (goals.calorieGoal != null) {
-      final validation = InputValidationService.validateCalorieGoal(goals.calorieGoal!);
+      final validation =
+          InputValidationService.validateCalorieGoal(goals.calorieGoal!);
       if (!validation.isValid) {
         InputValidationService.showValidationResult(context, validation);
         return false;
@@ -285,7 +303,8 @@ class RealTimeInputService {
     }
 
     if (goals.waterGlassesGoal != null) {
-      final validation = InputValidationService.validateWaterGoal(goals.waterGlassesGoal!);
+      final validation =
+          InputValidationService.validateWaterGoal(goals.waterGlassesGoal!);
       if (!validation.isValid) {
         InputValidationService.showValidationResult(context, validation);
         return false;
@@ -293,7 +312,8 @@ class RealTimeInputService {
     }
 
     if (goals.stepsPerDayGoal != null) {
-      final validation = InputValidationService.validateStepsGoal(goals.stepsPerDayGoal!);
+      final validation =
+          InputValidationService.validateStepsGoal(goals.stepsPerDayGoal!);
       if (!validation.isValid) {
         InputValidationService.showValidationResult(context, validation);
         return false;
@@ -316,7 +336,8 @@ class RealTimeInputService {
   }
 
   /// Handle user preferences update
-  Future<bool> handleUserPreferencesUpdate(BuildContext context, UserPreferences preferences) async {
+  Future<bool> handleUserPreferencesUpdate(
+      BuildContext context, UserPreferences preferences) async {
     final userId = getCurrentUserId();
     if (userId == null) {
       _showError(context, 'User not authenticated');
@@ -337,7 +358,8 @@ class RealTimeInputService {
   }
 
   /// Handle profile update
-  Future<bool> handleProfileUpdate(BuildContext context, Map<String, dynamic> profileData) async {
+  Future<bool> handleProfileUpdate(
+      BuildContext context, Map<String, dynamic> profileData) async {
     final userId = getCurrentUserId();
     if (userId == null) {
       _showError(context, 'User not authenticated');
@@ -354,7 +376,8 @@ class RealTimeInputService {
     }
 
     if (profileData['height'] != null) {
-      final validation = InputValidationService.validateHeight(profileData['height']);
+      final validation =
+          InputValidationService.validateHeight(profileData['height']);
       if (!validation.isValid) {
         InputValidationService.showValidationResult(context, validation);
         return false;
@@ -362,7 +385,8 @@ class RealTimeInputService {
     }
 
     if (profileData['weight'] != null) {
-      final validation = InputValidationService.validateWeight(profileData['weight']);
+      final validation =
+          InputValidationService.validateWeight(profileData['weight']);
       if (!validation.isValid) {
         InputValidationService.showValidationResult(context, validation);
         return false;
@@ -388,7 +412,8 @@ class RealTimeInputService {
   }
 
   /// Get historical daily summaries stream
-  Stream<List<DailySummary>> getHistoricalSummaries(String userId, {int days = 7}) {
+  Stream<List<DailySummary>> getHistoricalSummaries(String userId,
+      {int days = 7}) {
     return _firebaseService.getHistoricalDailySummaries(userId, days: days);
   }
 

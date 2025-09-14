@@ -19,7 +19,8 @@ class GoalsScreen extends StatefulWidget {
   State<GoalsScreen> createState() => _GoalsScreenState();
 }
 
-class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin {
+class _GoalsScreenState extends State<GoalsScreen>
+    with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -94,7 +95,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
 
   Future<void> _loadGoals() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
@@ -114,28 +115,38 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
   void _populateFields() {
     if (_currentGoals != null) {
       _weightController.text = _currentGoals!.weightGoal?.toString() ?? '';
-      _calorieController.text = _calorieUnitsService.formatCaloriesShort(_currentGoals!.calorieGoal?.toDouble() ?? 2000);
+      _calorieController.text = _calorieUnitsService
+          .formatCaloriesShort(_currentGoals!.calorieGoal?.toDouble() ?? 2000);
       _stepsController.text = _currentGoals!.stepsPerDayGoal?.toString() ?? '';
       _waterController.text = _currentGoals!.waterGlassesGoal?.toString() ?? '';
-      
+
       if (_currentGoals!.macroGoals != null) {
-        _carbsController.text = _calorieUnitsService.formatCaloriesShort(_currentGoals!.macroGoals!.carbsCalories?.toDouble() ?? 900);
-        _proteinController.text = _calorieUnitsService.formatCaloriesShort(_currentGoals!.macroGoals!.proteinCalories?.toDouble() ?? 500);
-        _fatController.text = _calorieUnitsService.formatCaloriesShort(_currentGoals!.macroGoals!.fatCalories?.toDouble() ?? 600);
+        _carbsController.text = _calorieUnitsService.formatCaloriesShort(
+            _currentGoals!.macroGoals!.carbsCalories?.toDouble() ?? 900);
+        _proteinController.text = _calorieUnitsService.formatCaloriesShort(
+            _currentGoals!.macroGoals!.proteinCalories?.toDouble() ?? 500);
+        _fatController.text = _calorieUnitsService.formatCaloriesShort(
+            _currentGoals!.macroGoals!.fatCalories?.toDouble() ?? 600);
       } else {
         // Set default values
-        _carbsController.text = _calorieUnitsService.formatCaloriesShort(MacroGoals.defaultMacros.carbsCalories?.toDouble() ?? 900);
-        _proteinController.text = _calorieUnitsService.formatCaloriesShort(MacroGoals.defaultMacros.proteinCalories?.toDouble() ?? 500);
-        _fatController.text = _calorieUnitsService.formatCaloriesShort(MacroGoals.defaultMacros.fatCalories?.toDouble() ?? 600);
+        _carbsController.text = _calorieUnitsService.formatCaloriesShort(
+            MacroGoals.defaultMacros.carbsCalories?.toDouble() ?? 900);
+        _proteinController.text = _calorieUnitsService.formatCaloriesShort(
+            MacroGoals.defaultMacros.proteinCalories?.toDouble() ?? 500);
+        _fatController.text = _calorieUnitsService.formatCaloriesShort(
+            MacroGoals.defaultMacros.fatCalories?.toDouble() ?? 600);
       }
     } else {
       // Set default values for new users
       _calorieController.text = _calorieUnitsService.formatCaloriesShort(2000);
       _stepsController.text = '10000';
       _waterController.text = '8';
-      _carbsController.text = _calorieUnitsService.formatCaloriesShort(MacroGoals.defaultMacros.carbsCalories?.toDouble() ?? 900);
-      _proteinController.text = _calorieUnitsService.formatCaloriesShort(MacroGoals.defaultMacros.proteinCalories?.toDouble() ?? 500);
-      _fatController.text = _calorieUnitsService.formatCaloriesShort(MacroGoals.defaultMacros.fatCalories?.toDouble() ?? 600);
+      _carbsController.text = _calorieUnitsService.formatCaloriesShort(
+          MacroGoals.defaultMacros.carbsCalories?.toDouble() ?? 900);
+      _proteinController.text = _calorieUnitsService.formatCaloriesShort(
+          MacroGoals.defaultMacros.proteinCalories?.toDouble() ?? 500);
+      _fatController.text = _calorieUnitsService.formatCaloriesShort(
+          MacroGoals.defaultMacros.fatCalories?.toDouble() ?? 600);
     }
   }
 
@@ -147,13 +158,21 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
       if (user != null) {
         final goals = UserGoals(
           weightGoal: double.tryParse(_weightController.text),
-          calorieGoal: _calorieUnitsService.convertToKcal(double.tryParse(_calorieController.text) ?? 2000).round(),
+          calorieGoal: _calorieUnitsService
+              .convertToKcal(double.tryParse(_calorieController.text) ?? 2000)
+              .round(),
           stepsPerDayGoal: int.tryParse(_stepsController.text),
           waterGlassesGoal: int.tryParse(_waterController.text),
           macroGoals: MacroGoals(
-            carbsCalories: _calorieUnitsService.convertToKcal(double.tryParse(_carbsController.text) ?? 900).round(),
-            proteinCalories: _calorieUnitsService.convertToKcal(double.tryParse(_proteinController.text) ?? 500).round(),
-            fatCalories: _calorieUnitsService.convertToKcal(double.tryParse(_fatController.text) ?? 600).round(),
+            carbsCalories: _calorieUnitsService
+                .convertToKcal(double.tryParse(_carbsController.text) ?? 900)
+                .round(),
+            proteinCalories: _calorieUnitsService
+                .convertToKcal(double.tryParse(_proteinController.text) ?? 500)
+                .round(),
+            fatCalories: _calorieUnitsService
+                .convertToKcal(double.tryParse(_fatController.text) ?? 600)
+                .round(),
           ),
           lastUpdated: DateTime.now(),
         );
@@ -163,15 +182,15 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
           context,
           goals,
         );
-        
+
         // Update AppStateService to ensure UI updates immediately
         final appStateService = AppStateService();
         await appStateService.updateUserGoals(goals);
-        
+
         // Force update to trigger immediate UI refresh
         appStateService.forceGoalsUpdate(goals);
         debugPrint('Goals force updated in AppStateService: ${goals.toMap()}');
-        
+
         // Force update the daily summary in Firebase with new goals
         try {
           await _firebaseService.updateUserGoalsInDailySummary(
@@ -179,31 +198,32 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
             goals,
           );
         } catch (e) {
-          debugPrint('Goals screen: Error updating daily summary in Firebase: $e');
+          debugPrint(
+              'Goals screen: Error updating daily summary in Firebase: $e');
         }
-        
+
         // Recalculate streaks and achievements based on new goals
         final analyticsService = AnalyticsService();
         await analyticsService.calculateStreaksAndAchievements();
-        
+
         // Force immediate UI update by triggering a global event
         debugPrint('Triggering global goals update...');
         _triggerGlobalGoalsUpdate(goals);
-        
+
         // Also emit via event bus for immediate notification
         GoalsEventBus().emitGoalsUpdate(goals);
         debugPrint('Goals update emitted via event bus');
-        
+
         // Notify via global callback for immediate UI update
         GlobalGoalsManager().notifyGoalsUpdate(goals);
         debugPrint('Goals update notified via global callback');
-        
+
         // Update simple goals notifier
         SimpleGoalsNotifier().updateGoals(goals);
         debugPrint('Goals updated in simple notifier');
-        
+
         debugPrint('Global goals update triggered');
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -269,15 +289,15 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                     children: [
                       _buildHeader(),
                       const SizedBox(height: 24),
-                                             _buildWeightGoalCard(),
-                       const SizedBox(height: 16),
-                       _buildCalorieGoalCard(),
-                       const SizedBox(height: 16),
-                       _buildStepsGoalCard(),
-                       const SizedBox(height: 16),
-                       _buildWaterGoalCard(),
-                       const SizedBox(height: 16),
-                       _buildMacroGoalsCard(),
+                      _buildWeightGoalCard(),
+                      const SizedBox(height: 16),
+                      _buildCalorieGoalCard(),
+                      const SizedBox(height: 16),
+                      _buildStepsGoalCard(),
+                      const SizedBox(height: 16),
+                      _buildWaterGoalCard(),
+                      const SizedBox(height: 16),
+                      _buildMacroGoalsCard(),
                       const SizedBox(height: 32),
                       _buildSaveButton(),
                       const SizedBox(height: 20),
@@ -479,7 +499,10 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [kPrimaryColor.withValues(alpha: 0.1), kAccentColor.withValues(alpha: 0.1)],
+                colors: [
+                  kPrimaryColor.withValues(alpha: 0.1),
+                  kAccentColor.withValues(alpha: 0.1)
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -493,7 +516,8 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                     color: kPrimaryColor.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.info_outline, color: kPrimaryColor, size: 16),
+                  child: const Icon(Icons.info_outline,
+                      color: kPrimaryColor, size: 16),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -523,7 +547,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
             ),
           ),
           const SizedBox(height: 20),
-          
+
           // Individual macro input fields
           _buildMacroField(
             controller: _carbsController,
@@ -533,7 +557,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
             description: 'Primary energy source',
           ),
           const SizedBox(height: 16),
-          
+
           _buildMacroField(
             controller: _proteinController,
             label: 'Protein',
@@ -542,7 +566,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
             description: 'Muscle building & repair',
           ),
           const SizedBox(height: 16),
-          
+
           _buildMacroField(
             controller: _fatController,
             label: 'Fat',
@@ -551,7 +575,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
             description: 'Essential nutrients & energy',
           ),
           const SizedBox(height: 20),
-          
+
           // Total calculation and recommendations
           Container(
             padding: const EdgeInsets.all(16),
@@ -573,7 +597,8 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                         color: kAccentColor.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.calculate, color: kAccentColor, size: 16),
+                      child: const Icon(Icons.calculate,
+                          color: kAccentColor, size: 16),
                     ),
                     const SizedBox(width: 12),
                     Text(
@@ -679,7 +704,10 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                       description,
                       style: GoogleFonts.poppins(
                         fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6),
                       ),
                     ),
                   ],
@@ -694,7 +722,8 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
             decoration: InputDecoration(
               hintText: 'Enter $label calories',
               suffixText: _calorieUnitsService.unitSuffix,
-              prefixIcon: Icon(Icons.local_fire_department, color: color, size: 20),
+              prefixIcon:
+                  Icon(Icons.local_fire_department, color: color, size: 20),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(color: color.withValues(alpha: 0.3)),
@@ -846,7 +875,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     // This ensures all listeners get the update immediately
     final appStateService = AppStateService();
     appStateService.forceGoalsUpdate(goals);
-    
+
     // Also try to directly notify the home screen if it's currently active
     _notifyHomeScreenDirectly(goals);
   }

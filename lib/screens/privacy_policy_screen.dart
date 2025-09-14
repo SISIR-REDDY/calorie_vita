@@ -34,7 +34,10 @@ class PrivacyPolicyScreen extends StatelessWidget {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [kAccentBlue.withOpacity(0.1), kAccentPurple.withOpacity(0.1)],
+                  colors: [
+                    kAccentBlue.withOpacity(0.1),
+                    kAccentPurple.withOpacity(0.1)
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),

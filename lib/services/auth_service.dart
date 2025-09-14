@@ -24,10 +24,10 @@ class AuthService {
     // Let Google Sign-In use the default configuration from google-services.json
   );
   final DemoAuthService _demoAuth = DemoAuthService();
-  final LocalStorageService _localStorage = LocalStorageService();
-  
-  final StreamController<AuthUser?> _userController = StreamController<AuthUser?>.broadcast();
-  
+
+  final StreamController<AuthUser?> _userController =
+      StreamController<AuthUser?>.broadcast();
+
   AuthUser? _currentUser;
   bool _isInitialized = false;
   bool _isFirebaseAvailable = false;
@@ -42,12 +42,12 @@ class AuthService {
   /// Initialize the authentication service
   Future<void> initialize() async {
     if (_isInitialized) return;
-    
+
     print('Auth service initialization started...');
     print('🔧 Google Sign-In configuration check...');
     print('🔧 Package name: com.sisirlabs.calorievita');
     print('🔧 SHA-1 fingerprint: fc8f2fd7b4c4072afe837b115676feaf70fc7cfd');
-    
+
     try {
       // Quick Firebase check with very short timeout
       _isFirebaseAvailable = await _checkFirebaseAvailability().timeout(
@@ -57,7 +57,7 @@ class AuthService {
           return false;
         },
       );
-      
+
       if (_isFirebaseAvailable) {
         print('Firebase is available, using Firebase authentication');
         await _initializeFirebaseAuth();
@@ -78,7 +78,7 @@ class AuthService {
         _isFirebaseAvailable = false;
       }
     }
-    
+
     // Additional check: if Firebase is marked as available but we get API key errors,
     // force demo mode
     if (_isFirebaseAvailable) {
@@ -86,7 +86,7 @@ class AuthService {
         // Test Firebase with a simple operation
         _firebaseAuth.currentUser;
       } catch (e) {
-        if (e.toString().contains('API key not valid') || 
+        if (e.toString().contains('API key not valid') ||
             e.toString().contains('invalid API key') ||
             e.toString().contains('internal error')) {
           print('Firebase API key error detected, switching to demo mode');
@@ -96,9 +96,10 @@ class AuthService {
         }
       }
     }
-    
+
     _isInitialized = true;
-    print('Auth service initialization completed. Firebase available: $_isFirebaseAvailable');
+    print(
+        'Auth service initialization completed. Firebase available: $_isFirebaseAvailable');
   }
 
   /// Check if Firebase is properly configured and available
@@ -112,7 +113,7 @@ class AuthService {
     } catch (e) {
       print('Firebase not available: $e');
       // Check if it's an API key error
-      if (e.toString().contains('API key not valid') || 
+      if (e.toString().contains('API key not valid') ||
           e.toString().contains('invalid API key') ||
           e.toString().contains('internal error')) {
         print('Firebase API key invalid, forcing demo mode');
@@ -131,7 +132,7 @@ class AuthService {
       _userController.add(_currentUser);
       print('Firebase current user found: ${currentUser.email}');
     }
-    
+
     _firebaseAuth.authStateChanges().listen((User? user) {
       if (user != null) {
         _currentUser = AuthUser.fromFirebaseUser(user);
@@ -154,7 +155,7 @@ class AuthService {
       _userController.add(_currentUser);
       print('Demo current user found: ${currentDemoUser.email}');
     }
-    
+
     _demoAuth.userStream.listen((DemoUser? user) {
       if (user != null) {
         _currentUser = AuthUser.fromDemoUser(user);
@@ -169,17 +170,18 @@ class AuthService {
   }
 
   /// Sign in with email and password
-  Future<AuthUser?> signInWithEmailAndPassword(String email, String password) async {
+  Future<AuthUser?> signInWithEmailAndPassword(
+      String email, String password) async {
     try {
       print('Attempting sign in with email: $email');
-      
+
       if (_isFirebaseAvailable) {
         print('Using Firebase authentication');
         final credential = await _firebaseAuth.signInWithEmailAndPassword(
           email: email,
           password: password,
         );
-        
+
         if (credential.user != null) {
           _currentUser = AuthUser.fromFirebaseUser(credential.user!);
           _userController.add(_currentUser);
@@ -188,7 +190,8 @@ class AuthService {
         }
       } else {
         print('Using demo authentication');
-        final demoUser = await _demoAuth.signInWithEmailAndPassword(email, password);
+        final demoUser =
+            await _demoAuth.signInWithEmailAndPassword(email, password);
         if (demoUser != null) {
           _currentUser = AuthUser.fromDemoUser(demoUser);
           _userController.add(_currentUser);
@@ -200,34 +203,38 @@ class AuthService {
       return null;
     } catch (e) {
       print('Sign in error: $e');
-      
+
       // Check for Firebase API key errors and switch to demo mode
-      if (e.toString().contains('API key not valid') || 
+      if (e.toString().contains('API key not valid') ||
           e.toString().contains('invalid API key') ||
           e.toString().contains('internal error')) {
         print('Firebase API key error detected, switching to demo mode');
         _isFirebaseAvailable = false;
         // Retry with demo auth
         try {
-          final demoUser = await _demoAuth.signInWithEmailAndPassword(email, password);
+          final demoUser =
+              await _demoAuth.signInWithEmailAndPassword(email, password);
           if (demoUser != null) {
             _currentUser = AuthUser.fromDemoUser(demoUser);
             _userController.add(_currentUser);
-            print('Demo sign in successful after Firebase error: ${_currentUser!.email}');
+            print(
+                'Demo sign in successful after Firebase error: ${_currentUser!.email}');
             return _currentUser;
           }
         } catch (demoError) {
           print('Demo auth also failed: $demoError');
         }
       }
-      
+
       // Provide more specific error messages
       if (e.toString().contains('user-not-found')) {
-        throw Exception('No account found with this email address. Please create an account first.');
+        throw Exception(
+            'No account found with this email address. Please create an account first.');
       } else if (e.toString().contains('wrong-password')) {
         throw Exception('Incorrect password. Please try again.');
       } else if (e.toString().contains('invalid-email')) {
-        throw Exception('Invalid email address. Please check your email format.');
+        throw Exception(
+            'Invalid email address. Please check your email format.');
       } else if (e.toString().contains('too-many-requests')) {
         throw Exception('Too many failed attempts. Please try again later.');
       } else {
@@ -237,17 +244,18 @@ class AuthService {
   }
 
   /// Create user with email and password
-  Future<AuthUser?> createUserWithEmailAndPassword(String email, String password) async {
+  Future<AuthUser?> createUserWithEmailAndPassword(
+      String email, String password) async {
     try {
       print('Attempting to create user with email: $email');
-      
+
       if (_isFirebaseAvailable) {
         print('Using Firebase authentication for user creation');
         final credential = await _firebaseAuth.createUserWithEmailAndPassword(
           email: email,
           password: password,
         );
-        
+
         if (credential.user != null) {
           _currentUser = AuthUser.fromFirebaseUser(credential.user!);
           _userController.add(_currentUser);
@@ -256,7 +264,8 @@ class AuthService {
         }
       } else {
         print('Using demo authentication for user creation');
-        final demoUser = await _demoAuth.createUserWithEmailAndPassword(email, password);
+        final demoUser =
+            await _demoAuth.createUserWithEmailAndPassword(email, password);
         if (demoUser != null) {
           _currentUser = AuthUser.fromDemoUser(demoUser);
           _userController.add(_currentUser);
@@ -268,34 +277,39 @@ class AuthService {
       return null;
     } catch (e) {
       print('User creation error: $e');
-      
+
       // Check for Firebase API key errors and switch to demo mode
-      if (e.toString().contains('API key not valid') || 
+      if (e.toString().contains('API key not valid') ||
           e.toString().contains('invalid API key') ||
           e.toString().contains('internal error')) {
         print('Firebase API key error detected, switching to demo mode');
         _isFirebaseAvailable = false;
         // Retry with demo auth
         try {
-          final demoUser = await _demoAuth.createUserWithEmailAndPassword(email, password);
+          final demoUser =
+              await _demoAuth.createUserWithEmailAndPassword(email, password);
           if (demoUser != null) {
             _currentUser = AuthUser.fromDemoUser(demoUser);
             _userController.add(_currentUser);
-            print('Demo user creation successful after Firebase error: ${_currentUser!.email}');
+            print(
+                'Demo user creation successful after Firebase error: ${_currentUser!.email}');
             return _currentUser;
           }
         } catch (demoError) {
           print('Demo auth also failed: $demoError');
         }
       }
-      
+
       // Provide more specific error messages
       if (e.toString().contains('email-already-in-use')) {
-        throw Exception('An account with this email already exists. Please sign in instead.');
+        throw Exception(
+            'An account with this email already exists. Please sign in instead.');
       } else if (e.toString().contains('weak-password')) {
-        throw Exception('Password is too weak. Please choose a stronger password.');
+        throw Exception(
+            'Password is too weak. Please choose a stronger password.');
       } else if (e.toString().contains('invalid-email')) {
-        throw Exception('Invalid email address. Please check your email format.');
+        throw Exception(
+            'Invalid email address. Please check your email format.');
       } else {
         throw Exception('Account creation failed: ${e.toString()}');
       }
@@ -312,7 +326,7 @@ class AuthService {
       } else {
         await _demoAuth.signOut();
       }
-      
+
       _currentUser = null;
       _userController.add(null);
       print('User signed out');
@@ -346,10 +360,10 @@ class AuthService {
       print('🔧 Google Sign-In scopes: ${_googleSignIn.scopes}');
       print('🔧 Package name: com.sisirlabs.calorievita');
       print('🔧 SHA-1 fingerprint: fc8f2fd7b4c4072afe837b115676feaf70fc7cfd');
-      
+
       if (_isFirebaseAvailable) {
         print('🔧 Using Firebase for Google sign in');
-        
+
         // Sign out first to ensure clean state
         try {
           await _googleSignIn.signOut();
@@ -357,11 +371,11 @@ class AuthService {
         } catch (e) {
           print('⚠️ Sign out failed (this is normal if not signed in): $e');
         }
-        
+
         // Trigger the authentication flow
         print('🔧 Starting Google Sign-In flow...');
         final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-        
+
         if (googleUser == null) {
           print('❌ Google sign in cancelled by user');
           return null;
@@ -370,11 +384,12 @@ class AuthService {
         print('✅ Google user obtained: ${googleUser.email}');
         print('🔧 User ID: ${googleUser.id}');
         print('🔧 Display name: ${googleUser.displayName}');
-        
+
         // Obtain the auth details from the request
         print('🔧 Getting Google authentication details...');
-        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-        
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
+
         print('🔧 Access token available: ${googleAuth.accessToken != null}');
         print('🔧 ID token available: ${googleAuth.idToken != null}');
 
@@ -387,8 +402,9 @@ class AuthService {
 
         // Sign in to Firebase with the Google credential
         print('🔧 Signing in to Firebase with Google credential...');
-        final UserCredential userCredential = await _firebaseAuth.signInWithCredential(credential);
-        
+        final UserCredential userCredential =
+            await _firebaseAuth.signInWithCredential(credential);
+
         if (userCredential.user != null) {
           _currentUser = AuthUser.fromFirebaseUser(userCredential.user!);
           _userController.add(_currentUser);
@@ -416,18 +432,21 @@ class AuthService {
       print('❌ Google sign in error: $e');
       print('❌ Error type: ${e.runtimeType}');
       print('❌ Error details: ${e.toString()}');
-      
+
       // Check for specific Google Sign-In errors
       if (e.toString().contains('ApiException: 10')) {
-        throw Exception('Google Sign-In configuration error. Please check your Firebase Console setup and SHA-1 fingerprint.');
+        throw Exception(
+            'Google Sign-In configuration error. Please check your Firebase Console setup and SHA-1 fingerprint.');
       } else if (e.toString().contains('ApiException: 7')) {
-        throw Exception('Network error. Please check your internet connection and try again.');
+        throw Exception(
+            'Network error. Please check your internet connection and try again.');
       } else if (e.toString().contains('ApiException: 12500')) {
         throw Exception('Google Sign-In was cancelled by user.');
       } else if (e.toString().contains('ApiException: 8')) {
         throw Exception('Google Sign-In internal error. Please try again.');
       } else if (e.toString().contains('network_error')) {
-        throw Exception('Network error. Please check your internet connection and try again.');
+        throw Exception(
+            'Network error. Please check your internet connection and try again.');
       } else if (e.toString().contains('sign_in_failed')) {
         throw Exception('Google sign in failed. Please try again.');
       } else if (e.toString().contains('sign_in_canceled')) {
@@ -449,11 +468,13 @@ class AuthService {
           phoneNumber: phoneNumber,
           verificationCompleted: (PhoneAuthCredential credential) async {
             // Auto-verification completed
-            final userCredential = await _firebaseAuth.signInWithCredential(credential);
+            final userCredential =
+                await _firebaseAuth.signInWithCredential(credential);
             if (userCredential.user != null) {
               _currentUser = AuthUser.fromFirebaseUser(userCredential.user!);
               _userController.add(_currentUser);
-              print('Phone verification completed automatically: ${_currentUser!.email}');
+              print(
+                  'Phone verification completed automatically: ${_currentUser!.email}');
             }
           },
           verificationFailed: (FirebaseAuthException e) {
@@ -486,7 +507,8 @@ class AuthService {
     try {
       if (_isFirebaseAvailable) {
         if (_verificationId == null) {
-          throw Exception('No verification ID found. Please request OTP first.');
+          throw Exception(
+              'No verification ID found. Please request OTP first.');
         }
 
         print('Verifying OTP: $otp');
@@ -495,8 +517,9 @@ class AuthService {
           smsCode: otp,
         );
 
-        final userCredential = await _firebaseAuth.signInWithCredential(credential);
-        
+        final userCredential =
+            await _firebaseAuth.signInWithCredential(credential);
+
         if (userCredential.user != null) {
           _currentUser = AuthUser.fromFirebaseUser(userCredential.user!);
           _userController.add(_currentUser);
@@ -534,7 +557,8 @@ class AuthService {
       if (_isFirebaseAvailable) {
         // For now, we'll simulate Facebook sign-in
         // In a real app, you would integrate with Facebook SDK
-        throw UnsupportedError('Facebook sign-in not implemented yet. Please use Google or Email sign-in.');
+        throw UnsupportedError(
+            'Facebook sign-in not implemented yet. Please use Google or Email sign-in.');
       } else {
         // Demo mode - create a demo Facebook user
         final demoUser = await _demoAuth.createDemoUser(
@@ -556,13 +580,13 @@ class AuthService {
 
   /// Get authentication method being used
   String get authMethod => _isFirebaseAvailable ? 'Firebase' : 'Demo';
-  
+
   /// Force demo mode for testing (useful when Firebase is not configured)
   void forceDemoMode() {
     _isFirebaseAvailable = false;
     print('Forced demo mode - Firebase disabled');
   }
-  
+
   /// Check if we're in demo mode and show appropriate message
   String get authModeMessage {
     if (_isFirebaseAvailable) {
@@ -571,7 +595,7 @@ class AuthService {
       return 'Using Demo Mode - Firebase not configured';
     }
   }
-  
+
   /// Get detailed status message for debugging
   String get detailedStatus {
     if (_isFirebaseAvailable) {

@@ -113,7 +113,7 @@ class UserAchievement {
       points: json['points'] ?? 0,
       type: AchievementType.values[json['type'] ?? 0],
       isUnlocked: json['isUnlocked'] ?? false,
-      unlockedAt: json['unlockedAt'] != null 
+      unlockedAt: json['unlockedAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(json['unlockedAt'])
           : null,
       requirements: Map<String, dynamic>.from(json['requirements'] ?? {}),
@@ -252,7 +252,8 @@ class Achievements {
   /// Get achievement by ID
   static UserAchievement? getById(String id) {
     try {
-      return defaultAchievements.firstWhere((achievement) => achievement.id == id);
+      return defaultAchievements
+          .firstWhere((achievement) => achievement.id == id);
     } catch (e) {
       return null;
     }
@@ -260,12 +261,17 @@ class Achievements {
 
   /// Get achievements by type
   static List<UserAchievement> getByType(AchievementType type) {
-    return defaultAchievements.where((achievement) => achievement.type == type).toList();
+    return defaultAchievements
+        .where((achievement) => achievement.type == type)
+        .toList();
   }
 
   /// Get unlocked achievements
-  static List<UserAchievement> getUnlocked(List<UserAchievement> userAchievements) {
-    return userAchievements.where((achievement) => achievement.isUnlocked).toList();
+  static List<UserAchievement> getUnlocked(
+      List<UserAchievement> userAchievements) {
+    return userAchievements
+        .where((achievement) => achievement.isUnlocked)
+        .toList();
   }
 
   /// Get total points from unlocked achievements

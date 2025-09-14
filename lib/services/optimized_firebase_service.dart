@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../models/food_entry.dart';
 import '../models/daily_summary.dart';
@@ -9,25 +8,25 @@ import '../models/macro_breakdown.dart';
 
 /// Optimized Firebase service with caching, offline support, and performance improvements
 class OptimizedFirebaseService {
-  static final OptimizedFirebaseService _instance = OptimizedFirebaseService._internal();
+  static final OptimizedFirebaseService _instance =
+      OptimizedFirebaseService._internal();
   factory OptimizedFirebaseService() => _instance;
   OptimizedFirebaseService._internal();
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
   final Connectivity _connectivity = Connectivity();
-  
+
   // Cache management
   final Map<String, dynamic> _cache = {};
   final Map<String, DateTime> _cacheTimestamps = {};
   static const Duration _cacheExpiry = Duration(minutes: 5);
   static const int _maxCacheSize = 100;
-  
+
   // Offline support
   bool _isOffline = false;
   final List<Map<String, dynamic>> _pendingWrites = [];
-  
+
   // Performance monitoring
   final Map<String, int> _operationCounts = {};
   final Map<String, Duration> _operationTimes = {};
@@ -40,19 +39,20 @@ class OptimizedFirebaseService {
         persistenceEnabled: true,
         cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
       );
-      
+
       // Monitor connectivity
-      _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
+      _connectivity.onConnectivityChanged
+          .listen((List<ConnectivityResult> results) {
         _isOffline = results.contains(ConnectivityResult.none);
         if (!_isOffline && _pendingWrites.isNotEmpty) {
           _processPendingWrites();
         }
       });
-      
+
       // Check initial connectivity
       final connectivityResults = await _connectivity.checkConnectivity();
       _isOffline = connectivityResults.contains(ConnectivityResult.none);
-      
+
       print('OptimizedFirebaseService initialized. Offline: $_isOffline');
     } catch (e) {
       print('Error initializing OptimizedFirebaseService: $e');
@@ -81,18 +81,20 @@ class OptimizedFirebaseService {
   }
 
   /// Optimized method to get user food entries with caching and pagination
-  Stream<List<FoodEntry>> getUserFoodEntries(String userId, {int limit = 20, DocumentSnapshot? lastDocument}) {
+  Stream<List<FoodEntry>> getUserFoodEntries(String userId,
+      {int limit = 20, DocumentSnapshot? lastDocument}) {
     if (!isAvailable) {
       return Stream.value([]);
     }
 
     final cacheKey = 'user_food_entries_$userId';
-    
+
     // Return cached data if available and not expired
     if (_isCacheValid(cacheKey)) {
       final cachedData = _cache[cacheKey] as List<dynamic>?;
       if (cachedData != null) {
-        final entries = cachedData.map((data) => FoodEntry.fromJson(data)).toList();
+        final entries =
+            cachedData.map((data) => FoodEntry.fromJson(data)).toList();
         return Stream.value(entries);
       }
     }
@@ -110,11 +112,12 @@ class OptimizedFirebaseService {
       }
 
       return query.snapshots().map((snapshot) {
-        final entries = snapshot.docs.map((doc) => FoodEntry.fromFirestore(doc)).toList();
-        
+        final entries =
+            snapshot.docs.map((doc) => FoodEntry.fromFirestore(doc)).toList();
+
         // Cache the results
         _cacheData(cacheKey, entries.map((e) => e.toMap()).toList());
-        
+
         return entries;
       }).handleError((error) {
         print('Error getting user food entries: $error');
@@ -141,7 +144,8 @@ class OptimizedFirebaseService {
     if (_isCacheValid(cacheKey)) {
       final cachedData = _cache[cacheKey] as List<dynamic>?;
       if (cachedData != null) {
-        final entries = cachedData.map((data) => FoodEntry.fromJson(data)).toList();
+        final entries =
+            cachedData.map((data) => FoodEntry.fromJson(data)).toList();
         return Stream.value(entries);
       }
     }
@@ -151,16 +155,18 @@ class OptimizedFirebaseService {
           .collection('users')
           .doc(userId)
           .collection('entries')
-          .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+          .where('timestamp',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
           .where('timestamp', isLessThan: Timestamp.fromDate(endOfDay))
           .orderBy('timestamp', descending: true)
           .snapshots()
           .map((snapshot) {
-        final entries = snapshot.docs.map((doc) => FoodEntry.fromFirestore(doc)).toList();
-        
+        final entries =
+            snapshot.docs.map((doc) => FoodEntry.fromFirestore(doc)).toList();
+
         // Cache the results
         _cacheData(cacheKey, entries.map((e) => e.toMap()).toList());
-        
+
         return entries;
       }).handleError((error) {
         print('Error getting today food entries: $error');
@@ -208,7 +214,7 @@ class OptimizedFirebaseService {
       // Invalidate related caches
       _invalidateCache('user_food_entries_$userId');
       _invalidateCache('today_food_entries_$userId');
-      
+
       print('Food entry saved successfully');
     } catch (e) {
       print('Error saving food entry: $e');
@@ -253,7 +259,7 @@ class OptimizedFirebaseService {
       // Invalidate related caches
       _invalidateCache('user_food_entries_$userId');
       _invalidateCache('today_food_entries_$userId');
-      
+
       print('Food entry deleted successfully');
     } catch (e) {
       print('Error deleting food entry: $e');
@@ -268,7 +274,7 @@ class OptimizedFirebaseService {
     }
 
     final cacheKey = 'user_profile_$userId';
-    
+
     // Return cached data if available and not expired
     if (_isCacheValid(cacheKey)) {
       return _cache[cacheKey] as Map<String, dynamic>? ?? {};
@@ -281,12 +287,14 @@ class OptimizedFirebaseService {
           .collection('profile')
           .doc('userData')
           .get();
-      
-      final data = doc.exists ? Map<String, dynamic>.from(doc.data() ?? {}) : <String, dynamic>{};
-      
+
+      final data = doc.exists
+          ? Map<String, dynamic>.from(doc.data() ?? {})
+          : <String, dynamic>{};
+
       // Cache the result
       _cacheData(cacheKey, data);
-      
+
       return data;
     } catch (e) {
       print('Error fetching user profile: $e');
@@ -295,7 +303,8 @@ class OptimizedFirebaseService {
   }
 
   /// Save user profile with caching
-  Future<void> saveUserProfile(String userId, Map<String, dynamic> profileData) async {
+  Future<void> saveUserProfile(
+      String userId, Map<String, dynamic> profileData) async {
     if (!isAvailable) {
       print('Firebase not available, cannot save user profile');
       return;
@@ -323,7 +332,7 @@ class OptimizedFirebaseService {
 
       // Update cache
       _cacheData('user_profile_$userId', profileData);
-      
+
       print('User profile saved successfully');
     } catch (e) {
       print('Error saving user profile: $e');
@@ -332,7 +341,8 @@ class OptimizedFirebaseService {
   }
 
   /// Get trainer chat history with pagination and caching
-  Stream<List<Map<String, dynamic>>> getTrainerChatHistory(String userId, {int limit = 50}) {
+  Stream<List<Map<String, dynamic>>> getTrainerChatHistory(String userId,
+      {int limit = 50}) {
     if (!isAvailable) {
       return Stream.value([]);
     }
@@ -367,7 +377,8 @@ class OptimizedFirebaseService {
   }
 
   /// Save trainer chat message with session tracking
-  Future<void> saveTrainerChatMessage(String userId, Map<String, dynamic> messageData) async {
+  Future<void> saveTrainerChatMessage(
+      String userId, Map<String, dynamic> messageData) async {
     if (!isAvailable) {
       print('Firebase not available, cannot save chat message');
       return;
@@ -387,7 +398,7 @@ class OptimizedFirebaseService {
       }
 
       final sessionId = messageData['sessionId'] ?? 'default';
-      
+
       // Save the message
       await _firestore
           .collection('users')
@@ -396,7 +407,8 @@ class OptimizedFirebaseService {
           .add({
         'sender': messageData['sender'],
         'text': messageData['text'],
-        'timestamp': Timestamp.fromDate(messageData['timestamp'] ?? DateTime.now()),
+        'timestamp':
+            Timestamp.fromDate(messageData['timestamp'] ?? DateTime.now()),
         'sessionId': sessionId,
       });
 
@@ -406,7 +418,7 @@ class OptimizedFirebaseService {
         final title = _generateSessionTitle(messageText);
         await saveChatSession(userId, sessionId, title, messageText);
       }
-      
+
       print('Chat message saved successfully');
     } catch (e) {
       print('Error saving chat message: $e');
@@ -415,7 +427,8 @@ class OptimizedFirebaseService {
   }
 
   /// Save chat session metadata
-  Future<void> saveChatSession(String userId, String sessionId, String title, String lastMessage) async {
+  Future<void> saveChatSession(
+      String userId, String sessionId, String title, String lastMessage) async {
     try {
       await _firestore
           .collection('users')
@@ -434,13 +447,14 @@ class OptimizedFirebaseService {
   }
 
   /// Get daily summaries for analytics with caching
-  Future<List<DailySummary>> getDailySummaries(String userId, {int days = 7}) async {
+  Future<List<DailySummary>> getDailySummaries(String userId,
+      {int days = 7}) async {
     if (!isAvailable) {
       return [];
     }
 
     final cacheKey = 'daily_summaries_${userId}_$days';
-    
+
     // Return cached data if available and not expired
     if (_isCacheValid(cacheKey)) {
       final cachedData = _cache[cacheKey] as List<dynamic>?;
@@ -452,12 +466,13 @@ class OptimizedFirebaseService {
     try {
       final endDate = DateTime.now();
       final startDate = endDate.subtract(Duration(days: days - 1));
-      
+
       final entries = await _firestore
           .collection('users')
           .doc(userId)
           .collection('entries')
-          .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+          .where('timestamp',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
           .where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
           .orderBy('timestamp', descending: false)
           .get();
@@ -466,7 +481,8 @@ class OptimizedFirebaseService {
       final Map<String, List<FoodEntry>> entriesByDate = {};
       for (final doc in entries.docs) {
         final entry = FoodEntry.fromFirestore(doc);
-        final dateKey = '${entry.timestamp.year}-${entry.timestamp.month}-${entry.timestamp.day}';
+        final dateKey =
+            '${entry.timestamp.year}-${entry.timestamp.month}-${entry.timestamp.day}';
         entriesByDate.putIfAbsent(dateKey, () => []).add(entry);
       }
 
@@ -475,12 +491,9 @@ class OptimizedFirebaseService {
         final date = startDate.add(Duration(days: i));
         final dateKey = '${date.year}-${date.month}-${date.day}';
         final dayEntries = entriesByDate[dateKey] ?? [];
-        
-        final caloriesConsumed = dayEntries.fold(0, (sum, entry) => sum + entry.calories);
-        final macros = dayEntries.fold<MacroBreakdown>(
-          MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0),
-          (MacroBreakdown sum, FoodEntry entry) => sum + entry.macroBreakdown,
-        );
+
+        final caloriesConsumed =
+            dayEntries.fold(0, (sum, entry) => sum + entry.calories);
 
         summaries.add(DailySummary(
           caloriesConsumed: caloriesConsumed,
@@ -509,7 +522,7 @@ class OptimizedFirebaseService {
     if (_pendingWrites.isEmpty) return;
 
     print('Processing ${_pendingWrites.length} pending writes...');
-    
+
     final writesToProcess = List<Map<String, dynamic>>.from(_pendingWrites);
     _pendingWrites.clear();
 
@@ -517,7 +530,8 @@ class OptimizedFirebaseService {
       try {
         switch (write['type']) {
           case 'save_food_entry':
-            await saveFoodEntry(write['userId'], FoodEntry.fromJson(write['data']));
+            await saveFoodEntry(
+                write['userId'], FoodEntry.fromJson(write['data']));
             break;
           case 'delete_food_entry':
             await deleteFoodEntry(write['userId'], write['entryId']);
@@ -541,7 +555,7 @@ class OptimizedFirebaseService {
   void _cacheData(String key, dynamic data) {
     _cache[key] = data;
     _cacheTimestamps[key] = DateTime.now();
-    
+
     // Clean up old cache entries if we exceed max size
     if (_cache.length > _maxCacheSize) {
       final oldestKey = _cacheTimestamps.entries
@@ -561,14 +575,6 @@ class OptimizedFirebaseService {
   void _invalidateCache(String key) {
     _cache.remove(key);
     _cacheTimestamps.remove(key);
-  }
-
-  void _invalidateCachePattern(String pattern) {
-    final keysToRemove = _cache.keys.where((key) => key.contains(pattern)).toList();
-    for (final key in keysToRemove) {
-      _cache.remove(key);
-      _cacheTimestamps.remove(key);
-    }
   }
 
   /// Generate a session title from the first user message

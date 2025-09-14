@@ -10,7 +10,7 @@ import '../models/user_preferences.dart';
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  
+
   /// Check if Firebase is available and properly configured
   bool get isAvailable {
     try {
@@ -28,7 +28,7 @@ class FirebaseService {
     if (!isAvailable) {
       return Stream.value([]);
     }
-    
+
     return _firestore
         .collection('users')
         .doc(userId)
@@ -53,7 +53,8 @@ class FirebaseService {
         .collection('users')
         .doc(userId)
         .collection('entries')
-        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .where('timestamp',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
         .where('timestamp', isLessThan: Timestamp.fromDate(endOfDay))
         .orderBy('timestamp', descending: true)
         .snapshots()
@@ -66,13 +67,15 @@ class FirebaseService {
   Stream<List<FoodEntry>> getWeeklyFoodEntries(String userId) {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    final startOfWeekDay = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+    final startOfWeekDay =
+        DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
 
     return _firestore
         .collection('users')
         .doc(userId)
         .collection('entries')
-        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeekDay))
+        .where('timestamp',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeekDay))
         .orderBy('timestamp', descending: true)
         .snapshots()
         .map((snapshot) {
@@ -108,7 +111,7 @@ class FirebaseService {
           .collection('profile')
           .doc('userData')
           .get();
-      
+
       if (doc.exists) {
         return doc.data() ?? {};
       }
@@ -120,7 +123,8 @@ class FirebaseService {
   }
 
   // Save user profile data
-  Future<void> saveUserProfile(String userId, Map<String, dynamic> profileData) async {
+  Future<void> saveUserProfile(
+      String userId, Map<String, dynamic> profileData) async {
     try {
       await _firestore
           .collection('users')
@@ -158,7 +162,8 @@ class FirebaseService {
   }
 
   // Get recent chat sessions (last 5 sessions)
-  Future<List<Map<String, dynamic>>> getRecentChatSessions(String userId) async {
+  Future<List<Map<String, dynamic>>> getRecentChatSessions(
+      String userId) async {
     try {
       final sessionsSnapshot = await _firestore
           .collection('users')
@@ -174,7 +179,8 @@ class FirebaseService {
           'sessionId': doc.id,
           'title': data['title'] ?? 'Chat Session',
           'lastMessage': data['lastMessage'] ?? '',
-          'lastMessageTime': data['lastMessageTime']?.toDate() ?? DateTime.now(),
+          'lastMessageTime':
+              data['lastMessageTime']?.toDate() ?? DateTime.now(),
           'messageCount': data['messageCount'] ?? 0,
         };
       }).toList();
@@ -185,7 +191,8 @@ class FirebaseService {
   }
 
   // Save chat session metadata
-  Future<void> saveChatSession(String userId, String sessionId, String title, String lastMessage) async {
+  Future<void> saveChatSession(
+      String userId, String sessionId, String title, String lastMessage) async {
     try {
       await _firestore
           .collection('users')
@@ -204,10 +211,11 @@ class FirebaseService {
   }
 
   // Save trainer chat message with session tracking
-  Future<void> saveTrainerChatMessage(String userId, Map<String, dynamic> messageData) async {
+  Future<void> saveTrainerChatMessage(
+      String userId, Map<String, dynamic> messageData) async {
     try {
       final sessionId = messageData['sessionId'] ?? 'default';
-      
+
       // Save the message
       await _firestore
           .collection('users')
@@ -216,7 +224,8 @@ class FirebaseService {
           .add({
         'sender': messageData['sender'],
         'text': messageData['text'],
-        'timestamp': Timestamp.fromDate(messageData['timestamp'] ?? DateTime.now()),
+        'timestamp':
+            Timestamp.fromDate(messageData['timestamp'] ?? DateTime.now()),
         'sessionId': sessionId,
       });
 
@@ -249,22 +258,22 @@ class FirebaseService {
           .doc(userId)
           .collection('trainerChats')
           .get();
-      
+
       for (final doc in chatDocs.docs) {
         batch.delete(doc.reference);
       }
-      
+
       // Also clear chat sessions
       final sessionDocs = await _firestore
           .collection('users')
           .doc(userId)
           .collection('chatSessions')
           .get();
-      
+
       for (final doc in sessionDocs.docs) {
         batch.delete(doc.reference);
       }
-      
+
       await batch.commit();
     } catch (e) {
       print('Error clearing chat history: $e');
@@ -285,13 +294,14 @@ class FirebaseService {
 
       // Keep only the last 50 messages (roughly 5 conversations)
       if (allMessages.docs.length > 50) {
-        final messagesToDelete = allMessages.docs.take(allMessages.docs.length - 50);
+        final messagesToDelete =
+            allMessages.docs.take(allMessages.docs.length - 50);
         final batch = _firestore.batch();
-        
+
         for (final doc in messagesToDelete) {
           batch.delete(doc.reference);
         }
-        
+
         await batch.commit();
         print('Cleaned up ${messagesToDelete.length} old chat messages');
       }
@@ -307,11 +317,11 @@ class FirebaseService {
       if (allSessions.docs.length > 5) {
         final sessionsToDelete = allSessions.docs.skip(5);
         final batch = _firestore.batch();
-        
+
         for (final doc in sessionsToDelete) {
           batch.delete(doc.reference);
         }
-        
+
         await batch.commit();
         print('Cleaned up ${sessionsToDelete.length} old chat sessions');
       }
@@ -323,16 +333,18 @@ class FirebaseService {
   // ========== ANALYTICS METHODS ==========
 
   // Get daily summaries for analytics
-  Future<List<DailySummary>> getDailySummaries(String userId, {int days = 7}) async {
+  Future<List<DailySummary>> getDailySummaries(String userId,
+      {int days = 7}) async {
     try {
       final endDate = DateTime.now();
       final startDate = endDate.subtract(Duration(days: days - 1));
-      
+
       final entries = await _firestore
           .collection('users')
           .doc(userId)
           .collection('entries')
-          .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+          .where('timestamp',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
           .where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
           .orderBy('timestamp', descending: false)
           .get();
@@ -341,7 +353,8 @@ class FirebaseService {
       final Map<String, List<FoodEntry>> entriesByDate = {};
       for (final doc in entries.docs) {
         final entry = FoodEntry.fromFirestore(doc);
-        final dateKey = '${entry.timestamp.year}-${entry.timestamp.month}-${entry.timestamp.day}';
+        final dateKey =
+            '${entry.timestamp.year}-${entry.timestamp.month}-${entry.timestamp.day}';
         entriesByDate.putIfAbsent(dateKey, () => []).add(entry);
       }
 
@@ -350,12 +363,9 @@ class FirebaseService {
         final date = startDate.add(Duration(days: i));
         final dateKey = '${date.year}-${date.month}-${date.day}';
         final dayEntries = entriesByDate[dateKey] ?? [];
-        
-        final caloriesConsumed = dayEntries.fold(0, (sum, entry) => sum + entry.calories);
-        final macros = dayEntries.fold<MacroBreakdown>(
-          MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0),
-          (MacroBreakdown sum, FoodEntry entry) => sum + entry.macroBreakdown,
-        );
+
+        final caloriesConsumed =
+            dayEntries.fold(0, (sum, entry) => sum + entry.calories);
 
         summaries.add(DailySummary(
           caloriesConsumed: caloriesConsumed,
@@ -377,22 +387,25 @@ class FirebaseService {
   }
 
   // Get macro breakdown for a specific period
-  Future<MacroBreakdown> getMacroBreakdown(String userId, {int days = 7}) async {
+  Future<MacroBreakdown> getMacroBreakdown(String userId,
+      {int days = 7}) async {
     try {
       final endDate = DateTime.now();
       final startDate = endDate.subtract(Duration(days: days - 1));
-      
+
       final entries = await _firestore
           .collection('users')
           .doc(userId)
           .collection('entries')
-          .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+          .where('timestamp',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
           .where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
           .get();
 
       return entries.docs.fold<MacroBreakdown>(
         MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0),
-        (MacroBreakdown sum, QueryDocumentSnapshot doc) => sum + FoodEntry.fromFirestore(doc).macroBreakdown,
+        (MacroBreakdown sum, QueryDocumentSnapshot doc) =>
+            sum + FoodEntry.fromFirestore(doc).macroBreakdown,
       );
     } catch (e) {
       print('Error fetching macro breakdown: $e');
@@ -413,14 +426,14 @@ class FirebaseService {
       if (doc.exists) {
         final data = doc.data() ?? {};
         final achievements = <UserAchievement>[];
-        
+
         for (final achievementData in data['achievements'] ?? []) {
           achievements.add(UserAchievement.fromJson(achievementData));
         }
-        
+
         return achievements;
       }
-      
+
       // Return default achievements if none exist
       return Achievements.defaultAchievements;
     } catch (e) {
@@ -430,7 +443,8 @@ class FirebaseService {
   }
 
   // Save user achievement
-  Future<void> saveUserAchievement(String userId, UserAchievement achievement) async {
+  Future<void> saveUserAchievement(
+      String userId, UserAchievement achievement) async {
     try {
       final docRef = _firestore
           .collection('users')
@@ -440,14 +454,16 @@ class FirebaseService {
 
       final doc = await docRef.get();
       final achievements = <Map<String, dynamic>>[];
-      
+
       if (doc.exists) {
         final data = doc.data() ?? {};
-        achievements.addAll((data['achievements'] ?? []).cast<Map<String, dynamic>>());
+        achievements
+            .addAll((data['achievements'] ?? []).cast<Map<String, dynamic>>());
       }
 
       // Update or add the achievement
-      final existingIndex = achievements.indexWhere((a) => a['id'] == achievement.id);
+      final existingIndex =
+          achievements.indexWhere((a) => a['id'] == achievement.id);
       if (existingIndex >= 0) {
         achievements[existingIndex] = achievement.toJson();
       } else {
@@ -462,11 +478,12 @@ class FirebaseService {
   }
 
   // Get weight history
-  Future<List<Map<String, dynamic>>> getWeightHistory(String userId, {int days = 30}) async {
+  Future<List<Map<String, dynamic>>> getWeightHistory(String userId,
+      {int days = 30}) async {
     try {
       final endDate = DateTime.now();
       final startDate = endDate.subtract(Duration(days: days - 1));
-      
+
       final entries = await _firestore
           .collection('users')
           .doc(userId)
@@ -515,41 +532,48 @@ class FirebaseService {
       // For now, return mock insights based on data patterns
       final dailySummaries = await getDailySummaries(userId, days: 14);
       final currentMacros = await getMacroBreakdown(userId, days: 7);
-      
+
       final insights = <Map<String, dynamic>>[];
-      
+
       // Analyze calorie trends
       if (dailySummaries.length >= 7) {
-        final thisWeek = dailySummaries.take(7).fold(0, (sum, day) => sum + day.caloriesConsumed);
-        final lastWeek = dailySummaries.skip(7).fold(0, (sum, day) => sum + day.caloriesConsumed);
-        
+        final thisWeek = dailySummaries
+            .take(7)
+            .fold(0, (sum, day) => sum + day.caloriesConsumed);
+        final lastWeek = dailySummaries
+            .skip(7)
+            .fold(0, (sum, day) => sum + day.caloriesConsumed);
+
         if (thisWeek > lastWeek * 1.1) {
           insights.add({
             'type': 'calorie_increase',
             'title': '📈 Calorie Increase',
-            'message': 'You consumed ${((thisWeek - lastWeek) / lastWeek * 100).toStringAsFixed(0)}% more calories this week compared to last week.',
+            'message':
+                'You consumed ${((thisWeek - lastWeek) / lastWeek * 100).toStringAsFixed(0)}% more calories this week compared to last week.',
             'color': 'warning',
           });
         } else if (thisWeek < lastWeek * 0.9) {
           insights.add({
             'type': 'calorie_decrease',
             'title': '📉 Calorie Decrease',
-            'message': 'You consumed ${((lastWeek - thisWeek) / lastWeek * 100).toStringAsFixed(0)}% fewer calories this week compared to last week.',
+            'message':
+                'You consumed ${((lastWeek - thisWeek) / lastWeek * 100).toStringAsFixed(0)}% fewer calories this week compared to last week.',
             'color': 'info',
           });
         }
       }
-      
+
       // Analyze macro balance
       if (!currentMacros.isWithinRecommended) {
         insights.add({
           'type': 'macro_imbalance',
           'title': '⚖️ Macro Imbalance',
-          'message': 'Your macro distribution needs adjustment. Consider consulting with a nutritionist.',
+          'message':
+              'Your macro distribution needs adjustment. Consider consulting with a nutritionist.',
           'color': 'warning',
         });
       }
-      
+
       return insights;
     } catch (e) {
       print('Error generating analytics insights: $e');
@@ -558,29 +582,31 @@ class FirebaseService {
   }
 
   // Get personalized recommendations
-  Future<List<Map<String, dynamic>>> getPersonalizedRecommendations(String userId) async {
+  Future<List<Map<String, dynamic>>> getPersonalizedRecommendations(
+      String userId) async {
     try {
-      final profile = await getUserProfile(userId);
       final todayCalories = await getTodayCalories(userId).first;
       final recommendations = <Map<String, dynamic>>[];
-      
+
       // Calorie-based recommendations
       if (todayCalories < 1500) {
         recommendations.add({
           'title': 'Increase calorie intake',
-          'description': 'You\'re below your minimum daily calorie needs. Consider adding healthy snacks.',
+          'description':
+              'You\'re below your minimum daily calorie needs. Consider adding healthy snacks.',
           'icon': '🍎',
           'color': 'info',
         });
       } else if (todayCalories > 2500) {
         recommendations.add({
           'title': 'Take a 20-minute walk',
-          'description': 'Balance today\'s calorie surplus with light activity.',
+          'description':
+              'Balance today\'s calorie surplus with light activity.',
           'icon': '🚶',
           'color': 'info',
         });
       }
-      
+
       // Water recommendations
       recommendations.add({
         'title': 'Drink more water',
@@ -588,7 +614,7 @@ class FirebaseService {
         'icon': '💧',
         'color': 'info',
       });
-      
+
       // Protein recommendations
       recommendations.add({
         'title': 'Increase protein intake',
@@ -596,7 +622,7 @@ class FirebaseService {
         'icon': '💪',
         'color': 'success',
       });
-      
+
       return recommendations;
     } catch (e) {
       print('Error generating personalized recommendations: $e');
@@ -673,7 +699,8 @@ class FirebaseService {
     }
   }
 
-  Future<void> saveUserPreferences(String userId, UserPreferences preferences) async {
+  Future<void> saveUserPreferences(
+      String userId, UserPreferences preferences) async {
     try {
       await _firestore
           .collection('users')
@@ -723,7 +750,7 @@ class FirebaseService {
       print('Firebase not available, cannot save food entry');
       return;
     }
-    
+
     try {
       await _firestore
           .collection('users')
@@ -780,9 +807,9 @@ class FirebaseService {
     });
   }
 
-
   /// Update exercise data in daily summary
-  Future<void> updateExercise(String userId, {
+  Future<void> updateExercise(
+    String userId, {
     required int caloriesBurned,
     required int durationMinutes,
     required String exerciseType,
@@ -842,7 +869,6 @@ class FirebaseService {
     }
   }
 
-
   /// Update weight in daily summary
   Future<void> updateWeight(String userId, double weight, double bmi) async {
     try {
@@ -875,7 +901,8 @@ class FirebaseService {
   }
 
   /// Update user goals in daily summary
-  Future<void> updateUserGoalsInDailySummary(String userId, UserGoals goals) async {
+  Future<void> updateUserGoalsInDailySummary(
+      String userId, UserGoals goals) async {
     try {
       final today = DateTime.now();
       final dateKey = _getDateKey(today);
@@ -902,7 +929,8 @@ class FirebaseService {
   }
 
   /// Get historical daily summaries
-  Stream<List<DailySummary>> getHistoricalDailySummaries(String userId, {int days = 7}) {
+  Stream<List<DailySummary>> getHistoricalDailySummaries(String userId,
+      {int days = 7}) {
     final endDate = DateTime.now();
     final startDate = endDate.subtract(Duration(days: days - 1));
 
@@ -915,7 +943,9 @@ class FirebaseService {
         .orderBy('date', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => DailySummary.fromMap(doc.data())).toList();
+      return snapshot.docs
+          .map((doc) => DailySummary.fromMap(doc.data()))
+          .toList();
     }).handleError((error) {
       print('Error getting historical daily summaries: $error');
       return <DailySummary>[];
@@ -926,4 +956,4 @@ class FirebaseService {
   String _getDateKey(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
-} 
+}

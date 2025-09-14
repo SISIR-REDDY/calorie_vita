@@ -5,27 +5,29 @@ import '../services/reward_notification_service.dart';
 /// Widget to display reward notifications with animations
 class RewardNotificationWidget extends StatefulWidget {
   final Widget child;
-  
+
   const RewardNotificationWidget({
     super.key,
     required this.child,
   });
 
   @override
-  State<RewardNotificationWidget> createState() => _RewardNotificationWidgetState();
+  State<RewardNotificationWidget> createState() =>
+      _RewardNotificationWidgetState();
 }
 
 class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
     with TickerProviderStateMixin {
-  final RewardNotificationService _notificationService = RewardNotificationService();
-  
+  final RewardNotificationService _notificationService =
+      RewardNotificationService();
+
   final List<RewardNotification> _notifications = [];
   final List<LevelUpNotification> _levelUpNotifications = [];
-  
+
   late AnimationController _slideController;
   late AnimationController _scaleController;
   late AnimationController _levelUpController;
-  
+
   late Animation<Offset> _slideAnimation;
   late Animation<double> _scaleAnimation;
   late Animation<double> _levelUpScaleAnimation;
@@ -33,22 +35,22 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
   @override
   void initState() {
     super.initState();
-    
+
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     _scaleController = AnimationController(
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
-    
+
     _levelUpController = AnimationController(
       duration: const Duration(milliseconds: 500),
       vsync: this,
     );
-    
+
     _slideAnimation = Tween<Offset>(
       begin: const Offset(1.0, 0.0),
       end: Offset.zero,
@@ -56,7 +58,7 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
       parent: _slideController,
       curve: Curves.easeOutBack,
     ));
-    
+
     _scaleAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -64,7 +66,7 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
       parent: _scaleController,
       curve: Curves.elasticOut,
     ));
-    
+
     _levelUpScaleAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -72,7 +74,7 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
       parent: _levelUpController,
       curve: Curves.elasticOut,
     ));
-    
+
     _setupNotificationListeners();
   }
 
@@ -83,7 +85,7 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
       });
       _showNotification();
     });
-    
+
     _notificationService.levelUpStream.listen((levelUpNotification) {
       setState(() {
         _levelUpNotifications.add(levelUpNotification);
@@ -95,14 +97,14 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
   void _showNotification() async {
     _slideController.forward();
     _scaleController.forward();
-    
+
     await Future.delayed(const Duration(seconds: 3));
-    
+
     _slideController.reverse();
     _scaleController.reverse();
-    
+
     await Future.delayed(const Duration(milliseconds: 300));
-    
+
     if (mounted && _notifications.isNotEmpty) {
       setState(() {
         _notifications.removeAt(0);
@@ -112,13 +114,13 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
 
   void _showLevelUpNotification() async {
     _levelUpController.forward();
-    
+
     await Future.delayed(const Duration(seconds: 4));
-    
+
     _levelUpController.reverse();
-    
+
     await Future.delayed(const Duration(milliseconds: 500));
-    
+
     if (mounted && _levelUpNotifications.isNotEmpty) {
       setState(() {
         _levelUpNotifications.removeAt(0);
@@ -139,7 +141,7 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
     return Stack(
       children: [
         widget.child,
-        
+
         // Reward notifications
         if (_notifications.isNotEmpty)
           Positioned(
@@ -159,7 +161,7 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
               },
             ),
           ),
-        
+
         // Level up notifications
         if (_levelUpNotifications.isNotEmpty)
           Center(
@@ -180,7 +182,7 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
 
   Widget _buildRewardNotification(RewardNotification notification) {
     final reward = notification.reward;
-    
+
     return Container(
       width: 300,
       padding: const EdgeInsets.all(16),
@@ -220,7 +222,7 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
             ),
           ),
           const SizedBox(width: 12),
-          
+
           // Reward details
           Expanded(
             child: Column(
@@ -254,7 +256,8 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
                 ),
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
@@ -307,7 +310,7 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
             style: TextStyle(fontSize: 48),
           ),
           const SizedBox(height: 16),
-          
+
           // Level up text
           const Text(
             'LEVEL UP!',
@@ -319,7 +322,7 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
             ),
           ),
           const SizedBox(height: 8),
-          
+
           // Old level
           Text(
             notification.oldLevel.title,
@@ -328,14 +331,14 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
               fontSize: 16,
             ),
           ),
-          
+
           // Arrow
           const Icon(
             Icons.keyboard_arrow_down,
             color: Colors.white,
             size: 24,
           ),
-          
+
           // New level
           Text(
             notification.newLevel.title,
@@ -346,14 +349,14 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
             ),
           ),
           const SizedBox(height: 8),
-          
+
           // New level emoji
           Text(
             notification.newLevel.emoji,
             style: const TextStyle(fontSize: 32),
           ),
           const SizedBox(height: 16),
-          
+
           // Total XP
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

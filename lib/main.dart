@@ -10,34 +10,34 @@ import 'services/error_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize performance monitoring first
   final performanceMonitor = PerformanceMonitor();
   await performanceMonitor.initialize();
   performanceMonitor.startTimer('app_startup');
-  
+
   // Initialize network service
   final networkService = NetworkService();
   await networkService.initialize();
-  
+
   // Initialize error handler
   final errorHandler = ErrorHandler();
   await errorHandler.initialize();
-  
+
   // Initialize Firebase with basic configuration
   bool firebaseInitialized = false;
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    
+
     // Initialize Firebase services
     await _initializeFirebaseServices();
-    
+
     firebaseInitialized = true;
     print('✅ Firebase initialized successfully');
     performanceMonitor.logEvent('firebase_initialized', {'success': true});
-    
+
     // Update error handler with Firebase availability
     await errorHandler.initialize(firebaseAvailable: true);
   } catch (e) {
@@ -56,13 +56,13 @@ void main() async {
       errorHandler.handleFirebaseError('initialization', e);
     }
   }
-  
+
   performanceMonitor.stopTimer('app_startup');
-  
+
   // Log startup performance
   final startupDuration = performanceMonitor.getOperationStats('app_startup');
   print('App startup completed in ${startupDuration['average_ms']}ms');
-  
+
   runApp(MainApp(firebaseInitialized: firebaseInitialized));
 }
 
@@ -73,10 +73,10 @@ Future<void> _initializeFirebaseServices() async {
     FlutterError.onError = (errorDetails) {
       FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
     };
-    
+
     // Initialize Analytics
     await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
-    
+
     print('Firebase services initialized successfully');
   } catch (e) {
     print('Error initializing Firebase services: $e');

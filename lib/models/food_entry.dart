@@ -78,7 +78,8 @@ class FoodEntry {
       id: json['id'] ?? '',
       name: json['name'] ?? '',
       calories: json['calories'] ?? 0,
-      timestamp: DateTime.fromMillisecondsSinceEpoch(json['timestamp'] ?? DateTime.now().millisecondsSinceEpoch),
+      timestamp: DateTime.fromMillisecondsSinceEpoch(
+          json['timestamp'] ?? DateTime.now().millisecondsSinceEpoch),
       imageUrl: json['imageUrl'],
       protein: (json['protein'] ?? 0.0).toDouble(),
       carbs: (json['carbs'] ?? 0.0).toDouble(),
@@ -98,4 +99,4 @@ class FoodEntry {
       sugar: sugar ?? 0.0,
     );
   }
-} 
+}

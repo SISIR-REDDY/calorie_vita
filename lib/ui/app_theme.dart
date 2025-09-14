@@ -173,7 +173,8 @@ class AppTheme {
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: kPrimaryColor, width: 2),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
         appBarTheme: AppBarTheme(
           backgroundColor: Colors.transparent,
@@ -202,7 +203,8 @@ class AppTheme {
           seedColor: kPrimaryColor,
           brightness: Brightness.dark,
         ),
-        textTheme: GoogleFonts.interTextTheme(ThemeData(brightness: Brightness.dark).textTheme),
+        textTheme: GoogleFonts.interTextTheme(
+            ThemeData(brightness: Brightness.dark).textTheme),
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF0F172A),
         cardTheme: CardThemeData(
@@ -275,7 +277,8 @@ class AppTheme {
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: kPrimaryColor, width: 2),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
         appBarTheme: AppBarTheme(
           backgroundColor: Colors.transparent,
@@ -297,4 +300,4 @@ class AppTheme {
           elevation: 8,
         ),
       );
-} 
+}

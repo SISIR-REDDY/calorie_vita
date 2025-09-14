@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 /// Comprehensive input validation service for all user inputs
 class InputValidationService {
-  static final InputValidationService _instance = InputValidationService._internal();
+  static final InputValidationService _instance =
+      InputValidationService._internal();
   factory InputValidationService() => _instance;
   InputValidationService._internal();
 
@@ -15,7 +16,7 @@ class InputValidationService {
         suggestion: 'Please enter a positive number',
       );
     }
-    
+
     if (glasses > 50) {
       return const ValidationResult(
         isValid: false,
@@ -23,15 +24,16 @@ class InputValidationService {
         suggestion: 'Please enter a realistic number (max 50 glasses)',
       );
     }
-    
+
     if (glasses > 20) {
       return const ValidationResult(
         isValid: true,
-        warningMessage: 'That\'s a lot of water! Make sure you\'re not overhydrating',
+        warningMessage:
+            'That\'s a lot of water! Make sure you\'re not overhydrating',
         suggestion: 'Consider consulting a doctor if this is your daily intake',
       );
     }
-    
+
     return const ValidationResult(isValid: true);
   }
 
@@ -44,7 +46,7 @@ class InputValidationService {
         suggestion: 'Please enter a positive number',
       );
     }
-    
+
     if (calories > 10000) {
       return const ValidationResult(
         isValid: false,
@@ -52,15 +54,16 @@ class InputValidationService {
         suggestion: 'Please enter a realistic number (max 10,000 calories)',
       );
     }
-    
+
     if (calories > 5000) {
       return const ValidationResult(
         isValid: true,
         warningMessage: 'Very high calorie intake detected',
-        suggestion: 'Consider consulting a nutritionist if this is your daily intake',
+        suggestion:
+            'Consider consulting a nutritionist if this is your daily intake',
       );
     }
-    
+
     return const ValidationResult(isValid: true);
   }
 
@@ -73,7 +76,7 @@ class InputValidationService {
         suggestion: 'Please enter a positive number',
       );
     }
-    
+
     if (calories > 5000) {
       return const ValidationResult(
         isValid: false,
@@ -81,7 +84,7 @@ class InputValidationService {
         suggestion: 'Please enter a realistic number (max 5,000 calories)',
       );
     }
-    
+
     if (calories > 2000) {
       return const ValidationResult(
         isValid: true,
@@ -89,7 +92,7 @@ class InputValidationService {
         suggestion: 'Make sure this is accurate for your activity level',
       );
     }
-    
+
     return const ValidationResult(isValid: true);
   }
 
@@ -102,7 +105,7 @@ class InputValidationService {
         suggestion: 'Please enter a positive number',
       );
     }
-    
+
     if (steps > 100000) {
       return const ValidationResult(
         isValid: false,
@@ -110,7 +113,7 @@ class InputValidationService {
         suggestion: 'Please enter a realistic number (max 100,000 steps)',
       );
     }
-    
+
     if (steps > 50000) {
       return const ValidationResult(
         isValid: true,
@@ -118,7 +121,7 @@ class InputValidationService {
         suggestion: 'Make sure this is accurate for your activity level',
       );
     }
-    
+
     return const ValidationResult(isValid: true);
   }
 
@@ -131,7 +134,7 @@ class InputValidationService {
         suggestion: 'Please enter a positive number',
       );
     }
-    
+
     if (hours > 24) {
       return const ValidationResult(
         isValid: false,
@@ -139,7 +142,7 @@ class InputValidationService {
         suggestion: 'Please enter a realistic number (max 24 hours)',
       );
     }
-    
+
     if (hours < 3) {
       return const ValidationResult(
         isValid: true,
@@ -147,15 +150,16 @@ class InputValidationService {
         suggestion: 'Consider getting more sleep for better health',
       );
     }
-    
+
     if (hours > 12) {
       return const ValidationResult(
         isValid: true,
         warningMessage: 'Very long sleep detected',
-        suggestion: 'Consider consulting a doctor if you sleep this much regularly',
+        suggestion:
+            'Consider consulting a doctor if you sleep this much regularly',
       );
     }
-    
+
     return const ValidationResult(isValid: true);
   }
 
@@ -168,7 +172,7 @@ class InputValidationService {
         suggestion: 'Please enter a valid weight',
       );
     }
-    
+
     if (weight < 20) {
       return const ValidationResult(
         isValid: false,
@@ -176,7 +180,7 @@ class InputValidationService {
         suggestion: 'Please enter a realistic weight (min 20 kg)',
       );
     }
-    
+
     if (weight > 500) {
       return const ValidationResult(
         isValid: false,
@@ -184,7 +188,7 @@ class InputValidationService {
         suggestion: 'Please enter a realistic weight (max 500 kg)',
       );
     }
-    
+
     if (weight < 30 || weight > 200) {
       return const ValidationResult(
         isValid: true,
@@ -192,7 +196,7 @@ class InputValidationService {
         suggestion: 'Please verify this is your current weight',
       );
     }
-    
+
     return const ValidationResult(isValid: true);
   }
 
@@ -205,7 +209,7 @@ class InputValidationService {
         suggestion: 'Please enter a valid BMI',
       );
     }
-    
+
     if (bmi < 10) {
       return const ValidationResult(
         isValid: false,
@@ -213,7 +217,7 @@ class InputValidationService {
         suggestion: 'Please enter a realistic BMI (min 10)',
       );
     }
-    
+
     if (bmi > 100) {
       return const ValidationResult(
         isValid: false,
@@ -221,7 +225,7 @@ class InputValidationService {
         suggestion: 'Please enter a realistic BMI (max 100)',
       );
     }
-    
+
     if (bmi < 15 || bmi > 50) {
       return const ValidationResult(
         isValid: true,
@@ -229,7 +233,7 @@ class InputValidationService {
         suggestion: 'Consider consulting a healthcare professional',
       );
     }
-    
+
     return const ValidationResult(isValid: true);
   }
 
@@ -242,7 +246,7 @@ class InputValidationService {
         suggestion: 'Please enter a positive number',
       );
     }
-    
+
     if (minutes > 480) {
       return const ValidationResult(
         isValid: false,
@@ -250,7 +254,7 @@ class InputValidationService {
         suggestion: 'Please enter a realistic duration (max 8 hours)',
       );
     }
-    
+
     if (minutes > 240) {
       return const ValidationResult(
         isValid: true,
@@ -258,7 +262,7 @@ class InputValidationService {
         suggestion: 'Make sure you\'re taking adequate rest',
       );
     }
-    
+
     return const ValidationResult(isValid: true);
   }
 
@@ -271,7 +275,7 @@ class InputValidationService {
         suggestion: 'Please enter a food name',
       );
     }
-    
+
     if (name.trim().length < 2) {
       return const ValidationResult(
         isValid: false,
@@ -279,7 +283,7 @@ class InputValidationService {
         suggestion: 'Please enter a more descriptive name',
       );
     }
-    
+
     if (name.trim().length > 100) {
       return const ValidationResult(
         isValid: false,
@@ -287,7 +291,7 @@ class InputValidationService {
         suggestion: 'Please enter a shorter name (max 100 characters)',
       );
     }
-    
+
     // Check for suspicious characters
     if (RegExp(r'[<>{}[\]\\|`~!@#$%^&*()+=]').hasMatch(name)) {
       return const ValidationResult(
@@ -296,7 +300,7 @@ class InputValidationService {
         suggestion: 'Please use standard letters and numbers',
       );
     }
-    
+
     return const ValidationResult(isValid: true);
   }
 
@@ -309,7 +313,7 @@ class InputValidationService {
         suggestion: 'Please enter a valid portion size',
       );
     }
-    
+
     if (portion > 1000) {
       return const ValidationResult(
         isValid: false,
@@ -317,7 +321,7 @@ class InputValidationService {
         suggestion: 'Please enter a realistic portion (max 1000 units)',
       );
     }
-    
+
     if (portion > 100) {
       return const ValidationResult(
         isValid: true,
@@ -325,7 +329,7 @@ class InputValidationService {
         suggestion: 'Please verify this is the correct portion size',
       );
     }
-    
+
     return const ValidationResult(isValid: true);
   }
 
@@ -338,7 +342,7 @@ class InputValidationService {
         suggestion: 'Please enter a valid age',
       );
     }
-    
+
     if (age < 13) {
       return const ValidationResult(
         isValid: false,
@@ -346,7 +350,7 @@ class InputValidationService {
         suggestion: 'This app is for users 13 and older',
       );
     }
-    
+
     if (age > 120) {
       return const ValidationResult(
         isValid: false,
@@ -354,7 +358,7 @@ class InputValidationService {
         suggestion: 'Please enter a realistic age (max 120)',
       );
     }
-    
+
     if (age > 100) {
       return const ValidationResult(
         isValid: true,
@@ -362,7 +366,7 @@ class InputValidationService {
         suggestion: 'Please verify this is your correct age',
       );
     }
-    
+
     return const ValidationResult(isValid: true);
   }
 
@@ -375,7 +379,7 @@ class InputValidationService {
         suggestion: 'Please enter a valid height',
       );
     }
-    
+
     if (height < 100) {
       return const ValidationResult(
         isValid: false,
@@ -383,7 +387,7 @@ class InputValidationService {
         suggestion: 'Please enter a realistic height (min 100 cm)',
       );
     }
-    
+
     if (height > 250) {
       return const ValidationResult(
         isValid: false,
@@ -391,7 +395,7 @@ class InputValidationService {
         suggestion: 'Please enter a realistic height (max 250 cm)',
       );
     }
-    
+
     if (height < 120 || height > 220) {
       return const ValidationResult(
         isValid: true,
@@ -399,7 +403,7 @@ class InputValidationService {
         suggestion: 'Please verify this is your correct height',
       );
     }
-    
+
     return const ValidationResult(isValid: true);
   }
 
@@ -412,7 +416,7 @@ class InputValidationService {
         suggestion: 'Minimum safe calorie goal is 800 calories',
       );
     }
-    
+
     if (goal > 5000) {
       return const ValidationResult(
         isValid: false,
@@ -420,7 +424,7 @@ class InputValidationService {
         suggestion: 'Please enter a realistic goal (max 5,000 calories)',
       );
     }
-    
+
     if (goal < 1200) {
       return const ValidationResult(
         isValid: true,
@@ -428,7 +432,7 @@ class InputValidationService {
         suggestion: 'Consider consulting a nutritionist for such low goals',
       );
     }
-    
+
     return const ValidationResult(isValid: true);
   }
 
@@ -441,7 +445,7 @@ class InputValidationService {
         suggestion: 'Minimum water goal is 1 glass',
       );
     }
-    
+
     if (goal > 20) {
       return const ValidationResult(
         isValid: false,
@@ -449,7 +453,7 @@ class InputValidationService {
         suggestion: 'Please enter a realistic goal (max 20 glasses)',
       );
     }
-    
+
     if (goal > 15) {
       return const ValidationResult(
         isValid: true,
@@ -457,7 +461,7 @@ class InputValidationService {
         suggestion: 'Make sure this is appropriate for your needs',
       );
     }
-    
+
     return const ValidationResult(isValid: true);
   }
 
@@ -470,7 +474,7 @@ class InputValidationService {
         suggestion: 'Minimum steps goal is 1,000 steps',
       );
     }
-    
+
     if (goal > 50000) {
       return const ValidationResult(
         isValid: false,
@@ -478,7 +482,7 @@ class InputValidationService {
         suggestion: 'Please enter a realistic goal (max 50,000 steps)',
       );
     }
-    
+
     if (goal > 30000) {
       return const ValidationResult(
         isValid: true,
@@ -486,7 +490,7 @@ class InputValidationService {
         suggestion: 'Make sure this is achievable for your lifestyle',
       );
     }
-    
+
     return const ValidationResult(isValid: true);
   }
 
@@ -499,7 +503,7 @@ class InputValidationService {
         suggestion: 'Minimum sleep goal is 4 hours',
       );
     }
-    
+
     if (goal > 12) {
       return const ValidationResult(
         isValid: false,
@@ -507,7 +511,7 @@ class InputValidationService {
         suggestion: 'Please enter a realistic goal (max 12 hours)',
       );
     }
-    
+
     if (goal < 6 || goal > 10) {
       return const ValidationResult(
         isValid: true,
@@ -515,12 +519,13 @@ class InputValidationService {
         suggestion: 'Most adults need 7-9 hours of sleep',
       );
     }
-    
+
     return const ValidationResult(isValid: true);
   }
 
   /// Show validation result as snackbar
-  static void showValidationResult(BuildContext context, ValidationResult result) {
+  static void showValidationResult(
+      BuildContext context, ValidationResult result) {
     if (!result.isValid) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

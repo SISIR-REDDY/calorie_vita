@@ -22,19 +22,22 @@ class DailySummary {
     required this.waterGlassesGoal,
     required this.date,
     MacroBreakdown? macroBreakdown,
-  }) : _macroBreakdown = macroBreakdown ?? MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
+  }) : _macroBreakdown = macroBreakdown ??
+            MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
 
   /// Calculate remaining calories
   int get caloriesRemaining => caloriesGoal - caloriesConsumed + caloriesBurned;
 
   /// Calculate calorie progress percentage
-  double get calorieProgress => (caloriesConsumed / caloriesGoal).clamp(0.0, 1.0);
+  double get calorieProgress =>
+      (caloriesConsumed / caloriesGoal).clamp(0.0, 1.0);
 
   /// Calculate steps progress percentage
   double get stepsProgress => (steps / stepsGoal).clamp(0.0, 1.0);
 
   /// Calculate water glasses progress percentage
-  double get waterGlassesProgress => (waterGlasses / waterGlassesGoal).clamp(0.0, 1.0);
+  double get waterGlassesProgress =>
+      (waterGlasses / waterGlassesGoal).clamp(0.0, 1.0);
 
   /// Check if daily goal is achieved
   bool get isGoalAchieved => caloriesConsumed >= caloriesGoal;
@@ -75,12 +78,14 @@ class DailySummary {
       stepsGoal: json['stepsGoal'] ?? 10000,
       waterGlasses: json['waterGlasses'] ?? 0,
       waterGlassesGoal: json['waterGlassesGoal'] ?? 8,
-      date: DateTime.fromMillisecondsSinceEpoch(json['date'] ?? DateTime.now().millisecondsSinceEpoch),
+      date: DateTime.fromMillisecondsSinceEpoch(
+          json['date'] ?? DateTime.now().millisecondsSinceEpoch),
     );
   }
 
   /// Create from Map (alias for fromJson)
-  factory DailySummary.fromMap(Map<String, dynamic> map) => DailySummary.fromJson(map);
+  factory DailySummary.fromMap(Map<String, dynamic> map) =>
+      DailySummary.fromJson(map);
 
   /// Copy with new values
   DailySummary copyWith({

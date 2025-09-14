@@ -17,7 +17,7 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
   final WeightLogService _weightLogService = WeightLogService();
   final TextEditingController _weightController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
-  
+
   DateTime _selectedDate = DateTime.now();
   WeightLog? _editingLog;
   bool _isLoading = false;
@@ -32,7 +32,7 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
   /// Show add/edit weight dialog
   void _showWeightDialog({WeightLog? weightLog}) async {
     _editingLog = weightLog;
-    
+
     if (weightLog != null) {
       _weightController.text = weightLog.weight.toString();
       _notesController.text = weightLog.notes ?? '';
@@ -47,7 +47,8 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text(
             weightLog != null ? 'Edit Weight' : 'Log Weight',
             style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
@@ -62,18 +63,20 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
                     labelText: 'Weight (kg)',
-                    prefixIcon: const Icon(Icons.monitor_weight, color: kAccentBlue),
+                    prefixIcon:
+                        const Icon(Icons.monitor_weight, color: kAccentBlue),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: kAccentBlue, width: 2),
+                      borderSide:
+                          const BorderSide(color: kAccentBlue, width: 2),
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Date picker
                 GestureDetector(
                   onTap: () async {
@@ -108,7 +111,7 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Notes input
                 TextField(
                   controller: _notesController,
@@ -120,7 +123,8 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: kAccentBlue, width: 2),
+                      borderSide:
+                          const BorderSide(color: kAccentBlue, width: 2),
                     ),
                   ),
                   maxLines: 3,
@@ -150,31 +154,37 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                   }
                   return;
                 }
-                
+
                 setState(() => _isLoading = true);
-                
+
                 try {
                   if (_editingLog != null) {
                     await _weightLogService.updateWeightLog(
                       id: _editingLog!.id,
                       weight: weight,
                       date: _selectedDate,
-                      notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+                      notes: _notesController.text.trim().isEmpty
+                          ? null
+                          : _notesController.text.trim(),
                     );
                   } else {
                     await _weightLogService.addWeightLog(
                       weight: weight,
                       date: _selectedDate,
-                      notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+                      notes: _notesController.text.trim().isEmpty
+                          ? null
+                          : _notesController.text.trim(),
                     );
                   }
-                  
+
                   if (mounted) {
                     Navigator.pop(context, true);
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(weightLog != null ? 'Weight updated!' : 'Weight logged!'),
+                          content: Text(weightLog != null
+                              ? 'Weight updated!'
+                              : 'Weight logged!'),
                           backgroundColor: kAccentGreen,
                         ),
                       );
@@ -251,7 +261,8 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
             onPressed: () => Navigator.pop(context, true),
             child: Text(
               'Delete',
-              style: GoogleFonts.poppins(color: kErrorColor, fontWeight: FontWeight.bold),
+              style: GoogleFonts.poppins(
+                  color: kErrorColor, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -303,7 +314,7 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
         children: [
           // Statistics Card
           _buildStatsCard(),
-          
+
           // Weight Log List
           Expanded(
             child: _buildWeightLogList(),
@@ -348,7 +359,10 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [kTextSecondary.withValues(alpha: 0.1), kTextSecondary.withValues(alpha: 0.05)],
+                colors: [
+                  kTextSecondary.withValues(alpha: 0.1),
+                  kTextSecondary.withValues(alpha: 0.05)
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -395,10 +409,11 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
           );
         }
 
-        final stats = snapshot.data ?? const WeightLogStats(
-          currentWeight: 0.0,
-          totalEntries: 0,
-        );
+        final stats = snapshot.data ??
+            const WeightLogStats(
+              currentWeight: 0.0,
+              totalEntries: 0,
+            );
 
         return Container(
           margin: const EdgeInsets.all(16),
@@ -437,7 +452,9 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                     _buildStatItem(
                       'Change',
                       '${stats.weightChange!.toStringAsFixed(1)} kg',
-                      stats.weightChange! > 0 ? Icons.trending_up : Icons.trending_down,
+                      stats.weightChange! > 0
+                          ? Icons.trending_up
+                          : Icons.trending_down,
                     ),
                 ],
               ),
@@ -538,7 +555,8 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                       onPressed: () {
                         setState(() {});
                       },
-                      icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
+                      icon: const Icon(Icons.refresh,
+                          color: Colors.white, size: 20),
                       label: Text(
                         'Try Again',
                         style: GoogleFonts.poppins(
@@ -621,7 +639,8 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                     height: 50,
                     child: ElevatedButton.icon(
                       onPressed: () => _showWeightDialog(),
-                      icon: const Icon(Icons.add, color: Colors.white, size: 20),
+                      icon:
+                          const Icon(Icons.add, color: Colors.white, size: 20),
                       label: Text(
                         'Log Your First Weight',
                         style: GoogleFonts.poppins(
@@ -665,7 +684,10 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                     offset: const Offset(0, 2),
                   ),
                 ],
-                border: isToday ? Border.all(color: kAccentGreen.withValues(alpha: 0.3), width: 1) : null,
+                border: isToday
+                    ? Border.all(
+                        color: kAccentGreen.withValues(alpha: 0.3), width: 1)
+                    : null,
               ),
               child: Material(
                 color: Colors.transparent,
@@ -679,8 +701,8 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: isToday 
-                                ? kAccentGreen.withValues(alpha: 0.15) 
+                            color: isToday
+                                ? kAccentGreen.withValues(alpha: 0.15)
                                 : kAccentBlue.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -708,7 +730,8 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                                   if (isToday) ...[
                                     const SizedBox(width: 8),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
                                         color: kAccentGreen,
                                         borderRadius: BorderRadius.circular(8),
@@ -727,18 +750,22 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                _getDateText(weightLog.date, isToday, isYesterday),
+                                _getDateText(
+                                    weightLog.date, isToday, isYesterday),
                                 style: GoogleFonts.poppins(
                                   color: kTextSecondary,
                                   fontSize: 13,
                                 ),
                               ),
-                              if (weightLog.notes != null && weightLog.notes!.isNotEmpty) ...[
+                              if (weightLog.notes != null &&
+                                  weightLog.notes!.isNotEmpty) ...[
                                 const SizedBox(height: 6),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: kTextSecondary.withValues(alpha: 0.1),
+                                    color:
+                                        kTextSecondary.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
@@ -771,9 +798,12 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                               value: 'edit',
                               child: Row(
                                 children: [
-                                  const Icon(Icons.edit, color: kAccentBlue, size: 20),
+                                  const Icon(Icons.edit,
+                                      color: kAccentBlue, size: 20),
                                   const SizedBox(width: 12),
-                                  Text('Edit', style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
+                                  Text('Edit',
+                                      style: GoogleFonts.poppins(
+                                          fontWeight: FontWeight.w500)),
                                 ],
                               ),
                             ),
@@ -781,9 +811,12 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                               value: 'delete',
                               child: Row(
                                 children: [
-                                  const Icon(Icons.delete, color: kErrorColor, size: 20),
+                                  const Icon(Icons.delete,
+                                      color: kErrorColor, size: 20),
                                   const SizedBox(width: 12),
-                                  Text('Delete', style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
+                                  Text('Delete',
+                                      style: GoogleFonts.poppins(
+                                          fontWeight: FontWeight.w500)),
                                 ],
                               ),
                             ),
@@ -804,13 +837,17 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
   /// Check if date is today
   bool _isToday(DateTime date) {
     final now = DateTime.now();
-    return date.year == now.year && date.month == now.month && date.day == now.day;
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
   }
 
   /// Check if date is yesterday
   bool _isYesterday(DateTime date) {
     final yesterday = DateTime.now().subtract(const Duration(days: 1));
-    return date.year == yesterday.year && date.month == yesterday.month && date.day == yesterday.day;
+    return date.year == yesterday.year &&
+        date.month == yesterday.month &&
+        date.day == yesterday.day;
   }
 
   /// Get formatted date text

@@ -21,7 +21,8 @@ class MacroBreakdown {
   double get carbsPercentage => carbs > 0 ? (carbs * 4) / totalCalories : 0.0;
 
   /// Get protein percentage
-  double get proteinPercentage => protein > 0 ? (protein * 4) / totalCalories : 0.0;
+  double get proteinPercentage =>
+      protein > 0 ? (protein * 4) / totalCalories : 0.0;
 
   /// Get fat percentage
   double get fatPercentage => fat > 0 ? (fat * 9) / totalCalories : 0.0;
@@ -41,28 +42,33 @@ class MacroBreakdown {
   bool get isWithinRecommended {
     final recommended = recommendedDaily;
     return carbs <= recommended.carbs * 1.2 &&
-           protein >= recommended.protein * 0.8 &&
-           protein <= recommended.protein * 1.2 &&
-           fat <= recommended.fat * 1.2;
+        protein >= recommended.protein * 0.8 &&
+        protein <= recommended.protein * 1.2 &&
+        fat <= recommended.fat * 1.2;
   }
 
   /// Get macro quality score (0-100)
   double get qualityScore {
     final recommended = recommendedDaily;
     double score = 0;
-    
+
     // Carbs score (40% weight)
-    final carbsScore = (1 - (carbs - recommended.carbs).abs() / recommended.carbs).clamp(0.0, 1.0);
+    final carbsScore =
+        (1 - (carbs - recommended.carbs).abs() / recommended.carbs)
+            .clamp(0.0, 1.0);
     score += carbsScore * 0.4;
-    
+
     // Protein score (35% weight)
-    final proteinScore = (1 - (protein - recommended.protein).abs() / recommended.protein).clamp(0.0, 1.0);
+    final proteinScore =
+        (1 - (protein - recommended.protein).abs() / recommended.protein)
+            .clamp(0.0, 1.0);
     score += proteinScore * 0.35;
-    
+
     // Fat score (25% weight)
-    final fatScore = (1 - (fat - recommended.fat).abs() / recommended.fat).clamp(0.0, 1.0);
+    final fatScore =
+        (1 - (fat - recommended.fat).abs() / recommended.fat).clamp(0.0, 1.0);
     score += fatScore * 0.25;
-    
+
     return (score * 100).clamp(0.0, 100.0);
   }
 

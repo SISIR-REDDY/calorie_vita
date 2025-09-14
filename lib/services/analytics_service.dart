@@ -26,7 +26,8 @@ class AnalyticsService {
   // Getter methods that ensure controllers exist and are not closed
   StreamController<List<DailySummary>> get _ensureDailySummariesController {
     if (_dailySummariesController?.isClosed != false) {
-      _dailySummariesController = StreamController<List<DailySummary>>.broadcast();
+      _dailySummariesController =
+          StreamController<List<DailySummary>>.broadcast();
     }
     return _dailySummariesController!;
   }
@@ -40,35 +41,45 @@ class AnalyticsService {
 
   StreamController<List<UserAchievement>> get _ensureAchievementsController {
     if (_achievementsController?.isClosed != false) {
-      _achievementsController = StreamController<List<UserAchievement>>.broadcast();
+      _achievementsController =
+          StreamController<List<UserAchievement>>.broadcast();
     }
     return _achievementsController!;
   }
 
   StreamController<List<Map<String, dynamic>>> get _ensureInsightsController {
     if (_insightsController?.isClosed != false) {
-      _insightsController = StreamController<List<Map<String, dynamic>>>.broadcast();
+      _insightsController =
+          StreamController<List<Map<String, dynamic>>>.broadcast();
     }
     return _insightsController!;
   }
 
-  StreamController<List<Map<String, dynamic>>> get _ensureRecommendationsController {
+  StreamController<List<Map<String, dynamic>>>
+      get _ensureRecommendationsController {
     if (_recommendationsController?.isClosed != false) {
-      _recommendationsController = StreamController<List<Map<String, dynamic>>>.broadcast();
+      _recommendationsController =
+          StreamController<List<Map<String, dynamic>>>.broadcast();
     }
     return _recommendationsController!;
   }
 
   // Streams for real-time data
-  Stream<List<DailySummary>> get dailySummariesStream => _ensureDailySummariesController.stream;
-  Stream<MacroBreakdown> get macroBreakdownStream => _ensureMacroBreakdownController.stream;
-  Stream<List<UserAchievement>> get achievementsStream => _ensureAchievementsController.stream;
-  Stream<List<Map<String, dynamic>>> get insightsStream => _ensureInsightsController.stream;
-  Stream<List<Map<String, dynamic>>> get recommendationsStream => _ensureRecommendationsController.stream;
+  Stream<List<DailySummary>> get dailySummariesStream =>
+      _ensureDailySummariesController.stream;
+  Stream<MacroBreakdown> get macroBreakdownStream =>
+      _ensureMacroBreakdownController.stream;
+  Stream<List<UserAchievement>> get achievementsStream =>
+      _ensureAchievementsController.stream;
+  Stream<List<Map<String, dynamic>>> get insightsStream =>
+      _ensureInsightsController.stream;
+  Stream<List<Map<String, dynamic>>> get recommendationsStream =>
+      _ensureRecommendationsController.stream;
 
   // Cache for offline support
   List<DailySummary> _cachedDailySummaries = [];
-  MacroBreakdown _cachedMacroBreakdown = MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
+  MacroBreakdown _cachedMacroBreakdown =
+      MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
   List<UserAchievement> _cachedAchievements = [];
   List<Map<String, dynamic>> _cachedInsights = [];
   List<Map<String, dynamic>> _cachedRecommendations = [];
@@ -79,9 +90,10 @@ class AnalyticsService {
   StreamSubscription<QuerySnapshot>? _weightHistorySubscription;
 
   /// Check if service is properly initialized
-  bool get isInitialized => _foodEntriesSubscription != null || 
-                           _achievementsSubscription != null || 
-                           _weightHistorySubscription != null;
+  bool get isInitialized =>
+      _foodEntriesSubscription != null ||
+      _achievementsSubscription != null ||
+      _weightHistorySubscription != null;
 
   /// Initialize real-time analytics with automated data tracking (with network timeouts)
   Future<void> initializeRealTimeAnalytics({int days = 7}) async {
@@ -96,45 +108,40 @@ class AnalyticsService {
 
     try {
       print('Setting up analytics listeners for user: $userId');
-      
+
       // Ensure stream controllers are available
       _ensureDailySummariesController;
       _ensureMacroBreakdownController;
       _ensureAchievementsController;
       _ensureInsightsController;
       _ensureRecommendationsController;
-      
+
       // Set up real-time listeners with timeouts
       await Future.wait([
         _setupFoodEntriesListener(userId, days).timeout(
-          const Duration(seconds: 3),
-          onTimeout: () => print('Food entries listener setup timed out')
-        ),
-        _setupAchievementsListener(userId).timeout(
-          const Duration(seconds: 2),
-          onTimeout: () => print('Achievements listener setup timed out')
-        ),
-        _setupWeightHistoryListener(userId).timeout(
-          const Duration(seconds: 2),
-          onTimeout: () => print('Weight history listener setup timed out')
-        ),
+            const Duration(seconds: 3),
+            onTimeout: () => print('Food entries listener setup timed out')),
+        _setupAchievementsListener(userId).timeout(const Duration(seconds: 2),
+            onTimeout: () => print('Achievements listener setup timed out')),
+        _setupWeightHistoryListener(userId).timeout(const Duration(seconds: 2),
+            onTimeout: () => print('Weight history listener setup timed out')),
       ]);
-      
+
       print('Analytics listeners set up successfully');
-      
+
       // Generate initial insights and recommendations with timeout (non-blocking)
-      _generateInsights(userId).timeout(
-        const Duration(seconds: 3),
-        onTimeout: () => print('Insights generation timed out')
-      ).catchError((error) => print('Error generating insights: $error'));
-      
-      _generateRecommendations(userId).timeout(
-        const Duration(seconds: 3),
-        onTimeout: () => print('Recommendations generation timed out')
-      ).catchError((error) => print('Error generating recommendations: $error'));
-      
+      _generateInsights(userId)
+          .timeout(const Duration(seconds: 3),
+              onTimeout: () => print('Insights generation timed out'))
+          .catchError((error) => print('Error generating insights: $error'));
+
+      _generateRecommendations(userId)
+          .timeout(const Duration(seconds: 3),
+              onTimeout: () => print('Recommendations generation timed out'))
+          .catchError(
+              (error) => print('Error generating recommendations: $error'));
+
       print('Analytics initialization completed');
-      
     } catch (e) {
       print('Error during analytics initialization: $e');
       // Don't throw - let the app continue with empty data
@@ -147,11 +154,11 @@ class AnalyticsService {
       await _foodEntriesSubscription?.cancel();
       await _achievementsSubscription?.cancel();
       await _weightHistorySubscription?.cancel();
-      
+
       _foodEntriesSubscription = null;
       _achievementsSubscription = null;
       _weightHistorySubscription = null;
-      
+
       print('Existing analytics listeners cancelled');
     } catch (e) {
       print('Error cancelling existing listeners: $e');
@@ -167,7 +174,8 @@ class AnalyticsService {
         .collection('users')
         .doc(userId)
         .collection('entries')
-        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+        .where('timestamp',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
         .where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
         .orderBy('timestamp', descending: false)
         .snapshots()
@@ -177,14 +185,16 @@ class AnalyticsService {
   }
 
   /// Process food entries update
-  Future<void> _processFoodEntriesUpdate(QuerySnapshot snapshot, int days) async {
+  Future<void> _processFoodEntriesUpdate(
+      QuerySnapshot snapshot, int days) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
 
     // Group entries by date
     final Map<String, List<QueryDocumentSnapshot>> entriesByDate = {};
     for (final doc in snapshot.docs) {
-      final timestamp = (doc.data() as Map<String, dynamic>)['timestamp'] as Timestamp;
+      final timestamp =
+          (doc.data() as Map<String, dynamic>)['timestamp'] as Timestamp;
       final date = timestamp.toDate();
       final dateKey = '${date.year}-${date.month}-${date.day}';
       entriesByDate.putIfAbsent(dateKey, () => []).add(doc);
@@ -199,7 +209,7 @@ class AnalyticsService {
       final date = startDate.add(Duration(days: i));
       final dateKey = '${date.year}-${date.month}-${date.day}';
       final dayEntries = entriesByDate[dateKey] ?? [];
-      
+
       final caloriesConsumed = dayEntries.fold(0, (sum, doc) {
         final data = doc.data() as Map<String, dynamic>;
         return sum + (data['calories'] as int? ?? 0);
@@ -209,13 +219,14 @@ class AnalyticsService {
         MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0),
         (sum, doc) {
           final data = doc.data() as Map<String, dynamic>;
-          return sum + MacroBreakdown(
-            carbs: (data['carbs'] ?? 0.0).toDouble(),
-            protein: (data['protein'] ?? 0.0).toDouble(),
-            fat: (data['fat'] ?? 0.0).toDouble(),
-            fiber: (data['fiber'] ?? 0.0).toDouble(),
-            sugar: (data['sugar'] ?? 0.0).toDouble(),
-          );
+          return sum +
+              MacroBreakdown(
+                carbs: (data['carbs'] ?? 0.0).toDouble(),
+                protein: (data['protein'] ?? 0.0).toDouble(),
+                fat: (data['fat'] ?? 0.0).toDouble(),
+                fiber: (data['fiber'] ?? 0.0).toDouble(),
+                sugar: (data['sugar'] ?? 0.0).toDouble(),
+              );
         },
       );
 
@@ -223,7 +234,7 @@ class AnalyticsService {
       final actualCaloriesBurned = await _getActualCaloriesBurned(userId, date);
       final actualSteps = await _getActualSteps(userId, date);
       final userGoals = await _getUserGoals(userId);
-      
+
       summaries.add(DailySummary(
         caloriesConsumed: caloriesConsumed,
         caloriesBurned: actualCaloriesBurned,
@@ -273,11 +284,11 @@ class AnalyticsService {
       if (snapshot.exists) {
         final data = snapshot.data() ?? {};
         final achievements = <UserAchievement>[];
-        
+
         for (final achievementData in data['achievements'] ?? []) {
           achievements.add(UserAchievement.fromJson(achievementData));
         }
-        
+
         _cachedAchievements = achievements;
         try {
           _ensureAchievementsController.add(achievements);
@@ -316,55 +327,66 @@ class AnalyticsService {
   Future<void> _generateInsights(String userId) async {
     try {
       final insights = <Map<String, dynamic>>[];
-      
+
       // Analyze calorie trends
       if (_cachedDailySummaries.length >= 7) {
-        final thisWeek = _cachedDailySummaries.take(7).fold(0, (sum, day) => sum + day.caloriesConsumed);
-        final lastWeek = _cachedDailySummaries.length >= 14 
-            ? _cachedDailySummaries.skip(7).take(7).fold(0, (sum, day) => sum + day.caloriesConsumed)
+        final thisWeek = _cachedDailySummaries
+            .take(7)
+            .fold(0, (sum, day) => sum + day.caloriesConsumed);
+        final lastWeek = _cachedDailySummaries.length >= 14
+            ? _cachedDailySummaries
+                .skip(7)
+                .take(7)
+                .fold(0, (sum, day) => sum + day.caloriesConsumed)
             : thisWeek;
-        
+
         if (lastWeek > 0) {
-          final changePercent = ((thisWeek - lastWeek) / lastWeek * 100).round();
+          final changePercent =
+              ((thisWeek - lastWeek) / lastWeek * 100).round();
           if (changePercent > 10) {
             insights.add({
               'title': '📈 Calorie Increase',
-              'message': 'You consumed $changePercent% more calories this week compared to last week.',
+              'message':
+                  'You consumed $changePercent% more calories this week compared to last week.',
               'color': 'warning',
               'timestamp': DateTime.now(),
             });
           } else if (changePercent < -10) {
             insights.add({
               'title': '📉 Calorie Decrease',
-              'message': 'You consumed ${changePercent.abs()}% fewer calories this week compared to last week.',
+              'message':
+                  'You consumed ${changePercent.abs()}% fewer calories this week compared to last week.',
               'color': 'info',
               'timestamp': DateTime.now(),
             });
           }
         }
       }
-      
+
       // Analyze macro balance
       if (!_cachedMacroBreakdown.isWithinRecommended) {
         insights.add({
           'title': '⚖️ Macro Imbalance',
-          'message': 'Your macro distribution needs adjustment. Consider consulting with a nutritionist.',
+          'message':
+              'Your macro distribution needs adjustment. Consider consulting with a nutritionist.',
           'color': 'warning',
           'timestamp': DateTime.now(),
         });
       }
-      
+
       // Analyze consistency
-      final goalMetDays = _cachedDailySummaries.where((day) => day.isGoalAchieved).length;
+      final goalMetDays =
+          _cachedDailySummaries.where((day) => day.isGoalAchieved).length;
       if (goalMetDays >= 5) {
         insights.add({
           'title': '🎯 Goal Consistency',
-          'message': 'Great job! You met your calorie goal $goalMetDays days this week.',
+          'message':
+              'Great job! You met your calorie goal $goalMetDays days this week.',
           'color': 'success',
           'timestamp': DateTime.now(),
         });
       }
-      
+
       _cachedInsights = insights;
       try {
         _ensureInsightsController.add(insights);
@@ -380,18 +402,19 @@ class AnalyticsService {
   Future<void> _generateRecommendations(String userId) async {
     try {
       final recommendations = <Map<String, dynamic>>[];
-      
+
       // Get user profile for personalized recommendations
       final profile = await _firebaseService.getUserProfile(userId);
-      
+
       // Calorie-based recommendations
       if (_cachedDailySummaries.isNotEmpty) {
         final todayCalories = _cachedDailySummaries.last.caloriesConsumed;
-        
+
         if (todayCalories < 1500) {
           recommendations.add({
             'title': 'Increase calorie intake',
-            'description': 'You\'re below your minimum daily calorie needs. Consider adding healthy snacks.',
+            'description':
+                'You\'re below your minimum daily calorie needs. Consider adding healthy snacks.',
             'icon': '🍎',
             'color': 'info',
             'priority': 1,
@@ -400,7 +423,8 @@ class AnalyticsService {
         } else if (todayCalories > 2500) {
           recommendations.add({
             'title': 'Take a 20-minute walk',
-            'description': 'Balance today\'s calorie surplus with light activity.',
+            'description':
+                'Balance today\'s calorie surplus with light activity.',
             'icon': '🚶',
             'color': 'info',
             'priority': 2,
@@ -408,23 +432,24 @@ class AnalyticsService {
           });
         }
       }
-      
-      
+
       // Protein recommendations
       if (_cachedMacroBreakdown.protein < 100) {
         recommendations.add({
           'title': 'Increase protein intake',
-          'description': 'Add ${(120 - _cachedMacroBreakdown.protein).toStringAsFixed(0)}g protein for better muscle recovery.',
+          'description':
+              'Add ${(120 - _cachedMacroBreakdown.protein).toStringAsFixed(0)}g protein for better muscle recovery.',
           'icon': '💪',
           'color': 'success',
           'priority': 4,
           'timestamp': DateTime.now(),
         });
       }
-      
+
       // Sort by priority
-      recommendations.sort((a, b) => (a['priority'] ?? 999).compareTo(b['priority'] ?? 999));
-      
+      recommendations.sort(
+          (a, b) => (a['priority'] ?? 999).compareTo(b['priority'] ?? 999));
+
       _cachedRecommendations = recommendations;
       try {
         _ensureRecommendationsController.add(recommendations);
@@ -441,7 +466,8 @@ class AnalyticsService {
   MacroBreakdown get cachedMacroBreakdown => _cachedMacroBreakdown;
   List<UserAchievement> get cachedAchievements => _cachedAchievements;
   List<Map<String, dynamic>> get cachedInsights => _cachedInsights;
-  List<Map<String, dynamic>> get cachedRecommendations => _cachedRecommendations;
+  List<Map<String, dynamic>> get cachedRecommendations =>
+      _cachedRecommendations;
 
   /// Update period and refresh data
   Future<void> updatePeriod(int days) async {
@@ -450,7 +476,7 @@ class AnalyticsService {
 
     // Cancel existing listeners
     await _foodEntriesSubscription?.cancel();
-    
+
     // Set up new listener with updated period
     await _setupFoodEntriesListener(userId, days);
   }
@@ -478,14 +504,15 @@ class AnalyticsService {
       if (userId == null) return;
 
       // Get daily summaries for streak calculation
-      final summaries = await _firebaseService.getDailySummaries(userId, days: 30);
-      
+      final summaries =
+          await _firebaseService.getDailySummaries(userId, days: 30);
+
       // Calculate streaks based on automated data
       final streaks = _calculateStreaks(summaries);
-      
+
       // Calculate achievements based on automated data
       final achievements = _calculateAchievements(summaries);
-      
+
       // Update cached data
       _cachedAchievements = achievements;
       try {
@@ -493,10 +520,9 @@ class AnalyticsService {
       } catch (e) {
         print('Error broadcasting calculated achievements: $e');
       }
-      
+
       // Save to Firebase
       await _saveStreaksAndAchievements(userId, streaks, achievements);
-      
     } catch (e) {
       print('Error calculating streaks and achievements: $e');
     }
@@ -513,20 +539,20 @@ class AnalyticsService {
 
     // Sort summaries by date (newest first)
     summaries.sort((a, b) => b.date.compareTo(a.date));
-    
+
     // Calculate streaks for each goal
     for (final goal in streaks.keys) {
       int currentStreak = 0;
       final today = DateTime.now();
-      
+
       for (int i = 0; i < summaries.length; i++) {
         final summary = summaries[i];
         final summaryDate = summary.date;
         final daysDiff = today.difference(summaryDate).inDays;
-        
+
         // Only count consecutive days
         if (daysDiff != i) break;
-        
+
         bool goalMet = false;
         switch (goal) {
           case 'calorieGoal':
@@ -542,31 +568,34 @@ class AnalyticsService {
             goalMet = summary.overallProgress >= 0.8; // 80% of all goals
             break;
         }
-        
+
         if (goalMet) {
           currentStreak++;
         } else {
           break;
         }
       }
-      
+
       streaks[goal] = currentStreak;
     }
-    
+
     return streaks;
   }
 
   /// Calculate achievements based on automated data
   List<UserAchievement> _calculateAchievements(List<DailySummary> summaries) {
     final achievements = <UserAchievement>[];
-    
+
     // Calculate total stats
-    final totalCaloriesConsumed = summaries.fold(0, (sum, s) => sum + s.caloriesConsumed);
+    final totalCaloriesConsumed =
+        summaries.fold(0, (sum, s) => sum + s.caloriesConsumed);
     final totalSteps = summaries.fold(0, (sum, s) => sum + s.steps);
-    final totalWaterGlasses = summaries.fold(0, (sum, s) => sum + s.waterGlasses);
-    final daysWithFoodLogged = summaries.where((s) => s.caloriesConsumed > 0).length;
+    final totalWaterGlasses =
+        summaries.fold(0, (sum, s) => sum + s.waterGlasses);
+    final daysWithFoodLogged =
+        summaries.where((s) => s.caloriesConsumed > 0).length;
     final daysWithSteps = summaries.where((s) => s.steps > 0).length;
-    
+
     // Define achievement criteria
     final achievementCriteria = [
       {
@@ -612,7 +641,7 @@ class AnalyticsService {
         'icon': '👑',
       },
     ];
-    
+
     // Check each achievement
     for (final criteria in achievementCriteria) {
       if (criteria['condition'] as bool) {
@@ -630,29 +659,38 @@ class AnalyticsService {
         ));
       }
     }
-    
+
     return achievements;
   }
 
   /// Save streaks and achievements to Firebase
-  Future<void> _saveStreaksAndAchievements(String userId, Map<String, int> streaks, List<UserAchievement> achievements) async {
+  Future<void> _saveStreaksAndAchievements(String userId,
+      Map<String, int> streaks, List<UserAchievement> achievements) async {
     try {
       final batch = _firestore.batch();
-      
+
       // Save streaks
-      final streaksRef = _firestore.collection('users').doc(userId).collection('progress').doc('streaks');
+      final streaksRef = _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('progress')
+          .doc('streaks');
       batch.set(streaksRef, {
         'streaks': streaks,
         'lastUpdated': FieldValue.serverTimestamp(),
       });
-      
+
       // Save achievements
-      final achievementsRef = _firestore.collection('users').doc(userId).collection('progress').doc('achievements');
+      final achievementsRef = _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('progress')
+          .doc('achievements');
       batch.set(achievementsRef, {
         'achievements': achievements.map((a) => a.toJson()).toList(),
         'lastUpdated': FieldValue.serverTimestamp(),
       });
-      
+
       await batch.commit();
     } catch (e) {
       print('Error saving streaks and achievements: $e');
@@ -669,12 +707,12 @@ class AnalyticsService {
           .collection('daily_summaries')
           .doc('${date.year}-${date.month}-${date.day}')
           .get();
-      
+
       if (summaryDoc.exists) {
         final data = summaryDoc.data()!;
         return data['caloriesBurned'] ?? 0;
       }
-      
+
       // If no data found, return 0 instead of fake data
       return 0;
     } catch (e) {
@@ -693,12 +731,12 @@ class AnalyticsService {
           .collection('daily_summaries')
           .doc('${date.year}-${date.month}-${date.day}')
           .get();
-      
+
       if (summaryDoc.exists) {
         final data = summaryDoc.data()!;
         return data['steps'] ?? 0;
       }
-      
+
       // If no data found, return 0 instead of fake data
       return 0;
     } catch (e) {
@@ -716,7 +754,7 @@ class AnalyticsService {
           .collection('goals')
           .doc('current')
           .get();
-      
+
       if (goalsDoc.exists) {
         final data = goalsDoc.data()!;
         return {
@@ -725,7 +763,7 @@ class AnalyticsService {
           'waterGlassesGoal': data['dailyWaterGoal'] ?? 8,
         };
       }
-      
+
       // Return reasonable defaults if no goals set
       return {
         'caloriesGoal': 2000,

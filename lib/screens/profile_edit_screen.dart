@@ -40,13 +40,18 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   // User reference
   User? _user;
   String? _userId;
-  
+
   // Services
   final RealTimeInputService _realTimeInputService = RealTimeInputService();
   final AppStateService _appStateService = AppStateService();
 
   // Dropdown options
-  final List<String> _genderOptions = ['Male', 'Female', 'Other', 'Prefer not to say'];
+  final List<String> _genderOptions = [
+    'Male',
+    'Female',
+    'Other',
+    'Prefer not to say'
+  ];
   final List<String> _activityLevels = [
     'Sedentary',
     'Lightly Active',
@@ -193,8 +198,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           _selectedFitnessGoal = data['fitnessGoal'];
           _selectedDietPreference = data['dietPreference'];
           _selectedProfession = data['profession'];
-          _selectedHobbies = data['hobbiesList'] != null 
-              ? List<String>.from(data['hobbiesList']) 
+          _selectedHobbies = data['hobbiesList'] != null
+              ? List<String>.from(data['hobbiesList'])
               : [];
           _profileImageUrl = data['profileImageUrl'];
         });
@@ -206,17 +211,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     }
   }
 
-
-
-
   /// Save profile data to Firestore with real-time updates
   Future<void> _saveProfile() async {
     // Optional validation - only validate if fields have content
-    if (_nameController.text.trim().isNotEmpty && _nameController.text.trim().length < 2) {
+    if (_nameController.text.trim().isNotEmpty &&
+        _nameController.text.trim().length < 2) {
       _showErrorSnackBar('Name must be at least 2 characters if provided');
       return;
     }
-    
+
     if (_ageController.text.trim().isNotEmpty) {
       final age = int.tryParse(_ageController.text);
       if (age == null || age < 1 || age > 120) {
@@ -466,7 +469,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               onPressed: () {
                 setState(() {
                   // Update hobbies text field with selected hobbies
-                  final selectedHobbies = _selectedHobbies.where((h) => h != 'Other').toList();
+                  final selectedHobbies =
+                      _selectedHobbies.where((h) => h != 'Other').toList();
                   if (_hobbiesController.text.isNotEmpty) {
                     selectedHobbies.add(_hobbiesController.text.trim());
                   }
@@ -487,8 +491,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       ),
     );
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -546,7 +548,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           label: 'Full Name',
                           icon: Icons.person,
                           validator: (value) {
-                            if (value != null && value.trim().isNotEmpty && value.trim().length < 2) {
+                            if (value != null &&
+                                value.trim().isNotEmpty &&
+                                value.trim().length < 2) {
                               return 'Name must be at least 2 characters if provided';
                             }
                             return null;
@@ -581,7 +585,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           label: 'Gender',
                           icon: Icons.wc,
                           items: _genderOptions,
-                          onChanged: (value) => setState(() => _selectedGender = value),
+                          onChanged: (value) =>
+                              setState(() => _selectedGender = value),
                         ),
                       ],
                     ),
@@ -599,7 +604,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           validator: (value) {
                             if (value != null && value.isNotEmpty) {
                               final height = double.tryParse(value);
-                              if (height == null || height < 50 || height > 300) {
+                              if (height == null ||
+                                  height < 50 ||
+                                  height > 300) {
                                 return 'Please enter a valid height';
                               }
                             }
@@ -615,7 +622,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           validator: (value) {
                             if (value != null && value.isNotEmpty) {
                               final weight = double.tryParse(value);
-                              if (weight == null || weight < 20 || weight > 300) {
+                              if (weight == null ||
+                                  weight < 20 ||
+                                  weight > 300) {
                                 return 'Please enter a valid weight';
                               }
                             }
@@ -635,12 +644,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           label: 'Activity Level',
                           icon: Icons.fitness_center,
                           items: _activityLevels,
-                          onChanged: (value) => setState(() => _selectedActivityLevel = value),
+                          onChanged: (value) =>
+                              setState(() => _selectedActivityLevel = value),
                         ),
                         if (_selectedActivityLevel != null) ...[
                           const SizedBox(height: 8),
                           Text(
-                            _getActivityLevelDescription(_selectedActivityLevel!),
+                            _getActivityLevelDescription(
+                                _selectedActivityLevel!),
                             style: GoogleFonts.poppins(
                               fontSize: 12,
                               color: kTextSecondary,
@@ -654,7 +665,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           label: 'Fitness Goal',
                           icon: Icons.flag,
                           items: _fitnessGoals,
-                          onChanged: (value) => setState(() => _selectedFitnessGoal = value),
+                          onChanged: (value) =>
+                              setState(() => _selectedFitnessGoal = value),
                         ),
                         const SizedBox(height: 16),
                         _buildDropdown(
@@ -662,7 +674,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           label: 'Diet Preference',
                           icon: Icons.restaurant,
                           items: _dietPreferences,
-                          onChanged: (value) => setState(() => _selectedDietPreference = value),
+                          onChanged: (value) =>
+                              setState(() => _selectedDietPreference = value),
                         ),
                       ],
                     ),
@@ -680,18 +693,18 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           onTap: _showProfessionDialog,
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // Hobbies & Interests
                         _buildSelectionField(
                           label: 'Hobbies & Interests',
                           icon: Icons.favorite,
-                          value: _selectedHobbies.isNotEmpty 
+                          value: _selectedHobbies.isNotEmpty
                               ? '${_selectedHobbies.length} selected'
                               : 'Select hobbies',
                           onTap: _showHobbiesDialog,
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // Bio
                         _buildTextField(
                           controller: _bioController,
@@ -898,5 +911,4 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       ),
     );
   }
-
 }

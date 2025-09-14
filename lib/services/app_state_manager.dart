@@ -23,10 +23,12 @@ class AppStateManager {
   bool _isOnline = true;
   bool _isFirebaseAvailable = false;
   String _currentUserId = '';
-  
+
   // Streams
-  final StreamController<AppState> _stateController = StreamController<AppState>.broadcast();
-  final StreamController<bool> _initializationController = StreamController<bool>.broadcast();
+  final StreamController<AppState> _stateController =
+      StreamController<AppState>.broadcast();
+  final StreamController<bool> _initializationController =
+      StreamController<bool>.broadcast();
 
   // Getters
   Stream<AppState> get stateStream => _stateController.stream;
@@ -35,7 +37,7 @@ class AppStateManager {
   bool get isOnline => _isOnline;
   bool get isFirebaseAvailable => _isFirebaseAvailable;
   String get currentUserId => _currentUserId;
-  
+
   // Service getters
   OptimizedFirebaseService get firebaseService => _firebaseService;
   PerformanceMonitor get performanceMonitor => _performanceMonitor;
@@ -46,28 +48,28 @@ class AppStateManager {
   /// Initialize the app state manager
   Future<void> initialize() async {
     if (_isInitialized) return;
-    
+
     try {
       print('🚀 Initializing AppStateManager...');
-      
+
       // Initialize services
       _firebaseService = OptimizedFirebaseService();
       _performanceMonitor = PerformanceMonitor();
       _networkService = NetworkService();
       _errorHandler = ErrorHandler();
       _authService = AuthService();
-      
+
       // Initialize performance monitoring first
       await _performanceMonitor.initialize();
       _performanceMonitor.startTimer('app_state_init');
-      
+
       // Initialize error handler
       await _errorHandler.initialize();
-      
+
       // Initialize network service
       await _networkService.initialize();
       _isOnline = _networkService.isOnline;
-      
+
       // Listen to network changes
       _networkService.connectivityStream.listen((isOnline) {
         _isOnline = isOnline;
@@ -75,37 +77,37 @@ class AppStateManager {
         _performanceMonitor.startTimer('network_status_changed');
         _performanceMonitor.stopTimer('network_status_changed');
       });
-      
+
       // Initialize Firebase service
       await _firebaseService.initialize();
       _isFirebaseAvailable = _firebaseService.isAvailable;
-      
+
       // Initialize auth service
       await _authService.initialize();
-      
+
       // Check if there's already a current user
       final currentUser = _authService.currentUser;
       if (currentUser != null) {
         _currentUserId = currentUser.uid;
         print('Current user found during initialization: ${currentUser.email}');
       }
-      
+
       // Listen to auth changes
       _authService.userStream.listen((user) {
-        print('Auth state changed: user=${user?.uid ?? 'null'}, email=${user?.email ?? 'null'}');
+        print(
+            'Auth state changed: user=${user?.uid ?? 'null'}, email=${user?.email ?? 'null'}');
         _currentUserId = user?.uid ?? '';
         _updateAppState();
         _performanceMonitor.startTimer('auth_state_changed');
         _performanceMonitor.stopTimer('auth_state_changed');
       });
-      
+
       _isInitialized = true;
       _initializationController.add(true);
       _updateAppState();
-      
+
       _performanceMonitor.stopTimer('app_state_init');
       print('✅ AppStateManager initialized successfully');
-      
     } catch (e) {
       print('❌ Error initializing AppStateManager: $e');
       _errorHandler.handleBusinessError('app_state_init', e);
@@ -122,8 +124,9 @@ class AppStateManager {
       currentUserId: _currentUserId,
       timestamp: DateTime.now(),
     );
-    
-    print('Updating app state: userId=$_currentUserId, initialized=$_isInitialized');
+
+    print(
+        'Updating app state: userId=$_currentUserId, initialized=$_isInitialized');
     _stateController.add(state);
   }
 
@@ -143,69 +146,75 @@ class AppStateManager {
     final performanceStats = _performanceMonitor.getAllStats();
     final errorStats = _errorHandler.getErrorStats();
     final networkInfo = await _networkService.getNetworkInfo();
-    
+
     // Calculate health score (0-100)
     int healthScore = 100;
-    
+
     // Deduct points for errors
     final totalErrors = errorStats['total_errors'] as int;
     if (totalErrors > 0) {
       healthScore -= (totalErrors * 2).clamp(0, 50);
     }
-    
+
     // Deduct points for performance issues
     final slowOps = _performanceMonitor.getSlowOperations(thresholdMs: 2000);
     if (slowOps.isNotEmpty) {
       healthScore -= (slowOps.length * 5).clamp(0, 30);
     }
-    
+
     // Deduct points for offline status
     if (!_isOnline) {
       healthScore -= 20;
     }
-    
+
     // Deduct points for Firebase unavailability
     if (!_isFirebaseAvailable) {
       healthScore -= 10;
     }
-    
+
     healthScore = healthScore.clamp(0, 100);
-    
+
     return AppHealthStatus(
       score: healthScore,
       isHealthy: healthScore >= 70,
       performanceStats: performanceStats,
       errorStats: errorStats,
       networkInfo: networkInfo,
-      recommendations: _getHealthRecommendations(healthScore, errorStats, slowOps),
+      recommendations:
+          _getHealthRecommendations(healthScore, errorStats, slowOps),
     );
   }
 
   /// Get health recommendations
-  List<String> _getHealthRecommendations(int healthScore, Map<String, dynamic> errorStats, List<Map<String, dynamic>> slowOps) {
+  List<String> _getHealthRecommendations(int healthScore,
+      Map<String, dynamic> errorStats, List<Map<String, dynamic>> slowOps) {
     final recommendations = <String>[];
-    
+
     if (healthScore < 70) {
-      recommendations.add('App health is below optimal. Consider reviewing the issues below.');
+      recommendations.add(
+          'App health is below optimal. Consider reviewing the issues below.');
     }
-    
+
     if (!_isOnline) {
       recommendations.add('App is offline. Check internet connection.');
     }
-    
+
     if (!_isFirebaseAvailable) {
-      recommendations.add('Firebase is not available. App is running in demo mode.');
+      recommendations
+          .add('Firebase is not available. App is running in demo mode.');
     }
-    
+
     final totalErrors = errorStats['total_errors'] as int;
     if (totalErrors > 10) {
-      recommendations.add('High error count detected. Review error logs for details.');
+      recommendations
+          .add('High error count detected. Review error logs for details.');
     }
-    
+
     if (slowOps.isNotEmpty) {
-      recommendations.add('Performance issues detected. Consider optimizing slow operations.');
+      recommendations.add(
+          'Performance issues detected. Consider optimizing slow operations.');
     }
-    
+
     return recommendations;
   }
 
@@ -213,20 +222,20 @@ class AppStateManager {
   Future<void> refreshServices() async {
     try {
       _performanceMonitor.startTimer('services_refresh');
-      
+
       // Refresh network status
       await _networkService.initialize();
       _isOnline = _networkService.isOnline;
-      
+
       // Refresh Firebase availability
       _isFirebaseAvailable = _firebaseService.isAvailable;
-      
+
       // Refresh auth state
       await _authService.initialize();
-      
+
       _updateAppState();
       _performanceMonitor.stopTimer('services_refresh');
-      
+
       print('✅ Services refreshed successfully');
     } catch (e) {
       print('❌ Error refreshing services: $e');

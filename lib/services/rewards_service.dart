@@ -8,9 +8,12 @@ class RewardsService {
   RewardsService._internal();
 
   // Stream controllers for real-time updates
-  final StreamController<UserProgress> _progressController = StreamController<UserProgress>.broadcast();
-  final StreamController<List<UserReward>> _newRewardsController = StreamController<List<UserReward>>.broadcast();
-  final StreamController<LevelUpEvent> _levelUpController = StreamController<LevelUpEvent>.broadcast();
+  final StreamController<UserProgress> _progressController =
+      StreamController<UserProgress>.broadcast();
+  final StreamController<List<UserReward>> _newRewardsController =
+      StreamController<List<UserReward>>.broadcast();
+  final StreamController<LevelUpEvent> _levelUpController =
+      StreamController<LevelUpEvent>.broadcast();
 
   // Getters for streams
   Stream<UserProgress> get progressStream => _progressController.stream;
@@ -19,15 +22,15 @@ class RewardsService {
 
   // Current user progress
   UserProgress _currentProgress = UserProgress.initial();
-  
+
   // Activity tracking
   final Map<String, ActivityStreak> _activityStreaks = {};
   final Map<String, int> _lifetimeTotals = {};
   final Map<String, int> _yearlyTotals = {};
-  
+
   // Challenge tracking
   final Map<String, ChallengeProgress> _challenges = {};
-  
+
   // Anti-gaming measures
   final Map<String, List<DateTime>> _recentActivities = {};
   static const int maxRetroactiveEntries = 3;
@@ -37,13 +40,13 @@ class RewardsService {
   Future<void> initialize() async {
     // Load user progress from storage
     await _loadUserProgress();
-    
+
     // Initialize activity streaks
     _initializeActivityStreaks();
-    
+
     // Initialize challenges
     _initializeChallenges();
-    
+
     // Start daily reset timer
     _startDailyResetTimer();
   }
@@ -55,7 +58,7 @@ class RewardsService {
     DateTime? timestamp,
   }) async {
     final now = timestamp ?? DateTime.now();
-    
+
     // Anti-gaming validation
     if (!_validateActivity(activityType, activityData, now)) {
       return const ActivityResult(
@@ -69,29 +72,30 @@ class RewardsService {
 
     // Calculate base XP
     int baseXp = _calculateBaseXp(activityType, activityData);
-    
+
     // Apply streak multipliers
     double streakMultiplier = _getStreakMultiplier(activityType);
     int totalXp = (baseXp * streakMultiplier).round();
-    
+
     // Update streaks
     _updateStreak(activityType, now);
-    
+
     // Update lifetime and yearly totals
     _updateTotals(activityType, activityData);
-    
+
     // Update progress based on streaks (no points system)
     // Streaks are calculated separately in analytics service
-    
+
     // Check for level up
     LevelUpEvent? levelUp = _checkLevelUp();
-    
+
     // Check for new rewards
-    List<UserReward> newRewards = _checkForNewRewards(activityType, activityData);
-    
+    List<UserReward> newRewards =
+        _checkForNewRewards(activityType, activityData);
+
     // Update challenges
     _updateChallenges(activityType, activityData);
-    
+
     // Emit updates
     _progressController.add(_currentProgress);
     if (newRewards.isNotEmpty) {
@@ -100,10 +104,10 @@ class RewardsService {
     if (levelUp != null) {
       _levelUpController.add(levelUp);
     }
-    
+
     // Save progress
     await _saveUserProgress();
-    
+
     return ActivityResult(
       success: true,
       message: 'Activity processed successfully',
@@ -118,7 +122,8 @@ class RewardsService {
 
   /// Get activity streak for specific activity
   ActivityStreak getActivityStreak(ActivityType activityType) {
-    return _activityStreaks[activityType.name] ?? ActivityStreak.initial(activityType);
+    return _activityStreaks[activityType.name] ??
+        ActivityStreak.initial(activityType);
   }
 
   /// Get all unlocked rewards
@@ -137,7 +142,8 @@ class RewardsService {
   }
 
   /// Calculate base XP for activity
-  int _calculateBaseXp(ActivityType activityType, Map<String, dynamic> activityData) {
+  int _calculateBaseXp(
+      ActivityType activityType, Map<String, dynamic> activityData) {
     switch (activityType) {
       case ActivityType.mealLogging:
         return 10; // +10 XP per meal
@@ -170,7 +176,7 @@ class RewardsService {
   void _updateStreak(ActivityType activityType, DateTime timestamp) {
     final streakKey = activityType.name;
     final today = DateTime(timestamp.year, timestamp.month, timestamp.day);
-    
+
     if (_activityStreaks.containsKey(streakKey)) {
       final streak = _activityStreaks[streakKey]!;
       final lastActivity = DateTime(
@@ -178,7 +184,7 @@ class RewardsService {
         streak.lastActivityDate.month,
         streak.lastActivityDate.day,
       );
-      
+
       if (today.difference(lastActivity).inDays == 1) {
         // Consecutive day - increment streak
         _activityStreaks[streakKey] = streak.copyWith(
@@ -198,13 +204,15 @@ class RewardsService {
         );
       } else {
         // Streak broken - reset
-        _activityStreaks[streakKey] = ActivityStreak.initial(activityType).copyWith(
+        _activityStreaks[streakKey] =
+            ActivityStreak.initial(activityType).copyWith(
           lastActivityDate: timestamp,
         );
       }
     } else {
       // First activity
-      _activityStreaks[streakKey] = ActivityStreak.initial(activityType).copyWith(
+      _activityStreaks[streakKey] =
+          ActivityStreak.initial(activityType).copyWith(
         currentStreak: 1,
         lastActivityDate: timestamp,
       );
@@ -212,22 +220,24 @@ class RewardsService {
   }
 
   /// Update lifetime and yearly totals
-  void _updateTotals(ActivityType activityType, Map<String, dynamic> activityData) {
+  void _updateTotals(
+      ActivityType activityType, Map<String, dynamic> activityData) {
     final now = DateTime.now();
     final year = now.year.toString();
-    
+
     // Update lifetime totals
-    _lifetimeTotals[activityType.name] = 
+    _lifetimeTotals[activityType.name] =
         (_lifetimeTotals[activityType.name] ?? 0) + 1;
-    
+
     // Update yearly totals
-    _yearlyTotals['${activityType.name}_$year'] = 
+    _yearlyTotals['${activityType.name}_$year'] =
         (_yearlyTotals['${activityType.name}_$year'] ?? 0) + 1;
   }
 
   /// Check for level up
   LevelUpEvent? _checkLevelUp() {
-    final newLevel = RewardSystem.getCurrentLevel(_currentProgress.currentStreak);
+    final newLevel =
+        RewardSystem.getCurrentLevel(_currentProgress.currentStreak);
     if (newLevel != _currentProgress.currentLevel) {
       final oldLevel = _currentProgress.currentLevel;
       _currentProgress = _currentProgress.copyWith(
@@ -241,7 +251,7 @@ class RewardsService {
           newLevel,
         ),
       );
-      
+
       return LevelUpEvent(
         oldLevel: oldLevel,
         newLevel: newLevel,
@@ -252,15 +262,16 @@ class RewardsService {
   }
 
   /// Check for new rewards
-  List<UserReward> _checkForNewRewards(ActivityType activityType, Map<String, dynamic> activityData) {
+  List<UserReward> _checkForNewRewards(
+      ActivityType activityType, Map<String, dynamic> activityData) {
     List<UserReward> newRewards = [];
     final allRewards = RewardSystem.getAllRewards();
-    
+
     for (final reward in allRewards) {
       if (_currentProgress.unlockedRewards.any((r) => r.id == reward.id)) {
         continue; // Already unlocked
       }
-      
+
       if (_shouldUnlockReward(reward, activityType, activityData)) {
         newRewards.add(reward.copyWith(
           isUnlocked: true,
@@ -268,18 +279,19 @@ class RewardsService {
         ));
       }
     }
-    
+
     if (newRewards.isNotEmpty) {
       _currentProgress = _currentProgress.copyWith(
         unlockedRewards: [..._currentProgress.unlockedRewards, ...newRewards],
       );
     }
-    
+
     return newRewards;
   }
 
   /// Check if reward should be unlocked
-  bool _shouldUnlockReward(UserReward reward, ActivityType activityType, Map<String, dynamic> activityData) {
+  bool _shouldUnlockReward(UserReward reward, ActivityType activityType,
+      Map<String, dynamic> activityData) {
     switch (reward.id) {
       // Streak rewards
       case 'streak_7':
@@ -290,7 +302,7 @@ class RewardsService {
         return getActivityStreak(activityType).currentStreak >= 100;
       case 'streak_365':
         return getActivityStreak(activityType).currentStreak >= 365;
-      
+
       // Milestone rewards
       case 'meals_10':
         return (_lifetimeTotals[ActivityType.mealLogging.name] ?? 0) >= 10;
@@ -300,75 +312,76 @@ class RewardsService {
         return (_lifetimeTotals[ActivityType.mealLogging.name] ?? 0) >= 500;
       case 'meals_1000':
         return (_lifetimeTotals[ActivityType.mealLogging.name] ?? 0) >= 1000;
-      
+
       case 'exercise_10':
         return (_lifetimeTotals[ActivityType.exercise.name] ?? 0) >= 10;
       case 'exercise_100':
         return (_lifetimeTotals[ActivityType.exercise.name] ?? 0) >= 100;
       case 'exercise_500':
         return (_lifetimeTotals[ActivityType.exercise.name] ?? 0) >= 500;
-      
+
       case 'steps_10000':
         return (_lifetimeTotals[ActivityType.steps.name] ?? 0) >= 10000;
       case 'steps_100000':
         return (_lifetimeTotals[ActivityType.steps.name] ?? 0) >= 100000;
       case 'steps_1000000':
         return (_lifetimeTotals[ActivityType.steps.name] ?? 0) >= 1000000;
-      
+
       // Special achievements
       case 'first_meal':
-        return activityType == ActivityType.mealLogging && 
-               (_lifetimeTotals[ActivityType.mealLogging.name] ?? 0) == 1;
+        return activityType == ActivityType.mealLogging &&
+            (_lifetimeTotals[ActivityType.mealLogging.name] ?? 0) == 1;
       case 'perfect_week':
         return _checkPerfectWeek();
       case 'early_bird':
         return _checkEarlyBird();
       case 'night_owl_restraint':
         return _checkNightOwlRestraint();
-      
+
       default:
         return false;
     }
   }
 
   /// Validate activity for anti-gaming
-  bool _validateActivity(ActivityType activityType, Map<String, dynamic> activityData, DateTime timestamp) {
+  bool _validateActivity(ActivityType activityType,
+      Map<String, dynamic> activityData, DateTime timestamp) {
     final now = DateTime.now();
     final activityKey = activityType.name;
-    
+
     // Check for unrealistic values
     if (activityType == ActivityType.exercise) {
       final calories = activityData['calories'] as int? ?? 0;
       if (calories > 5000) return false; // More than 5000 calories burned
     }
-    
+
     // Check for mass backlogging
     if (!_recentActivities.containsKey(activityKey)) {
       _recentActivities[activityKey] = [];
     }
-    
+
     final recentActivities = _recentActivities[activityKey]!;
-    final recentCount = recentActivities.where(
-      (time) => now.difference(time).inHours < 1
-    ).length;
-    
+    final recentCount = recentActivities
+        .where((time) => now.difference(time).inHours < 1)
+        .length;
+
     if (recentCount > 10) return false; // More than 10 activities per hour
-    
+
     // Check retroactive entries
     if (timestamp.isBefore(now.subtract(maxRetroactiveTime))) {
-      final retroactiveCount = recentActivities.where(
-        (time) => now.difference(time).inDays > 1
-      ).length;
-      
+      final retroactiveCount = recentActivities
+          .where((time) => now.difference(time).inDays > 1)
+          .length;
+
       if (retroactiveCount >= maxRetroactiveEntries) return false;
     }
-    
+
     // Add to recent activities
     recentActivities.add(timestamp);
     if (recentActivities.length > 100) {
       recentActivities.removeRange(0, recentActivities.length - 100);
     }
-    
+
     return true;
   }
 
@@ -392,7 +405,8 @@ class RewardsService {
   }
 
   /// Update challenges
-  void _updateChallenges(ActivityType activityType, Map<String, dynamic> activityData) {
+  void _updateChallenges(
+      ActivityType activityType, Map<String, dynamic> activityData) {
     for (final challengeProgress in _challenges.values) {
       if (challengeProgress.challenge.requiredActivity == activityType) {
         challengeProgress.updateProgress(activityData);
@@ -403,7 +417,8 @@ class RewardsService {
   /// Initialize activity streaks
   void _initializeActivityStreaks() {
     for (final activityType in ActivityType.values) {
-      _activityStreaks[activityType.name] = ActivityStreak.initial(activityType);
+      _activityStreaks[activityType.name] =
+          ActivityStreak.initial(activityType);
     }
   }
 
@@ -421,8 +436,7 @@ class RewardsService {
         xpReward: 25,
       ),
     );
-    
-    
+
     // Weekly challenges
     _challenges['weekly_calorie'] = ChallengeProgress(
       challenge: const Challenge(
@@ -435,7 +449,7 @@ class RewardsService {
         xpReward: 200,
       ),
     );
-    
+
     // Monthly challenges
     _challenges['monthly_perfect'] = ChallengeProgress(
       challenge: const Challenge(
@@ -468,7 +482,7 @@ class RewardsService {
         challengeProgress.reset();
       }
     }
-    
+
     // Clean up old recent activities
     final cutoff = DateTime.now().subtract(const Duration(days: 7));
     for (final activities in _recentActivities.values) {
@@ -494,7 +508,6 @@ class RewardsService {
     _levelUpController.close();
   }
 }
-
 
 /// Activity streak tracking
 class ActivityStreak {
@@ -578,7 +591,7 @@ class ChallengeProgress {
 
   void updateProgress(Map<String, dynamic> activityData) {
     if (isCompleted) return;
-    
+
     currentProgress++;
     if (currentProgress >= challenge.targetValue) {
       isCompleted = true;

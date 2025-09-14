@@ -44,11 +44,13 @@ class ChatSession {
     return {
       'id': id,
       'title': title,
-      'messages': messages.map((m) => {
-        'sender': m.sender,
-        'text': m.text,
-        'timestamp': m.timestamp.millisecondsSinceEpoch,
-      }).toList(),
+      'messages': messages
+          .map((m) => {
+                'sender': m.sender,
+                'text': m.text,
+                'timestamp': m.timestamp.millisecondsSinceEpoch,
+              })
+          .toList(),
       'timestamp': timestamp.millisecondsSinceEpoch,
       'userId': userId,
     };
@@ -59,35 +61,42 @@ class ChatSession {
       id: map['id'] ?? '',
       title: map['title'] ?? '',
       messages: (map['messages'] as List<dynamic>?)
-          ?.map((m) => Message(
-                sender: m['sender'] ?? '',
-                text: m['text'] ?? '',
-                timestamp: DateTime.fromMillisecondsSinceEpoch(m['timestamp'] ?? 0),
-              ))
-          .toList() ?? [],
+              ?.map((m) => Message(
+                    sender: m['sender'] ?? '',
+                    text: m['text'] ?? '',
+                    timestamp: DateTime.fromMillisecondsSinceEpoch(
+                        m['timestamp'] ?? 0),
+                  ))
+              .toList() ??
+          [],
       timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp'] ?? 0),
       userId: map['userId'] ?? '',
     );
   }
 }
 
-class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMixin {
+class _AITrainerScreenState extends State<AITrainerScreen>
+    with GoogleFitSyncMixin {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseService _firebaseService = FirebaseService();
-  
+
   bool isDark = false;
   bool isLoading = false;
   bool isPremium = false; // Simulated premium status
   bool isLoadingHistory = false;
   Map<String, dynamic>? _userProfile;
-  
+
   List<Message> messages = [
-    Message(sender: 'Sisir', text: 'Hi! I am Trainer Sisir. Ask me anything about fitness or nutrition!', timestamp: DateTime.now()),
+    Message(
+        sender: 'Sisir',
+        text:
+            'Hi! I am Trainer Sisir. Ask me anything about fitness or nutrition!',
+        timestamp: DateTime.now()),
   ];
-  
+
   List<ChatSession> chatSessions = [];
   String? currentSessionId;
   DateTime? _lastHistoryLoad;
@@ -106,17 +115,19 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
   @override
   void onGoogleFitDataUpdate(Map<String, dynamic> syncData) {
     super.onGoogleFitDataUpdate(syncData);
-    
+
     // Store fitness data for AI trainer to use in recommendations
     _currentFitnessData = syncData;
-    print('Trainer screen: Updated with Google Fit data - Steps: ${syncData['steps']}');
+    print(
+        'Trainer screen: Updated with Google Fit data - Steps: ${syncData['steps']}');
   }
 
   /// Override mixin method to handle Google Fit connection changes
   @override
   void onGoogleFitConnectionChanged(bool isConnected) {
     super.onGoogleFitConnectionChanged(isConnected);
-    print('Trainer screen: Google Fit connection changed - Connected: $isConnected');
+    print(
+        'Trainer screen: Google Fit connection changed - Connected: $isConnected');
   }
 
   @override
@@ -151,17 +162,17 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
 
   Future<void> _loadChatHistory({bool forceRefresh = false}) async {
     if (!isPremium) return;
-    
+
     // Don't reload if already loading
     if (isLoadingHistory) return;
-    
+
     // Use cache if data is recent (less than 30 seconds old) and not forcing refresh
-    if (!forceRefresh && 
-        _lastHistoryLoad != null && 
+    if (!forceRefresh &&
+        _lastHistoryLoad != null &&
         DateTime.now().difference(_lastHistoryLoad!).inSeconds < 30) {
       return;
     }
-    
+
     // Only show loading if we have no data
     if (chatSessions.isEmpty) {
       setState(() {
@@ -206,7 +217,7 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
         isLoadingHistory = false;
         _lastHistoryLoad = DateTime.now();
       });
-      
+
       print('Chat history loaded: ${limitedSessions.length} sessions');
     } catch (e) {
       print('Error loading chat history: $e');
@@ -218,7 +229,7 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
 
   Future<void> _saveCurrentSession() async {
     if (!isPremium) return;
-    
+
     // Only save if there are user messages (more than just the welcome message)
     final userMessages = messages.where((msg) => msg.sender == 'user').toList();
     if (userMessages.isEmpty) return;
@@ -227,10 +238,11 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
       final user = _auth.currentUser;
       if (user == null) return;
 
-      final sessionId = currentSessionId ?? DateTime.now().millisecondsSinceEpoch.toString();
+      final sessionId =
+          currentSessionId ?? DateTime.now().millisecondsSinceEpoch.toString();
       final firstUserMessage = userMessages.first;
-      
-      final title = firstUserMessage.text.length > 30 
+
+      final title = firstUserMessage.text.length > 30
           ? '${firstUserMessage.text.substring(0, 30)}...'
           : firstUserMessage.text;
 
@@ -256,7 +268,7 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
 
       // Reload history
       await _loadChatHistory();
-      
+
       print('Chat session saved successfully: $sessionId');
     } catch (e) {
       print('Error saving chat session: $e');
@@ -281,14 +293,14 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
             final bTime = b.data()['timestamp'] as int? ?? 0;
             return aTime.compareTo(bTime); // Ascending order (oldest first)
           });
-        
+
         final docsToDelete = sortedDocs.skip(5);
         final batch = _firestore.batch();
-        
+
         for (final doc in docsToDelete) {
           batch.delete(doc.reference);
         }
-        
+
         await batch.commit();
       }
     } catch (e) {
@@ -317,45 +329,50 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
   void _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-    
+
     setState(() {
-      messages.add(Message(sender: 'user', text: text, timestamp: DateTime.now()));
+      messages
+          .add(Message(sender: 'user', text: text, timestamp: DateTime.now()));
       isLoading = true;
       _controller.clear();
     });
-    
+
     await Future.delayed(const Duration(milliseconds: 300));
     _scrollController.animateTo(
       _scrollController.position.maxScrollExtent + 100,
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
     );
-    
+
     String reply;
     try {
       // Convert messages to conversation history format
       final conversationHistory = messages
-          .where((msg) => msg.sender != 'Sisir' || msg.text != 'Hi! I am Trainer Sisir. Ask me anything about fitness or nutrition!')
+          .where((msg) =>
+              msg.sender != 'Sisir' ||
+              msg.text !=
+                  'Hi! I am Trainer Sisir. Ask me anything about fitness or nutrition!')
           .map((msg) => {
-            'role': msg.sender == 'user' ? 'user' : 'assistant',
-            'content': msg.text,
-          })
+                'role': msg.sender == 'user' ? 'user' : 'assistant',
+                'content': msg.text,
+              })
           .toList();
-      
+
       reply = await AIService.askTrainerSisir(
-        text, 
+        text,
         userProfile: _userProfile,
         conversationHistory: conversationHistory,
       );
     } catch (e) {
       reply = 'Sorry, there was a problem connecting to the AI service.';
     }
-    
+
     setState(() {
-      messages.add(Message(sender: 'Sisir', text: reply, timestamp: DateTime.now()));
+      messages.add(
+          Message(sender: 'Sisir', text: reply, timestamp: DateTime.now()));
       isLoading = false;
     });
-    
+
     await Future.delayed(const Duration(milliseconds: 300));
     _scrollController.animateTo(
       _scrollController.position.maxScrollExtent + 100,
@@ -372,10 +389,14 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
     if (currentSessionId != null && messages.length > 1) {
       _saveCurrentSession();
     }
-    
+
     setState(() {
       messages = [
-        Message(sender: 'Sisir', text: 'Hi! I am Trainer Sisir. Ask me anything about fitness or nutrition!', timestamp: DateTime.now()),
+        Message(
+            sender: 'Sisir',
+            text:
+                'Hi! I am Trainer Sisir. Ask me anything about fitness or nutrition!',
+            timestamp: DateTime.now()),
       ];
       currentSessionId = null;
     });
@@ -388,13 +409,13 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
         isLoadingHistory = false;
       });
     }
-    
+
     // Only refresh if we don't have recent data
-    if (_lastHistoryLoad == null || 
+    if (_lastHistoryLoad == null ||
         DateTime.now().difference(_lastHistoryLoad!).inSeconds > 30) {
       _loadChatHistory(forceRefresh: true);
     }
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -462,7 +483,8 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
                   ),
                 if (!isPremium)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.amber.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
@@ -544,7 +566,8 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
               style: ElevatedButton.styleFrom(
                 backgroundColor: kAccentBlue,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(25),
                 ),
@@ -637,7 +660,8 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
               style: ElevatedButton.styleFrom(
                 backgroundColor: kAccentBlue,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(25),
                 ),
@@ -659,16 +683,14 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
 
   Widget _buildSessionCard(ChatSession session) {
     final isCurrentSession = currentSessionId == session.id;
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: isDark ? Colors.grey[800] : Colors.grey[50],
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isCurrentSession 
-              ? kAccentBlue 
-              : Colors.grey.withOpacity(0.3),
+          color: isCurrentSession ? kAccentBlue : Colors.grey.withOpacity(0.3),
           width: isCurrentSession ? 2 : 1,
         ),
         boxShadow: [
@@ -865,7 +887,7 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
   Future<void> _deleteSession(ChatSession session) async {
     try {
       await _firestore.collection('chat_sessions').doc(session.id).delete();
-      
+
       setState(() {
         chatSessions.removeWhere((s) => s.id == session.id);
         if (currentSessionId == session.id) {
@@ -974,7 +996,10 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
                 ),
               ),
               const SizedBox(width: 12),
-              Text('Trainer Sisir', style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : kTextDark)),
+              Text('Trainer Sisir',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : kTextDark)),
             ],
           ),
           actions: [
@@ -990,7 +1015,8 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                 itemCount: messages.length + (isLoading ? 1 : 0),
                 itemBuilder: (context, i) {
                   if (i == messages.length && isLoading) {
@@ -998,7 +1024,10 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
                       padding: EdgeInsets.symmetric(vertical: 8),
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: SizedBox(width: 32, height: 32, child: CircularProgressIndicator(strokeWidth: 2)),
+                        child: SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: CircularProgressIndicator(strokeWidth: 2)),
                       ),
                     );
                   }
@@ -1033,8 +1062,11 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
                           borderSide: BorderSide.none,
                         ),
                         filled: true,
-                        fillColor: isDark ? Colors.grey[800] : kAccentBlue.withOpacity(0.08),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        fillColor: isDark
+                            ? Colors.grey[800]
+                            : kAccentBlue.withOpacity(0.08),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
                       ),
                       onSubmitted: (_) => _sendMessage(),
                     ),
@@ -1059,11 +1091,12 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
 
   Widget _buildEnhancedChatBubble(Message msg) {
     final isUser = msg.sender == 'user';
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment:
+            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Flexible(
@@ -1101,7 +1134,7 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
                   ),
                 ],
                 border: Border.all(
-                  color: isUser 
+                  color: isUser
                       ? kAccentBlue.withOpacity(0.3)
                       : Colors.grey.withOpacity(0.2),
                   width: 1,
@@ -1113,7 +1146,9 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
                   Text(
                     msg.text,
                     style: TextStyle(
-                      color: isUser ? Colors.white : (isDark ? Colors.white : kTextDark),
+                      color: isUser
+                          ? Colors.white
+                          : (isDark ? Colors.white : kTextDark),
                       fontSize: 15,
                       height: 1.4,
                     ),
@@ -1122,7 +1157,7 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
                   Text(
                     _formatTime(msg.timestamp),
                     style: TextStyle(
-                      color: isUser 
+                      color: isUser
                           ? Colors.white.withOpacity(0.7)
                           : Colors.grey[500],
                       fontSize: 11,

@@ -10,21 +10,23 @@ class ErrorHandler {
   ErrorHandler._internal();
 
   final List<ErrorEvent> _errors = [];
-  final StreamController<ErrorEvent> _errorController = StreamController<ErrorEvent>.broadcast();
-  
+  final StreamController<ErrorEvent> _errorController =
+      StreamController<ErrorEvent>.broadcast();
+
   bool _isInitialized = false;
   bool _isFirebaseAvailable = false;
 
   // Streams
   Stream<ErrorEvent> get errorStream => _errorController.stream;
-  List<ErrorEvent> get recentErrors => _errors.length > 50 ? _errors.sublist(_errors.length - 50) : _errors;
+  List<ErrorEvent> get recentErrors =>
+      _errors.length > 50 ? _errors.sublist(_errors.length - 50) : _errors;
 
   /// Initialize the error handler
   Future<void> initialize({bool firebaseAvailable = false}) async {
     if (_isInitialized) return;
-    
+
     _isFirebaseAvailable = firebaseAvailable;
-    
+
     // Set up Flutter error handling
     FlutterError.onError = (FlutterErrorDetails details) {
       _handleError(
@@ -34,7 +36,7 @@ class ErrorHandler {
         context: details.context?.toString(),
       );
     };
-    
+
     // Set up zone error handling
     PlatformDispatcher.instance.onError = (error, stack) {
       _handleError(
@@ -44,7 +46,7 @@ class ErrorHandler {
       );
       return true;
     };
-    
+
     _isInitialized = true;
     print('ErrorHandler initialized');
   }
@@ -65,15 +67,15 @@ class ErrorHandler {
       context: context,
       additionalData: additionalData ?? {},
     );
-    
+
     _errors.add(error);
     _errorController.add(error);
-    
+
     // Keep only last 100 errors
     if (_errors.length > 100) {
       _errors.removeAt(0);
     }
-    
+
     // Log to console in debug mode
     if (kDebugMode) {
       print('🚨 Error [${type.name}]: $message');
@@ -81,7 +83,7 @@ class ErrorHandler {
         print('Stack trace: $stackTrace');
       }
     }
-    
+
     // Report to Firebase if available
     if (_isFirebaseAvailable) {
       _reportToFirebase(error);
@@ -95,21 +97,22 @@ class ErrorHandler {
       FirebaseCrashlytics.instance.recordError(
         error.message,
         error.stackTrace,
-        fatal: error.type == ErrorType.flutter || error.type == ErrorType.platform,
+        fatal:
+            error.type == ErrorType.flutter || error.type == ErrorType.platform,
         information: [
           'Type: ${error.type.name}',
           'Context: ${error.context ?? 'N/A'}',
           'Additional Data: ${error.additionalData}',
         ],
       );
-      
+
       // Log to Analytics
       FirebaseAnalytics.instance.logEvent(
         name: 'error_occurred',
         parameters: {
           'error_type': error.type.name,
-          'error_message': error.message.length > 100 
-              ? error.message.substring(0, 100) 
+          'error_message': error.message.length > 100
+              ? error.message.substring(0, 100)
               : error.message,
           'has_stack_trace': error.stackTrace != null,
           'has_context': error.context != null,
@@ -121,7 +124,8 @@ class ErrorHandler {
   }
 
   /// Handle Firebase errors
-  void handleFirebaseError(String operation, dynamic error, {StackTrace? stackTrace}) {
+  void handleFirebaseError(String operation, dynamic error,
+      {StackTrace? stackTrace}) {
     _handleError(
       ErrorType.firebase,
       'Firebase $operation failed: $error',
@@ -131,7 +135,8 @@ class ErrorHandler {
   }
 
   /// Handle network errors
-  void handleNetworkError(String operation, dynamic error, {StackTrace? stackTrace}) {
+  void handleNetworkError(String operation, dynamic error,
+      {StackTrace? stackTrace}) {
     _handleError(
       ErrorType.network,
       'Network $operation failed: $error',
@@ -141,7 +146,8 @@ class ErrorHandler {
   }
 
   /// Handle authentication errors
-  void handleAuthError(String operation, dynamic error, {StackTrace? stackTrace}) {
+  void handleAuthError(String operation, dynamic error,
+      {StackTrace? stackTrace}) {
     _handleError(
       ErrorType.authentication,
       'Auth $operation failed: $error',
@@ -151,7 +157,8 @@ class ErrorHandler {
   }
 
   /// Handle data processing errors
-  void handleDataError(String operation, dynamic error, {StackTrace? stackTrace}) {
+  void handleDataError(String operation, dynamic error,
+      {StackTrace? stackTrace}) {
     _handleError(
       ErrorType.data,
       'Data $operation failed: $error',
@@ -161,7 +168,8 @@ class ErrorHandler {
   }
 
   /// Handle UI errors
-  void handleUIError(String operation, dynamic error, {StackTrace? stackTrace}) {
+  void handleUIError(String operation, dynamic error,
+      {StackTrace? stackTrace}) {
     _handleError(
       ErrorType.ui,
       'UI $operation failed: $error',
@@ -171,7 +179,8 @@ class ErrorHandler {
   }
 
   /// Handle business logic errors
-  void handleBusinessError(String operation, dynamic error, {StackTrace? stackTrace}) {
+  void handleBusinessError(String operation, dynamic error,
+      {StackTrace? stackTrace}) {
     _handleError(
       ErrorType.business,
       'Business $operation failed: $error',
@@ -184,21 +193,24 @@ class ErrorHandler {
   Map<String, dynamic> getErrorStats() {
     final errorCounts = <ErrorType, int>{};
     final recentErrorCounts = <ErrorType, int>{};
-    
+
     for (final error in _errors) {
       errorCounts[error.type] = (errorCounts[error.type] ?? 0) + 1;
     }
-    
-    final recentErrors = _errors.length > 24 ? _errors.sublist(_errors.length - 24) : _errors; // Last 24 hours
+
+    final recentErrors = _errors.length > 24
+        ? _errors.sublist(_errors.length - 24)
+        : _errors; // Last 24 hours
     for (final error in recentErrors) {
       recentErrorCounts[error.type] = (recentErrorCounts[error.type] ?? 0) + 1;
     }
-    
+
     return {
       'total_errors': _errors.length,
       'recent_errors': recentErrors.length,
       'error_counts': errorCounts.map((k, v) => MapEntry(k.name, v)),
-      'recent_error_counts': recentErrorCounts.map((k, v) => MapEntry(k.name, v)),
+      'recent_error_counts':
+          recentErrorCounts.map((k, v) => MapEntry(k.name, v)),
       'last_error': _errors.isNotEmpty ? _errors.last.toMap() : null,
     };
   }
@@ -228,40 +240,43 @@ class ErrorHandler {
 
   /// Check if there are critical errors
   bool hasCriticalErrors() {
-    return _errors.any((error) => 
-      error.type == ErrorType.flutter || 
-      error.type == ErrorType.platform ||
-      error.message.toLowerCase().contains('fatal')
-    );
+    return _errors.any((error) =>
+        error.type == ErrorType.flutter ||
+        error.type == ErrorType.platform ||
+        error.message.toLowerCase().contains('fatal'));
   }
 
   /// Get error recommendations
   List<String> getErrorRecommendations() {
     final recommendations = <String>[];
     final stats = getErrorStats();
-    
+
     // Check for high error rates
     final totalErrors = stats['total_errors'] as int;
     if (totalErrors > 50) {
-      recommendations.add('High error count detected. Consider reviewing error logs.');
+      recommendations
+          .add('High error count detected. Consider reviewing error logs.');
     }
-    
+
     // Check for specific error patterns
     final firebaseErrors = getErrorsByType(ErrorType.firebase).length;
     if (firebaseErrors > 10) {
-      recommendations.add('Multiple Firebase errors detected. Check Firebase configuration.');
+      recommendations.add(
+          'Multiple Firebase errors detected. Check Firebase configuration.');
     }
-    
+
     final networkErrors = getErrorsByType(ErrorType.network).length;
     if (networkErrors > 20) {
-      recommendations.add('Network connectivity issues detected. Check internet connection.');
+      recommendations.add(
+          'Network connectivity issues detected. Check internet connection.');
     }
-    
+
     final authErrors = getErrorsByType(ErrorType.authentication).length;
     if (authErrors > 5) {
-      recommendations.add('Authentication issues detected. Check user credentials.');
+      recommendations
+          .add('Authentication issues detected. Check user credentials.');
     }
-    
+
     return recommendations;
   }
 

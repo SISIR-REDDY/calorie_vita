@@ -12,10 +12,11 @@ class CalorieUnitsService {
 
   final AppStateService _appStateService = AppStateService();
   CalorieUnit _currentUnit = CalorieUnit.kcal;
-  
+
   // Stream controller for notifying UI of unit changes
-  final StreamController<CalorieUnit> _unitController = StreamController<CalorieUnit>.broadcast();
-  
+  final StreamController<CalorieUnit> _unitController =
+      StreamController<CalorieUnit>.broadcast();
+
   // Stream for UI components to listen to unit changes
   Stream<CalorieUnit> get unitStream => _unitController.stream;
 
@@ -59,11 +60,11 @@ class CalorieUnitsService {
   /// Format calories with the current unit
   String formatCalories(double kcalValue, {int? decimalPlaces}) {
     final convertedValue = convertFromKcal(kcalValue);
-    
+
     if (decimalPlaces != null) {
       return '${convertedValue.toStringAsFixed(decimalPlaces)} ${_currentUnit.displayName}';
     }
-    
+
     // Auto-determine decimal places based on unit
     switch (_currentUnit) {
       case CalorieUnit.kcal:
@@ -76,7 +77,7 @@ class CalorieUnitsService {
   /// Format calories for display in cards (shorter format)
   String formatCaloriesShort(double kcalValue) {
     final convertedValue = convertFromKcal(kcalValue);
-    
+
     switch (_currentUnit) {
       case CalorieUnit.kcal:
         return '${convertedValue.round()}';
@@ -89,7 +90,8 @@ class CalorieUnitsService {
   String get unitSuffix => _currentUnit.displayName;
 
   /// Format calories with custom formatting
-  String formatCaloriesCustom(double kcalValue, {
+  String formatCaloriesCustom(
+    double kcalValue, {
     bool showUnit = true,
     int? decimalPlaces,
     String? prefix,
@@ -97,7 +99,7 @@ class CalorieUnitsService {
   }) {
     final convertedValue = convertFromKcal(kcalValue);
     final unit = showUnit ? ' ${_currentUnit.displayName}' : '';
-    
+
     String formattedValue;
     if (decimalPlaces != null) {
       formattedValue = convertedValue.toStringAsFixed(decimalPlaces);
@@ -111,7 +113,7 @@ class CalorieUnitsService {
           break;
       }
     }
-    
+
     return '${prefix ?? ''}$formattedValue$unit${suffix ?? ''}';
   }
 

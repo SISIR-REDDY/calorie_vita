@@ -76,7 +76,7 @@ class StreakSummaryWidget extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          
+
           // Active streaks count
           Row(
             children: [
@@ -111,7 +111,8 @@ class StreakSummaryWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
+  Widget _buildStatItem(
+      String label, String value, IconData icon, Color color) {
     return Column(
       children: [
         Icon(icon, color: color, size: 20),
@@ -199,8 +200,9 @@ class _GoalStreakCardState extends State<GoalStreakCard>
       return _buildLoadingCard(context);
     }
 
-    final isEmpty = widget.streak.currentStreak == 0 && widget.streak.longestStreak == 0;
-    
+    final isEmpty =
+        widget.streak.currentStreak == 0 && widget.streak.longestStreak == 0;
+
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
@@ -216,16 +218,16 @@ class _GoalStreakCardState extends State<GoalStreakCard>
                   color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: widget.streak.achievedToday 
+                    color: widget.streak.achievedToday
                         ? widget.streak.goalType.color.withOpacity(0.3)
-                        : isEmpty 
+                        : isEmpty
                             ? Colors.grey.withOpacity(0.15)
                             : Colors.grey.withOpacity(0.2),
                     width: 2,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: widget.streak.achievedToday 
+                      color: widget.streak.achievedToday
                           ? widget.streak.goalType.color.withOpacity(0.1)
                           : Colors.grey.withOpacity(0.05),
                       blurRadius: 8,
@@ -258,9 +260,10 @@ class _GoalStreakCardState extends State<GoalStreakCard>
                           ],
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: widget.streak.achievedToday 
+                            color: widget.streak.achievedToday
                                 ? widget.streak.goalType.color.withOpacity(0.1)
                                 : isEmpty
                                     ? Colors.orange.withOpacity(0.1)
@@ -268,15 +271,15 @@ class _GoalStreakCardState extends State<GoalStreakCard>
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            widget.streak.achievedToday 
-                                ? 'Done' 
-                                : isEmpty 
+                            widget.streak.achievedToday
+                                ? 'Done'
+                                : isEmpty
                                     ? 'Start'
                                     : 'Pending',
                             style: GoogleFonts.poppins(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
-                              color: widget.streak.achievedToday 
+                              color: widget.streak.achievedToday
                                   ? widget.streak.goalType.color
                                   : isEmpty
                                       ? Colors.orange
@@ -287,7 +290,7 @@ class _GoalStreakCardState extends State<GoalStreakCard>
                       ],
                     ),
                     const SizedBox(height: 12),
-                    
+
                     // Streak information
                     Row(
                       children: [
@@ -299,15 +302,20 @@ class _GoalStreakCardState extends State<GoalStreakCard>
                                 'Current Streak',
                                 style: GoogleFonts.poppins(
                                   fontSize: 12,
-                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withOpacity(0.7),
                                 ),
                               ),
                               Text(
-                                isEmpty ? '0 days' : '${widget.streak.currentStreak} days',
+                                isEmpty
+                                    ? '0 days'
+                                    : '${widget.streak.currentStreak} days',
                                 style: GoogleFonts.poppins(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
-                                  color: isEmpty 
+                                  color: isEmpty
                                       ? Colors.grey.withOpacity(0.6)
                                       : widget.streak.goalType.color,
                                 ),
@@ -323,11 +331,16 @@ class _GoalStreakCardState extends State<GoalStreakCard>
                                 'Best Streak',
                                 style: GoogleFonts.poppins(
                                   fontSize: 12,
-                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withOpacity(0.7),
                                 ),
                               ),
                               Text(
-                                isEmpty ? '0 days' : '${widget.streak.longestStreak} days',
+                                isEmpty
+                                    ? '0 days'
+                                    : '${widget.streak.longestStreak} days',
                                 style: GoogleFonts.poppins(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -342,17 +355,20 @@ class _GoalStreakCardState extends State<GoalStreakCard>
                       ],
                     ),
                     const SizedBox(height: 8),
-                    
+
                     // Status message with enhanced empty state
                     Text(
-                      isEmpty 
+                      isEmpty
                           ? 'Start your streak today!'
                           : widget.streak.statusMessage,
                       style: GoogleFonts.poppins(
                         fontSize: 12,
                         color: isEmpty
                             ? Colors.orange.withOpacity(0.8)
-                            : Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                            : Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.8),
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -495,9 +511,10 @@ class WeeklyStreakCalendar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final days = List.generate(7, (index) => weekStart.add(Duration(days: index)));
+    final days =
+        List.generate(7, (index) => weekStart.add(Duration(days: index)));
     final today = DateTime.now();
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -519,26 +536,28 @@ class WeeklyStreakCalendar extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Calendar grid
           Row(
             children: days.map((day) {
-              final isToday = day.day == today.day && day.month == today.month && day.year == today.year;
+              final isToday = day.day == today.day &&
+                  day.month == today.month &&
+                  day.year == today.year;
               final isPast = day.isBefore(today);
               final isFuture = day.isAfter(today);
-              
+
               // Count how many goals were achieved on this day
               int achievedCount = 0;
               if (isPast || isToday) {
                 for (final streak in goalStreaks.values) {
-                  if (streak.lastAchievedDate.day == day.day && 
-                      streak.lastAchievedDate.month == day.month && 
+                  if (streak.lastAchievedDate.day == day.day &&
+                      streak.lastAchievedDate.month == day.month &&
                       streak.lastAchievedDate.year == day.year) {
                     achievedCount++;
                   }
                 }
               }
-              
+
               return Expanded(
                 child: Column(
                   children: [
@@ -546,7 +565,10 @@ class WeeklyStreakCalendar extends StatelessWidget {
                       _getDayName(day.weekday),
                       style: GoogleFonts.poppins(
                         fontSize: 10,
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.7),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -554,17 +576,22 @@ class WeeklyStreakCalendar extends StatelessWidget {
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: _getDayColor(achievedCount, goalStreaks.length, isToday, isFuture),
+                        color: _getDayColor(achievedCount, goalStreaks.length,
+                            isToday, isFuture),
                         borderRadius: BorderRadius.circular(8),
-                        border: isToday ? Border.all(color: kPrimaryColor, width: 2) : null,
+                        border: isToday
+                            ? Border.all(color: kPrimaryColor, width: 2)
+                            : null,
                       ),
                       child: Center(
                         child: Text(
                           '${day.day}',
                           style: GoogleFonts.poppins(
                             fontSize: 12,
-                            fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                            color: _getDayTextColor(achievedCount, goalStreaks.length, isToday, isFuture),
+                            fontWeight:
+                                isToday ? FontWeight.bold : FontWeight.normal,
+                            color: _getDayTextColor(achievedCount,
+                                goalStreaks.length, isToday, isFuture),
                           ),
                         ),
                       ),
@@ -574,7 +601,10 @@ class WeeklyStreakCalendar extends StatelessWidget {
                       '$achievedCount/${goalStreaks.length}',
                       style: GoogleFonts.poppins(
                         fontSize: 8,
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.6),
                       ),
                     ),
                   ],
@@ -592,7 +622,8 @@ class WeeklyStreakCalendar extends StatelessWidget {
     return days[weekday - 1];
   }
 
-  Color _getDayColor(int achievedCount, int totalGoals, bool isToday, bool isFuture) {
+  Color _getDayColor(
+      int achievedCount, int totalGoals, bool isToday, bool isFuture) {
     if (isFuture) return Colors.grey.withOpacity(0.1);
     if (achievedCount == 0) return Colors.grey.withOpacity(0.2);
     if (achievedCount == totalGoals) return Colors.green;
@@ -600,7 +631,8 @@ class WeeklyStreakCalendar extends StatelessWidget {
     return Colors.red.withOpacity(0.3);
   }
 
-  Color _getDayTextColor(int achievedCount, int totalGoals, bool isToday, bool isFuture) {
+  Color _getDayTextColor(
+      int achievedCount, int totalGoals, bool isToday, bool isFuture) {
     if (isFuture) return Colors.grey;
     if (achievedCount == 0) return Colors.grey;
     return Colors.white;
@@ -619,11 +651,11 @@ class StreakMotivationWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mostImpressive = streakSummary.mostImpressiveStreak;
-    
+
     if (mostImpressive == null || mostImpressive.currentStreak == 0) {
       return _buildStartMotivation(context);
     }
-    
+
     return _buildStreakMotivation(context, mostImpressive);
   }
 

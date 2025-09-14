@@ -12,9 +12,10 @@ class AIService {
   static String get _apiKey => AIConfig.apiKey;
   static String get _chatModel => AIConfig.chatModel;
   static String get _visionModel => AIConfig.visionModel;
-  
+
   /// Ask Trainer Sisir for fitness and nutrition advice with conversation context
-  static Future<String> askTrainerSisir(String query, {
+  static Future<String> askTrainerSisir(
+    String query, {
     Map<String, dynamic>? userProfile,
     List<Map<String, String>>? conversationHistory,
   }) async {
@@ -24,12 +25,13 @@ class AIService {
       if (userProfile != null && userProfile.isNotEmpty) {
         personalizedContext = _formatProfileForAI(userProfile);
       }
-      
+
       // Build conversation messages with context
       List<Map<String, dynamic>> messages = [
         {
           'role': 'system',
-          'content': '''You are Trainer Sisir, a professional fitness and nutrition coach with 15+ years of experience. You provide concise, actionable advice like a real trainer.
+          'content':
+              '''You are Trainer Sisir, a professional fitness and nutrition coach with 15+ years of experience. You provide concise, actionable advice like a real trainer.
 
 ${personalizedContext.isNotEmpty ? 'CLIENT PROFILE:\n$personalizedContext\n\n' : ''}RESPONSE GUIDELINES:
 - Keep responses under 150 words
@@ -56,13 +58,13 @@ You got this! 💪"
 Be concise, specific, and motivational like a real trainer.''',
         },
       ];
-      
+
       // Add conversation history if provided (last 10 messages to maintain context)
       if (conversationHistory != null && conversationHistory.isNotEmpty) {
-        final recentHistory = conversationHistory.length > 10 
+        final recentHistory = conversationHistory.length > 10
             ? conversationHistory.sublist(conversationHistory.length - 10)
             : conversationHistory;
-        
+
         for (final msg in recentHistory) {
           messages.add({
             'role': msg['role'] ?? 'user',
@@ -70,37 +72,40 @@ Be concise, specific, and motivational like a real trainer.''',
           });
         }
       }
-      
+
       // Add current user query
       messages.add({
         'role': 'user',
         'content': query,
       });
-      
+
       final response = await _makeRequest(
         model: _chatModel,
         messages: messages,
         isChatRequest: true,
       );
-      
-      return response['choices'][0]['message']['content'] ?? 'Sorry, I couldn\'t process your request.';
+
+      return response['choices'][0]['message']['content'] ??
+          'Sorry, I couldn\'t process your request.';
     } catch (e) {
       print('Error in askTrainerSisir: $e');
       return '⚠️ AI service unavailable, please try again later.';
     }
   }
-  
+
   /// Get AI-powered analytics insights based on user data
-  static Future<String> getAnalyticsInsights(Map<String, dynamic> userData) async {
+  static Future<String> getAnalyticsInsights(
+      Map<String, dynamic> userData) async {
     try {
       final dataSummary = _formatUserDataForAI(userData);
-      
+
       final response = await _makeRequest(
         model: _chatModel,
         messages: [
           {
             'role': 'system',
-            'content': '''You are a professional health analytics expert. Provide concise, actionable insights from user data.
+            'content':
+                '''You are a professional health analytics expert. Provide concise, actionable insights from user data.
 
 ANALYSIS REQUIREMENTS:
 - Keep response under 200 words
@@ -131,30 +136,34 @@ Be professional, concise, and actionable.''',
           },
           {
             'role': 'user',
-            'content': 'Analyze this health data and provide concise professional insights:\n\n$dataSummary',
+            'content':
+                'Analyze this health data and provide concise professional insights:\n\n$dataSummary',
           },
         ],
         isAnalyticsRequest: true,
       );
-      
-      return response['choices'][0]['message']['content'] ?? 'Unable to generate insights at this time.';
+
+      return response['choices'][0]['message']['content'] ??
+          'Unable to generate insights at this time.';
     } catch (e) {
       print('Error in getAnalyticsInsights: $e');
       return '⚠️ AI service unavailable, please try again later.';
     }
   }
-  
+
   /// Get personalized health and nutrition recommendations
-  static Future<String> getPersonalizedRecommendations(Map<String, dynamic> profile) async {
+  static Future<String> getPersonalizedRecommendations(
+      Map<String, dynamic> profile) async {
     try {
       final profileSummary = _formatProfileForAI(profile);
-      
+
       final response = await _makeRequest(
         model: _chatModel,
         messages: [
           {
             'role': 'system',
-            'content': '''You are a certified trainer and dietitian. Provide concise, personalized recommendations.
+            'content':
+                '''You are a certified trainer and dietitian. Provide concise, personalized recommendations.
 
 REQUIREMENTS:
 - Keep under 250 words
@@ -188,40 +197,45 @@ Be professional, specific, and motivating.''',
           },
           {
             'role': 'user',
-            'content': 'Provide personalized recommendations for this profile:\n\n$profileSummary',
+            'content':
+                'Provide personalized recommendations for this profile:\n\n$profileSummary',
           },
         ],
         isAnalyticsRequest: true,
       );
-      
-      return response['choices'][0]['message']['content'] ?? 'Unable to generate recommendations at this time.';
+
+      return response['choices'][0]['message']['content'] ??
+          'Unable to generate recommendations at this time.';
     } catch (e) {
       print('Error in getPersonalizedRecommendations: $e');
       return '⚠️ AI service unavailable, please try again later.';
     }
   }
-  
+
   /// Detect calories and nutrition info from food image with high accuracy
-  static Future<Map<String, dynamic>> detectCaloriesFromImage(File imageFile) async {
+  static Future<Map<String, dynamic>> detectCaloriesFromImage(
+      File imageFile) async {
     try {
       // Optimize image before sending
       final optimizedImageBytes = await _optimizeImageForAnalysis(imageFile);
       final base64Image = base64Encode(optimizedImageBytes);
-      
+
       // Try primary model first
       try {
         final result = await _analyzeFoodWithModel(base64Image, _visionModel);
         if (result['confidence'] >= 0.7) {
           return result;
         }
-        print('Primary model confidence too low (${result['confidence']}), trying backup model');
+        print(
+            'Primary model confidence too low (${result['confidence']}), trying backup model');
       } catch (e) {
         print('Primary model failed: $e, trying backup model');
       }
-      
+
       // Try backup model if primary fails or confidence is low
       try {
-        return await _analyzeFoodWithModel(base64Image, AIConfig.backupVisionModel);
+        return await _analyzeFoodWithModel(
+            base64Image, AIConfig.backupVisionModel);
       } catch (e) {
         print('Backup model also failed: $e');
         throw Exception('All vision models failed');
@@ -240,9 +254,10 @@ Be professional, specific, and motivating.''',
       };
     }
   }
-  
+
   /// Analyze food with specific model
-  static Future<Map<String, dynamic>> _analyzeFoodWithModel(String base64Image, String model) async {
+  static Future<Map<String, dynamic>> _analyzeFoodWithModel(
+      String base64Image, String model) async {
     final response = await _makeRequest(
       model: model,
       messages: [
@@ -251,7 +266,8 @@ Be professional, specific, and motivating.''',
           'content': [
             {
               'type': 'text',
-              'text': '''You are an expert nutritionist and food scientist with 20+ years of experience. Analyze this food image with maximum accuracy.
+              'text':
+                  '''You are an expert nutritionist and food scientist with 20+ years of experience. Analyze this food image with maximum accuracy.
 
 CRITICAL ANALYSIS STEPS:
 1. Identify EVERY food item visible (main dishes, sides, drinks, condiments)
@@ -297,40 +313,43 @@ Be extremely precise. If confidence < 0.8, provide conservative estimates.''',
       ],
       isVisionRequest: true,
     );
-    
+
     final content = response['choices'][0]['message']['content'] ?? '';
     print('AI Vision Response ($model): $content');
-    
+
     return _parseFoodAnalysisResponse(content);
   }
-  
+
   /// Parse and validate food analysis response
   static Map<String, dynamic> _parseFoodAnalysisResponse(String content) {
     try {
       // Clean the response
       String cleanedContent = content.trim();
-      cleanedContent = cleanedContent.replaceAll('```json', '').replaceAll('```', '');
-      
+      cleanedContent =
+          cleanedContent.replaceAll('```json', '').replaceAll('```', '');
+
       // Find JSON object with better regex
-      final jsonMatch = RegExp(r'\{.*\}', dotAll: true).firstMatch(cleanedContent);
+      final jsonMatch =
+          RegExp(r'\{.*\}', dotAll: true).firstMatch(cleanedContent);
       if (jsonMatch != null) {
         final jsonStr = jsonMatch.group(0)!.trim();
         final parsed = jsonDecode(jsonStr) as Map<String, dynamic>;
-        
+
         // Validate and clean the parsed data
         final calories = _parseNumber(parsed['calories']);
         final confidence = _parseNumber(parsed['confidence']) ?? 0.5;
-        
+
         // Validate confidence
         final validatedConfidence = confidence.clamp(0.0, 1.0);
-        
+
         return {
           'food': (parsed['food'] ?? 'Unknown Food').toString().trim(),
           'calories': calories ?? 0,
           'protein': _formatMacro(parsed['protein']),
           'carbs': _formatMacro(parsed['carbs']),
           'fat': _formatMacro(parsed['fat']),
-          'serving_size': (parsed['serving_size'] ?? '1 serving').toString().trim(),
+          'serving_size':
+              (parsed['serving_size'] ?? '1 serving').toString().trim(),
           'confidence': validatedConfidence,
           'notes': parsed['notes']?.toString(),
           'breakdown': parsed['breakdown'],
@@ -341,37 +360,37 @@ Be extremely precise. If confidence < 0.8, provide conservative estimates.''',
       print('Error parsing food analysis JSON: $e');
       print('Raw response: $content');
     }
-    
+
     // Enhanced fallback with better text extraction
     return _extractFoodInfoFromText(content);
   }
-  
+
   /// Optimize image for better AI analysis
   static Future<List<int>> _optimizeImageForAnalysis(File imageFile) async {
     try {
       // Read and decode image
       final imageBytes = await imageFile.readAsBytes();
       final image = img.decodeImage(imageBytes);
-      
+
       if (image == null) {
         print('Could not decode image, using original bytes');
         return imageBytes;
       }
-      
+
       // Resize if too large (max 1024x1024 for better processing)
       img.Image optimizedImage = image;
       if (image.width > 1024 || image.height > 1024) {
         optimizedImage = img.copyResize(
-          image, 
+          image,
           width: image.width > image.height ? 1024 : null,
           height: image.height > image.width ? 1024 : null,
           interpolation: img.Interpolation.linear,
         );
       }
-      
+
       // Enhance contrast slightly for better recognition
       optimizedImage = img.contrast(optimizedImage, contrast: 1.1);
-      
+
       // Convert back to bytes
       return img.encodeJpg(optimizedImage, quality: 90);
     } catch (e) {
@@ -379,7 +398,7 @@ Be extremely precise. If confidence < 0.8, provide conservative estimates.''',
       return await imageFile.readAsBytes();
     }
   }
-  
+
   /// Parse number from dynamic value
   static double? _parseNumber(dynamic value) {
     if (value == null) return null;
@@ -390,7 +409,7 @@ Be extremely precise. If confidence < 0.8, provide conservative estimates.''',
     }
     return null;
   }
-  
+
   /// Format macro value properly
   static String _formatMacro(dynamic value) {
     if (value == null) return '0g';
@@ -405,7 +424,7 @@ Be extremely precise. If confidence < 0.8, provide conservative estimates.''',
     }
     return '0g';
   }
-  
+
   /// Extract food info from text when JSON parsing fails (enhanced)
   static Map<String, dynamic> _extractFoodInfoFromText(String text) {
     final result = {
@@ -416,16 +435,17 @@ Be extremely precise. If confidence < 0.8, provide conservative estimates.''',
       'fat': '0g',
       'serving_size': '1 serving',
       'confidence': 0.4,
-      'note': 'AI analysis completed but format was unclear. Manual verification recommended.',
+      'note':
+          'AI analysis completed but format was unclear. Manual verification recommended.',
     };
-    
+
     // Enhanced calorie extraction
     final caloriePatterns = [
       RegExp(r'(\d+)\s*calories?', caseSensitive: false),
       RegExp(r'calorie[:\s]*(\d+)', caseSensitive: false),
       RegExp(r'kcal[:\s]*(\d+)', caseSensitive: false),
     ];
-    
+
     for (final pattern in caloriePatterns) {
       final match = pattern.firstMatch(text);
       if (match != null) {
@@ -433,14 +453,14 @@ Be extremely precise. If confidence < 0.8, provide conservative estimates.''',
         break;
       }
     }
-    
+
     // Enhanced food name extraction
     final foodPatterns = [
       RegExp(r'(?:food|item|dish|meal)[:\s]*([^.]+)', caseSensitive: false),
       RegExp(r'"food":\s*"([^"]+)"', caseSensitive: false),
       RegExp(r'food[:\s]*([a-zA-Z\s]+)', caseSensitive: false),
     ];
-    
+
     for (final pattern in foodPatterns) {
       final match = pattern.firstMatch(text);
       if (match != null) {
@@ -448,41 +468,50 @@ Be extremely precise. If confidence < 0.8, provide conservative estimates.''',
         break;
       }
     }
-    
+
     // Extract macros
-    final proteinMatch = RegExp(r'protein[:\s]*([0-9.]+g?)', caseSensitive: false).firstMatch(text);
+    final proteinMatch =
+        RegExp(r'protein[:\s]*([0-9.]+g?)', caseSensitive: false)
+            .firstMatch(text);
     if (proteinMatch != null) {
       result['protein'] = proteinMatch.group(1)!;
     }
-    
-    final carbsMatch = RegExp(r'(?:carbs|carbohydrates)[:\s]*([0-9.]+g?)', caseSensitive: false).firstMatch(text);
+
+    final carbsMatch = RegExp(r'(?:carbs|carbohydrates)[:\s]*([0-9.]+g?)',
+            caseSensitive: false)
+        .firstMatch(text);
     if (carbsMatch != null) {
       result['carbs'] = carbsMatch.group(1)!;
     }
-    
-    final fatMatch = RegExp(r'fat[:\s]*([0-9.]+g?)', caseSensitive: false).firstMatch(text);
+
+    final fatMatch =
+        RegExp(r'fat[:\s]*([0-9.]+g?)', caseSensitive: false).firstMatch(text);
     if (fatMatch != null) {
       result['fat'] = fatMatch.group(1)!;
     }
-    
+
     // Extract serving size
-    final servingMatch = RegExp(r'(?:serving|portion)[:\s]*([^.]+)', caseSensitive: false).firstMatch(text);
+    final servingMatch =
+        RegExp(r'(?:serving|portion)[:\s]*([^.]+)', caseSensitive: false)
+            .firstMatch(text);
     if (servingMatch != null) {
       result['serving_size'] = servingMatch.group(1)!.trim();
     }
-    
+
     return result;
   }
-  
+
   /// Get nutrition info from barcode using AI
-  static Future<Map<String, dynamic>> getNutritionFromBarcode(String barcode) async {
+  static Future<Map<String, dynamic>> getNutritionFromBarcode(
+      String barcode) async {
     try {
       final response = await _makeRequest(
         model: _chatModel,
         messages: [
           {
             'role': 'system',
-            'content': '''You are a nutrition database expert. When given a barcode, provide nutritional information for the most likely product.
+            'content':
+                '''You are a nutrition database expert. When given a barcode, provide nutritional information for the most likely product.
 
 Return ONLY a valid JSON object in this exact format:
 {
@@ -504,23 +533,25 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
           },
         ],
       );
-      
+
       final content = response['choices'][0]['message']['content'] ?? '';
       print('AI Barcode Response: $content');
-      
+
       // Try to parse JSON from the response
       try {
         String cleanedContent = content.trim();
-        cleanedContent = cleanedContent.replaceAll('```json', '').replaceAll('```', '');
-        
-        final jsonMatch = RegExp(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}').firstMatch(cleanedContent);
+        cleanedContent =
+            cleanedContent.replaceAll('```json', '').replaceAll('```', '');
+
+        final jsonMatch = RegExp(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}')
+            .firstMatch(cleanedContent);
         if (jsonMatch != null) {
           final jsonStr = jsonMatch.group(0)!.trim();
           final parsed = jsonDecode(jsonStr) as Map<String, dynamic>;
-          
+
           final calories = _parseNumber(parsed['calories']);
           final confidence = _parseNumber(parsed['confidence']) ?? 0.3;
-          
+
           return {
             'food': (parsed['food'] ?? 'Unknown Product').toString(),
             'calories': calories ?? 0,
@@ -536,7 +567,7 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
       } catch (e) {
         print('Error parsing barcode JSON: $e');
       }
-      
+
       // Fallback for barcode
       return {
         'food': 'Product from barcode $barcode',
@@ -546,7 +577,8 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
         'fat': '0g',
         'serving_size': '1 serving',
         'confidence': 0.2,
-        'note': 'Could not identify product from barcode. Please verify manually.',
+        'note':
+            'Could not identify product from barcode. Please verify manually.',
         'barcode': barcode,
       };
     } catch (e) {
@@ -564,7 +596,7 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
       };
     }
   }
-  
+
   /// Make HTTP request to OpenRouter API
   static Future<Map<String, dynamic>> _makeRequest({
     required String model,
@@ -576,7 +608,7 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
     // Determine appropriate token limit and temperature
     int maxTokens;
     double temperature;
-    
+
     if (isVisionRequest) {
       maxTokens = AIConfig.visionMaxTokens;
       temperature = AIConfig.visionTemperature;
@@ -590,7 +622,7 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
       maxTokens = AIConfig.maxTokens;
       temperature = AIConfig.temperature;
     }
-    
+
     final response = await http.post(
       Uri.parse(_baseUrl),
       headers: {
@@ -606,24 +638,28 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
         'temperature': temperature,
       }),
     );
-    
+
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     } else {
-      throw Exception('API request failed with status ${response.statusCode}: ${response.body}');
+      throw Exception(
+          'API request failed with status ${response.statusCode}: ${response.body}');
     }
   }
-  
+
   /// Format user data for AI analysis
   static String _formatUserDataForAI(Map<String, dynamic> userData) {
     final buffer = StringBuffer();
-    
+
     // Basic info
     if (userData['age'] != null) buffer.writeln('Age: ${userData['age']}');
-    if (userData['weight'] != null) buffer.writeln('Weight: ${userData['weight']} kg');
-    if (userData['height'] != null) buffer.writeln('Height: ${userData['height']} cm');
-    if (userData['activity_level'] != null) buffer.writeln('Activity Level: ${userData['activity_level']}');
-    
+    if (userData['weight'] != null)
+      buffer.writeln('Weight: ${userData['weight']} kg');
+    if (userData['height'] != null)
+      buffer.writeln('Height: ${userData['height']} cm');
+    if (userData['activity_level'] != null)
+      buffer.writeln('Activity Level: ${userData['activity_level']}');
+
     // Goals
     if (userData['goals'] != null) {
       buffer.writeln('\nGoals:');
@@ -632,7 +668,7 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
         if (value != null) buffer.writeln('- $key: $value');
       });
     }
-    
+
     // Recent data
     if (userData['recent_calories'] != null) {
       buffer.writeln('\nRecent Calorie Intake:');
@@ -643,7 +679,7 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
         }
       });
     }
-    
+
     if (userData['recent_steps'] != null) {
       buffer.writeln('\nRecent Steps:');
       final steps = userData['recent_steps'] as List<dynamic>?;
@@ -653,7 +689,7 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
         }
       });
     }
-    
+
     // Health metrics
     if (userData['health_metrics'] != null) {
       buffer.writeln('\nHealth Metrics:');
@@ -662,23 +698,27 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
         if (value != null) buffer.writeln('- $key: $value');
       });
     }
-    
+
     return buffer.toString();
   }
-  
+
   /// Format user profile for AI recommendations
   static String _formatProfileForAI(Map<String, dynamic> profile) {
     final buffer = StringBuffer();
-    
+
     // Basic profile
     buffer.writeln('User Profile:');
     if (profile['name'] != null) buffer.writeln('Name: ${profile['name']}');
     if (profile['age'] != null) buffer.writeln('Age: ${profile['age']}');
-    if (profile['gender'] != null) buffer.writeln('Gender: ${profile['gender']}');
-    if (profile['weight'] != null) buffer.writeln('Weight: ${profile['weight']} kg');
-    if (profile['height'] != null) buffer.writeln('Height: ${profile['height']} cm');
-    if (profile['activity_level'] != null) buffer.writeln('Activity Level: ${profile['activity_level']}');
-    
+    if (profile['gender'] != null)
+      buffer.writeln('Gender: ${profile['gender']}');
+    if (profile['weight'] != null)
+      buffer.writeln('Weight: ${profile['weight']} kg');
+    if (profile['height'] != null)
+      buffer.writeln('Height: ${profile['height']} cm');
+    if (profile['activity_level'] != null)
+      buffer.writeln('Activity Level: ${profile['activity_level']}');
+
     // Goals and preferences
     if (profile['goals'] != null) {
       buffer.writeln('\nGoals:');
@@ -687,19 +727,19 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
         if (value != null) buffer.writeln('- $key: $value');
       });
     }
-    
+
     if (profile['dietary_preferences'] != null) {
       buffer.writeln('\nDietary Preferences:');
       final prefs = profile['dietary_preferences'] as List<dynamic>?;
       prefs?.forEach((pref) => buffer.writeln('- $pref'));
     }
-    
+
     if (profile['allergies'] != null) {
       buffer.writeln('\nAllergies:');
       final allergies = profile['allergies'] as List<dynamic>?;
       allergies?.forEach((allergy) => buffer.writeln('- $allergy'));
     }
-    
+
     // Current status
     if (profile['current_calories'] != null) {
       buffer.writeln('\nCurrent Status:');
@@ -708,7 +748,7 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
         buffer.writeln('Calorie Goal: ${profile['calorie_goal']}');
       }
     }
-    
+
     return buffer.toString();
   }
 }

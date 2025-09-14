@@ -7,7 +7,12 @@ class ChatBubble extends StatelessWidget {
   final String sender;
   final DateTime timestamp;
   final bool isUser;
-  const ChatBubble({required this.text, required this.sender, required this.timestamp, required this.isUser, super.key});
+  const ChatBubble(
+      {required this.text,
+      required this.sender,
+      required this.timestamp,
+      required this.isUser,
+      super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +20,7 @@ class ChatBubble extends StatelessWidget {
     final textColor = isUser ? Colors.white : kTextPrimary;
     final senderColor = isUser ? Colors.white.withOpacity(0.8) : kTextSecondary;
     final timeColor = isUser ? Colors.white.withOpacity(0.6) : kTextTertiary;
-    
+
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
@@ -35,7 +40,8 @@ class ChatBubble extends StatelessWidget {
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+          constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.75),
           decoration: BoxDecoration(
             color: bubbleColor,
             borderRadius: BorderRadius.only(
@@ -44,22 +50,25 @@ class ChatBubble extends StatelessWidget {
               bottomLeft: Radius.circular(isUser ? 20 : 4),
               bottomRight: Radius.circular(isUser ? 4 : 20),
             ),
-            boxShadow: isUser ? [
-              BoxShadow(
-                color: kPrimaryColor.withOpacity(0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ] : [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            boxShadow: isUser
+                ? [
+                    BoxShadow(
+                      color: kPrimaryColor.withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
           child: Column(
-            crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            crossAxisAlignment:
+                isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
               Text(
                 text,
@@ -97,4 +106,4 @@ class ChatBubble extends StatelessWidget {
       ),
     );
   }
-} 
+}

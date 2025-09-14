@@ -7,7 +7,7 @@ class EnhancedLoadingWidget extends StatefulWidget {
   final double size;
   final Color? color;
   final bool showText;
-  
+
   const EnhancedLoadingWidget({
     super.key,
     this.text = 'Loading...',
@@ -30,12 +30,12 @@ class _EnhancedLoadingWidgetState extends State<EnhancedLoadingWidget>
   @override
   void initState() {
     super.initState();
-    
+
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-    
+
     _rotationController = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,
@@ -153,12 +153,12 @@ class _GoogleFitShimmerCardState extends State<GoogleFitShimmerCard>
   @override
   void initState() {
     super.initState();
-    
+
     _shimmerController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
-    
+
     _shimmerAnimation = Tween<double>(
       begin: -2,
       end: 2,
@@ -270,12 +270,12 @@ class _SmoothDataTransitionState extends State<SmoothDataTransition>
   @override
   void initState() {
     super.initState();
-    
+
     _controller = AnimationController(
       duration: widget.duration,
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -298,7 +298,7 @@ class _SmoothDataTransitionState extends State<SmoothDataTransition>
   @override
   void didUpdateWidget(SmoothDataTransition oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     if (oldWidget.isLoading != widget.isLoading) {
       if (widget.isLoading) {
         _controller.reverse();

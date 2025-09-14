@@ -23,15 +23,24 @@ class AppStateService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Stream controllers for real-time updates
-  final StreamController<User?> _userController = StreamController<User?>.broadcast();
-  final StreamController<List<FoodEntry>> _foodEntriesController = StreamController<List<FoodEntry>>.broadcast();
-  final StreamController<UserGoals?> _goalsController = StreamController<UserGoals?>.broadcast();
-  final StreamController<UserPreferences> _preferencesController = StreamController<UserPreferences>.broadcast();
-  final StreamController<DailySummary?> _dailySummaryController = StreamController<DailySummary?>.broadcast();
-  final StreamController<MacroBreakdown> _macroBreakdownController = StreamController<MacroBreakdown>.broadcast();
-  final StreamController<List<UserAchievement>> _achievementsController = StreamController<List<UserAchievement>>.broadcast();
-  final StreamController<bool> _isOnlineController = StreamController<bool>.broadcast();
-  final StreamController<Map<String, dynamic>?> _profileDataController = StreamController<Map<String, dynamic>?>.broadcast();
+  final StreamController<User?> _userController =
+      StreamController<User?>.broadcast();
+  final StreamController<List<FoodEntry>> _foodEntriesController =
+      StreamController<List<FoodEntry>>.broadcast();
+  final StreamController<UserGoals?> _goalsController =
+      StreamController<UserGoals?>.broadcast();
+  final StreamController<UserPreferences> _preferencesController =
+      StreamController<UserPreferences>.broadcast();
+  final StreamController<DailySummary?> _dailySummaryController =
+      StreamController<DailySummary?>.broadcast();
+  final StreamController<MacroBreakdown> _macroBreakdownController =
+      StreamController<MacroBreakdown>.broadcast();
+  final StreamController<List<UserAchievement>> _achievementsController =
+      StreamController<List<UserAchievement>>.broadcast();
+  final StreamController<bool> _isOnlineController =
+      StreamController<bool>.broadcast();
+  final StreamController<Map<String, dynamic>?> _profileDataController =
+      StreamController<Map<String, dynamic>?>.broadcast();
 
   // Current state
   User? _currentUser;
@@ -39,7 +48,8 @@ class AppStateService {
   UserGoals? _userGoals;
   UserPreferences _userPreferences = const UserPreferences();
   DailySummary? _dailySummary;
-  MacroBreakdown _macroBreakdown = MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
+  MacroBreakdown _macroBreakdown =
+      MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
   List<UserAchievement> _achievements = [];
   Map<String, dynamic>? _profileData;
   bool _isOnline = true;
@@ -55,14 +65,20 @@ class AppStateService {
 
   // Getters for streams
   Stream<User?> get userStream => _userController.stream;
-  Stream<List<FoodEntry>> get foodEntriesStream => _foodEntriesController.stream;
+  Stream<List<FoodEntry>> get foodEntriesStream =>
+      _foodEntriesController.stream;
   Stream<UserGoals?> get goalsStream => _goalsController.stream;
-  Stream<UserPreferences> get preferencesStream => _preferencesController.stream;
-  Stream<DailySummary?> get dailySummaryStream => _dailySummaryController.stream;
-  Stream<MacroBreakdown> get macroBreakdownStream => _macroBreakdownController.stream;
-  Stream<List<UserAchievement>> get achievementsStream => _achievementsController.stream;
+  Stream<UserPreferences> get preferencesStream =>
+      _preferencesController.stream;
+  Stream<DailySummary?> get dailySummaryStream =>
+      _dailySummaryController.stream;
+  Stream<MacroBreakdown> get macroBreakdownStream =>
+      _macroBreakdownController.stream;
+  Stream<List<UserAchievement>> get achievementsStream =>
+      _achievementsController.stream;
   Stream<bool> get isOnlineStream => _isOnlineController.stream;
-  Stream<Map<String, dynamic>?> get profileDataStream => _profileDataController.stream;
+  Stream<Map<String, dynamic>?> get profileDataStream =>
+      _profileDataController.stream;
 
   // Getters for current state
   User? get currentUser => _currentUser;
@@ -86,7 +102,7 @@ class AppStateService {
       _authSubscription = _auth.authStateChanges().listen((user) {
         _currentUser = user;
         _userController.add(user);
-        
+
         if (user != null) {
           _setupUserDataListeners(user.uid);
         } else {
@@ -118,7 +134,8 @@ class AppStateService {
         .orderBy('timestamp', descending: true)
         .snapshots()
         .listen((snapshot) {
-      _foodEntries = snapshot.docs.map((doc) => FoodEntry.fromFirestore(doc)).toList();
+      _foodEntries =
+          snapshot.docs.map((doc) => FoodEntry.fromFirestore(doc)).toList();
       _foodEntriesController.add(_foodEntries);
       updateDailySummary();
       _updateMacroBreakdown();
@@ -173,8 +190,9 @@ class AppStateService {
       if (snapshot.exists) {
         final data = snapshot.data()!;
         _achievements = (data['achievements'] as List?)
-            ?.map((a) => UserAchievement.fromJson(a))
-            .toList() ?? [];
+                ?.map((a) => UserAchievement.fromJson(a))
+                .toList() ??
+            [];
       } else {
         _achievements = [];
       }
@@ -191,7 +209,8 @@ class AppStateService {
         .doc('userData')
         .snapshots()
         .listen((snapshot) {
-      print('Profile data snapshot received in AppStateService: ${snapshot.exists}');
+      print(
+          'Profile data snapshot received in AppStateService: ${snapshot.exists}');
       if (snapshot.exists) {
         _profileData = snapshot.data()!;
         print('Profile data updated: $_profileData');
@@ -204,22 +223,19 @@ class AppStateService {
     });
   }
 
-
   /// Update daily summary based on current food entries and health data
   void updateDailySummary() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    
+
     final todayEntries = _foodEntries.where((entry) {
-      final entryDate = DateTime(entry.timestamp.year, entry.timestamp.month, entry.timestamp.day);
+      final entryDate = DateTime(
+          entry.timestamp.year, entry.timestamp.month, entry.timestamp.day);
       return entryDate.isAtSameMomentAs(today);
     }).toList();
 
-    final caloriesConsumed = todayEntries.fold(0, (sum, entry) => sum + entry.calories);
-    final macros = todayEntries.fold<MacroBreakdown>(
-      MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0),
-      (sum, entry) => sum + entry.macroBreakdown,
-    );
+    final caloriesConsumed =
+        todayEntries.fold(0, (sum, entry) => sum + entry.calories);
 
     _dailySummary = DailySummary(
       caloriesConsumed: caloriesConsumed,
@@ -277,12 +293,11 @@ class AppStateService {
       // Sync any pending food entries
       final prefs = await SharedPreferences.getInstance();
       final pendingEntries = prefs.getStringList('pending_food_entries') ?? [];
-      
+
       for (final entryJson in pendingEntries) {
         try {
           final entry = FoodEntry.fromJson(
-            Map<String, dynamic>.from(jsonDecode(entryJson))
-          );
+              Map<String, dynamic>.from(jsonDecode(entryJson)));
           await _firebaseService.saveFoodEntry(_currentUser!.uid, entry);
         } catch (e) {
           print('Error syncing pending entry: $e');
@@ -300,20 +315,20 @@ class AppStateService {
   Future<void> _loadCachedData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       // Load cached food entries
       final cachedEntries = prefs.getStringList('cached_food_entries') ?? [];
-      _foodEntries = cachedEntries.map((json) => FoodEntry.fromJson(
-        Map<String, dynamic>.from(jsonDecode(json))
-      )).toList();
+      _foodEntries = cachedEntries
+          .map((json) =>
+              FoodEntry.fromJson(Map<String, dynamic>.from(jsonDecode(json))))
+          .toList();
       _foodEntriesController.add(_foodEntries);
 
       // Load cached preferences
       final cachedPrefs = prefs.getString('cached_preferences');
       if (cachedPrefs != null) {
         _userPreferences = UserPreferences.fromMap(
-          Map<String, dynamic>.from(jsonDecode(cachedPrefs))
-        );
+            Map<String, dynamic>.from(jsonDecode(cachedPrefs)));
         _preferencesController.add(_userPreferences);
       }
 
@@ -321,8 +336,7 @@ class AppStateService {
       final cachedGoals = prefs.getString('cached_goals');
       if (cachedGoals != null) {
         _userGoals = UserGoals.fromMap(
-          Map<String, dynamic>.from(jsonDecode(cachedGoals))
-        );
+            Map<String, dynamic>.from(jsonDecode(cachedGoals)));
         _goalsController.add(_userGoals);
       }
     } catch (e) {
@@ -335,8 +349,8 @@ class AppStateService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final entriesJson = _foodEntries.map((entry) => entry.toJson()).toList();
-      await prefs.setStringList('cached_food_entries', 
-        entriesJson.map((json) => json.toString()).toList());
+      await prefs.setStringList('cached_food_entries',
+          entriesJson.map((json) => json.toString()).toList());
     } catch (e) {
       print('Error caching food entries: $e');
     }
@@ -346,7 +360,8 @@ class AppStateService {
   Future<void> _cacheUserPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('cached_preferences', _userPreferences.toMap().toString());
+      await prefs.setString(
+          'cached_preferences', _userPreferences.toMap().toString());
     } catch (e) {
       print('Error caching preferences: $e');
     }
@@ -356,7 +371,8 @@ class AppStateService {
   Future<void> _cacheUserGoals() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('cached_goals', _userGoals?.toMap().toString() ?? '');
+      await prefs.setString(
+          'cached_goals', _userGoals?.toMap().toString() ?? '');
     } catch (e) {
       print('Error caching goals: $e');
     }
@@ -367,8 +383,8 @@ class AppStateService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final achievementsJson = _achievements.map((a) => a.toJson()).toList();
-      await prefs.setStringList('cached_achievements', 
-        achievementsJson.map((json) => json.toString()).toList());
+      await prefs.setStringList('cached_achievements',
+          achievementsJson.map((json) => json.toString()).toList());
     } catch (e) {
       print('Error caching achievements: $e');
     }
@@ -378,7 +394,8 @@ class AppStateService {
   Future<void> _cacheProfileData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('cached_profile_data', _profileData?.toString() ?? '');
+      await prefs.setString(
+          'cached_profile_data', _profileData?.toString() ?? '');
     } catch (e) {
       print('Error caching profile data: $e');
     }
@@ -394,7 +411,8 @@ class AppStateService {
       } else {
         // Save to pending entries for later sync
         final prefs = await SharedPreferences.getInstance();
-        final pendingEntries = prefs.getStringList('pending_food_entries') ?? [];
+        final pendingEntries =
+            prefs.getStringList('pending_food_entries') ?? [];
         pendingEntries.add(entry.toJson().toString());
         await prefs.setStringList('pending_food_entries', pendingEntries);
       }
@@ -416,7 +434,8 @@ class AppStateService {
 
     try {
       if (_isOnline) {
-        await _firebaseService.saveUserPreferences(_currentUser!.uid, preferences);
+        await _firebaseService.saveUserPreferences(
+            _currentUser!.uid, preferences);
       }
 
       // Update local state immediately
@@ -459,10 +478,10 @@ class AppStateService {
   /// Force goals update to trigger immediate UI refresh
   void forceGoalsUpdate(UserGoals goals) {
     if (_currentUser == null) return;
-    
+
     print('=== FORCE GOALS UPDATE ===');
     print('Forcing goals update: ${goals.toMap()}');
-    
+
     // Update local state immediately
     _userGoals = goals;
     _goalsController.add(_userGoals);
@@ -507,7 +526,8 @@ class AppStateService {
     _userGoals = null;
     _userPreferences = const UserPreferences();
     _dailySummary = null;
-    _macroBreakdown = MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
+    _macroBreakdown =
+        MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
     _achievements = [];
 
     _foodEntriesController.add(_foodEntries);
@@ -543,6 +563,5 @@ class AppStateService {
     _achievementsController.close();
     _isOnlineController.close();
     _profileDataController.close();
-    
   }
 }

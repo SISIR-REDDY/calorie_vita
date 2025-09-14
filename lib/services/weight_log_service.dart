@@ -34,9 +34,8 @@ class WeightLogService {
       updatedAt: now,
     );
 
-    final docRef = await _firestore
-        .collection('weightLogs')
-        .add(weightLog.toFirestore());
+    final docRef =
+        await _firestore.collection('weightLogs').add(weightLog.toFirestore());
 
     return docRef.id;
   }
@@ -96,16 +95,14 @@ class WeightLogService {
         .orderBy('date', descending: true)
         .snapshots()
         .map((snapshot) {
-          debugPrint('WeightLogService: Received ${snapshot.docs.length} documents');
-          return snapshot.docs
-              .map((doc) => WeightLog.fromFirestore(doc))
-              .toList();
-        })
-        .handleError((error) {
-          // Log error for debugging
-          debugPrint('WeightLogService Error: $error');
-          throw error;
-        });
+      debugPrint(
+          'WeightLogService: Received ${snapshot.docs.length} documents');
+      return snapshot.docs.map((doc) => WeightLog.fromFirestore(doc)).toList();
+    }).handleError((error) {
+      // Log error for debugging
+      debugPrint('WeightLogService Error: $error');
+      throw error;
+    });
   }
 
   /// Get weight log entries for a specific date range
@@ -149,7 +146,7 @@ class WeightLogService {
     if (_userId == null) throw Exception('User not authenticated');
 
     final weightLogs = await getWeightLogs();
-    
+
     if (weightLogs.isEmpty) {
       return const WeightLogStats(
         currentWeight: 0.0,
@@ -159,11 +156,13 @@ class WeightLogService {
 
     final currentWeight = weightLogs.first.weight;
     final previousWeight = weightLogs.length > 1 ? weightLogs[1].weight : null;
-    final weightChange = previousWeight != null ? currentWeight - previousWeight : null;
-    
-    final totalWeight = weightLogs.fold(0.0, (total, log) => total + log.weight);
+    final weightChange =
+        previousWeight != null ? currentWeight - previousWeight : null;
+
+    final totalWeight =
+        weightLogs.fold(0.0, (total, log) => total + log.weight);
     final averageWeight = totalWeight / weightLogs.length;
-    
+
     final firstEntryDate = weightLogs.last.date;
     final lastEntryDate = weightLogs.first.date;
 
@@ -189,12 +188,15 @@ class WeightLogService {
       }
 
       final currentWeight = weightLogs.first.weight;
-      final previousWeight = weightLogs.length > 1 ? weightLogs[1].weight : null;
-      final weightChange = previousWeight != null ? currentWeight - previousWeight : null;
-      
-      final totalWeight = weightLogs.fold(0.0, (total, log) => total + log.weight);
+      final previousWeight =
+          weightLogs.length > 1 ? weightLogs[1].weight : null;
+      final weightChange =
+          previousWeight != null ? currentWeight - previousWeight : null;
+
+      final totalWeight =
+          weightLogs.fold(0.0, (total, log) => total + log.weight);
       final averageWeight = totalWeight / weightLogs.length;
-      
+
       final firstEntryDate = weightLogs.last.date;
       final lastEntryDate = weightLogs.first.date;
 

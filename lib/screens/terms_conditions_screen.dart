@@ -34,7 +34,10 @@ class TermsConditionsScreen extends StatelessWidget {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [kAccentGreen.withOpacity(0.1), kAccentBlue.withOpacity(0.1)],
+                  colors: [
+                    kAccentGreen.withOpacity(0.1),
+                    kAccentBlue.withOpacity(0.1)
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),

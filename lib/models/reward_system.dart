@@ -37,7 +37,7 @@ enum UserLevel {
   deity('Deity', 1000, Colors.cyan, '✨');
 
   const UserLevel(this.title, this.requiredStreakDays, this.color, this.emoji);
-  
+
   final String title;
   final int requiredStreakDays; // Changed from points to streak days
   final Color color;
@@ -127,13 +127,13 @@ class UserReward {
         (e) => e.name == map['type'],
         orElse: () => RewardType.daily,
       ),
-      category: map['category'] != null 
+      category: map['category'] != null
           ? BadgeCategory.values.firstWhere(
               (e) => e.name == map['category'],
               orElse: () => BadgeCategory.achievement,
             )
           : null,
-      earnedAt: map['earnedAt'] != null 
+      earnedAt: map['earnedAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(map['earnedAt'])
           : null,
       isUnlocked: map['isUnlocked'] ?? false,
@@ -641,13 +641,15 @@ class RewardSystem {
     return nextLevel.requiredStreakDays - currentStreakDays;
   }
 
-  static double getLevelProgress(int currentStreakDays, UserLevel currentLevel) {
+  static double getLevelProgress(
+      int currentStreakDays, UserLevel currentLevel) {
     final nextLevel = getNextLevel(currentLevel);
     if (nextLevel == currentLevel) return 1.0;
-    
-    final levelRange = nextLevel.requiredStreakDays - currentLevel.requiredStreakDays;
+
+    final levelRange =
+        nextLevel.requiredStreakDays - currentLevel.requiredStreakDays;
     final currentProgress = currentStreakDays - currentLevel.requiredStreakDays;
-    
+
     return (currentProgress / levelRange).clamp(0.0, 1.0);
   }
 
@@ -658,7 +660,7 @@ class RewardSystem {
     int streakDays = 0,
   }) {
     int baseXp = 0;
-    
+
     switch (activityType) {
       case ActivityType.mealLogging:
         baseXp = 10; // +10 XP per meal
@@ -683,7 +685,7 @@ class RewardSystem {
         baseXp = 50; // +50 XP for completing all daily goals
         break;
     }
-    
+
     // Apply streak multiplier
     double multiplier = _getStreakMultiplier(streakDays);
     return (baseXp * multiplier).round();
@@ -718,21 +720,23 @@ class RewardSystem {
   ) {
     List<UserReward> newRewards = [];
     final allRewards = getAllRewards();
-    
+
     // Check each reward condition
     for (final reward in allRewards) {
       if (currentProgress.unlockedRewards.any((r) => r.id == reward.id)) {
         continue; // Already unlocked
       }
-      
+
       bool shouldUnlock = false;
-      
+
       switch (reward.id) {
         case 'first_log':
-          shouldUnlock = activityData['mealsLogged'] != null && activityData['mealsLogged'] >= 1;
+          shouldUnlock = activityData['mealsLogged'] != null &&
+              activityData['mealsLogged'] >= 1;
           break;
         case 'water_warrior':
-          shouldUnlock = activityData['waterGlasses'] != null && activityData['waterGlasses'] >= 8;
+          shouldUnlock = activityData['waterGlasses'] != null &&
+              activityData['waterGlasses'] >= 8;
           break;
         case 'calorie_tracker':
           shouldUnlock = activityData['metCalorieGoal'] == true;
@@ -741,11 +745,12 @@ class RewardSystem {
           shouldUnlock = currentProgress.currentStreak >= 7;
           break;
         case 'hundred_club':
-          shouldUnlock = activityData['totalMealsLogged'] != null && activityData['totalMealsLogged'] >= 100;
+          shouldUnlock = activityData['totalMealsLogged'] != null &&
+              activityData['totalMealsLogged'] >= 100;
           break;
         // Add more conditions as needed
       }
-      
+
       if (shouldUnlock) {
         newRewards.add(reward.copyWith(
           isUnlocked: true,
@@ -753,7 +758,7 @@ class RewardSystem {
         ));
       }
     }
-    
+
     return newRewards;
   }
 }

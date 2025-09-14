@@ -5,12 +5,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 /// Comprehensive error handling and offline support service
 class ErrorHandlingService {
-  static final ErrorHandlingService _instance = ErrorHandlingService._internal();
+  static final ErrorHandlingService _instance =
+      ErrorHandlingService._internal();
   factory ErrorHandlingService() => _instance;
   ErrorHandlingService._internal();
 
-  final StreamController<bool> _connectivityController = StreamController<bool>.broadcast();
-  final StreamController<String> _errorController = StreamController<String>.broadcast();
+  final StreamController<bool> _connectivityController =
+      StreamController<bool>.broadcast();
+  final StreamController<String> _errorController =
+      StreamController<String>.broadcast();
 
   // Getters
   Stream<bool> get connectivityStream => _connectivityController.stream;
@@ -91,7 +94,9 @@ class ErrorHandlingService {
       return handleAuthError(error);
     } else if (error is FirebaseException) {
       return handleFirestoreError(error);
-    } else if (error is SocketException || error is TimeoutException || error is HttpException) {
+    } else if (error is SocketException ||
+        error is TimeoutException ||
+        error is HttpException) {
       return handleNetworkError(error);
     } else {
       return 'An unexpected error occurred: ${error.toString()}';
@@ -214,13 +219,13 @@ class ErrorHandlingService {
         if (retryCount >= maxRetries) {
           rethrow;
         }
-        
+
         // Exponential backoff
         await Future.delayed(delay);
         delay = Duration(seconds: delay.inSeconds * 2);
       }
     }
-    
+
     throw Exception('Max retries exceeded');
   }
 

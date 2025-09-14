@@ -38,7 +38,7 @@ class LocalStorageService {
     final prefs = await SharedPreferences.getInstance();
     final email = prefs.getString(_userEmailKey);
     final password = prefs.getString(_userPasswordKey);
-    
+
     if (email != null && password != null) {
       return {'email': email, 'password': password};
     }
@@ -72,7 +72,7 @@ class LocalStorageService {
   Future<List<FoodEntry>> getFoodEntries() async {
     final prefs = await SharedPreferences.getInstance();
     final entriesJson = prefs.getString(_foodEntriesKey);
-    
+
     if (entriesJson != null) {
       try {
         final List<dynamic> entriesList = jsonDecode(entriesJson);
@@ -95,7 +95,7 @@ class LocalStorageService {
   Future<UserGoals?> getUserGoals() async {
     final prefs = await SharedPreferences.getInstance();
     final goalsJson = prefs.getString(_userGoalsKey);
-    
+
     if (goalsJson != null) {
       try {
         final Map<String, dynamic> goalsMap = jsonDecode(goalsJson);
@@ -118,7 +118,7 @@ class LocalStorageService {
   Future<UserPreferences> getUserPreferences() async {
     final prefs = await SharedPreferences.getInstance();
     final preferencesJson = prefs.getString(_userPreferencesKey);
-    
+
     if (preferencesJson != null) {
       try {
         final Map<String, dynamic> preferencesMap = jsonDecode(preferencesJson);
@@ -141,7 +141,7 @@ class LocalStorageService {
   Future<DailySummary?> getDailySummary() async {
     final prefs = await SharedPreferences.getInstance();
     final summaryJson = prefs.getString(_dailySummaryKey);
-    
+
     if (summaryJson != null) {
       try {
         final Map<String, dynamic> summaryMap = jsonDecode(summaryJson);
@@ -164,7 +164,7 @@ class LocalStorageService {
   Future<MacroBreakdown> getMacroBreakdown() async {
     final prefs = await SharedPreferences.getInstance();
     final breakdownJson = prefs.getString(_macroBreakdownKey);
-    
+
     if (breakdownJson != null) {
       try {
         final Map<String, dynamic> breakdownMap = jsonDecode(breakdownJson);
@@ -194,11 +194,13 @@ class LocalStorageService {
   Future<List<UserAchievement>> getAchievements() async {
     final prefs = await SharedPreferences.getInstance();
     final achievementsJson = prefs.getString(_achievementsKey);
-    
+
     if (achievementsJson != null) {
       try {
         final List<dynamic> achievementsList = jsonDecode(achievementsJson);
-        return achievementsList.map((a) => UserAchievement.fromJson(a)).toList();
+        return achievementsList
+            .map((a) => UserAchievement.fromJson(a))
+            .toList();
       } catch (e) {
         print('Error parsing achievements: $e');
       }

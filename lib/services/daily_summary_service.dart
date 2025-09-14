@@ -17,13 +17,14 @@ class DailySummaryService {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseService _firebaseService = FirebaseService();
   final RewardsService _rewardsService = RewardsService();
   final ErrorHandler _errorHandler = ErrorHandler();
 
   // Stream controllers for real-time updates
-  final StreamController<DailySummary> _dailySummaryController = StreamController<DailySummary>.broadcast();
-  final StreamController<Map<String, dynamic>> _progressController = StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<DailySummary> _dailySummaryController =
+      StreamController<DailySummary>.broadcast();
+  final StreamController<Map<String, dynamic>> _progressController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   // Getters for streams
   Stream<DailySummary> get dailySummaryStream => _dailySummaryController.stream;
@@ -77,9 +78,9 @@ class DailySummaryService {
     });
   }
 
-
   /// Update exercise data
-  Future<void> updateExercise(String userId, {
+  Future<void> updateExercise(
+    String userId, {
     required int caloriesBurned,
     required int durationMinutes,
     required String exerciseType,
@@ -120,10 +121,12 @@ class DailySummaryService {
 
       // Update local cache
       await _updateLocalSummary(userId, {
-        'caloriesBurned': (_currentDailySummary?.caloriesBurned ?? 0) + caloriesBurned,
+        'caloriesBurned':
+            (_currentDailySummary?.caloriesBurned ?? 0) + caloriesBurned,
       });
 
-      _errorHandler.handleBusinessError('updateExercise', 'Exercise updated successfully');
+      _errorHandler.handleBusinessError(
+          'updateExercise', 'Exercise updated successfully');
     } catch (e) {
       _errorHandler.handleFirebaseError('updateExercise', e);
       rethrow;
@@ -160,13 +163,13 @@ class DailySummaryService {
       // Update local cache
       await _updateLocalSummary(userId, {'steps': steps});
 
-      _errorHandler.handleBusinessError('updateSteps', 'Steps updated successfully');
+      _errorHandler.handleBusinessError(
+          'updateSteps', 'Steps updated successfully');
     } catch (e) {
       _errorHandler.handleFirebaseError('updateSteps', e);
       rethrow;
     }
   }
-
 
   /// Update meal logging (called when food entry is added)
   Future<void> onMealLogged(String userId, FoodEntry foodEntry) async {
@@ -181,10 +184,11 @@ class DailySummaryService {
 
       // Get current summary
       final currentSummary = await _getCurrentSummary(userId, dateKey);
-      
+
       // Update calories consumed
-      final newCaloriesConsumed = (currentSummary['caloriesConsumed'] ?? 0) + foodEntry.calories;
-      
+      final newCaloriesConsumed =
+          (currentSummary['caloriesConsumed'] ?? 0) + foodEntry.calories;
+
       await docRef.set({
         'caloriesConsumed': newCaloriesConsumed,
         'lastMealLogged': FieldValue.serverTimestamp(),
@@ -197,14 +201,17 @@ class DailySummaryService {
         activityData: {
           'calories': foodEntry.calories,
           'foodName': foodEntry.name,
-          'mealType': 'meal', // Default meal type since FoodEntry doesn't have this property
+          'mealType':
+              'meal', // Default meal type since FoodEntry doesn't have this property
         },
       );
 
       // Update local cache
-      await _updateLocalSummary(userId, {'caloriesConsumed': newCaloriesConsumed});
+      await _updateLocalSummary(
+          userId, {'caloriesConsumed': newCaloriesConsumed});
 
-      _errorHandler.handleBusinessError('onMealLogged', 'Meal logged successfully');
+      _errorHandler.handleBusinessError(
+          'onMealLogged', 'Meal logged successfully');
     } catch (e) {
       _errorHandler.handleFirebaseError('onMealLogged', e);
       rethrow;
@@ -246,7 +253,8 @@ class DailySummaryService {
       // Update local cache
       await _updateLocalSummary(userId, {'weight': weight, 'bmi': bmi});
 
-      _errorHandler.handleBusinessError('updateWeight', 'Weight updated successfully');
+      _errorHandler.handleBusinessError(
+          'updateWeight', 'Weight updated successfully');
     } catch (e) {
       _errorHandler.handleFirebaseError('updateWeight', e);
       rethrow;
@@ -280,7 +288,8 @@ class DailySummaryService {
         'sleepGoal': 8.0,
       });
 
-      _errorHandler.handleBusinessError('updateUserGoals', 'User goals updated successfully');
+      _errorHandler.handleBusinessError(
+          'updateUserGoals', 'User goals updated successfully');
     } catch (e) {
       _errorHandler.handleFirebaseError('updateUserGoals', e);
       rethrow;
@@ -288,7 +297,8 @@ class DailySummaryService {
   }
 
   /// Get historical daily summaries
-  Stream<List<DailySummary>> getHistoricalSummaries(String userId, {int days = 7}) {
+  Stream<List<DailySummary>> getHistoricalSummaries(String userId,
+      {int days = 7}) {
     final endDate = DateTime.now();
     final startDate = endDate.subtract(Duration(days: days - 1));
 
@@ -301,7 +311,9 @@ class DailySummaryService {
         .orderBy('date', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => DailySummary.fromMap(doc.data())).toList();
+      return snapshot.docs
+          .map((doc) => DailySummary.fromMap(doc.data()))
+          .toList();
     }).handleError((error) {
       _errorHandler.handleFirebaseError('getHistoricalSummaries', error);
       return <DailySummary>[];
@@ -309,7 +321,8 @@ class DailySummaryService {
   }
 
   /// Get current summary data
-  Future<Map<String, dynamic>> _getCurrentSummary(String userId, String dateKey) async {
+  Future<Map<String, dynamic>> _getCurrentSummary(
+      String userId, String dateKey) async {
     try {
       final doc = await _firestore
           .collection('users')
@@ -317,7 +330,7 @@ class DailySummaryService {
           .collection('dailySummary')
           .doc(dateKey)
           .get();
-      
+
       return doc.exists ? doc.data()! : {};
     } catch (e) {
       _errorHandler.handleFirebaseError('_getCurrentSummary', e);
@@ -354,7 +367,8 @@ class DailySummaryService {
       _currentDailySummary = updatedSummary;
       _dailySummaryController.add(updatedSummary);
 
-      _errorHandler.handleBusinessError('updateDailySummary', 'Daily summary updated successfully');
+      _errorHandler.handleBusinessError(
+          'updateDailySummary', 'Daily summary updated successfully');
     } catch (e) {
       _errorHandler.handleFirebaseError('updateDailySummary', e);
       rethrow;
@@ -362,14 +376,18 @@ class DailySummaryService {
   }
 
   /// Update local summary cache
-  Future<void> _updateLocalSummary(String userId, Map<String, dynamic> updates) async {
+  Future<void> _updateLocalSummary(
+      String userId, Map<String, dynamic> updates) async {
     if (_currentDailySummary == null) return;
 
     final updatedSummary = _currentDailySummary!.copyWith(
-      caloriesConsumed: updates['caloriesConsumed'] ?? _currentDailySummary!.caloriesConsumed,
-      caloriesBurned: updates['caloriesBurned'] ?? _currentDailySummary!.caloriesBurned,
+      caloriesConsumed:
+          updates['caloriesConsumed'] ?? _currentDailySummary!.caloriesConsumed,
+      caloriesBurned:
+          updates['caloriesBurned'] ?? _currentDailySummary!.caloriesBurned,
       steps: updates['steps'] ?? _currentDailySummary!.steps,
-      caloriesGoal: updates['caloriesGoal'] ?? _currentDailySummary!.caloriesGoal,
+      caloriesGoal:
+          updates['caloriesGoal'] ?? _currentDailySummary!.caloriesGoal,
       stepsGoal: updates['stepsGoal'] ?? _currentDailySummary!.stepsGoal,
     );
 
@@ -418,7 +436,7 @@ class DailySummaryService {
     // Reset daily summary cache
     _currentDailySummary = null;
     _lastUpdateDate = null;
-    
+
     // Emit reset event
     _progressController.add({
       'dailyReset': true,

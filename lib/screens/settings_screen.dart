@@ -32,7 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final DemoAuthService _demoAuth = DemoAuthService();
   final RealTimeInputService _realTimeInputService = RealTimeInputService();
   final GoogleFitService _googleFitService = GoogleFitService();
-  
+
   // User data
   User? _user;
   DemoUser? _demoUser;
@@ -40,13 +40,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _userEmail;
   String? _profileImageUrl;
   UserPreferences _userPreferences = const UserPreferences();
-  
+
   // Stream subscription for profile data
   StreamSubscription<DocumentSnapshot>? _profileSubscription;
-  
+
   // Settings state variables
   bool _isDarkMode = false;
-  
+
   // Google Fit state
   bool _isGoogleFitConnected = false;
   bool _isConnectingToGoogleFit = false;
@@ -131,7 +131,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadUserData() async {
     _user = _appStateService.currentUser;
     _demoUser = _demoAuth.currentUser;
-    
+
     if (_user != null) {
       _loadUserProfileData(_user!);
     } else if (_demoUser != null) {
@@ -139,7 +139,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _userEmail = _demoUser!.email;
     }
   }
-
 
   /// Load user profile data
   Future<void> _loadUserProfileData(User user) async {
@@ -151,7 +150,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           .collection('profile')
           .doc('userData')
           .get();
-      
+
       if (mounted) {
         setState(() {
           if (doc.exists) {
@@ -159,22 +158,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Use Firestore name if available, otherwise use Auth displayName
             final firestoreName = data['name']?.toString();
             final authName = user.displayName;
-            
-            _userName = firestoreName?.isNotEmpty == true 
-                ? firestoreName 
-                : authName?.isNotEmpty == true 
-                    ? authName 
+
+            _userName = firestoreName?.isNotEmpty == true
+                ? firestoreName
+                : authName?.isNotEmpty == true
+                    ? authName
                     : 'User';
-            
+
             // Debug print to help troubleshoot
-            print('Settings Screen - Firestore name: $firestoreName, Auth name: $authName, Final name: $_userName');
+            print(
+                'Settings Screen - Firestore name: $firestoreName, Auth name: $authName, Final name: $_userName');
             _userEmail = user.email ?? 'user@example.com';
             _profileImageUrl = data['profileImageUrl'];
           } else {
             // Fallback to Auth data
-            _userName = user.displayName?.isNotEmpty == true ? user.displayName : 'User';
+            _userName = user.displayName?.isNotEmpty == true
+                ? user.displayName
+                : 'User';
             _userEmail = user.email ?? 'user@example.com';
-            print('Settings Screen - No Firestore profile data, using Auth name: ${user.displayName}');
+            print(
+                'Settings Screen - No Firestore profile data, using Auth name: ${user.displayName}');
           }
         });
       }
@@ -182,10 +185,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // Fallback to Auth data on error
       if (mounted) {
         setState(() {
-          _userName = user.displayName?.isNotEmpty == true ? user.displayName : 'User';
+          _userName =
+              user.displayName?.isNotEmpty == true ? user.displayName : 'User';
           _userEmail = user.email ?? 'user@example.com';
         });
-        print('Settings Screen - Error loading profile, using Auth name: ${user.displayName}');
+        print(
+            'Settings Screen - Error loading profile, using Auth name: ${user.displayName}');
       }
     }
   }
@@ -194,7 +199,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _setupProfileDataListener(String userId) {
     // Cancel existing subscription
     _profileSubscription?.cancel();
-    
+
     // Set up new subscription to listen for profile data changes
     _profileSubscription = FirebaseFirestore.instance
         .collection('users')
@@ -209,23 +214,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Update profile data in real-time
           final firestoreName = data['name']?.toString();
           final authName = _user?.displayName;
-          
-          _userName = firestoreName?.isNotEmpty == true 
-              ? firestoreName 
-              : authName?.isNotEmpty == true 
-                  ? authName 
+
+          _userName = firestoreName?.isNotEmpty == true
+              ? firestoreName
+              : authName?.isNotEmpty == true
+                  ? authName
                   : 'User';
-          
+
           _profileImageUrl = data['profileImageUrl'];
-          
-          print('Settings Screen - Profile data updated in real-time: $_userName');
+
+          print(
+              'Settings Screen - Profile data updated in real-time: $_userName');
         });
       }
     }, onError: (error) {
       print('Settings Screen - Error listening to profile data: $error');
     });
   }
-
 
   /// Handle dark mode toggle
   void _onDarkModeToggle(bool value) async {
@@ -302,11 +307,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // Get current unit from CalorieUnitsService (should be up-to-date)
         final CalorieUnitsService calorieUnitsService = CalorieUnitsService();
         String selectedUnit = calorieUnitsService.unitSuffix;
-        
+
         return StatefulBuilder(
           builder: (context, setState) {
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24)),
               elevation: 20,
               child: ConstrainedBox(
                 constraints: BoxConstraints(
@@ -318,7 +324,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(24),
                     gradient: LinearGradient(
-                      colors: [Colors.white, Colors.white.withValues(alpha: 0.95)],
+                      colors: [
+                        Colors.white,
+                        Colors.white.withValues(alpha: 0.95)
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -327,116 +336,127 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                    // Header with icon and title
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [kAccentGold, kAccentGold.withValues(alpha: 0.8)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: kAccentGold.withValues(alpha: 0.3),
-                            blurRadius: 12,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.straighten, color: Colors.white, size: 24),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Select Calorie Unit',
-                            style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                        // Header with icon and title
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                kAccentGold,
+                                kAccentGold.withValues(alpha: 0.8)
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    // Description
-                    Text(
-                      'Choose your preferred unit for displaying calories throughout the app',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: kTextSecondary,
-                        height: 1.4,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    // Unit options
-                    _buildEnhancedUnitOption('kcal', 'Kilocalories', 'kcal', 'Most common unit', selectedUnit, () {
-                      setState(() => selectedUnit = 'kcal');
-                    }),
-                    const SizedBox(height: 16),
-                    _buildEnhancedUnitOption('cal', 'Calories', 'cal', 'Small calorie unit', selectedUnit, () {
-                      setState(() => selectedUnit = 'cal');
-                    }),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Action buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: BorderSide(color: kTextSecondary.withValues(alpha: 0.3)),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: kAccentGold.withValues(alpha: 0.3),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
                               ),
-                            ),
-                            child: Text(
-                              'Cancel',
-                              style: GoogleFonts.poppins(
-                                color: kTextSecondary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.straighten,
+                                  color: Colors.white, size: 24),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Select Calorie Unit',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
-                            ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              _saveCalorieUnit(selectedUnit);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: kAccentGold,
-                              foregroundColor: Colors.white,
-                              elevation: 8,
-                              shadowColor: kAccentGold.withValues(alpha: 0.4),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                            ),
-                            child: Text(
-                              'Save Unit',
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
+                        const SizedBox(height: 24),
+
+                        // Description
+                        Text(
+                          'Choose your preferred unit for displaying calories throughout the app',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            color: kTextSecondary,
+                            height: 1.4,
                           ),
+                          textAlign: TextAlign.center,
                         ),
-                      ],
-                    ),
+                        const SizedBox(height: 24),
+
+                        // Unit options
+                        _buildEnhancedUnitOption('kcal', 'Kilocalories', 'kcal',
+                            'Most common unit', selectedUnit, () {
+                          setState(() => selectedUnit = 'kcal');
+                        }),
+                        const SizedBox(height: 16),
+                        _buildEnhancedUnitOption('cal', 'Calories', 'cal',
+                            'Small calorie unit', selectedUnit, () {
+                          setState(() => selectedUnit = 'cal');
+                        }),
+
+                        const SizedBox(height: 24),
+
+                        // Action buttons
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: TextButton.styleFrom(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: BorderSide(
+                                        color: kTextSecondary.withValues(
+                                            alpha: 0.3)),
+                                  ),
+                                ),
+                                child: Text(
+                                  'Cancel',
+                                  style: GoogleFonts.poppins(
+                                    color: kTextSecondary,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  _saveCalorieUnit(selectedUnit);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: kAccentGold,
+                                  foregroundColor: Colors.white,
+                                  elevation: 8,
+                                  shadowColor:
+                                      kAccentGold.withValues(alpha: 0.4),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 14),
+                                ),
+                                child: Text(
+                                  'Save Unit',
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -450,18 +470,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// Build enhanced unit option for dialog
-  Widget _buildEnhancedUnitOption(String value, String label, String unit, String description, String selectedUnit, VoidCallback onTap) {
+  Widget _buildEnhancedUnitOption(String value, String label, String unit,
+      String description, String selectedUnit, VoidCallback onTap) {
     final isSelected = selectedUnit == value;
-    
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: isSelected 
+          gradient: isSelected
               ? LinearGradient(
-                  colors: [kAccentGold.withValues(alpha: 0.1), kAccentGold.withValues(alpha: 0.05)],
+                  colors: [
+                    kAccentGold.withValues(alpha: 0.1),
+                    kAccentGold.withValues(alpha: 0.05)
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 )
@@ -472,24 +496,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected 
+            color: isSelected
                 ? kAccentGold
                 : kTextSecondary.withValues(alpha: 0.15),
             width: isSelected ? 2 : 1,
           ),
-          boxShadow: isSelected ? [
-            BoxShadow(
-              color: kAccentGold.withValues(alpha: 0.2),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ] : [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: kAccentGold.withValues(alpha: 0.2),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Row(
           children: [
@@ -501,17 +527,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? kAccentGold : kTextSecondary.withValues(alpha: 0.4),
+                  color: isSelected
+                      ? kAccentGold
+                      : kTextSecondary.withValues(alpha: 0.4),
                   width: isSelected ? 2 : 1.5,
                 ),
                 color: isSelected ? kAccentGold : Colors.transparent,
-                boxShadow: isSelected ? [
-                  BoxShadow(
-                    color: kAccentGold.withValues(alpha: 0.3),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ] : null,
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: kAccentGold.withValues(alpha: 0.3),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
               ),
               child: isSelected
                   ? const Icon(
@@ -542,27 +572,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          gradient: isSelected 
+                          gradient: isSelected
                               ? LinearGradient(
-                                  colors: [kAccentGold, kAccentGold.withValues(alpha: 0.8)],
+                                  colors: [
+                                    kAccentGold,
+                                    kAccentGold.withValues(alpha: 0.8)
+                                  ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 )
                               : LinearGradient(
-                                  colors: [kTextSecondary.withValues(alpha: 0.1), kTextSecondary.withValues(alpha: 0.05)],
+                                  colors: [
+                                    kTextSecondary.withValues(alpha: 0.1),
+                                    kTextSecondary.withValues(alpha: 0.05)
+                                  ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
                           borderRadius: BorderRadius.circular(6),
-                          boxShadow: isSelected ? [
-                            BoxShadow(
-                              color: kAccentGold.withValues(alpha: 0.3),
-                              blurRadius: 4,
-                              offset: const Offset(0, 1),
-                            ),
-                          ] : null,
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: kAccentGold.withValues(alpha: 0.3),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ]
+                              : null,
                         ),
                         child: Text(
                           unit,
@@ -580,7 +619,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     description,
                     style: GoogleFonts.poppins(
                       fontSize: 12,
-                      color: isSelected ? kAccentGold.withValues(alpha: 0.8) : kTextSecondary,
+                      color: isSelected
+                          ? kAccentGold.withValues(alpha: 0.8)
+                          : kTextSecondary,
                       height: 1.2,
                     ),
                     maxLines: 2,
@@ -624,23 +665,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         (u) => u.name == unit,
         orElse: () => CalorieUnit.kcal,
       );
-      
+
       final updatedPreferences = _userPreferences.copyWith(
         calorieUnit: calorieUnit,
         lastUpdated: DateTime.now(),
       );
-      
+
       await _appStateService.updateUserPreferences(updatedPreferences);
-      
+
       // Update the global calorie units service
       final calorieUnitsService = CalorieUnitsService();
       calorieUnitsService.updateUnit(calorieUnit);
-      
+
       // Update local preferences
       setState(() {
         _userPreferences = updatedPreferences;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -653,7 +694,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             backgroundColor: kAccentGold,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -726,7 +768,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: GoogleFonts.poppins(),
             ),
             const SizedBox(height: 20),
-            
+
             // Email
             _buildContactOption(
               icon: Icons.email_outlined,
@@ -742,9 +784,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 );
               },
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Phone
             _buildContactOption(
               icon: Icons.phone_outlined,
@@ -760,9 +802,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 );
               },
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Business Hours
             _buildContactOption(
               icon: Icons.access_time_outlined,
@@ -864,7 +906,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () => Navigator.pop(context, true),
             child: Text(
               'Logout',
-              style: GoogleFonts.poppins(color: kErrorColor, fontWeight: FontWeight.bold),
+              style: GoogleFonts.poppins(
+                  color: kErrorColor, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -877,15 +920,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (_user != null) {
           await FirebaseAuth.instance.signOut();
         }
-        
+
         // Also try demo logout
         if (_demoUser != null) {
           await _demoAuth.signOut();
         }
-        
+
         if (mounted) {
           // Navigate to welcome screen
-          Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
+          Navigator.pushNamedAndRemoveUntil(
+              context, '/welcome', (route) => false);
         }
       } catch (e) {
         if (mounted) {
@@ -908,18 +952,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         builder: (context) => const ProfileEditScreen(),
       ),
     );
-    
+
     // Reload user data if profile was updated
     if (result == true) {
       print('Profile edit completed, refreshing user data...');
-      
+
       // Add a small delay to ensure Firebase Auth update has propagated
       await Future.delayed(const Duration(milliseconds: 500));
-      
+
       // Force refresh the current user from Firebase Auth
       _user = FirebaseAuth.instance.currentUser;
       print('Current user after edit: ${_user?.displayName}');
-      
+
       await _loadUserData();
       // Also reload profile data specifically for Firebase users
       if (_user != null) {
@@ -929,7 +973,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         setState(() {});
       }
-      
+
       // Additional refresh after a short delay
       Future.delayed(const Duration(seconds: 1), () {
         if (mounted) {
@@ -949,12 +993,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         builder: (context) => const GoalsScreen(),
       ),
     );
-    
+
     if (result == true) {
       _loadUserData();
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -992,7 +1035,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 16),
 
             // Google Health Connection Section
-        _buildGoogleHealthCard(),
+            _buildGoogleHealthCard(),
             const SizedBox(height: 12),
 
             const SizedBox(height: 12),
@@ -1104,7 +1147,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-
   Widget _buildUniformSettingsCard({
     required IconData icon,
     required String title,
@@ -1135,7 +1177,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Icon(icon, color: color, size: 24),
               ),
               const SizedBox(width: 16),
-              
+
               // Text Content
               Expanded(
                 child: Column(
@@ -1161,19 +1203,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
               ),
-              
+
               // Trailing Widget (Switch or Arrow)
               if (trailing != null)
                 trailing
               else
-                const Icon(Icons.arrow_forward_ios, size: 16, color: kTextSecondary),
+                const Icon(Icons.arrow_forward_ios,
+                    size: 16, color: kTextSecondary),
             ],
           ),
         ),
       ),
     );
   }
-
 
   /// Initialize Google Fit service (with persistence check)
   Future<void> _initializeGoogleFit() async {
@@ -1187,7 +1229,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         print('Google Fit already connected, skipping initialization');
         return;
       }
-      
+
       // Only initialize if not already connected
       await _googleFitService.initialize();
       final isAuthenticated = await _googleFitService.validateAuthentication();
@@ -1197,8 +1239,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _lastGoogleFitSync = DateTime.now();
         }
       });
-      
-      print('Google Fit initialization completed. Connected: $_isGoogleFitConnected');
+
+      print(
+          'Google Fit initialization completed. Connected: $_isGoogleFitConnected');
     } catch (e) {
       print('Error initializing Google Fit: $e');
       setState(() {
@@ -1236,7 +1279,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _isGoogleFitConnected = true;
           _lastGoogleFitSync = DateTime.now();
         });
-        
+
         // Show success message
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1274,7 +1317,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _isGoogleFitConnected = false;
         _lastGoogleFitSync = null;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1293,7 +1336,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_lastGoogleFitSync == null) return 'Never';
     final now = DateTime.now();
     final difference = now.difference(_lastGoogleFitSync!);
-    
+
     if (difference.inMinutes < 1) {
       return 'Just now';
     } else if (difference.inMinutes < 60) {
@@ -1311,7 +1354,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
-        onTap: _isGoogleFitConnected ? _disconnectFromGoogleFit : _connectToGoogleFit,
+        onTap: _isGoogleFitConnected
+            ? _disconnectFromGoogleFit
+            : _connectToGoogleFit,
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(20),
@@ -1323,11 +1368,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 height: 52,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _isGoogleFitConnected ? kSuccessColor.withValues(alpha: 0.1) : Colors.grey[100],
+                  color: _isGoogleFitConnected
+                      ? kSuccessColor.withValues(alpha: 0.1)
+                      : Colors.grey[100],
                   border: Border.all(
-                    color: _isGoogleFitConnected ? kSuccessColor : Colors.grey[300]!, 
-                    width: 1
-                  ),
+                      color: _isGoogleFitConnected
+                          ? kSuccessColor
+                          : Colors.grey[300]!,
+                      width: 1),
                 ),
                 child: Center(
                   child: _isConnectingToGoogleFit
@@ -1336,7 +1384,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(kPrimaryColor),
                           ),
                         )
                       : Image.asset(
@@ -1348,7 +1397,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(width: 16),
-              
+
               // Content
               Expanded(
                 child: Column(
@@ -1364,25 +1413,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _isGoogleFitConnected 
+                      _isGoogleFitConnected
                           ? 'Connected - Last sync: ${_formatLastSyncTime()}'
                           : 'Connect to sync fitness data',
                       style: GoogleFonts.poppins(
                         fontSize: 12,
-                        color: _isGoogleFitConnected ? kSuccessColor : kTextSecondary,
+                        color: _isGoogleFitConnected
+                            ? kSuccessColor
+                            : kTextSecondary,
                       ),
                     ),
                   ],
                 ),
               ),
-              
+
               // Status indicator
               Container(
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _isGoogleFitConnected ? kSuccessColor : Colors.grey[400],
+                  color:
+                      _isGoogleFitConnected ? kSuccessColor : Colors.grey[400],
                 ),
               ),
             ],
@@ -1526,17 +1578,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-
-
   /// Build profile card with user info and edit button
   Widget _buildProfileCard() {
     // Get the current user directly from Firebase Auth for real-time updates
     final currentUser = FirebaseAuth.instance.currentUser;
     final displayName = currentUser?.displayName;
-    
+
     // Debug print to see what we're getting
-    print('Profile Card - Current user displayName: $displayName, _userName: $_userName');
-    
+    print(
+        'Profile Card - Current user displayName: $displayName, _userName: $_userName');
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1553,7 +1604,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   : null,
               child: _profileImageUrl == null
                   ? Text(
-                      (displayName?.isNotEmpty == true ? displayName! : _userName?.isNotEmpty == true ? _userName! : 'U').substring(0, 1).toUpperCase(),
+                      (displayName?.isNotEmpty == true
+                              ? displayName!
+                              : _userName?.isNotEmpty == true
+                                  ? _userName!
+                                  : 'U')
+                          .substring(0, 1)
+                          .toUpperCase(),
                       style: GoogleFonts.poppins(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -1570,7 +1627,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    displayName?.isNotEmpty == true ? displayName! : (_userName?.isNotEmpty == true ? _userName! : 'User'),
+                    displayName?.isNotEmpty == true
+                        ? displayName!
+                        : (_userName?.isNotEmpty == true ? _userName! : 'User'),
                     style: GoogleFonts.poppins(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -1601,7 +1660,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-
   /// Build logout card with red styling
   Widget _buildLogoutCard() {
     return Card(
@@ -1621,7 +1679,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-
   /// Show health integration dialog (disabled - Google Fit removed)
   void _showHealthIntegrationDialog() {
     // Health integration disabled - Google Fit removed
@@ -1632,7 +1689,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
-
 
   @override
   void dispose() {
