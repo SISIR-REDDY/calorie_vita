@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart';
 
 /// Network service to handle connectivity and offline/online states
 class NetworkService {

@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:googleapis_auth/auth_io.dart';
-import 'package:googleapis/fitness/v1.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
@@ -88,7 +86,7 @@ class GoogleFitService {
       final isSignedIn = await _googleSignIn!.isSignedIn();
       if (isSignedIn) {
         // Verify authentication by getting current user
-        final user = await _googleSignIn!.currentUser;
+        final user = _googleSignIn!.currentUser;
         if (user != null) {
           _isAuthenticated = true;
           _logger.i('Google Fit authentication status restored');
@@ -140,7 +138,7 @@ class GoogleFitService {
       _authClient = authenticatedClient(
         http.Client(),
         AccessCredentials(
-          AccessToken('Bearer', auth.accessToken!, DateTime.now().toUtc().add(Duration(hours: 1))),
+          AccessToken('Bearer', auth.accessToken!, DateTime.now().toUtc().add(const Duration(hours: 1))),
           auth.idToken,
           _getScopes(),
         ),
@@ -191,9 +189,9 @@ class GoogleFitService {
     
     try {
       final startOfDay = DateTime(date.year, date.month, date.day);
-      final endOfDay = startOfDay.add(Duration(days: 1));
+      final endOfDay = startOfDay.add(const Duration(days: 1));
       
-      final url = '$_baseUrl/users/me/dataset:aggregate';
+      const url = '$_baseUrl/users/me/dataset:aggregate';
       
       final requestBody = {
         'aggregateBy': [
@@ -249,9 +247,9 @@ class GoogleFitService {
     
     try {
       final startOfDay = DateTime(date.year, date.month, date.day);
-      final endOfDay = startOfDay.add(Duration(days: 1));
+      final endOfDay = startOfDay.add(const Duration(days: 1));
       
-      final url = '$_baseUrl/users/me/dataset:aggregate';
+      const url = '$_baseUrl/users/me/dataset:aggregate';
       
       final requestBody = {
         'aggregateBy': [
@@ -307,9 +305,9 @@ class GoogleFitService {
     
     try {
       final startOfDay = DateTime(date.year, date.month, date.day);
-      final endOfDay = startOfDay.add(Duration(days: 1));
+      final endOfDay = startOfDay.add(const Duration(days: 1));
       
-      final url = '$_baseUrl/users/me/dataset:aggregate';
+      const url = '$_baseUrl/users/me/dataset:aggregate';
       
       final requestBody = {
         'aggregateBy': [
@@ -366,7 +364,7 @@ class GoogleFitService {
     }
     
     try {
-      final url = '$_baseUrl/users/me/dataSources';
+      const url = '$_baseUrl/users/me/dataSources';
       final response = await _authClient!.get(Uri.parse(url));
       
       if (response.statusCode == 200) {
@@ -502,7 +500,7 @@ class GoogleFitService {
       _authClient = authenticatedClient(
         http.Client(),
         AccessCredentials(
-          AccessToken('Bearer', auth.accessToken!, DateTime.now().toUtc().add(Duration(hours: 1))),
+          AccessToken('Bearer', auth.accessToken!, DateTime.now().toUtc().add(const Duration(hours: 1))),
           auth.idToken,
           [
             'https://www.googleapis.com/auth/fitness.activity.read',

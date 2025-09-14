@@ -42,7 +42,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.privacy_tip_outlined,
                     size: 48,
                     color: kAccentBlue,

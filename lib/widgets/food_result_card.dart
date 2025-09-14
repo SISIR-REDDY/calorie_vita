@@ -114,7 +114,7 @@ class FoodResultCard extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.info_outline,
                           color: kInfoColor,
                           size: 20,
@@ -123,7 +123,7 @@ class FoodResultCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             comment!,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 14,
                               color: kTextPrimary,
                               fontStyle: FontStyle.italic,
@@ -212,7 +212,7 @@ class FoodResultCard extends StatelessWidget {
                 color: kPrimaryColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.pie_chart,
                 color: kPrimaryColor,
                 size: 20,

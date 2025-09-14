@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Comprehensive error handling and offline support service
 class ErrorHandlingService {
@@ -104,10 +103,10 @@ class ErrorHandlingService {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Row(
+        title: const Row(
           children: [
             Icon(Icons.error_outline, color: Colors.red),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             Text('Error'),
           ],
         ),
@@ -115,7 +114,7 @@ class ErrorHandlingService {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text('OK'),
+            child: const Text('OK'),
           ),
         ],
       ),
@@ -128,7 +127,7 @@ class ErrorHandlingService {
       SnackBar(
         content: Row(
           children: [
-            Icon(Icons.error_outline, color: Colors.white),
+            const Icon(Icons.error_outline, color: Colors.white),
             const SizedBox(width: 8),
             Expanded(child: Text(error)),
           ],
@@ -152,7 +151,7 @@ class ErrorHandlingService {
       SnackBar(
         content: Row(
           children: [
-            Icon(Icons.check_circle_outline, color: Colors.white),
+            const Icon(Icons.check_circle_outline, color: Colors.white),
             const SizedBox(width: 8),
             Expanded(child: Text(message)),
           ],

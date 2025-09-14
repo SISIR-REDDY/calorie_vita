@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'demo_auth_service.dart';
 import 'local_storage_service.dart';
@@ -85,7 +84,7 @@ class AuthService {
     if (_isFirebaseAvailable) {
       try {
         // Test Firebase with a simple operation
-        await _firebaseAuth.currentUser;
+        _firebaseAuth.currentUser;
       } catch (e) {
         if (e.toString().contains('API key not valid') || 
             e.toString().contains('invalid API key') ||

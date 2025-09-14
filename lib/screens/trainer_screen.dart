@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../widgets/chat_bubble.dart';
 import '../services/ai_service.dart';
 import '../services/firebase_service.dart';
-import '../services/real_time_input_service.dart';
 import '../ui/app_colors.dart';
 import '../mixins/google_fit_sync_mixin.dart';
 
@@ -430,7 +428,7 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Row(
               children: [
-                Icon(
+                const Icon(
                   Icons.chat,
                   color: kAccentBlue,
                   size: 24,
@@ -688,7 +686,7 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
             color: kAccentBlue.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
+          child: const Icon(
             Icons.chat_bubble,
             color: kAccentBlue,
             size: 20,
@@ -714,7 +712,7 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
           mainAxisSize: MainAxisSize.min,
           children: [
             if (isCurrentSession)
-              Icon(
+              const Icon(
                 Icons.check_circle,
                 color: kAccentBlue,
                 size: 20,
@@ -981,7 +979,7 @@ class _AITrainerScreenState extends State<AITrainerScreen> with GoogleFitSyncMix
           ),
           actions: [
             IconButton(
-              icon: Icon(Icons.chat, color: kAccentBlue),
+              icon: const Icon(Icons.chat, color: kAccentBlue),
               tooltip: 'Chat History',
               onPressed: _showChatHistory,
             ),

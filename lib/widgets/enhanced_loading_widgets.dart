@@ -9,12 +9,12 @@ class EnhancedLoadingWidget extends StatefulWidget {
   final bool showText;
   
   const EnhancedLoadingWidget({
-    Key? key,
+    super.key,
     this.text = 'Loading...',
     this.size = 24.0,
     this.color,
     this.showText = true,
-  }) : super(key: key);
+  });
 
   @override
   State<EnhancedLoadingWidget> createState() => _EnhancedLoadingWidgetState();
@@ -135,11 +135,11 @@ class GoogleFitShimmerCard extends StatefulWidget {
   final BorderRadius? borderRadius;
 
   const GoogleFitShimmerCard({
-    Key? key,
+    super.key,
     this.height = 120,
     this.width = double.infinity,
     this.borderRadius,
-  }) : super(key: key);
+  });
 
   @override
   State<GoogleFitShimmerCard> createState() => _GoogleFitShimmerCardState();
@@ -251,11 +251,11 @@ class SmoothDataTransition extends StatefulWidget {
   final Duration duration;
 
   const SmoothDataTransition({
-    Key? key,
+    super.key,
     required this.child,
     required this.isLoading,
     this.duration = const Duration(milliseconds: 300),
-  }) : super(key: key);
+  });
 
   @override
   State<SmoothDataTransition> createState() => _SmoothDataTransitionState();
@@ -338,11 +338,11 @@ class LoadingOverlay extends StatelessWidget {
   final String? message;
 
   const LoadingOverlay({
-    Key? key,
+    super.key,
     required this.isLoading,
     required this.child,
     this.message,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

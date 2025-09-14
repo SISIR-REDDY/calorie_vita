@@ -2,6 +2,7 @@
 /// 
 /// This file contains configuration settings for Google Fit integration.
 /// Follow the setup instructions to configure Google Fit API access.
+library;
 
 class GoogleFitConfig {
   /// Google Fit API Configuration

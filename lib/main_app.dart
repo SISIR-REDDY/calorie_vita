@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'screens/home_screen.dart';
 import 'screens/analytics_screen.dart';
 import 'screens/camera_screen.dart';
@@ -10,7 +9,6 @@ import 'widgets/reward_notification_widget.dart';
 import 'ui/app_theme.dart';
 import 'services/app_state_manager.dart';
 import 'services/global_google_fit_manager.dart';
-import 'firebase_options.dart';
 
 class MainApp extends StatefulWidget {
   final bool firebaseInitialized;
@@ -353,7 +351,7 @@ class _MainNavigationState extends State<MainNavigation> {
   final GlobalGoogleFitManager _googleFitManager = GlobalGoogleFitManager();
   final List<Widget> _screens = [
     const PremiumHomeScreen(),
-    AnalyticsScreen(),
+    const AnalyticsScreen(),
     const SizedBox(), // Placeholder for FAB
     const AITrainerScreen(),
     const SettingsScreen(), 

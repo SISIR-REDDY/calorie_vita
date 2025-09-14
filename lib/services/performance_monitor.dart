@@ -16,8 +16,8 @@ class PerformanceMonitor {
   final Map<String, int> _operationCounts = {};
   final List<PerformanceEvent> _events = [];
   
-  DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
-  Connectivity _connectivity = Connectivity();
+  final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
+  final Connectivity _connectivity = Connectivity();
   
   String? _deviceModel;
   String? _appVersion;

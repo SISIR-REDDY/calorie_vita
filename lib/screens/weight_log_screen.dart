@@ -297,7 +297,7 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
           icon: const Icon(Icons.arrow_back, color: kTextDark),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [],
+        actions: const [],
       ),
       body: Column(
         children: [
@@ -531,7 +531,7 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 32),
-                  Container(
+                  SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton.icon(
@@ -616,7 +616,7 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 32),
-                  Container(
+                  SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton.icon(

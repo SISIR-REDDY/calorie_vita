@@ -3,14 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import '../models/food_entry.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
-import '../models/user_achievement.dart';
-import '../models/user_goals.dart';
-import '../models/user_preferences.dart';
 
 /// Optimized Firebase service with caching, offline support, and performance improvements
 class OptimizedFirebaseService {

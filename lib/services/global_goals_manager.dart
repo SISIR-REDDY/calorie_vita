@@ -1,4 +1,3 @@
-import 'dart:async';
 import '../models/user_goals.dart';
 
 /// Global goals manager for immediate UI updates

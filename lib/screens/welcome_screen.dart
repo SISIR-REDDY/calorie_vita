@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'home_screen.dart';
 import '../ui/app_colors.dart';
 import '../services/auth_service.dart';
 
@@ -67,11 +66,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       final user = await _authService.signInWithGoogle();
       if (user != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Signed in with Google successfully!'),
+          const SnackBar(
+            content: Text('Signed in with Google successfully!'),
             backgroundColor: kSuccessColor,
             behavior: SnackBarBehavior.floating,
-            shape: const RoundedRectangleBorder(
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.all(Radius.circular(12)),
             ),
           ),
@@ -328,13 +327,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               children: [
                 if (_isGoogleSigningIn) ...[
                   // Loading indicator
-                  SizedBox(
+                  const SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        const Color(0xFF3C4043),
+                        Color(0xFF3C4043),
                       ),
                     ),
                   ),
@@ -373,7 +372,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   /// Official Google Logo using proper brand colors
   Widget _buildGoogleLogo() {
-    return Container(
+    return SizedBox(
       width: 20,
       height: 20,
       child: CustomPaint(

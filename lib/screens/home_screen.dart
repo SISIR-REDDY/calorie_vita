@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import '../ui/app_colors.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
@@ -19,14 +17,12 @@ import '../services/daily_summary_service.dart';
 import '../services/simple_streak_service.dart';
 import '../services/calorie_units_service.dart';
 import '../services/analytics_service.dart';
-import '../services/ai_service.dart';
 import '../services/goals_event_bus.dart';
 import '../services/google_fit_service.dart';
 import '../services/google_fit_cache_service.dart';
 import '../services/global_goals_manager.dart';
 import '../services/global_google_fit_manager.dart';
 import '../mixins/google_fit_sync_mixin.dart';
-import '../widgets/enhanced_loading_widgets.dart';
 import '../services/simple_goals_notifier.dart';
 import '../services/rewards_service.dart';
 import '../models/reward_system.dart';
@@ -67,7 +63,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   MacroBreakdown? _macroBreakdown;
   UserPreferences _preferences = const UserPreferences();
   String _motivationalQuote = '';
-  bool _isLoading = false; // Start with false to show UI immediately
+  final bool _isLoading = false; // Start with false to show UI immediately
   bool _isRefreshing = false; // Track background data loading
   
   
@@ -109,7 +105,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   
 
   // Task management
-  List<Map<String, dynamic>> _tasks = [
+  final List<Map<String, dynamic>> _tasks = [
     {
       'id': 'task_1',
       'emoji': DynamicIconService().generateIcon('Drink 8 glasses of water'),
@@ -316,8 +312,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   void _loadCachedDataImmediate() {
     try {
       // Load cached summary if available
-      if (_dailySummary == null) {
-        _dailySummary = DailySummary(
+      _dailySummary ??= DailySummary(
           caloriesConsumed: 0,
           caloriesBurned: 0,
           caloriesGoal: 2000,
@@ -327,7 +322,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           waterGlassesGoal: 8,
           date: DateTime.now(),
         );
-      }
       
       // Load default motivational quote
       if (_motivationalQuote.isEmpty) {
@@ -1081,9 +1075,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   /// Update calorie value in the daily summary
   void _updateCalorieValue(String type, int value) {
-    if (_dailySummary == null) {
-      _dailySummary = _getEmptyDailySummary();
-    }
+    _dailySummary ??= _getEmptyDailySummary();
     
     setState(() {
       if (type == 'consumed') {
@@ -1099,9 +1091,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   /// Update water glasses value and save to Firestore
   Future<void> _updateWaterGlassesValue(int value) async {
-    if (_dailySummary == null) {
-      _dailySummary = _getEmptyDailySummary();
-    }
+    _dailySummary ??= _getEmptyDailySummary();
     
     setState(() {
       _dailySummary = _dailySummary!.copyWith(waterGlasses: value);
@@ -1112,9 +1102,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   /// Update water target value and save to Firestore
   Future<void> _updateWaterTargetValue(int value) async {
-    if (_dailySummary == null) {
-      _dailySummary = _getEmptyDailySummary();
-    }
+    _dailySummary ??= _getEmptyDailySummary();
     
     setState(() {
       _dailySummary = _dailySummary!.copyWith(waterGlassesGoal: value);
@@ -1125,7 +1113,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     // Also update the user goals in AppStateService
     await _appStateService.updateUserGoals(
       _appStateService.userGoals?.copyWith(waterGlassesGoal: value) ?? 
-      UserGoals(waterGlassesGoal: 8)
+      const UserGoals(waterGlassesGoal: 8)
     );
   }
 
@@ -2648,7 +2636,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 color: kErrorColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.delete_outline,
                 color: kErrorColor,
                 size: 16,
@@ -2833,7 +2821,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               },
             ),
           ),
-        ).toList(),
+        ),
       ],
       ),
     );
@@ -3017,7 +3005,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               color: Colors.orange.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
-            child: Icon(
+            child: const Icon(
               Icons.local_fire_department,
               color: Colors.deepOrange,
               size: 24,
@@ -3207,8 +3195,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             children: List.generate(7, (index) {
               final date = startOfWeek.add(Duration(days: index));
               final isToday = date.day == now.day && date.month == now.month;
-              final hasStreak = false; // Simplified for streak system
-              final hasReward = false; // Simplified for streak system
+              const hasStreak = false; // Simplified for streak system
+              const hasReward = false; // Simplified for streak system
               
               return Expanded(
                 child: Padding(
@@ -3240,7 +3228,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       indicator = Container(
         width: 6,
         height: 6,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: kSuccessColor,
           shape: BoxShape.circle,
         ),
@@ -3252,7 +3240,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       indicator = Container(
         width: 6,
         height: 6,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: kAccentColor,
           shape: BoxShape.circle,
         ),

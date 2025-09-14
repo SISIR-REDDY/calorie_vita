@@ -722,7 +722,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 ? NetworkImage(_profileImageUrl!)
                 : null,
             child: _profileImageUrl == null
-                ? Icon(
+                ? const Icon(
                     Icons.person,
                     size: 60,
                     color: kAccentBlue,
@@ -812,7 +812,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     required void Function(String?) onChanged,
   }) {
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       isExpanded: true,
       decoration: InputDecoration(
         labelText: label,

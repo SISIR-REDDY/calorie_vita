@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'local_storage_service.dart';
 
 /// Demo authentication service for development

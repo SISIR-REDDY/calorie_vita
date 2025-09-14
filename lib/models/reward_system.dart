@@ -292,7 +292,7 @@ class RewardSystem {
         emoji: '🏋️‍♂️',
         type: RewardType.streak,
         category: BadgeCategory.exercise,
-        color: const Color(0xFFD32F2F),
+        color: Color(0xFFD32F2F),
       ),
       const UserReward(
         id: 'exercise_streak_100',
@@ -454,7 +454,7 @@ class RewardSystem {
         emoji: '🏋️‍♂️',
         type: RewardType.milestone,
         category: BadgeCategory.exercise,
-        color: const Color(0xFFD32F2F),
+        color: Color(0xFFD32F2F),
       ),
       const UserReward(
         id: 'exercise_500',

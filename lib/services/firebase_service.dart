@@ -130,7 +130,7 @@ class FirebaseService {
           .set(profileData, SetOptions(merge: true));
     } catch (e) {
       print('Error saving user profile: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -228,7 +228,7 @@ class FirebaseService {
       }
     } catch (e) {
       print('Error saving chat message: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -268,7 +268,7 @@ class FirebaseService {
       await batch.commit();
     } catch (e) {
       print('Error clearing chat history: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -457,7 +457,7 @@ class FirebaseService {
       await docRef.set({'achievements': achievements});
     } catch (e) {
       print('Error saving user achievement: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -504,7 +504,7 @@ class FirebaseService {
       });
     } catch (e) {
       print('Error saving weight log: $e');
-      throw e;
+      rethrow;
     }
   }
 

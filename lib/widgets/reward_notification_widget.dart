@@ -19,8 +19,8 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
     with TickerProviderStateMixin {
   final RewardNotificationService _notificationService = RewardNotificationService();
   
-  List<RewardNotification> _notifications = [];
-  List<LevelUpNotification> _levelUpNotifications = [];
+  final List<RewardNotification> _notifications = [];
+  final List<LevelUpNotification> _levelUpNotifications = [];
   
   late AnimationController _slideController;
   late AnimationController _scaleController;
@@ -226,9 +226,9 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Achievement Unlocked!',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
@@ -259,9 +259,9 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text(
+                  child: const Text(
                     'Achievement Unlocked!',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -397,7 +397,7 @@ class StreakNotificationWidget extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             colors: [
               Colors.orange,
               Colors.red,

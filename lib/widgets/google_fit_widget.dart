@@ -209,7 +209,7 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: _isRefreshing 
-          ? GoogleFitShimmerCard(height: 100)
+          ? const GoogleFitShimmerCard(height: 100)
           : EnhancedLoadingWidget(
               text: 'Syncing with Google Fit...',
               color: AppColors.primary,
@@ -228,7 +228,7 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
       ),
       child: Column(
         children: [
-          Icon(
+          const Icon(
             Icons.error_outline,
             color: Colors.red,
             size: 24,
@@ -273,7 +273,7 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
       ),
       child: Column(
         children: [
-          Icon(
+          const Icon(
             Icons.fitness_center_outlined,
             color: Colors.blue,
             size: 32,

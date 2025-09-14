@@ -269,7 +269,7 @@ class DynamicIconService {
     
     // If no specific matches, use default
     if (sortedCategories.isEmpty) {
-      sortedCategories.add(MapEntry('default', 1.0));
+      sortedCategories.add(const MapEntry('default', 1.0));
     }
     
     // Generate icons from top categories

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'optimized_firebase_service.dart';
 import 'performance_monitor.dart';
 import 'network_service.dart';

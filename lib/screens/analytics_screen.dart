@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../ui/app_colors.dart';
 import '../services/analytics_service.dart';
 import '../services/firebase_service.dart';
@@ -213,6 +212,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       
       // Load Google Fit data in background (lowest priority)
       _loadGoogleFitDataAsync();
+      
+      // Generate AI insights after data is loaded
+      _generateAIInsights();
       
     } catch (e) {
       print('Background data loading error: $e');
@@ -713,6 +715,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       // Wait for all refreshes to complete
       await Future.wait(futures);
       
+      // Generate fresh AI insights after data refresh
+      _generateAIInsights();
+      
       print('Analytics data refreshed successfully');
     } catch (e) {
       setState(() {
@@ -745,6 +750,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       futures.add(_refreshAnalyticsForPeriod());
       
       await Future.wait(futures);
+      
+      // Generate fresh AI insights for the new period
+      _generateAIInsights();
     } catch (e) {
       setState(() {
         _error = 'Failed to change period: ${e.toString()}';
@@ -1014,9 +1022,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               color: Colors.red.withValues(alpha: 0.6),
             ),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               'Failed to load analytics',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
                 color: kTextPrimary,
@@ -1122,7 +1130,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                             color: Colors.green.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Row(
+                          child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               SizedBox(
@@ -1133,8 +1141,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                                   valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
                                 ),
                               ),
-                              const SizedBox(width: 4),
-                              const Text(
+                              SizedBox(width: 4),
+                              Text(
                                 'LIVE',
                                 style: TextStyle(
                                   fontSize: 10,
@@ -1537,15 +1545,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               color: kSuccessColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Row(
+            child: const Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.check_circle,
                   color: kSuccessColor,
                   size: 16,
                 ),
-                const SizedBox(width: 8),
-                const Expanded(
+                SizedBox(width: 8),
+                Expanded(
                   child: Text(
                     'Well Balanced',
                     style: TextStyle(
@@ -1643,9 +1651,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               ],
             ),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               'BMI data unavailable. Please check your profile and Google Fit connection.',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 color: kTextSecondary,
               ),
@@ -1722,7 +1730,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'Current BMI',
                         style: TextStyle(
                           fontSize: 14,
@@ -1753,7 +1761,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       if (hasHeight && hasWeight) ...[
                         Text(
                           'Height: ${(_userHeight! * 100).round()} cm | Weight: ${_userWeight!.round()} kg',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                             color: kTextSecondary,
@@ -1795,14 +1803,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Row(
                   children: [
                     Icon(
                       Icons.info_outline,
                       color: kInfoColor,
                       size: 16,
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     Text(
                       'BMI Categories',
                       style: TextStyle(
@@ -1834,14 +1842,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Row(
                   children: [
                     Icon(
                       Icons.lightbulb_outline,
                       color: kSuccessColor,
                       size: 16,
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     Text(
                       'Health Recommendations',
                       style: TextStyle(
@@ -1893,7 +1901,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           const Spacer(),
           Text(
             range,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 12,
               color: kTextSecondary,
             ),
@@ -1934,7 +1942,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     }
     
     if (hasRealData) {
-      return '$baseRecommendation Based on your profile (${gender}, ${age} years old), this recommendation is personalized for you.';
+      return '$baseRecommendation Based on your profile ($gender, $age years old), this recommendation is personalized for you.';
     } else {
       return '$baseRecommendation Update your profile in settings for more personalized recommendations.';
     }
@@ -2045,14 +2053,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
               Icon(
                 Icons.auto_awesome,
                 color: kAccentPurple,
                 size: 16,
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Text(
                 'AI Analysis',
                 style: TextStyle(
@@ -2171,7 +2179,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                 ),
                 const SizedBox(height: 8),
               ],
-            )).toList(),
+            )),
         ],
       ),
     );

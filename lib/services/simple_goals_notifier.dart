@@ -20,7 +20,7 @@ class SimpleGoalsNotifier {
 
   // Get goals with defaults
   UserGoals getGoalsWithDefaults() {
-    return _currentGoals ?? UserGoals(
+    return _currentGoals ?? const UserGoals(
       calorieGoal: 2000,
       stepsPerDayGoal: 10000,
       waterGlassesGoal: 8,

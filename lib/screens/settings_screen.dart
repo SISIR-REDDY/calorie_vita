@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,13 +7,11 @@ import 'package:google_fonts/google_fonts.dart';
 import '../ui/app_colors.dart';
 import '../services/app_state_service.dart';
 import '../services/demo_auth_service.dart';
-import '../services/firebase_service.dart';
 import '../services/real_time_input_service.dart';
 import '../services/calorie_units_service.dart';
 import '../services/google_fit_service.dart';
 
 import '../models/user_preferences.dart';
-import '../models/user_goals.dart';
 import 'profile_edit_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'terms_conditions_screen.dart';
@@ -712,7 +709,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.contact_support, color: kAccentGreen),
+            const Icon(Icons.contact_support, color: kAccentGreen),
             const SizedBox(width: 12),
             Text(
               'Contact Us',
@@ -830,7 +827,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             if (onTap != null)
-              Icon(
+              const Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
                 color: kTextSecondary,
@@ -1044,7 +1041,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _isDarkMode = value;
                   });
                 },
-                activeColor: kAccentPurple,
+                activeThumbColor: kAccentPurple,
               ),
             ),
             const SizedBox(height: 12),
@@ -1243,7 +1240,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // Show success message
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text('Successfully connected to Google Fit!'),
               backgroundColor: kSuccessColor,
             ),
@@ -1280,7 +1277,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('Disconnected from Google Fit'),
             backgroundColor: kInfoColor,
           ),
@@ -1334,7 +1331,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 child: Center(
                   child: _isConnectingToGoogleFit
-                      ? SizedBox(
+                      ? const SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(

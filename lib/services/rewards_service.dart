@@ -1,10 +1,5 @@
 import 'dart:async';
-import 'dart:math';
-import 'package:flutter/material.dart';
 import '../models/reward_system.dart';
-import '../models/user_achievement.dart';
-import '../models/daily_summary.dart';
-import '../models/food_entry.dart';
 
 /// Comprehensive rewards and achievements service
 class RewardsService {
@@ -63,7 +58,7 @@ class RewardsService {
     
     // Anti-gaming validation
     if (!_validateActivity(activityType, activityData, now)) {
-      return ActivityResult(
+      return const ActivityResult(
         success: false,
         message: 'Invalid activity data detected',
         xpEarned: 0,
@@ -416,7 +411,7 @@ class RewardsService {
   void _initializeChallenges() {
     // Daily challenges
     _challenges['daily_meal'] = ChallengeProgress(
-      challenge: Challenge(
+      challenge: const Challenge(
         id: 'daily_meal',
         title: 'Daily Meal Logger',
         description: 'Log at least 1 meal today',
@@ -430,7 +425,7 @@ class RewardsService {
     
     // Weekly challenges
     _challenges['weekly_calorie'] = ChallengeProgress(
-      challenge: Challenge(
+      challenge: const Challenge(
         id: 'weekly_calorie',
         title: 'Calorie Crusher',
         description: 'Stay within calorie goals for 5 days this week',
@@ -443,7 +438,7 @@ class RewardsService {
     
     // Monthly challenges
     _challenges['monthly_perfect'] = ChallengeProgress(
-      challenge: Challenge(
+      challenge: const Challenge(
         id: 'monthly_perfect',
         title: 'Perfect Month',
         description: 'Complete all daily goals for 20+ days this month',

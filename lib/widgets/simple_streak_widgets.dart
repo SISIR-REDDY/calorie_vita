@@ -646,9 +646,9 @@ class StreakMotivationWidget extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text(
+          const Text(
             '🌱',
-            style: const TextStyle(fontSize: 48),
+            style: TextStyle(fontSize: 48),
           ),
           const SizedBox(height: 12),
           Text(

@@ -104,7 +104,7 @@ class _CameraScreenState extends State<CameraScreen> {
       backgroundColor: kAppBackground,
         appBar: _buildPremiumAppBar(),
         body: Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [kAppBackground, kSurfaceLight],
               begin: Alignment.topCenter,
@@ -132,7 +132,7 @@ class _CameraScreenState extends State<CameraScreen> {
               gradient: kPrimaryGradient,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
+            child: const Icon(
               Icons.camera_alt,
               color: Colors.white,
               size: 20,
@@ -149,7 +149,7 @@ class _CameraScreenState extends State<CameraScreen> {
             ),
         ],
       ),
-      actions: [],
+      actions: const [],
     );
   }
 
@@ -187,7 +187,7 @@ class _CameraScreenState extends State<CameraScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
+                const Icon(
                   Icons.qr_code_scanner,
                   color: Colors.white,
                   size: 32,
@@ -239,7 +239,7 @@ class _CameraScreenState extends State<CameraScreen> {
             ),
             child: Column(
               children: [
-                CircularProgressIndicator(
+                const CircularProgressIndicator(
                   valueColor: AlwaysStoppedAnimation<Color>(kAccentBlue),
                   strokeWidth: 3,
                 ),
@@ -445,7 +445,7 @@ class _CameraScreenState extends State<CameraScreen> {
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: kCardShadow,
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.camera_alt,
                     color: Colors.white,
                     size: 40,

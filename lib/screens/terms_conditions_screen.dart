@@ -42,7 +42,7 @@ class TermsConditionsScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.description_outlined,
                     size: 48,
                     color: kAccentGreen,
