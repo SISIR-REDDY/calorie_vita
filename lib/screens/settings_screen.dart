@@ -12,6 +12,8 @@ import '../services/calorie_units_service.dart';
 import '../services/google_fit_service.dart';
 import '../widgets/setup_warning_popup.dart';
 import '../services/setup_check_service.dart';
+import '../providers/theme_provider.dart';
+import 'package:provider/provider.dart';
 
 import '../models/user_preferences.dart';
 import 'profile_edit_screen.dart';
@@ -47,7 +49,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   StreamSubscription<DocumentSnapshot>? _profileSubscription;
 
   // Settings state variables
-  bool _isDarkMode = false;
 
   // Google Fit state
   bool _isGoogleFitConnected = false;
@@ -234,24 +235,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
-  /// Handle dark mode toggle
+  /// Handle dark mode toggle (deprecated - now using ThemeProvider)
+  @deprecated
   void _onDarkModeToggle(bool value) async {
-    try {
-      final updatedPreferences = _userPreferences.copyWith(
-        darkModeEnabled: value,
-        lastUpdated: DateTime.now(),
-      );
-      await _appStateService.updateUserPreferences(updatedPreferences);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating dark mode settings: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+    // This method is deprecated in favor of ThemeProvider
+    // Keeping for backward compatibility if needed
   }
 
   /// Navigate to Privacy Policy
@@ -1073,21 +1061,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 12),
 
             // Dark Mode Section
-            _buildUniformSettingsCard(
-              icon: Icons.dark_mode,
-              title: 'Dark Mode',
-              subtitle: 'Switch to dark theme',
-              color: kAccentPurple,
-              onTap: () {},
-              trailing: Switch(
-                value: _isDarkMode,
-                onChanged: (value) {
-                  setState(() {
-                    _isDarkMode = value;
-                  });
-                },
-                activeThumbColor: kAccentPurple,
-              ),
+            Consumer<ThemeProvider>(
+              builder: (context, themeProvider, child) {
+                return _buildUniformSettingsCard(
+                  icon: Icons.dark_mode,
+                  title: 'Dark Mode',
+                  subtitle: 'Switch to dark theme',
+                  color: kAccentPurple,
+                  onTap: () {
+                    themeProvider.toggleTheme();
+                  },
+                  trailing: Switch(
+                    value: themeProvider.isDarkMode,
+                    onChanged: (value) {
+                      if (value) {
+                        themeProvider.setThemeMode(ThemeMode.dark);
+                      } else {
+                        themeProvider.setThemeMode(ThemeMode.light);
+                      }
+                    },
+                    activeThumbColor: kAccentPurple,
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 12),
 
