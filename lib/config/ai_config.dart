@@ -1,5 +1,5 @@
 class AIConfig {
-  static const String apiKey = '';
+  static const String apiKey = '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';
 
   static const String baseUrl = 'https://openrouter.ai/api/v1/chat/completions';
 
