@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/analytics_screen.dart';
 import 'screens/camera_screen.dart';
@@ -6,9 +7,12 @@ import 'screens/trainer_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/settings_screen.dart';
 import 'widgets/reward_notification_widget.dart';
+import 'widgets/setup_warning_popup.dart';
 import 'ui/app_theme.dart';
+import 'providers/theme_provider.dart';
 import 'services/app_state_manager.dart';
 import 'services/global_google_fit_manager.dart';
+import 'services/setup_check_service.dart';
 
 class MainApp extends StatefulWidget {
   final bool firebaseInitialized;
@@ -23,6 +27,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   final AppStateManager _appStateManager = AppStateManager();
   final GlobalGoogleFitManager _googleFitManager = GlobalGoogleFitManager();
   bool _isInitialized = false;
+  bool _hasShownSetupWarning = false;
 
   @override
   void initState() {
@@ -48,6 +53,59 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
 
     // Initialize global Google Fit manager
     _initializeGoogleFitManager();
+    
+    // Check and show setup warning if needed
+    _checkAndShowSetupWarning();
+  }
+
+  Future<void> _checkAndShowSetupWarning() async {
+    try {
+      // Check if warning has been shown before
+      final hasShownWarning = await SetupWarningService.hasShownWarning();
+      if (hasShownWarning) return;
+
+      // Check if setup is complete
+      final isSetupComplete = await SetupCheckService.isSetupComplete();
+      if (isSetupComplete) {
+        // Mark warning as shown since setup is complete
+        await SetupWarningService.markWarningAsShown();
+        return;
+      }
+
+      // Show warning after a short delay to ensure UI is ready
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      if (mounted && !_hasShownSetupWarning) {
+        setState(() {
+          _hasShownSetupWarning = true;
+        });
+        
+        _showSetupWarning();
+      }
+    } catch (e) {
+      print('Error checking setup warning: $e');
+    }
+  }
+
+  void _showSetupWarning() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => SetupWarningPopup(
+        onComplete: () {
+          // User chose "Maybe Later"
+          print('User chose to complete setup later');
+        },
+        onNavigateToSettings: () {
+          // Navigate to settings screen
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const SettingsScreen(),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _initializeAppStateManager() async {
@@ -310,15 +368,19 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
       );
     }
 
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Calorie Vita',
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      home: RewardNotificationWidget(
-        child: _buildHomeScreen(),
-      ),
+    return ChangeNotifierProvider(
+      create: (context) => ThemeProvider(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: 'Calorie Vita',
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeProvider.themeMode,
+            home: RewardNotificationWidget(
+              child: _buildHomeScreen(),
+            ),
       routes: {
         '/welcome': (context) => const WelcomeScreen(),
         '/home': (context) => const MainNavigation(),
@@ -336,6 +398,9 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
           builder: (context) => const WelcomeScreen(),
         );
       },
+          );
+        },
+      ),
     );
   }
 }

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'demo_auth_service.dart';
-import 'local_storage_service.dart';
 
 /// Unified authentication service that handles both Firebase and demo authentication
 class AuthService {

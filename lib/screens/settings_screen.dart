@@ -10,6 +10,8 @@ import '../services/demo_auth_service.dart';
 import '../services/real_time_input_service.dart';
 import '../services/calorie_units_service.dart';
 import '../services/google_fit_service.dart';
+import '../widgets/setup_warning_popup.dart';
+import '../services/setup_check_service.dart';
 
 import '../models/user_preferences.dart';
 import 'profile_edit_screen.dart';
@@ -1289,6 +1291,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           );
         }
+
+        // Check if setup is now complete and mark it
+        _checkAndMarkSetupComplete();
       } else {
         throw Exception('Authentication failed');
       }
@@ -1345,6 +1350,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return '${difference.inHours}h ago';
     } else {
       return '${difference.inDays}d ago';
+    }
+  }
+
+  /// Check if setup is complete and mark it
+  Future<void> _checkAndMarkSetupComplete() async {
+    try {
+      // Check if setup is complete
+      final isComplete = await SetupCheckService.isSetupComplete();
+      
+      if (isComplete) {
+        await SetupWarningService.markSetupComplete();
+        print('Setup marked as complete!');
+      }
+    } catch (e) {
+      print('Error checking setup completion: $e');
     }
   }
 

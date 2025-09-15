@@ -4,6 +4,7 @@ import 'package:googleapis_auth/auth_io.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 /// Service for integrating with Google Fit API
 /// Handles authentication and data retrieval for fitness metrics
@@ -13,6 +14,7 @@ class GoogleFitService {
   GoogleFitService._internal();
 
   final Logger _logger = Logger();
+  final Connectivity _connectivity = Connectivity();
 
   // Google Fit API configuration
   static const String _fitnessApiScope =
@@ -28,6 +30,29 @@ class GoogleFitService {
   GoogleSignIn? _googleSignIn;
   AuthClient? _authClient;
   bool _isAuthenticated = false;
+
+  /// Check if device has network connectivity
+  Future<bool> _hasNetworkConnection() async {
+    try {
+      final connectivityResult = await _connectivity.checkConnectivity();
+      return !connectivityResult.contains(ConnectivityResult.none);
+    } catch (e) {
+      _logger.w('Error checking connectivity: $e');
+      return false;
+    }
+  }
+
+  /// Handle network errors with user-friendly messages
+  void _handleNetworkError(String operation, dynamic error) {
+    if (error.toString().contains('SocketException') || 
+        error.toString().contains('Failed host lookup')) {
+      _logger.w('$operation failed: No internet connection');
+    } else if (error.toString().contains('timeout')) {
+      _logger.w('$operation failed: Request timeout');
+    } else {
+      _logger.e('$operation failed: $error');
+    }
+  }
 
   // Live sync properties
   Timer? _liveSyncTimer;
@@ -199,6 +224,12 @@ class GoogleFitService {
       return null;
     }
 
+    // Check network connectivity first
+    if (!await _hasNetworkConnection()) {
+      _logger.w('No network connection available for Google Fit API');
+      return null;
+    }
+
     try {
       final startOfDay = DateTime(date.year, date.month, date.day);
       final endOfDay = startOfDay.add(const Duration(days: 1));
@@ -247,7 +278,7 @@ class GoogleFitService {
 
       return null;
     } catch (e) {
-      _logger.e('Error getting daily steps: $e');
+      _handleNetworkError('Getting daily steps', e);
       return null;
     }
   }
@@ -258,6 +289,12 @@ class GoogleFitService {
         _authClient == null ||
         _googleSignIn?.currentUser == null) {
       _logger.w('Not authenticated with Google Fit');
+      return null;
+    }
+
+    // Check network connectivity first
+    if (!await _hasNetworkConnection()) {
+      _logger.w('No network connection available for Google Fit API');
       return null;
     }
 
@@ -309,7 +346,7 @@ class GoogleFitService {
 
       return null;
     } catch (e) {
-      _logger.e('Error getting daily calories burned: $e');
+      _handleNetworkError('Getting daily calories burned', e);
       return null;
     }
   }
@@ -320,6 +357,12 @@ class GoogleFitService {
         _authClient == null ||
         _googleSignIn?.currentUser == null) {
       _logger.w('Not authenticated with Google Fit');
+      return null;
+    }
+
+    // Check network connectivity first
+    if (!await _hasNetworkConnection()) {
+      _logger.w('No network connection available for Google Fit API');
       return null;
     }
 
@@ -374,7 +417,7 @@ class GoogleFitService {
 
       return null;
     } catch (e) {
-      _logger.e('Error getting daily distance: $e');
+      _handleNetworkError('Getting daily distance', e);
       return null;
     }
   }

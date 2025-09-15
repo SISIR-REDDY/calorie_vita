@@ -5,7 +5,6 @@ import '../models/daily_summary.dart';
 import '../models/food_entry.dart';
 import '../models/user_goals.dart';
 import '../models/reward_system.dart';
-import '../services/firebase_service.dart';
 import '../services/rewards_service.dart';
 import '../services/error_handler.dart';
 

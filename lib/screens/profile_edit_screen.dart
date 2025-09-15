@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../ui/app_colors.dart';
 import '../services/real_time_input_service.dart';
 import '../services/app_state_service.dart';
+import '../widgets/setup_warning_popup.dart';
+import '../services/setup_check_service.dart';
 
 /// Comprehensive Profile Editing Screen for Calorie Vita App
 /// Features: Personal info, fitness goals, preferences, profile photo
@@ -302,6 +304,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       }
 
       _showSuccessSnackBar('Profile updated successfully! 🎉');
+      
+      // Check if setup is now complete and mark it
+      _checkAndMarkSetupComplete();
+      
       Navigator.pop(context, true); // Return true to indicate success
     } catch (e) {
       _showErrorSnackBar('Error saving profile: $e');
@@ -330,6 +336,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  /// Check if setup is complete and mark it
+  Future<void> _checkAndMarkSetupComplete() async {
+    try {
+      // Check if setup is complete
+      final isComplete = await SetupCheckService.isSetupComplete();
+      
+      if (isComplete) {
+        await SetupWarningService.markSetupComplete();
+        print('Setup marked as complete!');
+      }
+    } catch (e) {
+      print('Error checking setup completion: $e');
+    }
   }
 
   /// Get activity level description

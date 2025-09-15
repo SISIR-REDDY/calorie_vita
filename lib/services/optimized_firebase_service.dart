@@ -4,7 +4,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../models/food_entry.dart';
 import '../models/daily_summary.dart';
-import '../models/macro_breakdown.dart';
 
 /// Optimized Firebase service with caching, offline support, and performance improvements
 class OptimizedFirebaseService {

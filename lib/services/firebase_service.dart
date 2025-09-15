@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../models/food_entry.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
@@ -10,6 +11,7 @@ import '../models/user_preferences.dart';
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final Connectivity _connectivity = Connectivity();
 
   /// Check if Firebase is available and properly configured
   bool get isAvailable {
@@ -20,6 +22,31 @@ class FirebaseService {
     } catch (e) {
       print('Firebase not available: $e');
       return false;
+    }
+  }
+
+  /// Check if device has network connectivity
+  Future<bool> _hasNetworkConnection() async {
+    try {
+      final connectivityResult = await _connectivity.checkConnectivity();
+      return !connectivityResult.contains(ConnectivityResult.none);
+    } catch (e) {
+      print('Error checking connectivity: $e');
+      return false;
+    }
+  }
+
+  /// Handle Firebase errors with user-friendly messages
+  void _handleFirebaseError(String operation, dynamic error) {
+    if (error.toString().contains('unavailable') || 
+        error.toString().contains('UNAVAILABLE')) {
+      print('$operation failed: Firebase service temporarily unavailable');
+    } else if (error.toString().contains('permission-denied')) {
+      print('$operation failed: Permission denied');
+    } else if (error.toString().contains('not-found')) {
+      print('$operation failed: Resource not found');
+    } else {
+      print('$operation failed: $error');
     }
   }
 

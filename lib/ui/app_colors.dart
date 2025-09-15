@@ -15,6 +15,7 @@ const Color kAccentGreen = Color(0xFF10B981); // Green accent
 const Color kAccentGold = Color(0xFFF59E0B); // Gold accent
 const Color kAccentPurple = Color(0xFF8B5CF6); // Purple accent
 
+// Light Theme Colors
 const Color kSurfaceColor = Color(0xFFFFFFFF); // Pure white surface
 const Color kSurfaceLight = Color(0xFFF8FAFC); // Very light gray surface
 const Color kSurfaceDark = Color(0xFFF1F5F9); // Light gray surface
@@ -40,7 +41,33 @@ const Color kSoftGray = Color(0xFFF1F5F9); // Soft gray
 // Background colors
 const Color kAppBackground = Color(0xFFF8FAFC); // App background
 
-// Gradients
+// Dark Theme Colors
+const Color kDarkSurfaceColor = Color(0xFF0F172A); // Dark slate surface
+const Color kDarkSurfaceLight = Color(0xFF1E293B); // Dark slate light
+const Color kDarkSurfaceDark = Color(0xFF334155); // Dark slate dark
+
+const Color kDarkTextPrimary = Color(0xFFF8FAFC); // Light text primary
+const Color kDarkTextSecondary = Color(0xFFCBD5E1); // Light text secondary
+const Color kDarkTextTertiary = Color(0xFF94A3B8); // Light text tertiary
+const Color kDarkTextDark = Color(0xFFE2E8F0); // Light text dark
+const Color kDarkTextGrey = Color(0xFF94A3B8); // Dark grey text
+
+const Color kDarkBorderColor = Color(0xFF334155); // Dark border
+const Color kDarkDividerColor = Color(0xFF475569); // Dark divider
+
+const Color kDarkSuccessColor = Color(0xFF10B981); // Green success (same)
+const Color kDarkWarningColor = Color(0xFFF59E0B); // Amber warning (same)
+const Color kDarkErrorColor = Color(0xFFEF4444); // Red error (same)
+const Color kDarkInfoColor = Color(0xFF3B82F6); // Blue info (same)
+
+// Dark theme additional colors
+const Color kDarkSoftWhite = Color(0xFF1E293B); // Dark soft white
+const Color kDarkSoftGray = Color(0xFF334155); // Dark soft gray
+
+// Dark background colors
+const Color kDarkAppBackground = Color(0xFF0F172A); // Dark app background
+
+// Light Theme Gradients
 const LinearGradient kPrimaryGradient = LinearGradient(
   colors: [kPrimaryColor, kPrimaryLight],
   begin: Alignment.topLeft,
@@ -59,7 +86,26 @@ const LinearGradient kAccentGradient = LinearGradient(
   end: Alignment.bottomRight,
 );
 
-// Shadows
+// Dark Theme Gradients
+const LinearGradient kDarkPrimaryGradient = LinearGradient(
+  colors: [kPrimaryColor, kPrimaryLight],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
+const LinearGradient kDarkSecondaryGradient = LinearGradient(
+  colors: [kSecondaryColor, kSecondaryLight],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
+const LinearGradient kDarkAccentGradient = LinearGradient(
+  colors: [kAccentColor, kAccentLight],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
+// Light Theme Shadows
 const List<BoxShadow> kCardShadow = [
   BoxShadow(
     color: Color(0x0A000000),
@@ -76,7 +122,24 @@ const List<BoxShadow> kElevatedShadow = [
   ),
 ];
 
-// Decorations
+// Dark Theme Shadows
+const List<BoxShadow> kDarkCardShadow = [
+  BoxShadow(
+    color: Color(0x1A000000),
+    blurRadius: 10,
+    offset: Offset(0, 2),
+  ),
+];
+
+const List<BoxShadow> kDarkElevatedShadow = [
+  BoxShadow(
+    color: Color(0x2A000000),
+    blurRadius: 20,
+    offset: Offset(0, 4),
+  ),
+];
+
+// Light Theme Decorations
 const BoxDecoration kCardDecoration = BoxDecoration(
   color: kSurfaceColor,
   borderRadius: BorderRadius.all(Radius.circular(16)),
@@ -87,4 +150,17 @@ const BoxDecoration kElevatedCardDecoration = BoxDecoration(
   color: kSurfaceColor,
   borderRadius: BorderRadius.all(Radius.circular(20)),
   boxShadow: kElevatedShadow,
+);
+
+// Dark Theme Decorations
+const BoxDecoration kDarkCardDecoration = BoxDecoration(
+  color: kDarkSurfaceLight,
+  borderRadius: BorderRadius.all(Radius.circular(16)),
+  boxShadow: kDarkCardShadow,
+);
+
+const BoxDecoration kDarkElevatedCardDecoration = BoxDecoration(
+  color: kDarkSurfaceLight,
+  borderRadius: BorderRadius.all(Radius.circular(20)),
+  boxShadow: kDarkElevatedShadow,
 );
