@@ -22,6 +22,7 @@ class GlobalGoogleFitManager {
   // Auto-sync properties
   Timer? _autoSyncTimer;
   Timer? _connectionCheckTimer;
+  bool _isSyncInProgress = false;
 
   // Stream controllers for global state
   final StreamController<bool> _connectionStateController =
@@ -30,8 +31,8 @@ class GlobalGoogleFitManager {
       StreamController<Map<String, dynamic>>.broadcast();
 
   // Configuration
-  static const Duration _autoSyncInterval = Duration(minutes: 1);
-  static const Duration _connectionCheckInterval = Duration(minutes: 2);
+  static const Duration _autoSyncInterval = Duration(minutes: 5);
+  static const Duration _connectionCheckInterval = Duration(minutes: 10);
   static const Duration _initTimeout = Duration(seconds: 8);
 
   /// Stream for connection state changes
@@ -169,7 +170,9 @@ class GlobalGoogleFitManager {
 
   /// Perform sync operation
   void _performSync() {
-    if (!_isConnected) return;
+    if (!_isConnected || _isSyncInProgress) return;
+    
+    _isSyncInProgress = true;
 
     // Use cache service for optimized sync
     _cacheService.forceRefresh().then((data) {
@@ -189,6 +192,8 @@ class GlobalGoogleFitManager {
       }
     }).catchError((e) {
       print('❌ GlobalGoogleFitManager: Sync failed: $e');
+    }).whenComplete(() {
+      _isSyncInProgress = false;
     });
   }
 

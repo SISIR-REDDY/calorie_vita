@@ -58,6 +58,7 @@ class GoogleFitService {
   Timer? _liveSyncTimer;
   StreamController<Map<String, dynamic>>? _liveDataController;
   bool _isLiveSyncing = false;
+  bool _isSyncInProgress = false;
 
   /// Initialize Google Fit service with Google Sign-In (enhanced for RAM clearing)
   Future<void> initialize() async {
@@ -523,15 +524,15 @@ class GoogleFitService {
     _isLiveSyncing = true;
     _liveDataController = StreamController<Map<String, dynamic>>.broadcast();
 
-    // Sync every 10 seconds for faster updates
-    _liveSyncTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+    // Sync every 2 minutes to reduce API calls
+    _liveSyncTimer = Timer.periodic(const Duration(minutes: 2), (timer) {
       _performLiveSync();
     });
 
     // Initial sync
     _performLiveSync();
 
-    _logger.i('Live sync started with 10-second intervals for faster updates');
+    _logger.i('Live sync started with 2-minute intervals to reduce API calls');
   }
 
   /// Stop live sync
@@ -640,10 +641,11 @@ class GoogleFitService {
     }
   }
 
-  /// Perform live sync operation (optimized for speed)
+  /// Perform live sync operation (optimized for speed with throttling)
   Future<void> _performLiveSync() async {
-    if (!_isAuthenticated || _liveDataController == null) return;
+    if (!_isAuthenticated || _liveDataController == null || _isSyncInProgress) return;
 
+    _isSyncInProgress = true;
     try {
       final today = DateTime.now();
 
@@ -687,6 +689,8 @@ class GoogleFitService {
           'isLive': false, // Don't disrupt UI on error
         });
       }
+    } finally {
+      _isSyncInProgress = false;
     }
   }
 

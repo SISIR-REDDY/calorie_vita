@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/analytics_screen.dart';
 import 'screens/camera_screen.dart';
@@ -9,7 +8,6 @@ import 'screens/settings_screen.dart';
 import 'widgets/reward_notification_widget.dart';
 import 'widgets/setup_warning_popup.dart';
 import 'ui/app_theme.dart';
-import 'providers/theme_provider.dart';
 import 'services/app_state_manager.dart';
 import 'services/global_google_fit_manager.dart';
 import 'services/setup_check_service.dart';
@@ -368,19 +366,13 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
       );
     }
 
-    return ChangeNotifierProvider(
-      create: (context) => ThemeProvider(),
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, child) {
-          return MaterialApp(
-            debugShowCheckedModeBanner: false,
-            title: 'Calorie Vita',
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: themeProvider.themeMode,
-            home: RewardNotificationWidget(
-              child: _buildHomeScreen(),
-            ),
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Calorie Vita',
+      theme: AppTheme.lightTheme,
+      home: RewardNotificationWidget(
+        child: _buildHomeScreen(),
+      ),
       routes: {
         '/welcome': (context) => const WelcomeScreen(),
         '/home': (context) => const MainNavigation(),
@@ -398,9 +390,6 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
           builder: (context) => const WelcomeScreen(),
         );
       },
-          );
-        },
-      ),
     );
   }
 }

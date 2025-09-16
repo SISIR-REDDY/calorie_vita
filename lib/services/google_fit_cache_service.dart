@@ -24,10 +24,11 @@ class GoogleFitCacheService {
   GoogleFitData? _cachedTodayData;
   DateTime? _lastCacheUpdate;
 
-  // Cache configuration
-  static const Duration _cacheExpiry = Duration(minutes: 5);
-  static const Duration _liveUpdateInterval = Duration(seconds: 10);
-  static const Duration _backgroundSyncInterval = Duration(minutes: 2);
+  // Cache configuration - Optimized for performance
+  static const Duration _cacheExpiry = Duration(minutes: 20);
+  static const Duration _liveUpdateInterval = Duration(minutes: 5);
+  static const Duration _backgroundSyncInterval = Duration(minutes: 10);
+  static const Duration _prefetchInterval = Duration(minutes: 2);
 
   /// Get live data stream for real-time updates
   Stream<GoogleFitData> get liveDataStream => _liveDataController.stream;

@@ -31,7 +31,7 @@ dependencies:
   intl: ^0.18.1
   provider: ^6.1.1
   google_sign_in: ^6.1.5
-  sign_in_button: ^4.0.1
+  flutter_signin_button: ^2.0.0
 
   # HTTP (for food detection API later)
   http: ^1.1.0

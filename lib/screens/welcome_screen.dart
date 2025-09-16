@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:sign_in_button/sign_in_button.dart';
+import 'package:flutter_signin_button/flutter_signin_button.dart';
 import '../ui/app_colors.dart';
 import '../services/auth_service.dart';
 
@@ -296,29 +296,29 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     );
   }
 
-  /// Professional Google Sign-In Button using external package
+  /// Professional Google Sign-In Button using Google's official design guidelines
   Widget _buildProfessionalGoogleButton() {
     return Container(
       width: double.infinity,
       height: 56,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
-            offset: const Offset(0, 4),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: _isGoogleSigningIn
           ? Container(
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: const Color(0xFFDADCE0),
-                  width: 1.5,
+                  width: 1,
                 ),
               ),
               child: Center(
@@ -326,42 +326,36 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const SizedBox(
-                      width: 24,
-                      height: 24,
+                      width: 20,
+                      height: 20,
                       child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
+                        strokeWidth: 2,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          Color(0xFF3C4043),
+                          Color(0xFF4285F4),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
                     Text(
                       'Signing in...',
                       style: GoogleFonts.roboto(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
                         color: const Color(0xFF3C4043),
-                        letterSpacing: 0.25,
                       ),
                     ),
                   ],
                 ),
               ),
             )
-          : SignInButton(
-              Buttons.google,
-              text: "Sign in with Google",
-              onPressed: _signInWithGoogle,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          : Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              textStyle: GoogleFonts.roboto(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF3C4043),
-                letterSpacing: 0.25,
+              child: SignInButton(
+                Buttons.Google,
+                text: "Sign in with Google",
+                onPressed: _signInWithGoogle,
               ),
             ),
     );

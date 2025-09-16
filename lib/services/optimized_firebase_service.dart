@@ -16,11 +16,12 @@ class OptimizedFirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final Connectivity _connectivity = Connectivity();
 
-  // Cache management
+  // Cache management - Aggressive caching for performance
   final Map<String, dynamic> _cache = {};
   final Map<String, DateTime> _cacheTimestamps = {};
-  static const Duration _cacheExpiry = Duration(minutes: 5);
-  static const int _maxCacheSize = 100;
+  static const Duration _cacheExpiry = Duration(minutes: 15);
+  static const Duration _criticalDataCacheExpiry = Duration(minutes: 30);
+  static const int _maxCacheSize = 500;
 
   // Offline support
   bool _isOffline = false;
@@ -29,6 +30,12 @@ class OptimizedFirebaseService {
   // Performance monitoring
   final Map<String, int> _operationCounts = {};
   final Map<String, Duration> _operationTimes = {};
+  
+  // Request batching and debouncing
+  final Map<String, Timer> _debounceTimers = {};
+  final Map<String, List<Map<String, dynamic>>> _pendingBatches = {};
+  static const Duration _batchDelay = Duration(milliseconds: 500);
+  static const int _maxBatchSize = 10;
 
   /// Initialize the service with proper configuration
   Future<void> initialize() async {

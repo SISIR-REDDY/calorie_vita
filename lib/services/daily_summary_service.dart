@@ -124,8 +124,7 @@ class DailySummaryService {
             (_currentDailySummary?.caloriesBurned ?? 0) + caloriesBurned,
       });
 
-      _errorHandler.handleBusinessError(
-          'updateExercise', 'Exercise updated successfully');
+      // Exercise updated successfully
     } catch (e) {
       _errorHandler.handleFirebaseError('updateExercise', e);
       rethrow;
@@ -162,8 +161,7 @@ class DailySummaryService {
       // Update local cache
       await _updateLocalSummary(userId, {'steps': steps});
 
-      _errorHandler.handleBusinessError(
-          'updateSteps', 'Steps updated successfully');
+      // Steps updated successfully
     } catch (e) {
       _errorHandler.handleFirebaseError('updateSteps', e);
       rethrow;
@@ -209,8 +207,7 @@ class DailySummaryService {
       await _updateLocalSummary(
           userId, {'caloriesConsumed': newCaloriesConsumed});
 
-      _errorHandler.handleBusinessError(
-          'onMealLogged', 'Meal logged successfully');
+      // Meal logged successfully
     } catch (e) {
       _errorHandler.handleFirebaseError('onMealLogged', e);
       rethrow;
@@ -252,8 +249,7 @@ class DailySummaryService {
       // Update local cache
       await _updateLocalSummary(userId, {'weight': weight, 'bmi': bmi});
 
-      _errorHandler.handleBusinessError(
-          'updateWeight', 'Weight updated successfully');
+      // Weight updated successfully
     } catch (e) {
       _errorHandler.handleFirebaseError('updateWeight', e);
       rethrow;
@@ -287,8 +283,7 @@ class DailySummaryService {
         'sleepGoal': 8.0,
       });
 
-      _errorHandler.handleBusinessError(
-          'updateUserGoals', 'User goals updated successfully');
+      // User goals updated successfully
     } catch (e) {
       _errorHandler.handleFirebaseError('updateUserGoals', e);
       rethrow;
@@ -366,8 +361,7 @@ class DailySummaryService {
       _currentDailySummary = updatedSummary;
       _dailySummaryController.add(updatedSummary);
 
-      _errorHandler.handleBusinessError(
-          'updateDailySummary', 'Daily summary updated successfully');
+      // Daily summary updated successfully
     } catch (e) {
       _errorHandler.handleFirebaseError('updateDailySummary', e);
       rethrow;
