@@ -68,6 +68,76 @@ class _GoalsScreenState extends State<GoalsScreen>
     super.dispose();
   }
 
+  /// Set up listener for calorie controller to auto-calculate macro goals
+  void _setupCalorieListener() {
+    // Remove existing listeners to avoid duplicates
+    _calorieController.removeListener(_calculateMacroGoalsFromCalories);
+    // Add the listener
+    _calorieController.addListener(_calculateMacroGoalsFromCalories);
+  }
+
+  /// Calculate macro goals based on calorie target using standard distribution
+  void _calculateMacroGoalsFromCalories() {
+    try {
+      final calorieText = _calorieController.text.trim();
+      
+      if (calorieText.isEmpty) {
+        _updateMacroFields(2000);
+        return;
+      }
+      
+      final calories = double.tryParse(calorieText);
+      if (calories == null || calories <= 0) {
+        _updateMacroFields(2000);
+        return;
+      }
+      
+      _updateMacroFields(calories);
+      
+    } catch (e) {
+      _updateMacroFields(2000); // Fallback to default
+    }
+  }
+  
+  /// Update macro fields with calculated values
+  void _updateMacroFields(double calories) {
+    try {
+      // Convert to kcal if needed
+      final caloriesInKcal = _calorieUnitsService.convertToKcal(calories);
+      
+      // Standard macro distribution percentages
+      final carbsCalories = (caloriesInKcal * 0.50).round();
+      final proteinCalories = (caloriesInKcal * 0.20).round();
+      final fatCalories = (caloriesInKcal * 0.30).round();
+      
+      // Update text controllers
+      _carbsController.text = carbsCalories.toString();
+      _proteinController.text = proteinCalories.toString();
+      _fatController.text = fatCalories.toString();
+      
+      // Trigger UI rebuild
+      setState(() {});
+      
+    } catch (e) {
+      // Silent error handling
+    }
+  }
+
+  /// Check if the current macro value is close to the default calculated value
+  /// This helps determine if the user has manually edited the macro goals
+  bool _isDefaultMacroValue(String currentValue, int calculatedValue) {
+    if (currentValue.isEmpty) return true;
+    
+    final current = double.tryParse(currentValue);
+    if (current == null) return true;
+    
+    final currentInKcal = _calorieUnitsService.convertToKcal(current);
+    final difference = (currentInKcal - calculatedValue).abs();
+    
+    // Consider it default if within 50 calories of calculated value
+    return difference <= 50;
+  }
+
   void _setupAnimations() {
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -148,6 +218,9 @@ class _GoalsScreenState extends State<GoalsScreen>
       _fatController.text = _calorieUnitsService.formatCaloriesShort(
           MacroGoals.defaultMacros.fatCalories?.toDouble() ?? 600);
     }
+    
+    // Set up calorie controller listener for auto-calculation
+    _setupCalorieListener();
   }
 
   Future<void> _saveGoals() async {
@@ -235,6 +308,10 @@ class _GoalsScreenState extends State<GoalsScreen>
               ),
             ),
           );
+          
+          // Small delay to ensure all updates are processed
+          await Future.delayed(const Duration(milliseconds: 200));
+          
           Navigator.pop(context, true);
         }
       }
@@ -534,13 +611,31 @@ class _GoalsScreenState extends State<GoalsScreen>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Set your daily macro targets in calories',
+                        'Auto-calculated from calorie goal (editable)',
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           color: kPrimaryColor.withValues(alpha: 0.8),
                         ),
                       ),
                     ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: _calculateMacroGoalsFromCalories,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    backgroundColor: kPrimaryColor.withValues(alpha: 0.1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    'Auto-calculate',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: kPrimaryColor,
+                    ),
                   ),
                 ),
               ],
@@ -554,7 +649,7 @@ class _GoalsScreenState extends State<GoalsScreen>
             label: 'Carbohydrates',
             icon: Icons.grain,
             color: Colors.orange,
-            description: 'Primary energy source',
+            description: 'Primary energy source (~50%)',
           ),
           const SizedBox(height: 16),
 
@@ -563,7 +658,7 @@ class _GoalsScreenState extends State<GoalsScreen>
             label: 'Protein',
             icon: Icons.fitness_center,
             color: Colors.red,
-            description: 'Muscle building & repair',
+            description: 'Muscle building & repair (~20%)',
           ),
           const SizedBox(height: 16),
 
@@ -572,7 +667,7 @@ class _GoalsScreenState extends State<GoalsScreen>
             label: 'Fat',
             icon: Icons.opacity,
             color: Colors.blue,
-            description: 'Essential nutrients & energy',
+            description: 'Essential nutrients & energy (~30%)',
           ),
           const SizedBox(height: 20),
 

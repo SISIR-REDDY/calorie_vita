@@ -977,7 +977,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     if (result == true) {
+      // Goals were updated, trigger immediate refresh
       _loadUserData();
+      
+      // Small delay to ensure goals are fully processed
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      // Force refresh the app state to ensure home screen gets updated
+      await _appStateService.refreshUserData();
+      
+      // Also trigger a global goals update to ensure all screens are notified
+      final currentGoals = _appStateService.userGoals;
+      if (currentGoals != null) {
+        _appStateService.forceGoalsUpdate(currentGoals);
+      }
     }
   }
 

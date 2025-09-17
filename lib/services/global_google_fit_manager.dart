@@ -32,6 +32,9 @@ class GlobalGoogleFitManager {
   final StreamController<Map<String, dynamic>> _syncDataController =
       StreamController<Map<String, dynamic>>.broadcast();
 
+  // Current fitness data cache
+  Map<String, dynamic>? _currentFitnessData;
+
   // Configuration
   static const Duration _autoSyncInterval = Duration(minutes: 5);
   static const Duration _connectionCheckInterval = Duration(minutes: 10);
@@ -48,6 +51,9 @@ class GlobalGoogleFitManager {
 
   /// Check if manager is initialized
   bool get isInitialized => _isInitialized;
+
+  /// Get current fitness data
+  Map<String, dynamic>? get currentFitnessData => _currentFitnessData;
 
   /// Initialize Google Fit manager globally
   Future<void> initialize() async {
@@ -203,6 +209,7 @@ class GlobalGoogleFitManager {
           'isAutoSync': true,
         };
 
+        _currentFitnessData = syncData;
         _syncDataController.add(syncData);
         print(
             '🔄 GlobalGoogleFitManager: Enhanced sync completed - Steps: ${data['steps']}');
@@ -219,6 +226,7 @@ class GlobalGoogleFitManager {
               'isAutoSync': true,
             };
 
+            _currentFitnessData = syncData;
             _syncDataController.add(syncData);
             print(
                 '🔄 GlobalGoogleFitManager: Cache sync completed - Steps: ${cacheData.steps}');
@@ -242,6 +250,7 @@ class GlobalGoogleFitManager {
             'isAutoSync': true,
           };
 
+          _currentFitnessData = syncData;
           _syncDataController.add(syncData);
           print(
               '🔄 GlobalGoogleFitManager: Fallback sync completed - Steps: ${data.steps}');
@@ -281,6 +290,7 @@ class GlobalGoogleFitManager {
           'isForceSync': true,
         };
 
+        _currentFitnessData = syncData;
         _syncDataController.add(syncData);
         print('✅ GlobalGoogleFitManager: Force sync completed');
         return syncData;

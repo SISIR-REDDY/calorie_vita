@@ -108,6 +108,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   StreamSubscription? _googleFitCacheStreamSubscription;
   Timer? _goalsCheckTimer;
   Timer? _googleFitRefreshTimer;
+  Timer? _streakRefreshTimer;
   UserStreakSummary _streakSummary = UserStreakSummary(
     goalStreaks: {},
     totalActiveStreaks: 0,
@@ -130,6 +131,16 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _loadRewardsDataAsync();
     _initializeGoogleFitAsync();
     initializeGoogleFitSync();
+    
+    // Set up periodic streak refresh to ensure data stays current
+    _setupPeriodicStreakRefresh();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh goals when screen becomes visible
+    _forceRefreshGoals();
   }
 
   /// Initialize services asynchronously to not block UI
@@ -295,6 +306,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _goalsEventBusSubscription?.cancel();
     _goalsCheckTimer?.cancel();
     _googleFitRefreshTimer?.cancel();
+    _streakRefreshTimer?.cancel();
     _googleFitLiveStreamSubscription?.cancel();
     _googleFitCacheStreamSubscription?.cancel();
     _googleFitCacheService.stopLiveUpdates();
@@ -342,6 +354,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
       // Load fresh data in background (non-blocking)
       _loadFreshDataAsync();
+      
+      // Force refresh goals to ensure UI is up to date
+      _forceRefreshGoals();
     } catch (e) {
       // Handle error silently in production
       debugPrint('Error loading home data: $e');
@@ -820,6 +835,25 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _googleFitRefreshTimer = null;
   }
 
+  /// Set up periodic streak refresh to ensure data stays current
+  void _setupPeriodicStreakRefresh() {
+    _streakRefreshTimer?.cancel();
+    _streakRefreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _refreshStreaksPeriodically();
+    });
+    debugPrint('Periodic streak refresh timer set up');
+  }
+
+  /// Refresh streaks periodically to ensure data stays current
+  Future<void> _refreshStreaksPeriodically() async {
+    try {
+      await _enhancedStreakService.refreshStreaks();
+      debugPrint('Periodic streak refresh completed');
+    } catch (e) {
+      debugPrint('Error in periodic streak refresh: $e');
+    }
+  }
+
   /// Format last sync time for display
   String _formatLastSyncTime(DateTime syncTime) {
     final now = DateTime.now();
@@ -839,11 +873,18 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     // Listen to daily summary updates
     _dailySummarySubscription?.cancel();
     _dailySummarySubscription =
-        _appStateService.dailySummaryStream.listen((summary) {
+        _appStateService.dailySummaryStream.listen((summary) async {
       if (mounted) {
         setState(() {
           _dailySummary = summary;
         });
+        
+        // Refresh streaks when daily summary changes
+        try {
+          await _enhancedStreakService.refreshStreaks();
+        } catch (e) {
+          debugPrint('Error refreshing streaks after daily summary update: $e');
+        }
       }
     });
 
@@ -886,6 +927,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           debugPrint('Daily summary after update: ${_dailySummary?.toMap()}');
           debugPrint(
               'UI should now show updated goals: Calorie=${goals?.calorieGoal}, Steps=${goals?.stepsPerDayGoal}, Water=${goals?.waterGlassesGoal}');
+          
+          // Force UI refresh to ensure changes are visible
+          setState(() {
+            // Trigger a rebuild to show updated goals
+          });
         }
         debugPrint('=== END HOME SCREEN GOALS STREAM UPDATE ===');
       },
@@ -1027,6 +1073,23 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
+  /// Force refresh goals to ensure UI is up to date
+  Future<void> _forceRefreshGoals() async {
+    try {
+      debugPrint('Force refreshing goals...');
+      final currentGoals = _appStateService.userGoals;
+      if (currentGoals != null) {
+        debugPrint('Current goals from AppState: ${currentGoals.toMap()}');
+        await _refreshDailySummaryWithNewGoals(currentGoals);
+        debugPrint('Goals force refreshed successfully');
+      } else {
+        debugPrint('No goals available in AppState');
+      }
+    } catch (e) {
+      debugPrint('Error force refreshing goals: $e');
+    }
+  }
+
   /// Check for goals update periodically
   void _checkForGoalsUpdate() {
     if (!mounted) return;
@@ -1034,14 +1097,19 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     final simpleGoals = SimpleGoalsNotifier().currentGoals;
     final appStateGoals = _appStateService.userGoals;
 
+    debugPrint('Periodic goals check - Simple: ${simpleGoals?.toMap()}, AppState: ${appStateGoals?.toMap()}');
+
     // Check if goals have changed
     if (simpleGoals != null && appStateGoals != null) {
       if (simpleGoals.calorieGoal != appStateGoals.calorieGoal ||
           simpleGoals.stepsPerDayGoal != appStateGoals.stepsPerDayGoal ||
           simpleGoals.waterGlassesGoal != appStateGoals.waterGlassesGoal) {
-        debugPrint('Goals change detected via periodic check');
+        debugPrint('Goals change detected via periodic check - refreshing UI');
         _refreshDailySummaryWithNewGoals(simpleGoals);
       }
+    } else if (simpleGoals != null && appStateGoals == null) {
+      debugPrint('Simple goals available but AppState goals null - refreshing with simple goals');
+      _refreshDailySummaryWithNewGoals(simpleGoals);
     }
   }
 
@@ -1109,9 +1177,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               ),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 final value = int.tryParse(controller.text) ?? 0;
-                _updateCalorieValue(type, value);
+                await _updateCalorieValue(type, value);
                 Navigator.of(context).pop();
               },
               style: ElevatedButton.styleFrom(
@@ -1136,7 +1204,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
   /// Update calorie value in the daily summary
-  void _updateCalorieValue(String type, int value) {
+  Future<void> _updateCalorieValue(String type, int value) async {
     _dailySummary ??= _getEmptyDailySummary();
 
     setState(() {
@@ -1148,7 +1216,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     });
 
     // Save to Firestore or local storage
-    _saveDailySummaryToFirestore();
+    await _saveDailySummaryToFirestore();
+    
+    // Refresh streaks after calorie update
+    try {
+      await _enhancedStreakService.refreshStreaks();
+    } catch (e) {
+      debugPrint('Error refreshing streaks after calorie update: $e');
+    }
   }
 
   /// Update water glasses value and save to Firestore
@@ -1160,6 +1235,13 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     });
 
     await _saveDailySummaryToFirestore();
+    
+    // Refresh streaks after water update
+    try {
+      await _enhancedStreakService.refreshStreaks();
+    } catch (e) {
+      debugPrint('Error refreshing streaks after water update: $e');
+    }
   }
 
   /// Update water target value and save to Firestore
@@ -1176,6 +1258,13 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     await _appStateService.updateUserGoals(
         _appStateService.userGoals?.copyWith(waterGlassesGoal: value) ??
             const UserGoals(waterGlassesGoal: 8));
+    
+    // Refresh streaks after water target update
+    try {
+      await _enhancedStreakService.refreshStreaks();
+    } catch (e) {
+      debugPrint('Error refreshing streaks after water target update: $e');
+    }
   }
 
   /// Show water glasses input dialog
@@ -2847,23 +2936,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Debug button for testing toggle
-            if (_tasks.isNotEmpty)
-              Container(
-                margin: const EdgeInsets.all(16),
-                child: ElevatedButton(
-                  onPressed: () {
-                    print('🔧 Debug: Force toggling first task');
-                    _taskService.forceToggleFirstTask();
-                    _refreshTasks();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('🔧 Debug: Toggle First Task'),
-                ),
-              ),
             // Header Section
             Container(
               padding: const EdgeInsets.all(32),
@@ -3208,8 +3280,18 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             children: List.generate(7, (index) {
               final date = startOfWeek.add(Duration(days: index));
               final isToday = date.day == now.day && date.month == now.month;
-              const hasStreak = false; // Simplified for streak system
-              const hasReward = false; // Simplified for streak system
+              
+              // Check if this date has streak data
+              final hasStreak = _streakSummary.goalStreaks.values.any((streak) {
+                return streak.currentStreak > 0 && 
+                       streak.lastActivityDate != null &&
+                       streak.lastActivityDate!.day == date.day &&
+                       streak.lastActivityDate!.month == date.month &&
+                       streak.lastActivityDate!.year == date.year;
+              });
+              
+              // Check if this date has rewards (simplified - could be enhanced)
+              final hasReward = false; // Could be enhanced with actual reward data
 
               return Expanded(
                 child: Padding(

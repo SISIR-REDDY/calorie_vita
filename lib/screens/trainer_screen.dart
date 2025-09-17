@@ -93,7 +93,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     Message(
         sender: 'Sisir',
         text:
-            'Hi! I am Trainer Sisir. Ask me anything about fitness or nutrition!',
+            'Hey there! I\'m Trainer Sisir, your personal fitness and nutrition coach. I\'m here to help you reach your health goals with personalized advice and support. What would you like to work on today? 💪',
         timestamp: DateTime.now()),
   ];
 
@@ -166,10 +166,10 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     // Don't reload if already loading
     if (isLoadingHistory) return;
 
-    // Use cache if data is recent (less than 30 seconds old) and not forcing refresh
+    // Use cache if data is recent (less than 60 seconds old) and not forcing refresh
     if (!forceRefresh &&
         _lastHistoryLoad != null &&
-        DateTime.now().difference(_lastHistoryLoad!).inSeconds < 30) {
+        DateTime.now().difference(_lastHistoryLoad!).inSeconds < 60) {
       return;
     }
 
@@ -189,36 +189,35 @@ class _AITrainerScreenState extends State<AITrainerScreen>
         return;
       }
 
-      // Use a more efficient query with limit
+      // Use optimized query with orderBy and limit for better performance
       final querySnapshot = await _firestore
           .collection('chat_sessions')
           .where('userId', isEqualTo: user.uid)
-          .limit(10) // Get a few extra to account for sorting
+          .orderBy('timestamp', descending: true)
+          .limit(5) // Only get what we need
           .get();
 
-      // Process data more efficiently
-      final sessions = <ChatSession>[];
-      for (final doc in querySnapshot.docs) {
-        try {
-          final session = ChatSession.fromMap(doc.data());
-          sessions.add(session);
-        } catch (e) {
-          print('Error parsing session ${doc.id}: $e');
-          continue;
-        }
-      }
-
-      // Sort and limit in one operation
-      sessions.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-      final limitedSessions = sessions.take(5).toList();
+      // Process data more efficiently with parallel processing
+      final sessions = querySnapshot.docs
+          .map((doc) {
+            try {
+              return ChatSession.fromMap(doc.data());
+            } catch (e) {
+              print('Error parsing session ${doc.id}: $e');
+              return null;
+            }
+          })
+          .where((session) => session != null)
+          .cast<ChatSession>()
+          .toList();
 
       setState(() {
-        chatSessions = limitedSessions;
+        chatSessions = sessions;
         isLoadingHistory = false;
         _lastHistoryLoad = DateTime.now();
       });
 
-      print('Chat history loaded: ${limitedSessions.length} sessions');
+      print('Chat history loaded: ${sessions.length} sessions');
     } catch (e) {
       print('Error loading chat history: $e');
       setState(() {
@@ -254,20 +253,27 @@ class _AITrainerScreenState extends State<AITrainerScreen>
         userId: user.uid,
       );
 
+      // Save session without waiting for cleanup
       await _firestore
           .collection('chat_sessions')
           .doc(sessionId)
           .set(session.toMap());
 
-      // Keep only 5 most recent sessions
-      await _cleanupOldSessions();
-
       setState(() {
         currentSessionId = sessionId;
       });
 
-      // Reload history
-      await _loadChatHistory();
+      // Update local history immediately for instant UI update
+      setState(() {
+        chatSessions.removeWhere((s) => s.id == sessionId);
+        chatSessions.insert(0, session);
+        if (chatSessions.length > 5) {
+          chatSessions = chatSessions.take(5).toList();
+        }
+      });
+
+      // Cleanup old sessions in background (non-blocking)
+      _cleanupOldSessions();
 
       print('Chat session saved successfully: $sessionId');
     } catch (e) {
@@ -350,8 +356,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       final conversationHistory = messages
           .where((msg) =>
               msg.sender != 'Sisir' ||
-              msg.text !=
-                  'Hi! I am Trainer Sisir. Ask me anything about fitness or nutrition!')
+              !msg.text.contains('Hey there! I\'m Trainer Sisir'))
           .map((msg) => {
                 'role': msg.sender == 'user' ? 'user' : 'assistant',
                 'content': msg.text,
@@ -362,6 +367,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
         text,
         userProfile: _userProfile,
         conversationHistory: conversationHistory,
+        currentFitnessData: _currentFitnessData,
       );
     } catch (e) {
       reply = 'Sorry, there was a problem connecting to the AI service.';
@@ -395,7 +401,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
         Message(
             sender: 'Sisir',
             text:
-                'Hi! I am Trainer Sisir. Ask me anything about fitness or nutrition!',
+                'Hey there! I\'m Trainer Sisir, your personal fitness and nutrition coach. I\'m here to help you reach your health goals with personalized advice and support. What would you like to work on today? 💪',
             timestamp: DateTime.now()),
       ];
       currentSessionId = null;
@@ -410,9 +416,9 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       });
     }
 
-    // Only refresh if we don't have recent data
+    // Only refresh if we don't have recent data (increased cache time)
     if (_lastHistoryLoad == null ||
-        DateTime.now().difference(_lastHistoryLoad!).inSeconds > 30) {
+        DateTime.now().difference(_lastHistoryLoad!).inSeconds > 60) {
       _loadChatHistory(forceRefresh: true);
     }
 
@@ -885,28 +891,39 @@ class _AITrainerScreenState extends State<AITrainerScreen>
   }
 
   Future<void> _deleteSession(ChatSession session) async {
+    // Optimistic update - remove from UI immediately
+    setState(() {
+      chatSessions.removeWhere((s) => s.id == session.id);
+      if (currentSessionId == session.id) {
+        _startNewChat();
+      }
+    });
+
+    // Show success message immediately
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Chat deleted successfully'),
+        backgroundColor: Colors.green[600],
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        duration: const Duration(milliseconds: 800),
+      ),
+    );
+
+    // Delete from Firestore in background
     try {
       await _firestore.collection('chat_sessions').doc(session.id).delete();
-
-      setState(() {
-        chatSessions.removeWhere((s) => s.id == session.id);
-        if (currentSessionId == session.id) {
-          _startNewChat();
-        }
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Chat deleted successfully'),
-          backgroundColor: Colors.green[600],
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      print('Session deleted from Firestore: ${session.id}');
     } catch (e) {
-      print('Error deleting session: $e');
+      print('Error deleting session from Firestore: $e');
+      // Revert UI change if Firestore delete failed
+      setState(() {
+        chatSessions.add(session);
+        chatSessions.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      });
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Failed to delete chat'),
@@ -921,6 +938,27 @@ class _AITrainerScreenState extends State<AITrainerScreen>
   }
 
   Future<void> _deleteAllSessions() async {
+    // Optimistic update - clear UI immediately
+    final originalSessions = List<ChatSession>.from(chatSessions);
+    setState(() {
+      chatSessions.clear();
+      _startNewChat();
+    });
+
+    // Show success message immediately
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('All chats cleared successfully'),
+        backgroundColor: Colors.green[600],
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        duration: const Duration(milliseconds: 800),
+      ),
+    );
+
+    // Delete from Firestore in background
     try {
       final user = _auth.currentUser;
       if (user == null) return;
@@ -930,29 +968,22 @@ class _AITrainerScreenState extends State<AITrainerScreen>
           .where('userId', isEqualTo: user.uid)
           .get();
 
-      final batch = _firestore.batch();
-      for (final doc in querySnapshot.docs) {
-        batch.delete(doc.reference);
+      if (querySnapshot.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        for (final doc in querySnapshot.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
       }
-      await batch.commit();
 
-      setState(() {
-        chatSessions.clear();
-        _startNewChat();
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('All chats cleared successfully'),
-          backgroundColor: Colors.green[600],
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      print('All sessions deleted from Firestore');
     } catch (e) {
-      print('Error deleting all sessions: $e');
+      print('Error deleting all sessions from Firestore: $e');
+      // Revert UI change if Firestore delete failed
+      setState(() {
+        chatSessions = originalSessions;
+      });
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Failed to clear chats'),

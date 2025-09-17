@@ -11,6 +11,7 @@ import '../services/daily_summary_service.dart';
 import '../services/rewards_service.dart';
 import '../services/input_validation_service.dart';
 import '../services/error_handler.dart';
+import '../services/app_state_service.dart';
 
 /// Comprehensive real-time input service that handles all user inputs with Firestore integration
 class RealTimeInputService {
@@ -325,6 +326,13 @@ class RealTimeInputService {
       await _firebaseService.saveUserGoals(userId, goals);
       await _firebaseService.updateUserGoalsInDailySummary(userId, goals);
       await _dailySummaryService.updateUserGoals(userId, goals);
+
+      // Update AppStateService to trigger immediate UI updates
+      final appStateService = AppStateService();
+      await appStateService.updateUserGoals(goals);
+      
+      // Force update to ensure immediate UI refresh
+      appStateService.forceGoalsUpdate(goals);
 
       _showSuccess(context, 'Goals updated successfully');
       return true;

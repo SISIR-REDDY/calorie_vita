@@ -43,6 +43,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   String? _error;
   bool _isGeneratingInsights = false;
   String _aiInsights = '';
+  
+  // AI insights caching
+  DateTime? _lastInsightsGeneration;
+  String? _cachedInsightsPeriod;
+  String? _cachedInsightsData;
 
   // Stream subscriptions
   StreamSubscription<Map<String, dynamic>?>? _profileDataSubscription;
@@ -811,15 +816,38 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     }
   }
 
-  /// Generate AI insights based on current data
-  Future<void> _generateAIInsights() async {
+  /// Generate AI insights based on current data with smart caching
+  Future<void> _generateAIInsights({bool forceRefresh = false}) async {
     if (_isGeneratingInsights) return;
+
+    // Check if we have recent cached insights (within 5 minutes)
+    final now = DateTime.now();
+    if (!forceRefresh && 
+        _lastInsightsGeneration != null &&
+        now.difference(_lastInsightsGeneration!).inMinutes < 5 &&
+        _cachedInsightsPeriod == _selectedPeriod &&
+        _aiInsights.isNotEmpty) {
+      print('Using cached AI insights for period: $_selectedPeriod');
+      return;
+    }
 
     setState(() {
       _isGeneratingInsights = true;
     });
 
     try {
+      // Create a data hash to check if data has changed significantly
+      final dataHash = _createDataHash();
+      if (!forceRefresh && 
+          _cachedInsightsData == dataHash && 
+          _aiInsights.isNotEmpty) {
+        print('Data unchanged, using cached insights');
+        setState(() {
+          _isGeneratingInsights = false;
+        });
+        return;
+      }
+
       // Fetch user profile data for comprehensive analysis
       final user = FirebaseAuth.instance.currentUser;
       Map<String, dynamic>? userProfile;
@@ -845,7 +873,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   'steps': summary.steps,
                 })
             .toList(),
-        // Note: Weight and BMI data would need to be fetched separately from user profile
 
         // Macro breakdown
         'macro_breakdown': {
@@ -873,18 +900,32 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             : 0,
       };
 
-      final insights = await AIService.getAnalyticsInsights(userData);
+      print('Generating fresh AI insights for period: $_selectedPeriod');
+      final insights = await AIService.getAnalyticsInsights(
+        userData,
+        currentFitnessData: _googleFitManager.currentFitnessData,
+      );
 
       setState(() {
         _aiInsights = insights;
         _isGeneratingInsights = false;
+        _lastInsightsGeneration = now;
+        _cachedInsightsPeriod = _selectedPeriod;
+        _cachedInsightsData = dataHash;
       });
     } catch (e) {
+      print('Error generating AI insights: $e');
       setState(() {
         _aiInsights = '⚠️ AI service unavailable, please try again later.';
         _isGeneratingInsights = false;
       });
     }
+  }
+
+  /// Create a hash of current data to detect changes
+  String _createDataHash() {
+    final dataString = '${_selectedPeriod}_${_dailySummaries.length}_${_macroBreakdown.carbs}_${_macroBreakdown.protein}_${_macroBreakdown.fat}';
+    return dataString.hashCode.toString();
   }
 
   @override
@@ -1542,6 +1583,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   }
 
   Widget _buildMacroBreakdown() {
+    final userGoals = _appStateService.userGoals;
+    final macroGoals = userGoals?.macroGoals;
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: const BoxDecoration(
@@ -1552,70 +1596,81 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Macronutrient Breakdown',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: kTextPrimary,
-            ),
+          Row(
+            children: [
+              const Text(
+                'Macronutrient Breakdown',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: kTextPrimary,
+                ),
+              ),
+              const Spacer(),
+              if (macroGoals != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: kPrimaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'vs Goals',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: kPrimaryColor,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 20),
+          
+          // Macro items with progress against goals
           Row(
             children: [
               Expanded(
-                child: _buildMacroItem(
-                    'Carbs',
-                    '${_macroBreakdown.carbs}g',
-                    '${_calculateMacroPercentage(_macroBreakdown.carbs)}%',
-                    kAccentColor),
+                child: _buildEnhancedMacroItem(
+                  'Carbs',
+                  _macroBreakdown.carbs,
+                  macroGoals?.carbsCalories?.toDouble() ?? 0,
+                  kAccentColor,
+                  'g',
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildMacroItem(
-                    'Protein',
-                    '${_macroBreakdown.protein}g',
-                    '${_calculateMacroPercentage(_macroBreakdown.protein)}%',
-                    kSecondaryColor),
+                child: _buildEnhancedMacroItem(
+                  'Protein',
+                  _macroBreakdown.protein,
+                  macroGoals?.proteinCalories?.toDouble() ?? 0,
+                  kSecondaryColor,
+                  'g',
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildMacroItem(
-                    'Fat',
-                    '${_macroBreakdown.fat}g',
-                    '${_calculateMacroPercentage(_macroBreakdown.fat)}%',
-                    kInfoColor),
+                child: _buildEnhancedMacroItem(
+                  'Fat',
+                  _macroBreakdown.fat,
+                  macroGoals?.fatCalories?.toDouble() ?? 0,
+                  kInfoColor,
+                  'g',
+                ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: kSuccessColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Row(
-              children: [
-                Icon(
-                  Icons.check_circle,
-                  color: kSuccessColor,
-                  size: 16,
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Well Balanced',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: kSuccessColor,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          
+          // Macro goal progress summary
+          if (macroGoals != null) ...[
+            _buildMacroProgressSummary(),
+            const SizedBox(height: 16),
+          ],
+          
+          // Macro balance indicator
+          _buildMacroBalanceIndicator(),
         ],
       ),
     );
@@ -1652,6 +1707,248 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             style: TextStyle(
               fontSize: 10,
               color: color.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Enhanced macro item with goal progress
+  Widget _buildEnhancedMacroItem(
+      String label, double current, double goalCalories, Color color, String unit) {
+    // Convert goal calories to grams (approximate conversion)
+    double goalGrams = 0;
+    if (label == 'Carbs' || label == 'Protein') {
+      goalGrams = goalCalories / 4; // 4 calories per gram
+    } else if (label == 'Fat') {
+      goalGrams = goalCalories / 9; // 9 calories per gram
+    }
+    
+    final progress = goalGrams > 0 ? (current / goalGrams).clamp(0.0, 1.0) : 0.0;
+    final percentage = goalGrams > 0 ? ((current / goalGrams) * 100).round() : 0;
+    
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: progress >= 1.0 ? kSuccessColor : color.withValues(alpha: 0.3),
+          width: progress >= 1.0 ? 2 : 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          // Current value
+          Text(
+            '${current.toStringAsFixed(0)}$unit',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+          // Label
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: kTextPrimary,
+            ),
+          ),
+          // Progress percentage
+          Text(
+            goalGrams > 0 ? '$percentage% of goal' : 'No goal set',
+            style: TextStyle(
+              fontSize: 10,
+              color: progress >= 1.0 ? kSuccessColor : color.withValues(alpha: 0.7),
+              fontWeight: progress >= 1.0 ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Progress bar
+          if (goalGrams > 0)
+            LinearProgressIndicator(
+              value: progress,
+              backgroundColor: color.withValues(alpha: 0.2),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                progress >= 1.0 ? kSuccessColor : color,
+              ),
+              minHeight: 4,
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Build macro progress summary
+  Widget _buildMacroProgressSummary() {
+    final userGoals = _appStateService.userGoals;
+    final macroGoals = userGoals?.macroGoals;
+    
+    if (macroGoals == null) return const SizedBox.shrink();
+    
+    // Calculate overall macro goal achievement
+    final carbsProgress = _calculateMacroGoalProgress(_macroBreakdown.carbs, macroGoals.carbsCalories?.toDouble() ?? 0, 'carbs');
+    final proteinProgress = _calculateMacroGoalProgress(_macroBreakdown.protein, macroGoals.proteinCalories?.toDouble() ?? 0, 'protein');
+    final fatProgress = _calculateMacroGoalProgress(_macroBreakdown.fat, macroGoals.fatCalories?.toDouble() ?? 0, 'fat');
+    
+    final overallProgress = (carbsProgress + proteinProgress + fatProgress) / 3;
+    final achievedGoals = [carbsProgress, proteinProgress, fatProgress].where((p) => p >= 1.0).length;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            kPrimaryColor.withValues(alpha: 0.1),
+            kAccentColor.withValues(alpha: 0.1),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(
+                achievedGoals == 3 ? Icons.check_circle : Icons.trending_up,
+                color: achievedGoals == 3 ? kSuccessColor : kPrimaryColor,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Macro Goal Progress',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: achievedGoals == 3 ? kSuccessColor : kPrimaryColor,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${(overallProgress * 100).round()}%',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: achievedGoals == 3 ? kSuccessColor : kPrimaryColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            achievedGoals == 3 
+                ? 'Excellent! All macro goals achieved 🎉'
+                : '$achievedGoals of 3 macro goals achieved',
+            style: TextStyle(
+              fontSize: 12,
+              color: achievedGoals == 3 ? kSuccessColor : kTextSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Calculate macro goal progress
+  double _calculateMacroGoalProgress(double current, double goalCalories, String macroType) {
+    if (goalCalories <= 0) return 0.0;
+    
+    // Convert goal calories to grams
+    double goalGrams = 0;
+    if (macroType == 'carbs' || macroType == 'protein') {
+      goalGrams = goalCalories / 4; // 4 calories per gram
+    } else if (macroType == 'fat') {
+      goalGrams = goalCalories / 9; // 9 calories per gram
+    }
+    
+    return goalGrams > 0 ? (current / goalGrams).clamp(0.0, 1.0) : 0.0;
+  }
+
+  /// Build macro balance indicator
+  Widget _buildMacroBalanceIndicator() {
+    final total = _macroBreakdown.carbs + _macroBreakdown.protein + _macroBreakdown.fat;
+    if (total == 0) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: kWarningColor.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.info_outline, color: kWarningColor, size: 16),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'No macro data available',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: kWarningColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    final carbsPercent = (_macroBreakdown.carbs / total) * 100;
+    final proteinPercent = (_macroBreakdown.protein / total) * 100;
+    final fatPercent = (_macroBreakdown.fat / total) * 100;
+    
+    // Determine balance status
+    String balanceStatus;
+    Color balanceColor;
+    IconData balanceIcon;
+    
+    if (carbsPercent >= 45 && carbsPercent <= 65 && 
+        proteinPercent >= 10 && proteinPercent <= 35 && 
+        fatPercent >= 20 && fatPercent <= 35) {
+      balanceStatus = 'Well Balanced';
+      balanceColor = kSuccessColor;
+      balanceIcon = Icons.check_circle;
+    } else if (carbsPercent > 70 || proteinPercent > 40 || fatPercent > 40) {
+      balanceStatus = 'Needs Adjustment';
+      balanceColor = kWarningColor;
+      balanceIcon = Icons.warning;
+    } else {
+      balanceStatus = 'Good Balance';
+      balanceColor = kInfoColor;
+      balanceIcon = Icons.info;
+    }
+    
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: balanceColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(balanceIcon, color: balanceColor, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              balanceStatus,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: balanceColor,
+              ),
+            ),
+          ),
+          Text(
+            'C${carbsPercent.round()}% P${proteinPercent.round()}% F${fatPercent.round()}%',
+            style: TextStyle(
+              fontSize: 10,
+              color: balanceColor.withValues(alpha: 0.8),
             ),
           ),
         ],
@@ -2044,7 +2341,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                 ),
               ),
               IconButton(
-                onPressed: _generateAIInsights,
+                onPressed: () => _generateAIInsights(forceRefresh: true),
                 icon: _isGeneratingInsights
                     ? const SizedBox(
                         width: 20,

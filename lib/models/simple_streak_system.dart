@@ -28,6 +28,7 @@ class GoalStreak {
   final DateTime lastAchievedDate;
   final bool achievedToday;
   final int totalDaysAchieved;
+  final DateTime? lastActivityDate;
 
   const GoalStreak({
     required this.goalType,
@@ -36,6 +37,7 @@ class GoalStreak {
     required this.lastAchievedDate,
     required this.achievedToday,
     required this.totalDaysAchieved,
+    this.lastActivityDate,
   });
 
   GoalStreak copyWith({
@@ -45,6 +47,7 @@ class GoalStreak {
     DateTime? lastAchievedDate,
     bool? achievedToday,
     int? totalDaysAchieved,
+    DateTime? lastActivityDate,
   }) {
     return GoalStreak(
       goalType: goalType ?? this.goalType,
@@ -53,6 +56,7 @@ class GoalStreak {
       lastAchievedDate: lastAchievedDate ?? this.lastAchievedDate,
       achievedToday: achievedToday ?? this.achievedToday,
       totalDaysAchieved: totalDaysAchieved ?? this.totalDaysAchieved,
+      lastActivityDate: lastActivityDate ?? this.lastActivityDate,
     );
   }
 
@@ -64,6 +68,7 @@ class GoalStreak {
       'lastAchievedDate': lastAchievedDate.millisecondsSinceEpoch,
       'achievedToday': achievedToday,
       'totalDaysAchieved': totalDaysAchieved,
+      'lastActivityDate': lastActivityDate?.millisecondsSinceEpoch,
     };
   }
 
@@ -79,6 +84,9 @@ class GoalStreak {
           DateTime.fromMillisecondsSinceEpoch(map['lastAchievedDate'] ?? 0),
       achievedToday: map['achievedToday'] ?? false,
       totalDaysAchieved: map['totalDaysAchieved'] ?? 0,
+      lastActivityDate: map['lastActivityDate'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['lastActivityDate'])
+          : null,
     );
   }
 

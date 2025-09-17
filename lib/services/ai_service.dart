@@ -18,6 +18,7 @@ class AIService {
     String query, {
     Map<String, dynamic>? userProfile,
     List<Map<String, String>>? conversationHistory,
+    Map<String, dynamic>? currentFitnessData,
   }) async {
     try {
       // Prepare personalized context if profile data is available
@@ -26,36 +27,48 @@ class AIService {
         personalizedContext = _formatProfileForAI(userProfile);
       }
 
+      // Add current fitness data to context
+      String fitnessContext = '';
+      if (currentFitnessData != null && currentFitnessData.isNotEmpty) {
+        fitnessContext = _formatFitnessDataForAI(currentFitnessData);
+      }
+
       // Build conversation messages with context
       List<Map<String, dynamic>> messages = [
         {
           'role': 'system',
           'content':
-              '''You are Trainer Sisir, a professional fitness and nutrition coach with 15+ years of experience. You provide concise, actionable advice like a real trainer.
+              '''You are Trainer Sisir, a certified personal trainer and nutritionist with 15+ years of experience. You're friendly, encouraging, and professional - like a real fitness coach who genuinely cares about your clients' success.
 
-${personalizedContext.isNotEmpty ? 'CLIENT PROFILE:\n$personalizedContext\n\n' : ''}RESPONSE GUIDELINES:
-- Keep responses under 150 words
-- Be direct and actionable
+${personalizedContext.isNotEmpty ? 'CLIENT PROFILE:\n$personalizedContext\n\n' : ''}${fitnessContext.isNotEmpty ? 'CURRENT FITNESS DATA:\n$fitnessContext\n\n' : ''}YOUR PERSONALITY:
+- Warm and encouraging, but professional
+- Use "we" and "us" to show partnership
+- Be specific with numbers and actionable advice
+- Celebrate small wins and progress
+- Address concerns with empathy
+- Keep responses conversational, not robotic
+
+RESPONSE STYLE:
+- Keep under 120 words
 - Use bullet points for multiple items
 - Give specific numbers (calories, reps, sets, days)
-- Be encouraging but professional
-- Reference previous conversations when relevant
+- Reference previous conversations naturally
 - Focus on what they can do TODAY
-- Use trainer language (e.g., "Let's hit", "Focus on", "Your target is")
+- Use encouraging language like "Let's work on this together", "You're doing great", "I believe in you"
 
-EXAMPLE STYLE:
-"Your maintenance is 2,200 calories. For fat loss, aim for 1,800-1,900 daily. 
+EXAMPLE RESPONSES:
+"Hey! Great question about your calorie target. Your maintenance is around 2,200 calories, so for fat loss, let's aim for 1,800-1,900 daily.
 
-This week's plan:
-• Cardio: 4x 30min sessions
-• Strength: 3x full body
-• Protein: 140g daily
+Here's your action plan:
+• Cardio: 4 sessions this week, 30 minutes each
+• Strength training: 3 full-body workouts
+• Protein target: 140g daily
 
-Start with meal prep Sunday - prep your proteins and veggies. Track everything in the app.
+Start with meal prep this Sunday - prep your proteins and veggies. Track everything in the app so we can see your progress.
 
-You got this! 💪"
+You've got this! I'm here to support you every step of the way. 💪"
 
-Be concise, specific, and motivational like a real trainer.''',
+Be genuine, supportive, and motivating like a real trainer who cares about their clients.''',
         },
       ];
 
@@ -95,9 +108,17 @@ Be concise, specific, and motivational like a real trainer.''',
 
   /// Get AI-powered analytics insights based on user data
   static Future<String> getAnalyticsInsights(
-      Map<String, dynamic> userData) async {
+      Map<String, dynamic> userData, {
+      Map<String, dynamic>? currentFitnessData,
+    }) async {
     try {
       final dataSummary = _formatUserDataForAI(userData);
+      
+      // Add current fitness data if available
+      String fitnessSummary = '';
+      if (currentFitnessData != null && currentFitnessData.isNotEmpty) {
+        fitnessSummary = '\n\nCURRENT FITNESS STATUS:\n${_formatFitnessDataForAI(currentFitnessData)}';
+      }
 
       final response = await _makeRequest(
         model: _chatModel,
@@ -108,40 +129,40 @@ Be concise, specific, and motivational like a real trainer.''',
                 '''You are a professional health analytics expert. Provide concise, actionable insights from user data.
 
 ANALYSIS REQUIREMENTS:
-- Keep response under 200 words
+- Keep response under 150 words (faster processing)
 - Use clear sections with headers
-- Focus on 3-4 key insights only
+- Focus on 2-3 key insights only
 - Give specific numbers and percentages
-- Include 1-2 immediate action items
+- Include 1 immediate action item
 - Be encouraging about progress
 - Highlight concerns briefly
 
-FORMAT:
-📊 **Key Metrics**
+FORMAT (NO MARKDOWN FORMATTING):
+📊 Key Metrics
 • [Specific number/percentage]
 • [Trend analysis]
 
-🎯 **Progress Status**
+🎯 Progress Status
 • [Goal achievement]
 • [Areas of concern]
 
-⚡ **Action Items**
+⚡ Action Items
 • [Immediate step 1]
 • [Immediate step 2]
 
-💪 **Next Week Focus**
+💪 Next Week Focus
 • [Primary goal]
 
-Be professional, concise, and actionable.''',
+Be professional, concise, and actionable. Do not use ** or any markdown formatting.''',
           },
           {
             'role': 'user',
             'content':
-                'Analyze this health data and provide concise professional insights:\n\n$dataSummary',
+                'Analyze this health data and provide concise professional insights:\n\n$dataSummary$fitnessSummary',
           },
         ],
         isAnalyticsRequest: true,
-      );
+      ).timeout(const Duration(seconds: 10)); // Add 10-second timeout
 
       return response['choices'][0]['message']['content'] ??
           'Unable to generate insights at this time.';
@@ -153,9 +174,17 @@ Be professional, concise, and actionable.''',
 
   /// Get personalized health and nutrition recommendations
   static Future<String> getPersonalizedRecommendations(
-      Map<String, dynamic> profile) async {
+      Map<String, dynamic> profile, {
+      Map<String, dynamic>? currentFitnessData,
+    }) async {
     try {
       final profileSummary = _formatProfileForAI(profile);
+      
+      // Add current fitness data if available
+      String fitnessSummary = '';
+      if (currentFitnessData != null && currentFitnessData.isNotEmpty) {
+        fitnessSummary = '\n\nCURRENT FITNESS STATUS:\n${_formatFitnessDataForAI(currentFitnessData)}';
+      }
 
       final response = await _makeRequest(
         model: _chatModel,
@@ -172,33 +201,33 @@ REQUIREMENTS:
 - Include timeline and milestones
 - Be actionable and practical
 
-FORMAT:
-🎯 **Your Targets**
+FORMAT (NO MARKDOWN FORMATTING):
+🎯 Your Targets
 • Calories: [number]
 • Protein: [number]g daily
 • [Other key metrics]
 
-🥗 **Nutrition Plan**
+🥗 Nutrition Plan
 • [Main dietary focus]
 • [Key foods to prioritize]
 
-💪 **Workout Strategy**
+💪 Workout Strategy
 • [Frequency and type]
 • [Key exercises/sessions]
 
-📅 **Weekly Schedule**
+📅 Weekly Schedule
 • [Specific days/times]
 • [Milestone targets]
 
-⚡ **Start Today**
+⚡ Start Today
 • [Immediate first step]
 
-Be professional, specific, and motivating.''',
+Be professional, specific, and motivating. Do not use ** or any markdown formatting.''',
           },
           {
             'role': 'user',
             'content':
-                'Provide personalized recommendations for this profile:\n\n$profileSummary',
+                'Provide personalized recommendations for this profile:\n\n$profileSummary$fitnessSummary',
           },
         ],
         isAnalyticsRequest: true,
@@ -746,6 +775,54 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
       buffer.writeln('Today\'s Calories: ${profile['current_calories']}');
       if (profile['calorie_goal'] != null) {
         buffer.writeln('Calorie Goal: ${profile['calorie_goal']}');
+      }
+    }
+
+    return buffer.toString();
+  }
+
+  /// Format current fitness data for AI analysis
+  static String _formatFitnessDataForAI(Map<String, dynamic> fitnessData) {
+    final buffer = StringBuffer();
+
+    buffer.writeln('Today\'s Activity:');
+    
+    if (fitnessData['steps'] != null) {
+      buffer.writeln('• Steps: ${fitnessData['steps']}');
+    }
+    
+    if (fitnessData['caloriesBurned'] != null) {
+      buffer.writeln('• Calories Burned: ${fitnessData['caloriesBurned']} cal');
+    }
+    
+    if (fitnessData['distance'] != null) {
+      buffer.writeln('• Distance: ${fitnessData['distance']} km');
+    }
+    
+    if (fitnessData['weight'] != null) {
+      buffer.writeln('• Current Weight: ${fitnessData['weight']} kg');
+    }
+    
+    if (fitnessData['activityLevel'] != null) {
+      buffer.writeln('• Activity Level: ${fitnessData['activityLevel']}');
+    }
+
+    // Add timestamp if available
+    if (fitnessData['timestamp'] != null) {
+      try {
+        final timestamp = DateTime.parse(fitnessData['timestamp']);
+        final now = DateTime.now();
+        final difference = now.difference(timestamp);
+        
+        if (difference.inMinutes < 60) {
+          buffer.writeln('• Data Age: ${difference.inMinutes} minutes ago');
+        } else if (difference.inHours < 24) {
+          buffer.writeln('• Data Age: ${difference.inHours} hours ago');
+        } else {
+          buffer.writeln('• Data Age: ${difference.inDays} days ago');
+        }
+      } catch (e) {
+        buffer.writeln('• Data Age: Recent');
       }
     }
 

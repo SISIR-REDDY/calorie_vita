@@ -500,6 +500,36 @@ class AppStateService {
     print('Profile data force updated: $_profileData');
   }
 
+  /// Refresh all user data to ensure UI is up to date
+  Future<void> refreshUserData() async {
+    if (_currentUser == null) return;
+
+    try {
+      print('=== REFRESHING USER DATA ===');
+      
+      // Force refresh all data streams
+      await _loadCachedData();
+      
+      // Trigger a fresh daily summary calculation
+      updateDailySummary();
+      
+      // Force broadcast current state to all listeners
+      _userController.add(_currentUser);
+      _foodEntriesController.add(_foodEntries);
+      _goalsController.add(_userGoals);
+      _preferencesController.add(_userPreferences);
+      _dailySummaryController.add(_dailySummary);
+      _macroBreakdownController.add(_macroBreakdown);
+      _achievementsController.add(_achievements);
+      _profileDataController.add(_profileData);
+      
+      print('User data refreshed successfully');
+      print('=== END REFRESHING USER DATA ===');
+    } catch (e) {
+      print('Error refreshing user data: $e');
+    }
+  }
+
   /// Delete food entry
   Future<void> deleteFoodEntry(String entryId) async {
     if (_currentUser == null) return;
