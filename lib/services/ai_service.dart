@@ -284,7 +284,7 @@ Be professional, specific, and motivating. Do not use ** or any markdown formatt
     }
   }
 
-  /// Analyze food with specific model
+  /// Analyze food with specific model - Enhanced for accuracy
   static Future<Map<String, dynamic>> _analyzeFoodWithModel(
       String base64Image, String model) async {
     final response = await _makeRequest(
@@ -296,40 +296,39 @@ Be professional, specific, and motivating. Do not use ** or any markdown formatt
             {
               'type': 'text',
               'text':
-                  '''You are an expert nutritionist and food scientist with 20+ years of experience. Analyze this food image with maximum accuracy.
+                  '''You are a nutritionist. Analyze this food image and provide accurate nutritional information.
 
-CRITICAL ANALYSIS STEPS:
-1. Identify EVERY food item visible (main dishes, sides, drinks, condiments)
-2. Estimate portion sizes using common references (cup, slice, piece, etc.)
-3. Consider cooking methods (fried, baked, grilled, raw, etc.)
-4. Account for visible oils, sauces, and toppings
-5. Calculate nutrition for the ENTIRE portion shown
+ANALYSIS STEPS:
+1. Identify all visible food items and ingredients
+2. Estimate portion size and weight
+3. Consider cooking method (fried, grilled, raw, etc.)
+4. Calculate nutrition for the entire portion
 
-ACCURACY REQUIREMENTS:
-- Confidence must be 0.8+ for high accuracy
-- Provide specific, realistic estimates
-- Consider food density and preparation methods
-- Account for all visible ingredients
-
-Return ONLY this exact JSON format (no other text):
+Return ONLY this JSON format:
 {
-  "food": "Complete description of all foods visible",
+  "food": "Description of all visible foods",
   "calories": number,
   "protein": "X.Xg",
-  "carbs": "X.Xg",
+  "carbs": "X.Xg", 
   "fat": "X.Xg",
-  "serving_size": "Accurate portion description",
+  "fiber": "X.Xg",
+  "sugar": "X.Xg",
+  "serving_size": "Portion description with weight",
   "confidence": 0.0-1.0,
-  "notes": "Cooking method and key ingredients",
+  "analysis_details": {
+    "ingredients_identified": ["ingredient1", "ingredient2"],
+    "estimated_weight_grams": number,
+    "cooking_method": "method used"
+  },
   "breakdown": {
     "main_food": "Primary food item",
     "sides": ["Side dish 1", "Side dish 2"],
-    "beverages": ["Any drinks visible"],
     "condiments": ["Sauces, oils, toppings"]
-  }
+  },
+  "notes": "Brief analysis notes"
 }
 
-Be extremely precise. If confidence < 0.8, provide conservative estimates.''',
+Be accurate and realistic. If uncertain, provide conservative estimates.''',
             },
             {
               'type': 'image_url',
@@ -349,7 +348,7 @@ Be extremely precise. If confidence < 0.8, provide conservative estimates.''',
     return _parseFoodAnalysisResponse(content);
   }
 
-  /// Parse and validate food analysis response
+  /// Parse and validate food analysis response - Enhanced for accuracy
   static Map<String, dynamic> _parseFoodAnalysisResponse(String content) {
     try {
       // Clean the response
@@ -371,17 +370,28 @@ Be extremely precise. If confidence < 0.8, provide conservative estimates.''',
         // Validate confidence
         final validatedConfidence = confidence.clamp(0.0, 1.0);
 
+        // Extract analysis details
+        final analysisDetails = parsed['analysis_details'] as Map<String, dynamic>? ?? {};
+        final breakdown = parsed['breakdown'] as Map<String, dynamic>? ?? {};
+
         return {
           'food': (parsed['food'] ?? 'Unknown Food').toString().trim(),
           'calories': calories ?? 0,
           'protein': _formatMacro(parsed['protein']),
           'carbs': _formatMacro(parsed['carbs']),
           'fat': _formatMacro(parsed['fat']),
+          'fiber': _formatMacro(parsed['fiber']),
+          'sugar': _formatMacro(parsed['sugar']),
           'serving_size':
               (parsed['serving_size'] ?? '1 serving').toString().trim(),
           'confidence': validatedConfidence,
           'notes': parsed['notes']?.toString(),
-          'breakdown': parsed['breakdown'],
+          'breakdown': breakdown,
+          'analysis_details': {
+            'ingredients_identified': analysisDetails['ingredients_identified'] ?? [],
+            'estimated_weight_grams': _parseNumber(analysisDetails['estimated_weight_grams']) ?? 0,
+            'cooking_method': analysisDetails['cooking_method']?.toString() ?? 'Unknown',
+          },
           'timestamp': DateTime.now().toIso8601String(),
         };
       }

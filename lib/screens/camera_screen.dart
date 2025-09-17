@@ -298,16 +298,204 @@ class _CameraScreenState extends State<CameraScreen> {
       margin: const EdgeInsets.symmetric(vertical: 20),
       child: Column(
         children: [
-          FoodResultCard(
-            title: _result!['title'] ?? '',
-            calories: _result!['calories'],
-            macros: _result!['macros'],
-            comment: _result!['comment'],
-            imageUrl: _result!['imageUrl'],
-            onRetry: _reset,
-            onAskTrainer: () {
-              // TODO: Navigate to Sisir chatbot
-            },
+          // Enhanced Food Result Card
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: kCardShadow,
+            ),
+            child: Column(
+              children: [
+                // Header with confidence indicator
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: kPrimaryGradient,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _result!['food'] ?? 'Unknown Food',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _result!['serving_size'] ?? '1 serving',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Confidence indicator
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.analytics,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${((_result!['confidence'] ?? 0.0) * 100).toInt()}%',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Nutrition details
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      // Calories
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: kAccentBlue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Calories',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: kTextDark,
+                              ),
+                            ),
+                            Text(
+                              '${_result!['calories'] ?? 0}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: kAccentBlue,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Macros
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildMacroCard(
+                              'Protein',
+                              _parseMacroValue(_result!['protein']),
+                              kAccentGreen,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildMacroCard(
+                              'Carbs',
+                              _parseMacroValue(_result!['carbs']),
+                              kWarningColor,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildMacroCard(
+                              'Fat',
+                              _parseMacroValue(_result!['fat']),
+                              kErrorColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      // Additional nutrition info
+                      if (_result!['fiber'] != null || _result!['sugar'] != null) ...[
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            if (_result!['fiber'] != null)
+                              Expanded(
+                                child: _buildMacroCard(
+                                  'Fiber',
+                                  _parseMacroValue(_result!['fiber']),
+                                  kAccentPurple,
+                                ),
+                              ),
+                            if (_result!['fiber'] != null && _result!['sugar'] != null)
+                              const SizedBox(width: 12),
+                            if (_result!['sugar'] != null)
+                              Expanded(
+                                child: _buildMacroCard(
+                                  'Sugar',
+                                  _parseMacroValue(_result!['sugar']),
+                                  kAccentPurple,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                      
+                      // Analysis details
+                      if (_result!['analysis_details'] != null) ...[
+                        const SizedBox(height: 20),
+                        _buildAnalysisDetails(),
+                      ],
+                      
+                      // Notes
+                      if (_result!['notes'] != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: kSurfaceLight,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _result!['notes'],
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: kTextSecondary,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 20),
           Container(
@@ -581,6 +769,133 @@ class _CameraScreenState extends State<CameraScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMacroCard(String label, double value, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${value.toStringAsFixed(1)}g',
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalysisDetails() {
+    final analysisDetails = _result!['analysis_details'] as Map<String, dynamic>?;
+    if (analysisDetails == null) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kSurfaceLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kBorderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Analysis Details',
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: kTextDark,
+            ),
+          ),
+          const SizedBox(height: 12),
+          
+          // Ingredients
+          if (analysisDetails['ingredients_identified'] != null) ...[
+            _buildDetailRow(
+              'Ingredients',
+              (analysisDetails['ingredients_identified'] as List).join(', '),
+              Icons.restaurant,
+            ),
+            const SizedBox(height: 8),
+          ],
+          
+          // Weight and cooking method
+          Row(
+            children: [
+              if (analysisDetails['estimated_weight_grams'] != null)
+                Expanded(
+                  child: _buildDetailRow(
+                    'Weight',
+                    '${analysisDetails['estimated_weight_grams']}g',
+                    Icons.monitor_weight,
+                  ),
+                ),
+              if (analysisDetails['estimated_weight_grams'] != null && 
+                  analysisDetails['cooking_method'] != null)
+                const SizedBox(width: 16),
+              if (analysisDetails['cooking_method'] != null)
+                Expanded(
+                  child: _buildDetailRow(
+                    'Cooking',
+                    analysisDetails['cooking_method'],
+                    Icons.local_fire_department,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: kTextSecondary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 10,
+                  color: kTextSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                value,
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  color: kTextDark,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

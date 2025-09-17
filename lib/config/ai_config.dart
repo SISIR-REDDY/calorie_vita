@@ -5,14 +5,14 @@ class AIConfig {
 
   static const String chatModel = 'openai/gpt-3.5-turbo';
   static const String visionModel =
-      'openai/gpt-4o'; // Best vision model for food analysis
+      'microsoft/phi-3-vision-128k-instruct'; // Cost-effective vision model
   static const String backupVisionModel =
-      'google/gemini-pro-1.5'; // Backup option
+      'meta-llama/llama-3.2-11b-vision-instruct'; // Backup option
 
-  static const int maxTokens = 1000;
-  static const int chatMaxTokens = 300;
-  static const int analyticsMaxTokens = 400;
-  static const int visionMaxTokens = 2000;
+  static const int maxTokens = 800;
+  static const int chatMaxTokens = 250;
+  static const int analyticsMaxTokens = 300;
+  static const int visionMaxTokens = 1500;
   static const double temperature = 0.7;
   static const double visionTemperature = 0.3;
 
