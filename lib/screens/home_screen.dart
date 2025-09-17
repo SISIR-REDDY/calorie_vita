@@ -15,6 +15,11 @@ import '../services/dynamic_icon_service.dart';
 import '../services/real_time_input_service.dart';
 import '../services/daily_summary_service.dart';
 import '../services/simple_streak_service.dart';
+import '../services/enhanced_streak_service.dart';
+import '../services/task_service.dart';
+import '../models/task.dart';
+import '../widgets/task_popup.dart';
+import '../widgets/task_card.dart';
 import '../services/calorie_units_service.dart';
 import '../services/analytics_service.dart';
 import '../services/goals_event_bus.dart';
@@ -54,6 +59,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   final RealTimeInputService _realTimeInputService = RealTimeInputService();
   final DailySummaryService _dailySummaryService = DailySummaryService();
   final SimpleStreakService _streakService = SimpleStreakService();
+  final EnhancedStreakService _enhancedStreakService = EnhancedStreakService();
   final CalorieUnitsService _calorieUnitsService = CalorieUnitsService();
   final AnalyticsService _analyticsService = AnalyticsService();
   final RewardsService _rewardsService = RewardsService();
@@ -61,6 +67,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   final GoogleFitCacheService _googleFitCacheService = GoogleFitCacheService();
   final GlobalGoogleFitManager _globalGoogleFitManager =
       GlobalGoogleFitManager();
+  final TaskService _taskService = TaskService();
 
   // Data
   DailySummary? _dailySummary;
@@ -85,12 +92,18 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   bool _isGoogleFitLoading = false;
   DateTime? _lastSyncTime;
 
+  // Task management
+  List<Task> _tasks = [];
+  bool _isTasksLoading = true;
+  bool _hasUserTasks = false;
+
   // Stream subscriptions
   StreamSubscription<DailySummary?>? _dailySummarySubscription;
   StreamSubscription<MacroBreakdown>? _macroBreakdownSubscription;
   StreamSubscription<UserPreferences>? _preferencesSubscription;
   StreamSubscription<UserGoals?>? _goalsSubscription;
   StreamSubscription<UserGoals>? _goalsEventBusSubscription;
+  StreamSubscription<List<Task>>? _tasksSubscription;
   StreamSubscription<Map<String, dynamic>>? _googleFitLiveStreamSubscription;
   StreamSubscription? _googleFitCacheStreamSubscription;
   Timer? _goalsCheckTimer;
@@ -104,51 +117,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   );
   List<UserAchievement> _achievements = [];
   String? _currentUserId;
-
-  // Task management
-  final List<Map<String, dynamic>> _tasks = [
-    {
-      'id': 'task_1',
-      'emoji': DynamicIconService().generateIcon('Drink 8 glasses of water'),
-      'title': 'Drink 8 glasses of water',
-      'isCompleted': false,
-      'priority': 'High',
-      'createdAt': DateTime.now().subtract(const Duration(hours: 2)),
-    },
-    {
-      'id': 'task_2',
-      'emoji': DynamicIconService().generateIcon('30 minutes morning walk'),
-      'title': '30 minutes morning walk',
-      'isCompleted': true,
-      'priority': 'Medium',
-      'createdAt': DateTime.now().subtract(const Duration(hours: 4)),
-    },
-    {
-      'id': 'task_3',
-      'emoji':
-          DynamicIconService().generateIcon('Eat 5 servings of vegetables'),
-      'title': 'Eat 5 servings of vegetables',
-      'isCompleted': false,
-      'priority': 'High',
-      'createdAt': DateTime.now().subtract(const Duration(hours: 1)),
-    },
-    {
-      'id': 'task_4',
-      'emoji': '📱',
-      'title': 'Log all meals in app',
-      'isCompleted': true,
-      'priority': 'Low',
-      'createdAt': DateTime.now().subtract(const Duration(minutes: 30)),
-    },
-    {
-      'id': 'task_5',
-      'emoji': '😴',
-      'title': 'Get 8 hours of sleep',
-      'isCompleted': false,
-      'priority': 'High',
-      'createdAt': DateTime.now().subtract(const Duration(minutes: 15)),
-    },
-  ];
 
   @override
   void initState() {
@@ -188,6 +156,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     await _realTimeInputService.initialize();
     await _dailySummaryService.initialize();
     await _streakService.initialize();
+    await _enhancedStreakService.initialize();
+    await _taskService.initialize();
     await _calorieUnitsService.initialize();
     _currentUserId = _realTimeInputService.getCurrentUserId();
   }
@@ -209,15 +179,59 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           debugPrint('Daily summary stream error: $error');
         });
 
-        // Listen to streak updates
-        _streakService.streakStream.listen((streakSummary) {
+        // Listen to enhanced streak updates
+        _enhancedStreakService.streakStream.listen((streakSummary) {
           if (mounted) {
             setState(() {
               _streakSummary = streakSummary;
             });
           }
         }).onError((error) {
-          debugPrint('Streak stream error: $error');
+          debugPrint('Enhanced streak stream error: $error');
+        });
+
+        // Listen to task updates with optimized state management
+        _taskService.tasksStream.listen((tasks) {
+          debugPrint('📋 Task stream received ${tasks.length} tasks');
+          debugPrint('📋 Task titles: ${tasks.map((t) => t.title).toList()}');
+          if (mounted) {
+            // Only update state if tasks actually changed and we're not in the middle of a manual update
+            if (_tasks.length != tasks.length || 
+                !_listsEqual(_tasks, tasks)) {
+              // Add a delay to prevent conflicts with manual updates
+              Future.delayed(const Duration(milliseconds: 200), () {
+                if (mounted) {
+                  setState(() {
+                    _tasks = tasks;
+                    _isTasksLoading = false;
+                    _hasUserTasks = _taskService.hasUserTasks();
+                  });
+                  debugPrint('📋 UI updated with ${_tasks.length} tasks, hasUserTasks: $_hasUserTasks');
+                }
+              });
+            }
+            
+            // Add example tasks if user has no tasks and we haven't loaded any yet
+            if (tasks.isEmpty && !_hasUserTasks && !_taskService.hasExampleTasksAdded) {
+              debugPrint('📋 No tasks found, adding example tasks...');
+              _taskService.addExampleTasks();
+            }
+          }
+        }).onError((error) {
+          debugPrint('❌ Task stream error: $error');
+          if (mounted) {
+            setState(() {
+              _isTasksLoading = false;
+            });
+          }
+        });
+
+        // Fallback: Load tasks directly after a delay if stream doesn't work
+        Timer(const Duration(seconds: 5), () {
+          if (_isTasksLoading && mounted) {
+            debugPrint('📋 Task stream timeout, loading tasks directly...');
+            _loadTasksData();
+          }
         });
       }
 
@@ -246,6 +260,29 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     } catch (e) {
       debugPrint('Stream setup error: $e');
     }
+  }
+
+  /// Helper method to compare task lists efficiently
+  bool _listsEqual(List<Task> list1, List<Task> list2) {
+    if (list1.length != list2.length) return false;
+    for (int i = 0; i < list1.length; i++) {
+      if (list1[i].id != list2[i].id || 
+          list1[i].isCompleted != list2[i].isCompleted ||
+          list1[i].title != list2[i].title) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Force refresh tasks list
+  void _refreshTasks() {
+    setState(() {
+      _tasks = _taskService.getCurrentTasks();
+      _isTasksLoading = false;
+      _hasUserTasks = _taskService.hasUserTasks();
+    });
+    print('📋 Tasks refreshed: ${_tasks.length} tasks');
   }
 
   @override
@@ -359,6 +396,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             onTimeout: () => debugPrint('Today summary load timed out')),
         _loadStreakData().timeout(const Duration(seconds: 2),
             onTimeout: () => debugPrint('Streak data load timed out')),
+        _loadTasksData().timeout(const Duration(seconds: 3),
+            onTimeout: () => debugPrint('Tasks data load timed out')),
       ]).timeout(const Duration(seconds: 5));
 
       // Initialize analytics service in background (lower priority)
@@ -662,6 +701,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       // Update the daily summary service
       await _dailySummaryService.updateDailySummary(updatedSummary);
 
+      // Refresh streaks after updating daily summary
+      await _enhancedStreakService.refreshStreaks();
+
       setState(() {
         _dailySummary = updatedSummary;
       });
@@ -956,6 +998,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       // Recalculate streaks and achievements based on new goals
       try {
         await _analyticsService.calculateStreaksAndAchievements();
+        await _enhancedStreakService.refreshStreaks();
         debugPrint('Streaks and achievements recalculated successfully');
       } catch (e) {
         debugPrint('Error recalculating streaks and achievements: $e');
@@ -1366,8 +1409,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       _streakSummary = _getDefaultStreakData();
       setState(() => _isStreakLoading = false);
 
-      // Load actual streak data from the analytics service (real-time data)
-      _streakSummary = _streakService.currentStreaks;
+      // Load actual streak data from the enhanced streak service
+      _streakSummary = _enhancedStreakService.currentStreaks;
       if (mounted) {
         setState(() => _isStreakLoading = false);
       }
@@ -1375,6 +1418,33 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       debugPrint('Error loading streak data: $e');
       if (mounted) {
         setState(() => _isStreakLoading = false);
+      }
+    }
+  }
+
+  /// Load tasks data with fallback
+  Future<void> _loadTasksData() async {
+    try {
+      debugPrint('📋 Loading tasks data...');
+      final tasks = await _taskService.getTasks();
+      debugPrint('📋 Loaded ${tasks.length} tasks from service');
+      
+      if (mounted) {
+        setState(() {
+          _tasks = tasks;
+          _isTasksLoading = false;
+          // Check if user has any tasks (not just example tasks)
+          _hasUserTasks = _taskService.hasUserTasks();
+        });
+        
+        // Example tasks are handled by the stream listener
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading tasks: $e');
+      if (mounted) {
+        setState(() {
+          _isTasksLoading = false;
+        });
       }
     }
   }
@@ -2502,10 +2572,27 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   style: GoogleFonts.poppins(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: Colors.black,
                   ),
                 ),
                 const Spacer(),
+                if (_isTasksLoading)
+                  GestureDetector(
+                    onTap: () => _loadTasksData(),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.refresh,
+                        color: Colors.blue,
+                        size: 20,
+                      ),
+                    ),
+                  )
+                else
                 GestureDetector(
                   onTap: () => _showAddTaskDialog(),
                   child: Container(
@@ -2526,181 +2613,38 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             const SizedBox(height: 20),
 
             // Today's Tasks
-            ..._tasks.map((task) => Column(
-                  children: [
-                    _buildTaskItem(
-                      task['emoji'],
-                      task['title'],
-                      task['isCompleted'],
-                      task['priority'],
-                      task['id'],
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                )),
+            if (_isTasksLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Column(
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Loading tasks...'),
+                    ],
+                  ),
+                ),
+              )
+            else if (_tasks.isEmpty && !_hasUserTasks)
+              ExampleTasksWidget(
+                onAddTask: () => _showAddTaskDialog(),
+              )
+            else
+              ..._tasks.map((task) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: TaskCard(
+                  task: task,
+                  onToggleCompletion: () => _toggleTaskCompletion(task.id),
+                  onDelete: () => _deleteTask(task.id),
+                ),
+              )),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTaskItem(String emoji, String task, bool isCompleted,
-      String priority, String taskId) {
-    Color priorityColor;
-    switch (priority.toLowerCase()) {
-      case 'high':
-        priorityColor = kErrorColor;
-        break;
-      case 'medium':
-        priorityColor = Colors.orange;
-        break;
-      case 'low':
-        priorityColor = kSuccessColor;
-        break;
-      default:
-        priorityColor = kTextSecondary;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isCompleted
-            ? kSuccessColor.withValues(alpha: 0.1)
-            : Theme.of(context)
-                .colorScheme
-                .surfaceContainerHighest
-                .withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isCompleted
-              ? kSuccessColor.withValues(alpha: 0.3)
-              : priorityColor.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          // Task completion checkbox
-          GestureDetector(
-            onTap: () => _toggleTaskCompletion(taskId, task),
-            child: Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: isCompleted ? kSuccessColor : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isCompleted ? kSuccessColor : priorityColor,
-                  width: 2,
-                ),
-              ),
-              child: isCompleted
-                  ? const Icon(
-                      Icons.check,
-                      color: Colors.white,
-                      size: 16,
-                    )
-                  : null,
-            ),
-          ),
-          const SizedBox(width: 16),
-
-          // Task emoji
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(emoji, style: const TextStyle(fontSize: 20)),
-          ),
-          const SizedBox(width: 16),
-
-          // Task details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  task,
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: isCompleted
-                        ? Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.6)
-                        : Theme.of(context).colorScheme.onSurface,
-                    decoration: isCompleted ? TextDecoration.lineThrough : null,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: priorityColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        priority,
-                        style: GoogleFonts.poppins(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: priorityColor,
-                        ),
-                      ),
-                    ),
-                    if (isCompleted)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: kSuccessColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'Completed',
-                          style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: kSuccessColor,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Delete button
-          GestureDetector(
-            onTap: () => _showDeleteTaskConfirmation(taskId, task),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: kErrorColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.delete_outline,
-                color: kErrorColor,
-                size: 16,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   // Helper methods
   String _getGreeting(int hour) {
@@ -2903,6 +2847,23 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       body: SingleChildScrollView(
         child: Column(
           children: [
+            // Debug button for testing toggle
+            if (_tasks.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.all(16),
+                child: ElevatedButton(
+                  onPressed: () {
+                    print('🔧 Debug: Force toggling first task');
+                    _taskService.forceToggleFirstTask();
+                    _refreshTasks();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('🔧 Debug: Toggle First Task'),
+                ),
+              ),
             // Header Section
             Container(
               padding: const EdgeInsets.all(32),
@@ -3472,174 +3433,193 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
   void _showAddTaskDialog() {
-    final TextEditingController taskController = TextEditingController();
-    String selectedPriority = 'Medium';
-
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-              title: Text(
-                'Add New Task',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: taskController,
-                    decoration: InputDecoration(
-                      labelText: 'Task description',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Priority',
-                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: RadioListTile<String>(
-                          title: Text('High',
-                              style: GoogleFonts.poppins(fontSize: 12)),
-                          value: 'High',
-                          groupValue: selectedPriority,
-                          onChanged: (value) =>
-                              setState(() => selectedPriority = value!),
-                          activeColor: kErrorColor,
-                        ),
-                      ),
-                      Expanded(
-                        child: RadioListTile<String>(
-                          title: Text('Medium',
-                              style: GoogleFonts.poppins(fontSize: 12)),
-                          value: 'Medium',
-                          groupValue: selectedPriority,
-                          onChanged: (value) =>
-                              setState(() => selectedPriority = value!),
-                          activeColor: Colors.orange,
-                        ),
-                      ),
-                      Expanded(
-                        child: RadioListTile<String>(
-                          title: Text('Low',
-                              style: GoogleFonts.poppins(fontSize: 12)),
-                          value: 'Low',
-                          groupValue: selectedPriority,
-                          onChanged: (value) =>
-                              setState(() => selectedPriority = value!),
-                          activeColor: kSuccessColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text('Cancel',
-                      style: GoogleFonts.poppins(color: kTextSecondary)),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (taskController.text.isNotEmpty) {
-                      _addTask(taskController.text, selectedPriority);
-                      Navigator.pop(context);
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kAccentColor,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: Text('Add Task',
-                      style: GoogleFonts.poppins(color: Colors.white)),
-                ),
-              ],
-            );
+        return TaskPopup(
+          onAddTask: (title, description) {
+            _addTask(title, description);
           },
         );
       },
     );
   }
 
-  void _addTask(String taskTitle, String priority) {
-    setState(() {
-      // Create new task with improved icon generation
-      final dynamicIconService = DynamicIconService();
-      final bestCategory = dynamicIconService.getBestCategory(taskTitle);
-      final confidence =
-          dynamicIconService.getCategoryConfidence(taskTitle, bestCategory);
+  void _addTask(String taskTitle, String? description) {
+    try {
+      // INSTANT add - no async/await delays
+      final task = _taskService.addTask(
+        title: taskTitle,
+        description: description,
+      );
 
-      final newTask = {
-        'id': 'task_${DateTime.now().millisecondsSinceEpoch}',
-        'emoji': _getTaskEmoji(taskTitle),
-        'title': taskTitle,
-        'isCompleted': false,
-        'priority': priority,
-        'createdAt': DateTime.now(),
-        'category': bestCategory,
-        'confidence': confidence,
-      };
-
-      // Add to the beginning of the list
-      _tasks.insert(0, newTask);
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Task added: $taskTitle'),
-        backgroundColor: kAccentColor,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+      if (task != null) {
+        // Show success message INSTANTLY (no delays)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Task added'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(milliseconds: 800),
+          ),
+        );
+        
+        // FORCE immediate UI update - bypass stream completely
+        _refreshTasks();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add task'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(milliseconds: 800),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error adding task: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(milliseconds: 800),
+        ),
+      );
+    }
   }
 
-  void _toggleTaskCompletion(String taskId, String taskTitle) {
-    setState(() {
-      // Find and update the task
-      final taskIndex = _tasks.indexWhere((task) => task['id'] == taskId);
-      if (taskIndex != -1) {
-        final task = _tasks[taskIndex];
-        final wasCompleted = task['isCompleted'] as bool;
-
-        // Toggle completion status
-        _tasks[taskIndex]['isCompleted'] = !wasCompleted;
-
-        if (!wasCompleted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Task completed: ${task['title']}'),
-              backgroundColor: kSuccessColor,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Task marked as incomplete: ${task['title']}'),
-              backgroundColor: Colors.orange,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-          );
-        }
+  void _toggleTaskCompletion(String taskId) {
+    try {
+      print('🔄 Toggling task completion for ID: $taskId');
+      print('🔄 Available tasks: ${_tasks.map((t) => '${t.id}:${t.title}').toList()}');
+      
+      // Find task before toggling for snackbar message
+      final task = _tasks.firstWhere((task) => task.id == taskId);
+      final wasCompleted = task.isCompleted;
+      print('🔄 Found task: ${task.title}, was completed: $wasCompleted');
+      
+      // Try to toggle with the current task ID first
+      bool success = _taskService.toggleTaskCompletion(taskId);
+      print('🔄 Toggle result with original ID: $success');
+      
+      // If that fails, try to find the task by title and toggle it
+      if (!success) {
+        print('🔄 Original ID failed, trying to find task by title: ${task.title}');
+        final serviceTasks = _taskService.getCurrentTasks();
+        final matchingTask = serviceTasks.firstWhere(
+          (t) => t.title == task.title,
+          orElse: () => throw Exception('Task not found'),
+        );
+        print('🔄 Found matching task with ID: ${matchingTask.id}');
+        success = _taskService.toggleTaskCompletion(matchingTask.id);
+        print('🔄 Toggle result with matching ID: $success');
       }
-    });
+      
+      if (success) {
+        // Show success message INSTANTLY (no delays)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Task updated'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(milliseconds: 800),
+          ),
+        );
+        
+        // FORCE immediate UI update - bypass stream completely
+        _refreshTasks();
+        print('🔄 UI refreshed after toggle');
+      } else {
+        print('🔄 Toggle failed');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update task'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(milliseconds: 800),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error toggling task: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error updating task: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(milliseconds: 800),
+        ),
+      );
+    }
+  }
+
+  void _deleteTask(String taskId) {
+    try {
+      print('🗑️ Deleting task with ID: $taskId');
+      
+      // Find task before deleting for fallback
+      final task = _tasks.firstWhere((task) => task.id == taskId);
+      
+      // Try to delete with the current task ID first
+      bool success = _taskService.deleteTask(taskId);
+      print('🗑️ Delete result with original ID: $success');
+      
+      // If that fails, try to find the task by title and delete it
+      if (!success) {
+        print('🗑️ Original ID failed, trying to find task by title: ${task.title}');
+        final serviceTasks = _taskService.getCurrentTasks();
+        final matchingTask = serviceTasks.firstWhere(
+          (t) => t.title == task.title,
+          orElse: () => throw Exception('Task not found'),
+        );
+        print('🗑️ Found matching task with ID: ${matchingTask.id}');
+        success = _taskService.deleteTask(matchingTask.id);
+        print('🗑️ Delete result with matching ID: $success');
+      }
+      
+      if (success) {
+        // Show success message INSTANTLY (no delays)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Task deleted'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(milliseconds: 800),
+          ),
+        );
+        
+        // Force immediate UI update as fallback
+        _refreshTasks();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete task'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(milliseconds: 800),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error deleting task: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error deleting task: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(milliseconds: 800),
+        ),
+      );
+    }
   }
 
   String _getTaskEmoji(String task) {
@@ -3679,7 +3659,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             ),
             ElevatedButton(
               onPressed: () {
-                _deleteTask(taskId, taskTitle);
+                _deleteTask(taskId);
                 Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
@@ -3696,21 +3676,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-  void _deleteTask(String taskId, String taskTitle) {
-    setState(() {
-      // Remove task from the list
-      _tasks.removeWhere((task) => task['id'] == taskId);
-    });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Task deleted: $taskTitle'),
-        backgroundColor: kErrorColor,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
+
+
+
 
   // Helper methods for Daily Goals section
   String _getDailyProgressMessage() {

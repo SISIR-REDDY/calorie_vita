@@ -130,6 +130,14 @@ class AppStateManager {
     _stateController.add(state);
   }
 
+  /// Manually update user state (useful for immediate navigation)
+  Future<void> updateUserState(String userId) async {
+    print('🔄 Manually updating user state: $userId');
+    _currentUserId = userId;
+    _updateAppState();
+    print('✅ User state updated successfully');
+  }
+
   /// Get current app state
   AppState getCurrentState() {
     return AppState(

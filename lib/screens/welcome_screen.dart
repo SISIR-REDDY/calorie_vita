@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_signin_button/flutter_signin_button.dart';
 import '../ui/app_colors.dart';
 import '../services/auth_service.dart';
+import '../services/app_state_manager.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -14,6 +15,7 @@ class WelcomeScreen extends StatefulWidget {
 class _WelcomeScreenState extends State<WelcomeScreen>
     with TickerProviderStateMixin {
   final AuthService _authService = AuthService();
+  final AppStateManager _appStateManager = AppStateManager();
   late AnimationController _fadeController;
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
@@ -47,6 +49,15 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     Future.delayed(const Duration(milliseconds: 200), () {
       _slideController.forward();
     });
+
+    // Listen to auth state changes for immediate navigation
+    _authService.userStream.listen((user) {
+      if (user != null && mounted) {
+        print('🔐 Auth state changed in welcome screen: ${user.email}');
+        // Navigate to home screen immediately
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
+    });
   }
 
   @override
@@ -64,8 +75,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     });
 
     try {
+      print('🔐 Starting Google Sign-In process...');
       final user = await _authService.signInWithGoogle();
+      
       if (user != null && mounted) {
+        print('✅ Google Sign-In successful: ${user.email}');
+        
+        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Signed in with Google successfully!'),
@@ -74,10 +90,42 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.all(Radius.circular(12)),
             ),
+            duration: Duration(seconds: 2),
           ),
         );
+
+        // Update app state to trigger navigation
+        print('🔄 Updating app state with user: ${user.uid}');
+        await _appStateManager.updateUserState(user.uid);
+        
+        // The navigation will be handled by the StreamBuilder in main_app.dart
+        // which listens to the app state changes
+        print('✅ App state updated, navigation should happen automatically');
+        
+        // Fallback navigation after a short delay if the automatic navigation doesn't work
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            print('🔄 Fallback navigation triggered');
+            Navigator.of(context).pushReplacementNamed('/home');
+          }
+        });
+      } else {
+        print('❌ Google Sign-In returned null user');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Google sign-in was cancelled'),
+              backgroundColor: kErrorColor,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
+      print('❌ Google Sign-In error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

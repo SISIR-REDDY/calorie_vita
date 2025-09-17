@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/daily_summary.dart';
@@ -7,6 +8,7 @@ import '../models/user_goals.dart';
 import '../models/reward_system.dart';
 import '../services/rewards_service.dart';
 import '../services/error_handler.dart';
+import '../services/enhanced_streak_service.dart';
 
 /// Comprehensive daily summary service for real-time Firestore integration
 class DailySummaryService {
@@ -124,6 +126,14 @@ class DailySummaryService {
             (_currentDailySummary?.caloriesBurned ?? 0) + caloriesBurned,
       });
 
+      // Refresh streaks after exercise update
+      try {
+        final enhancedStreakService = EnhancedStreakService();
+        await enhancedStreakService.refreshStreaks();
+      } catch (e) {
+        debugPrint('Error refreshing streaks after exercise update: $e');
+      }
+
       // Exercise updated successfully
     } catch (e) {
       _errorHandler.handleFirebaseError('updateExercise', e);
@@ -160,6 +170,14 @@ class DailySummaryService {
 
       // Update local cache
       await _updateLocalSummary(userId, {'steps': steps});
+
+      // Refresh streaks after steps update
+      try {
+        final enhancedStreakService = EnhancedStreakService();
+        await enhancedStreakService.refreshStreaks();
+      } catch (e) {
+        debugPrint('Error refreshing streaks after steps update: $e');
+      }
 
       // Steps updated successfully
     } catch (e) {
@@ -206,6 +224,14 @@ class DailySummaryService {
       // Update local cache
       await _updateLocalSummary(
           userId, {'caloriesConsumed': newCaloriesConsumed});
+
+      // Refresh streaks after meal logging
+      try {
+        final enhancedStreakService = EnhancedStreakService();
+        await enhancedStreakService.refreshStreaks();
+      } catch (e) {
+        debugPrint('Error refreshing streaks after meal logging: $e');
+      }
 
       // Meal logged successfully
     } catch (e) {

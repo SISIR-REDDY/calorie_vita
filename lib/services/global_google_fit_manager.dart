@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'google_fit_service.dart';
+import 'enhanced_google_fit_service.dart';
 import 'google_fit_cache_service.dart';
 
 /// Global Google Fit manager for automatic sync across all screens
@@ -12,6 +13,7 @@ class GlobalGoogleFitManager {
   GlobalGoogleFitManager._internal();
 
   final GoogleFitService _googleFitService = GoogleFitService();
+  final EnhancedGoogleFitService _enhancedGoogleFitService = EnhancedGoogleFitService();
   final GoogleFitCacheService _cacheService = GoogleFitCacheService();
 
   // Initialization state
@@ -59,15 +61,22 @@ class GlobalGoogleFitManager {
       // Initialize services with timeout
       await Future.wait([
         _googleFitService.initialize(),
+        _enhancedGoogleFitService.initialize(),
         _cacheService.initialize(),
       ]).timeout(_initTimeout);
 
-      // Check authentication status
-      final isAuthenticated = await _googleFitService
-          .validateAuthentication()
-          .timeout(const Duration(seconds: 5));
-
-      _isConnected = isAuthenticated;
+      // Check authentication status using enhanced service
+      final isAuthenticated = _enhancedGoogleFitService.isConnected;
+      
+      // Also check with original service as fallback
+      if (!isAuthenticated) {
+        final fallbackAuth = await _googleFitService
+            .validateAuthentication()
+            .timeout(const Duration(seconds: 5));
+        _isConnected = fallbackAuth;
+      } else {
+        _isConnected = isAuthenticated;
+      }
       _isInitialized = true;
 
       if (_isConnected) {
@@ -141,9 +150,16 @@ class GlobalGoogleFitManager {
   Future<void> _checkConnection() async {
     try {
       final wasConnected = _isConnected;
-      _isConnected = await _googleFitService
-          .validateAuthentication()
-          .timeout(const Duration(seconds: 5));
+      
+      // Use enhanced service for better connection checking
+      _isConnected = _enhancedGoogleFitService.isConnected;
+      
+      // Fallback to original service if enhanced service is not connected
+      if (!_isConnected) {
+        _isConnected = await _googleFitService
+            .validateAuthentication()
+            .timeout(const Duration(seconds: 5));
+      }
 
       // If connection state changed
       if (wasConnected != _isConnected) {
@@ -174,24 +190,65 @@ class GlobalGoogleFitManager {
     
     _isSyncInProgress = true;
 
-    // Use cache service for optimized sync
-    _cacheService.forceRefresh().then((data) {
+    // Use enhanced service for better data sync
+    _enhancedGoogleFitService.getTodayFitnessDataBatch().then((data) {
       if (data != null) {
         final syncData = {
-          'timestamp': DateTime.now().toIso8601String(),
-          'steps': data.steps ?? 0,
-          'caloriesBurned': data.caloriesBurned ?? 0.0,
-          'distance': data.distance ?? 0.0,
-          'weight': data.weight,
+          'timestamp': data['timestamp'] ?? DateTime.now().toIso8601String(),
+          'steps': data['steps'] ?? 0,
+          'caloriesBurned': data['caloriesBurned'] ?? 0.0,
+          'distance': data['distance'] ?? 0.0,
+          'weight': data['weight'],
+          'activityLevel': data['activityLevel'],
           'isAutoSync': true,
         };
 
         _syncDataController.add(syncData);
         print(
-            '🔄 GlobalGoogleFitManager: Auto-sync completed - Steps: ${data.steps}');
+            '🔄 GlobalGoogleFitManager: Enhanced sync completed - Steps: ${data['steps']}');
+      } else {
+        // Fallback to cache service
+        _cacheService.forceRefresh().then((cacheData) {
+          if (cacheData != null) {
+            final syncData = {
+              'timestamp': DateTime.now().toIso8601String(),
+              'steps': cacheData.steps ?? 0,
+              'caloriesBurned': cacheData.caloriesBurned ?? 0.0,
+              'distance': cacheData.distance ?? 0.0,
+              'weight': cacheData.weight,
+              'isAutoSync': true,
+            };
+
+            _syncDataController.add(syncData);
+            print(
+                '🔄 GlobalGoogleFitManager: Cache sync completed - Steps: ${cacheData.steps}');
+          }
+        }).catchError((e) {
+          print('❌ GlobalGoogleFitManager: Cache sync also failed: $e');
+        });
       }
     }).catchError((e) {
-      print('❌ GlobalGoogleFitManager: Sync failed: $e');
+      print('❌ GlobalGoogleFitManager: Enhanced sync failed, trying cache: $e');
+      
+      // Fallback to cache service
+      _cacheService.forceRefresh().then((data) {
+        if (data != null) {
+          final syncData = {
+            'timestamp': DateTime.now().toIso8601String(),
+            'steps': data.steps ?? 0,
+            'caloriesBurned': data.caloriesBurned ?? 0.0,
+            'distance': data.distance ?? 0.0,
+            'weight': data.weight,
+            'isAutoSync': true,
+          };
+
+          _syncDataController.add(syncData);
+          print(
+              '🔄 GlobalGoogleFitManager: Fallback sync completed - Steps: ${data.steps}');
+        }
+      }).catchError((fallbackError) {
+        print('❌ GlobalGoogleFitManager: All sync methods failed: $fallbackError');
+      });
     }).whenComplete(() {
       _isSyncInProgress = false;
     });
@@ -264,7 +321,14 @@ class GlobalGoogleFitManager {
     try {
       print('🔧 GlobalGoogleFitManager: Connecting to Google Fit...');
 
-      final success = await _googleFitService.authenticate();
+      // Try enhanced service first
+      bool success = await _enhancedGoogleFitService.authenticate();
+      
+      // Fallback to original service if enhanced fails
+      if (!success) {
+        print('⚠️ GlobalGoogleFitManager: Enhanced auth failed, trying fallback...');
+        success = await _googleFitService.authenticate();
+      }
 
       if (success) {
         _isConnected = true;
@@ -292,7 +356,11 @@ class GlobalGoogleFitManager {
   /// Disconnect from Google Fit
   Future<void> disconnect() async {
     try {
-      await _googleFitService.signOut();
+      // Disconnect from both services
+      await Future.wait([
+        _googleFitService.signOut(),
+        _enhancedGoogleFitService.signOut(),
+      ]);
 
       _isConnected = false;
       _connectionStateController.add(false);
