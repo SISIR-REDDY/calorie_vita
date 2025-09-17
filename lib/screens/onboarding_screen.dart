@@ -95,11 +95,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     },
   ];
 
-  // Diet preference options
+  // Diet preference options - must match profile edit screen exactly
   final List<Map<String, String>> _dietPreferences = [
     {
-      'value': 'balanced',
-      'label': 'Balanced',
+      'value': 'no_restrictions',
+      'label': 'No Restrictions',
       'description': 'All foods in moderation'
     },
     {
@@ -126,6 +126,26 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       'value': 'mediterranean',
       'label': 'Mediterranean',
       'description': 'Olive oil, fish, vegetables'
+    },
+    {
+      'value': 'low_carb',
+      'label': 'Low Carb',
+      'description': 'Reduced carbohydrate intake'
+    },
+    {
+      'value': 'high_protein',
+      'label': 'High Protein',
+      'description': 'Increased protein consumption'
+    },
+    {
+      'value': 'gluten_free',
+      'label': 'Gluten Free',
+      'description': 'No gluten-containing foods'
+    },
+    {
+      'value': 'dairy_free',
+      'label': 'Dairy Free',
+      'description': 'No dairy products'
     },
   ];
 
@@ -782,7 +802,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   // Map diet preference from onboarding to profile edit format
   String _mapDietPreference(String value) {
     switch (value) {
-      case 'balanced':
+      case 'no_restrictions':
         return 'No Restrictions';
       case 'vegetarian':
         return 'Vegetarian';
@@ -794,6 +814,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         return 'Paleo';
       case 'mediterranean':
         return 'Mediterranean';
+      case 'low_carb':
+        return 'Low Carb';
+      case 'high_protein':
+        return 'High Protein';
+      case 'gluten_free':
+        return 'Gluten Free';
+      case 'dairy_free':
+        return 'Dairy Free';
       default:
         return 'No Restrictions';
     }
@@ -931,7 +959,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         // Activity and fitness information
         'activityLevel': _mapActivityLevel(_selectedActivityLevel ?? 'moderately_active'),
         'fitnessGoal': _mapFitnessGoal(_selectedFitnessGoal ?? 'maintenance'),
-        'dietPreference': _mapDietPreference(_selectedDietPreference ?? 'balanced'),
+        'dietPreference': _mapDietPreference(_selectedDietPreference ?? 'no_restrictions'),
         
         // Onboarding completion status
         'onboardingCompleted': true,
@@ -957,7 +985,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           'weight': double.tryParse(_weightController.text) ?? 70.0,
           'activityLevel': _selectedActivityLevel ?? 'moderately_active',
           'fitnessGoal': _selectedFitnessGoal ?? 'maintenance',
-          'dietPreference': _selectedDietPreference ?? 'balanced',
+          'dietPreference': _selectedDietPreference ?? 'no_restrictions',
         },
       };
 
