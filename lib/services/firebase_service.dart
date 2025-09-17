@@ -165,6 +165,23 @@ class FirebaseService {
     }
   }
 
+  // Save user profile data (alias for onboarding)
+  Future<void> saveUserProfileData(
+      String userId, Map<String, dynamic> profileData) async {
+    return saveUserProfile(userId, profileData);
+  }
+
+  // Check if user has completed onboarding
+  Future<bool> isOnboardingCompleted(String userId) async {
+    try {
+      final profile = await getUserProfile(userId);
+      return profile['onboardingCompleted'] == true;
+    } catch (e) {
+      print('Error checking onboarding status: $e');
+      return false;
+    }
+  }
+
   // Get trainer chat history (last 5 conversations)
   Stream<List<Map<String, dynamic>>> getTrainerChatHistory(String userId) {
     return _firestore

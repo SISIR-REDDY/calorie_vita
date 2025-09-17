@@ -5,12 +5,14 @@ import 'screens/camera_screen.dart';
 import 'screens/trainer_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'widgets/reward_notification_widget.dart';
 import 'widgets/setup_warning_popup.dart';
 import 'ui/app_theme.dart';
 import 'services/app_state_manager.dart';
 import 'services/global_google_fit_manager.dart';
 import 'services/setup_check_service.dart';
+import 'services/firebase_service.dart';
 
 class MainApp extends StatefulWidget {
   final bool firebaseInitialized;
@@ -38,13 +40,6 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
 
   void _initializeAppImmediately() {
     print('Starting immediate app initialization...');
-
-    // Set initialized immediately - no waiting
-    setState(() {
-      _isInitialized = true;
-    });
-
-    print('App initialized immediately - showing welcome screen');
 
     // Initialize app state manager in background (non-blocking)
     _initializeAppStateManager();
@@ -222,150 +217,6 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    if (!_isInitialized) {
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'Calorie Vita',
-        home: Scaffold(
-          body: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF667eea),
-                  Color(0xFF764ba2),
-                  Color(0xFFf093fb),
-                ],
-                stops: [0.0, 0.5, 1.0],
-              ),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Animated Logo
-                  TweenAnimationBuilder<double>(
-                    duration: const Duration(milliseconds: 1500),
-                    tween: Tween(begin: 0.0, end: 1.0),
-                    builder: (context, value, child) {
-                      return Transform.scale(
-                        scale: 0.8 + (0.2 * value),
-                        child: Opacity(
-                          opacity: value,
-                          child: Container(
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(32),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.2),
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 10),
-                                ),
-                              ],
-                            ),
-                            child: Image.asset(
-                              'calorie_logo.png',
-                              width: 80,
-                              height: 80,
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 40),
-
-                  // App Title
-                  TweenAnimationBuilder<double>(
-                    duration: const Duration(milliseconds: 1200),
-                    tween: Tween(begin: 0.0, end: 1.0),
-                    builder: (context, value, child) {
-                      return Opacity(
-                        opacity: value,
-                        child: Text(
-                          'Calorie Vita',
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: -0.5,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withOpacity(0.3),
-                                offset: const Offset(0, 2),
-                                blurRadius: 4,
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Loading indicator
-                  TweenAnimationBuilder<double>(
-                    duration: const Duration(milliseconds: 1000),
-                    tween: Tween(begin: 0.0, end: 1.0),
-                    builder: (context, value, child) {
-                      return Opacity(
-                        opacity: value,
-                        child: Column(
-                          children: [
-                            const SizedBox(
-                              width: 30,
-                              height: 30,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 3,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            Text(
-                              'Initializing Calorie Vita...',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white.withOpacity(0.9),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            // Debug button to force initialization
-                            ElevatedButton(
-                              onPressed: () {
-                                print('Force initialization button pressed');
-                                setState(() {
-                                  _isInitialized = true;
-                                });
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white.withOpacity(0.2),
-                                foregroundColor: Colors.white,
-                              ),
-                              child: const Text('Skip Loading'),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Calorie Vita',
@@ -401,9 +252,13 @@ class MainNavigation extends StatefulWidget {
   State<MainNavigation> createState() => _MainNavigationState();
 }
 
-class _MainNavigationState extends State<MainNavigation> {
+class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObserver {
   int _currentIndex = 0;
   final GlobalGoogleFitManager _googleFitManager = GlobalGoogleFitManager();
+  final FirebaseService _firebaseService = FirebaseService();
+  bool _isCheckingOnboarding = true;
+  bool _onboardingCompleted = false;
+  
   final List<Widget> _screens = [
     const PremiumHomeScreen(),
     const AnalyticsScreen(),
@@ -411,6 +266,63 @@ class _MainNavigationState extends State<MainNavigation> {
     const AITrainerScreen(),
     const SettingsScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _checkOnboardingStatus();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Check onboarding status when app resumes
+      _checkOnboardingStatus();
+    }
+  }
+
+  Future<void> _checkOnboardingStatus() async {
+    try {
+      final userId = _firebaseService.getCurrentUserId();
+      if (userId != null) {
+        final isCompleted = await _firebaseService.isOnboardingCompleted(userId);
+        if (mounted) {
+          setState(() {
+            _onboardingCompleted = isCompleted;
+            _isCheckingOnboarding = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _onboardingCompleted = false;
+            _isCheckingOnboarding = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error checking onboarding status: $e');
+      if (mounted) {
+        setState(() {
+          _onboardingCompleted = false;
+          _isCheckingOnboarding = false;
+        });
+      }
+    }
+  }
+
+  // Method to refresh onboarding status (called from onboarding screen)
+  void refreshOnboardingStatus() {
+    _checkOnboardingStatus();
+  }
+
 
   void _onTabSelected(int index) {
     print('Tab selected: $index'); // Debug log
@@ -442,6 +354,33 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
+    // Show loading while checking onboarding status
+    if (_isCheckingOnboarding) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Loading your profile...'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show onboarding if not completed
+    if (!_onboardingCompleted) {
+      return OnboardingScreen(
+        onCompleted: () {
+          // Refresh onboarding status when completed
+          _checkOnboardingStatus();
+        },
+      );
+    }
+
+    // Show main navigation if onboarding is completed
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: AnimatedSwitcher(
@@ -588,3 +527,4 @@ class _MainNavigationState extends State<MainNavigation> {
     );
   }
 }
+

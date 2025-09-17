@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:gzip/gzip.dart';
 
 /// Service for compressing and optimizing data for faster transmission
 class DataCompressionService {
@@ -14,7 +13,7 @@ class DataCompressionService {
     try {
       final jsonString = jsonEncode(data);
       final bytes = utf8.encode(jsonString);
-      return gzip.encode(bytes);
+      return Uint8List.fromList(gzip.encode(bytes));
     } catch (e) {
       print('JSON compression error: $e');
       return Uint8List(0);
@@ -37,7 +36,7 @@ class DataCompressionService {
   static Uint8List compressString(String data) {
     try {
       final bytes = utf8.encode(data);
-      return gzip.encode(bytes);
+      return Uint8List.fromList(gzip.encode(bytes));
     } catch (e) {
       print('String compression error: $e');
       return Uint8List(0);
