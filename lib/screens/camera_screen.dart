@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import '../services/ai_service.dart';
+import '../services/food_scanner_pipeline.dart';
+import '../services/barcode_scanning_service.dart';
 import '../services/app_state_service.dart';
 import '../models/food_entry.dart';
+import '../models/portion_estimation_result.dart';
 import '../widgets/food_result_card.dart';
 import '../ui/app_colors.dart';
 
@@ -20,9 +22,11 @@ class _CameraScreenState extends State<CameraScreen> {
   File? _imageFile;
   String? _barcode;
   bool _loading = false;
-  Map<String, dynamic>? _result;
+  FoodScannerResult? _scannerResult;
   String? _error;
   bool _showBarcodeScanner = false;
+  bool _showPortionSelector = false;
+  double _selectedPortion = 150.0; // Default portion in grams
 
   final ImagePicker _picker = ImagePicker();
 
@@ -42,7 +46,8 @@ class _CameraScreenState extends State<CameraScreen> {
     setState(() {
       _loading = true;
       _error = null;
-      _result = null;
+      _scannerResult = null;
+      _showPortionSelector = false;
     });
 
     try {
@@ -51,10 +56,24 @@ class _CameraScreenState extends State<CameraScreen> {
         setState(() {
           _imageFile = File(picked.path);
         });
-        final aiResult = await AIService.detectCaloriesFromImage(_imageFile!);
+        
+        // Process image through the food scanner pipeline
+        final result = await FoodScannerPipeline.processFoodImage(_imageFile!);
+        
         setState(() {
-          _result = aiResult;
+          _scannerResult = result;
+          if (result.success && result.portionResult != null) {
+            _selectedPortion = result.portionResult!.estimatedWeight;
+          }
         });
+        
+        // Show portion selector if needed
+        if (result.success && result.portionResult != null && 
+            result.portionResult!.isLowConfidence) {
+          setState(() {
+            _showPortionSelector = true;
+          });
+        }
       }
     } catch (e) {
       setState(() {
@@ -71,25 +90,31 @@ class _CameraScreenState extends State<CameraScreen> {
     setState(() {
       _showBarcodeScanner = true;
       _error = null;
-      _result = null;
+      _scannerResult = null;
+      _showPortionSelector = false;
     });
   }
 
   void _onBarcodeDetected(BarcodeCapture capture) async {
     final barcode = capture.barcodes.firstOrNull?.rawValue;
     if (barcode != null) {
+      print('📱 Barcode detected: $barcode');
       setState(() {
         _showBarcodeScanner = false;
         _loading = true;
         _barcode = barcode;
       });
       try {
-        // Use the correct barcode method instead of image analysis
-        final barcodeResult = await AIService.getNutritionFromBarcode(barcode);
+        // Process barcode through the food scanner pipeline
+        final result = await FoodScannerPipeline.processBarcodeScan(barcode);
         setState(() {
-          _result = barcodeResult;
+          _scannerResult = result;
+          if (result != null && !result.success) {
+            _error = result.error ?? "Barcode not found in any database";
+          }
         });
       } catch (e) {
+        print('❌ Barcode processing error: $e');
         setState(() {
           _error = "Couldn't fetch product info. Try again.";
         });
@@ -105,11 +130,59 @@ class _CameraScreenState extends State<CameraScreen> {
     setState(() {
       _imageFile = null;
       _barcode = null;
-      _result = null;
+      _scannerResult = null;
       _error = null;
       _loading = false;
       _showBarcodeScanner = false;
+      _showPortionSelector = false;
+      _selectedPortion = 150.0;
     });
+  }
+
+  void _testBarcodeScanning() async {
+    print('🧪 Testing barcode scanning...');
+    await BarcodeScanningService.testBarcodeScanning();
+  }
+
+  void _updatePortion(double newPortion) {
+    setState(() {
+      _selectedPortion = newPortion;
+    });
+  }
+
+  void _confirmPortion() {
+    setState(() {
+      _showPortionSelector = false;
+    });
+    // Recalculate nutrition with new portion
+    if (_scannerResult != null && _scannerResult!.nutritionInfo != null) {
+      final nutrition = _scannerResult!.nutritionInfo!;
+      final multiplier = _selectedPortion / nutrition.weightGrams;
+      
+      setState(() {
+        _scannerResult = FoodScannerResult(
+          success: true,
+          recognitionResult: _scannerResult!.recognitionResult,
+          portionResult: PortionEstimationResult(
+            estimatedWeight: _selectedPortion,
+            confidence: 0.8,
+            method: 'Manual selection',
+          ),
+          nutritionInfo: nutrition.copyWith(
+            weightGrams: _selectedPortion,
+            calories: nutrition.calories * multiplier,
+            protein: nutrition.protein * multiplier,
+            carbs: nutrition.carbs * multiplier,
+            fat: nutrition.fat * multiplier,
+            fiber: nutrition.fiber * multiplier,
+            sugar: nutrition.sugar * multiplier,
+          ),
+          aiAnalysis: _scannerResult!.aiAnalysis,
+          processingTime: _scannerResult!.processingTime,
+          isBarcodeScan: _scannerResult!.isBarcodeScan,
+        );
+      });
+    }
   }
 
   @override
@@ -231,9 +304,10 @@ class _CameraScreenState extends State<CameraScreen> {
         children: [
           if (_loading) _buildLoadingState(),
           if (_error != null) _buildErrorState(),
-          if (_result != null) _buildResultState(),
-          if (_imageFile != null && _result == null) _buildImagePreview(),
-          if (_result == null && !_loading) _buildActionButtons(),
+          if (_scannerResult != null) _buildResultState(),
+          if (_showPortionSelector) _buildPortionSelector(),
+          if (_imageFile != null && _scannerResult == null) _buildImagePreview(),
+          if (_scannerResult == null && !_loading) _buildActionButtons(),
         ],
       ),
     );
@@ -294,6 +368,22 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Widget _buildResultState() {
+    if (_scannerResult == null || !_scannerResult!.success) {
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 20),
+        child: FoodResultCard(
+          title: 'Error',
+          comment: _scannerResult?.error ?? 'Unknown error',
+          onRetry: _reset,
+        ),
+      );
+    }
+
+    final nutrition = _scannerResult!.nutritionInfo!;
+    final recognition = _scannerResult!.recognitionResult;
+    final portion = _scannerResult!.portionResult;
+    final aiAnalysis = _scannerResult!.aiAnalysis;
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 20),
       child: Column(
@@ -324,7 +414,7 @@ class _CameraScreenState extends State<CameraScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _result!['food'] ?? 'Unknown Food',
+                              nutrition.foodName,
                               style: GoogleFonts.poppins(
                                 color: Colors.white,
                                 fontSize: 18,
@@ -333,12 +423,22 @@ class _CameraScreenState extends State<CameraScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _result!['serving_size'] ?? '1 serving',
+                              nutrition.formattedWeight,
                               style: GoogleFonts.poppins(
                                 color: Colors.white.withOpacity(0.9),
                                 fontSize: 14,
                               ),
                             ),
+                            if (nutrition.brand != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'by ${nutrition.brand}',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white.withOpacity(0.8),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -359,7 +459,7 @@ class _CameraScreenState extends State<CameraScreen> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '${((_result!['confidence'] ?? 0.0) * 100).toInt()}%',
+                              '${_scannerResult!.confidencePercentage}%',
                               style: GoogleFonts.poppins(
                                 color: Colors.white,
                                 fontSize: 12,
@@ -397,7 +497,7 @@ class _CameraScreenState extends State<CameraScreen> {
                               ),
                             ),
                             Text(
-                              '${_result!['calories'] ?? 0}',
+                              nutrition.formattedCalories,
                               style: GoogleFonts.poppins(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
@@ -416,7 +516,7 @@ class _CameraScreenState extends State<CameraScreen> {
                           Expanded(
                             child: _buildMacroCard(
                               'Protein',
-                              _parseMacroValue(_result!['protein']),
+                              nutrition.protein,
                               kAccentGreen,
                             ),
                           ),
@@ -424,7 +524,7 @@ class _CameraScreenState extends State<CameraScreen> {
                           Expanded(
                             child: _buildMacroCard(
                               'Carbs',
-                              _parseMacroValue(_result!['carbs']),
+                              nutrition.carbs,
                               kWarningColor,
                             ),
                           ),
@@ -432,7 +532,7 @@ class _CameraScreenState extends State<CameraScreen> {
                           Expanded(
                             child: _buildMacroCard(
                               'Fat',
-                              _parseMacroValue(_result!['fat']),
+                              nutrition.fat,
                               kErrorColor,
                             ),
                           ),
@@ -440,25 +540,25 @@ class _CameraScreenState extends State<CameraScreen> {
                       ),
                       
                       // Additional nutrition info
-                      if (_result!['fiber'] != null || _result!['sugar'] != null) ...[
+                      if (nutrition.fiber > 0 || nutrition.sugar > 0) ...[
                         const SizedBox(height: 16),
                         Row(
                           children: [
-                            if (_result!['fiber'] != null)
+                            if (nutrition.fiber > 0)
                               Expanded(
                                 child: _buildMacroCard(
                                   'Fiber',
-                                  _parseMacroValue(_result!['fiber']),
+                                  nutrition.fiber,
                                   kAccentPurple,
                                 ),
                               ),
-                            if (_result!['fiber'] != null && _result!['sugar'] != null)
+                            if (nutrition.fiber > 0 && nutrition.sugar > 0)
                               const SizedBox(width: 12),
-                            if (_result!['sugar'] != null)
+                            if (nutrition.sugar > 0)
                               Expanded(
                                 child: _buildMacroCard(
                                   'Sugar',
-                                  _parseMacroValue(_result!['sugar']),
+                                  nutrition.sugar,
                                   kAccentPurple,
                                 ),
                               ),
@@ -466,14 +566,14 @@ class _CameraScreenState extends State<CameraScreen> {
                         ),
                       ],
                       
-                      // Analysis details
-                      if (_result!['analysis_details'] != null) ...[
+                      // AI Analysis
+                      if (aiAnalysis != null && aiAnalysis!['insights'] != null) ...[
                         const SizedBox(height: 20),
-                        _buildAnalysisDetails(),
+                        _buildAIAnalysis(aiAnalysis!),
                       ],
                       
-                      // Notes
-                      if (_result!['notes'] != null) ...[
+                      // Source information
+                      if (nutrition.source != null) ...[
                         const SizedBox(height: 16),
                         Container(
                           padding: const EdgeInsets.all(12),
@@ -481,13 +581,22 @@ class _CameraScreenState extends State<CameraScreen> {
                             color: kSurfaceLight,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Text(
-                            _result!['notes'],
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              color: kTextSecondary,
-                              fontStyle: FontStyle.italic,
-                            ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 16,
+                                color: kTextSecondary,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Source: ${nutrition.source}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: kTextSecondary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -516,28 +625,22 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
               ),
               onPressed: () async {
-                if (_result != null) {
+                if (_scannerResult != null && _scannerResult!.success) {
                   try {
-                    // Parse macro values from AI result
-                    final protein = _parseMacroValue(_result!['protein']);
-                    final carbs = _parseMacroValue(_result!['carbs']);
-                    final fat = _parseMacroValue(_result!['fat']);
-                    final fiber = _parseMacroValue(_result!['fiber']);
-                    final sugar = _parseMacroValue(_result!['sugar']);
+                    final nutrition = _scannerResult!.nutritionInfo!;
 
                     // Create food entry
                     final foodEntry = FoodEntry(
                       id: DateTime.now().millisecondsSinceEpoch.toString(),
-                      name: _result!['food'] ?? 'Unknown Food',
-                      calories: (_result!['calories'] as num?)?.round() ?? 0,
+                      name: nutrition.foodName,
+                      calories: nutrition.calories.round(),
                       timestamp: DateTime.now(),
-                      imageUrl:
-                          null, // TODO: Upload image to Firebase Storage if needed
-                      protein: protein,
-                      carbs: carbs,
-                      fat: fat,
-                      fiber: fiber,
-                      sugar: sugar,
+                      imageUrl: null, // TODO: Upload image to Firebase Storage if needed
+                      protein: nutrition.protein,
+                      carbs: nutrition.carbs,
+                      fat: nutrition.fat,
+                      fiber: nutrition.fiber,
+                      sugar: nutrition.sugar,
                     );
 
                     // Save to app state (which will sync to Firestore)
@@ -547,7 +650,7 @@ class _CameraScreenState extends State<CameraScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            'Food saved to history! Calories: ${foodEntry.calories}, Protein: ${protein.toStringAsFixed(1)}g, Carbs: ${carbs.toStringAsFixed(1)}g, Fat: ${fat.toStringAsFixed(1)}g',
+                            'Food saved to history! Calories: ${foodEntry.calories}, Protein: ${nutrition.formattedProtein}, Carbs: ${nutrition.formattedCarbs}, Fat: ${nutrition.formattedFat}',
                             style: GoogleFonts.poppins(),
                           ),
                           backgroundColor: kSuccessColor,
@@ -804,9 +907,10 @@ class _CameraScreenState extends State<CameraScreen> {
     );
   }
 
-  Widget _buildAnalysisDetails() {
-    final analysisDetails = _result!['analysis_details'] as Map<String, dynamic>?;
-    if (analysisDetails == null) return const SizedBox.shrink();
+  Widget _buildAIAnalysis(Map<String, dynamic> aiAnalysis) {
+    final insights = aiAnalysis['insights'] as List<dynamic>? ?? [];
+    final recommendations = aiAnalysis['recommendations'] as List<dynamic>? ?? [];
+    final tips = aiAnalysis['tips'] as List<dynamic>? ?? [];
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -819,47 +923,154 @@ class _CameraScreenState extends State<CameraScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Analysis Details',
+            'AI Analysis',
             style: GoogleFonts.poppins(
-              fontSize: 14,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: kTextDark,
             ),
           ),
           const SizedBox(height: 12),
           
-          // Ingredients
-          if (analysisDetails['ingredients_identified'] != null) ...[
-            _buildDetailRow(
-              'Ingredients',
-              (analysisDetails['ingredients_identified'] as List).join(', '),
-              Icons.restaurant,
-            ),
-            const SizedBox(height: 8),
+          if (insights.isNotEmpty) ...[
+            _buildAnalysisSection('Insights', insights, Icons.lightbulb_outline),
+            const SizedBox(height: 12),
           ],
           
-          // Weight and cooking method
+          if (recommendations.isNotEmpty) ...[
+            _buildAnalysisSection('Recommendations', recommendations, Icons.recommend),
+            const SizedBox(height: 12),
+          ],
+          
+          if (tips.isNotEmpty) ...[
+            _buildAnalysisSection('Tips', tips, Icons.tips_and_updates),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalysisSection(String title, List<dynamic> items, IconData icon) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 16, color: kAccentBlue),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: kTextDark,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...items.map((item) => Padding(
+          padding: const EdgeInsets.only(left: 24, bottom: 4),
+          child: Text(
+            '• ${item.toString()}',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              color: kTextSecondary,
+            ),
+          ),
+        )),
+      ],
+    );
+  }
+
+  Widget _buildPortionSelector() {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: kCardShadow,
+      ),
+      child: Column(
+        children: [
+          Text(
+            'Adjust Portion Size',
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: kTextDark,
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          Text(
+            '${_selectedPortion.toStringAsFixed(0)}g',
+            style: GoogleFonts.poppins(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: kAccentBlue,
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          Slider(
+            value: _selectedPortion,
+            min: 50,
+            max: 500,
+            divisions: 45,
+            activeColor: kAccentBlue,
+            inactiveColor: kAccentBlue.withOpacity(0.3),
+            onChanged: _updatePortion,
+          ),
+          
+          const SizedBox(height: 16),
+          
           Row(
             children: [
-              if (analysisDetails['estimated_weight_grams'] != null)
-                Expanded(
-                  child: _buildDetailRow(
-                    'Weight',
-                    '${analysisDetails['estimated_weight_grams']}g',
-                    Icons.monitor_weight,
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _confirmPortion,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kAccentBlue,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Confirm',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              if (analysisDetails['estimated_weight_grams'] != null && 
-                  analysisDetails['cooking_method'] != null)
-                const SizedBox(width: 16),
-              if (analysisDetails['cooking_method'] != null)
-                Expanded(
-                  child: _buildDetailRow(
-                    'Cooking',
-                    analysisDetails['cooking_method'],
-                    Icons.local_fire_department,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    setState(() {
+                      _showPortionSelector = false;
+                    });
+                  },
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Cancel',
+                    style: GoogleFonts.poppins(
+                      color: kTextDark,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
+              ),
             ],
           ),
         ],
@@ -867,35 +1078,4 @@ class _CameraScreenState extends State<CameraScreen> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: kTextSecondary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: 10,
-                  color: kTextSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              Text(
-                value,
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  color: kTextDark,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 }

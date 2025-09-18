@@ -59,6 +59,10 @@ dependencies:
   # Bluetooth / Fitness devices
   permission_handler: ^11.3.1
   
+  # AR for portion estimation (commented out due to compatibility issues)
+  # arcore_flutter_plugin: ^0.0.9
+  # arkit_plugin: ^0.11.0
+  
   # Health & Fitness Integration
   # Using Google Fit REST API for real-time data
   googleapis_auth: ^1.4.1
@@ -81,5 +85,8 @@ flutter:
   assets:
     - assets/
     - assets/calorie_data.json
+    - assets/indian_foods.json
+    - assets/comprehensive_indian_foods.json
+    - assets/indian_packaged.json
     - calorie_logo.png
     - google-fit-png-logo.png
