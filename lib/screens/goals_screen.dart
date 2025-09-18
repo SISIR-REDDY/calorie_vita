@@ -38,35 +38,11 @@ class _GoalsScreenState extends State<GoalsScreen>
   UserGoals? _currentGoals;
   bool _isLoading = true;
   bool _isSaving = false;
-  String _selectedFitnessGoal = 'maintenance';
 
   final FirebaseService _firebaseService = FirebaseService();
   final RealTimeInputService _realTimeInputService = RealTimeInputService();
   final CalorieUnitsService _calorieUnitsService = CalorieUnitsService();
 
-  // Fitness goal options
-  final List<Map<String, String>> _fitnessGoals = [
-    {
-      'value': 'weight_loss',
-      'label': 'Weight Loss',
-      'description': 'Lose weight and burn fat'
-    },
-    {
-      'value': 'weight_gain',
-      'label': 'Weight Gain',
-      'description': 'Gain muscle and weight'
-    },
-    {
-      'value': 'maintenance',
-      'label': 'Maintenance',
-      'description': 'Maintain current weight'
-    },
-    {
-      'value': 'muscle_building',
-      'label': 'Muscle Building',
-      'description': 'Build muscle and strength'
-    },
-  ];
 
   @override
   void initState() {
@@ -214,7 +190,6 @@ class _GoalsScreenState extends State<GoalsScreen>
           .formatCaloriesShort(_currentGoals!.calorieGoal?.toDouble() ?? 2000);
       _stepsController.text = _currentGoals!.stepsPerDayGoal?.toString() ?? '';
       _waterController.text = _currentGoals!.waterGlassesGoal?.toString() ?? '';
-      _selectedFitnessGoal = _currentGoals!.fitnessGoal ?? 'maintenance';
 
       if (_currentGoals!.macroGoals != null) {
         _carbsController.text = _calorieUnitsService.formatCaloriesShort(
@@ -262,7 +237,6 @@ class _GoalsScreenState extends State<GoalsScreen>
               .round(),
           stepsPerDayGoal: int.tryParse(_stepsController.text),
           waterGlassesGoal: int.tryParse(_waterController.text),
-          fitnessGoal: _selectedFitnessGoal,
           macroGoals: MacroGoals(
             carbsCalories: _calorieUnitsService
                 .convertToKcal(double.tryParse(_carbsController.text) ?? 900)
@@ -400,8 +374,6 @@ class _GoalsScreenState extends State<GoalsScreen>
                       _buildStepsGoalCard(),
                       const SizedBox(height: 16),
                       _buildWaterGoalCard(),
-                      const SizedBox(height: 16),
-                      _buildFitnessGoalCard(),
                       const SizedBox(height: 16),
                       _buildMacroGoalsCard(),
                       const SizedBox(height: 32),
@@ -593,86 +565,6 @@ class _GoalsScreenState extends State<GoalsScreen>
     );
   }
 
-  Widget _buildFitnessGoalCard() {
-    return _buildGoalCard(
-      title: 'Fitness Goal',
-      icon: Icons.fitness_center,
-      color: Colors.purple,
-      child: Column(
-        children: _fitnessGoals.map((goal) => _buildFitnessGoalOption(goal)).toList(),
-      ),
-    );
-  }
-
-  Widget _buildFitnessGoalOption(Map<String, String> goal) {
-    final isSelected = _selectedFitnessGoal == goal['value'];
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedFitnessGoal = goal['value']!;
-        });
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isSelected 
-              ? Colors.purple.withValues(alpha: 0.1)
-              : Colors.grey.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected 
-                ? Colors.purple
-                : Colors.grey.withValues(alpha: 0.3),
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isSelected ? Colors.purple : Colors.transparent,
-                border: Border.all(
-                  color: isSelected ? Colors.purple : Colors.grey,
-                  width: 2,
-                ),
-              ),
-              child: isSelected
-                  ? const Icon(Icons.check, color: Colors.white, size: 12)
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    goal['label']!,
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected ? Colors.purple : Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    goal['description']!,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: isSelected ? Colors.purple.withValues(alpha: 0.8) : Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildMacroGoalsCard() {
     return _buildGoalCard(
