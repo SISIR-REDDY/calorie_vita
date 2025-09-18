@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../services/ai_service.dart';
 import '../services/firebase_service.dart';
+import '../services/chat_history_manager.dart';
 import '../ui/app_colors.dart';
 import '../mixins/google_fit_sync_mixin.dart';
 
@@ -84,6 +85,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseService _firebaseService = FirebaseService();
+  final ChatHistoryManager _chatHistoryManager = ChatHistoryManager();
 
   bool isDark = false;
   bool isLoading = false;
@@ -183,74 +185,64 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     // Don't reload if already loading
     if (isLoadingHistory) return;
 
-    // Try to load from cache first (unless forcing refresh)
-    if (!forceRefresh) {
-      final cacheUsed = await _loadChatSessionsFromCache();
-      if (cacheUsed) {
-        // Cache was used, check if we need to refresh from Firebase
-        if (_lastHistoryLoad != null &&
-            DateTime.now().difference(_lastHistoryLoad!).inSeconds < 30) {
-          return; // Cache is recent, no need to refresh
-        }
-      }
-    }
-
-    // Use cache if data is recent (less than 30 seconds old) and not forcing refresh
-    if (!forceRefresh &&
-        _lastHistoryLoad != null &&
-        DateTime.now().difference(_lastHistoryLoad!).inSeconds < 30) {
-      return;
-    }
-
-    // No loading states - operations happen in background
+    setState(() {
+      isLoadingHistory = true;
+    });
 
     try {
-      final user = _auth.currentUser;
-      if (user == null) {
-        return;
-      }
+      // Use the enhanced chat history manager
+      final history = await _chatHistoryManager.getChatHistory(
+        forceRefresh: forceRefresh,
+        limit: 50,
+      );
 
-      // Use optimized query with orderBy and limit for better performance
-      final querySnapshot = await _firestore
-          .collection('chat_sessions')
-          .where('userId', isEqualTo: user.uid)
-          .orderBy('timestamp', descending: true)
-          .limit(5) // Only get what we need
-          .get()
-          .timeout(
-            const Duration(seconds: 2), // Further reduced timeout for faster response
-            onTimeout: () {
-              throw Exception('Query operation timed out');
-            },
+      // Convert to ChatSession objects
+      final sessions = history.map((data) {
+        try {
+          final messageText = data['text'] ?? '';
+          final title = messageText.length > 30 
+              ? '${messageText.substring(0, 30)}...' 
+              : messageText;
+          
+          return ChatSession(
+            id: data['id'] ?? '',
+            userId: _auth.currentUser?.uid ?? '',
+            title: title,
+            messages: [
+              Message(
+                sender: data['sender'] ?? 'user',
+                text: messageText,
+                timestamp: data['timestamp'] is DateTime 
+                    ? data['timestamp'] as DateTime
+                    : DateTime.parse(data['timestamp'].toString()),
+              ),
+            ],
+            timestamp: data['timestamp'] is DateTime 
+                ? data['timestamp'] as DateTime
+                : DateTime.parse(data['timestamp'].toString()),
           );
-
-      // Process data more efficiently with parallel processing
-      final sessions = querySnapshot.docs
-          .map((doc) {
-            try {
-              return ChatSession.fromMap(doc.data());
-            } catch (e) {
-              print('Error parsing session ${doc.id}: $e');
-              return null;
-            }
-          })
-          .where((session) => session != null)
-          .cast<ChatSession>()
-          .toList();
+        } catch (e) {
+          print('Error converting chat data: $e');
+          return null;
+        }
+      }).where((session) => session != null).cast<ChatSession>().toList();
 
       if (mounted) {
         setState(() {
           chatSessions = sessions;
           _lastHistoryLoad = DateTime.now();
         });
-        
-        // Cache the loaded sessions
-        _cacheChatSessions();
       }
 
       print('Chat history loaded: ${sessions.length} sessions');
     } catch (e) {
       print('Error loading chat history: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoadingHistory = false;
+        });
+      }
     }
   }
 
