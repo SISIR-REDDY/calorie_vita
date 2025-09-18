@@ -32,6 +32,7 @@ import '../services/simple_goals_notifier.dart';
 import '../services/rewards_service.dart';
 import '../models/reward_system.dart';
 import '../widgets/simple_streak_widgets.dart';
+import '../services/fitness_goal_calculator.dart';
 import 'camera_screen.dart';
 import 'trainer_screen.dart';
 import '../models/user_preferences.dart';
@@ -2151,13 +2152,30 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
   Widget _buildCaloriesToTargetCard() {
-    final caloriesToTarget =
-        _dailySummary!.caloriesGoal - _dailySummary!.caloriesConsumed;
-    final isReached = caloriesToTarget <= 0;
-    final color = isReached
-        ? const Color(0xFF2196F3)
-        : Colors.orange[
-            600]!; // Blue when reached, yellowish orange when not reached
+    // Get user goals to determine fitness goal
+    final userGoals = _appStateService.userGoals;
+    final fitnessGoal = userGoals?.fitnessGoal ?? 'maintenance';
+    
+    // Calculate remaining calories based on fitness goal
+    final caloriesToTarget = FitnessGoalCalculator.calculateRemainingCalories(
+      fitnessGoal: fitnessGoal,
+      caloriesConsumed: _dailySummary!.caloriesConsumed,
+      caloriesBurned: _dailySummary!.caloriesBurned,
+      baseCalorieGoal: _dailySummary!.caloriesGoal,
+    );
+    
+    final isReached = FitnessGoalCalculator.isGoalReached(
+      fitnessGoal: fitnessGoal,
+      remainingCalories: caloriesToTarget,
+    );
+    
+    final colorValue = FitnessGoalCalculator.getProgressColor(
+      fitnessGoal: fitnessGoal,
+      isGoalReached: isReached,
+      remainingCalories: caloriesToTarget,
+    );
+    
+    final color = Color(colorValue);
     final icon = isReached ? Icons.check_circle : Icons.flag;
     final status = isReached ? 'Goal Reached!' : 'To Reach Goal';
 
@@ -2234,9 +2252,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  isReached
-                      ? 'You have successfully reached your daily calorie goal! 🏆'
-                      : 'Keep going to reach your daily target! 💪',
+                  FitnessGoalCalculator.getMotivationalMessage(
+                    fitnessGoal: fitnessGoal,
+                    remainingCalories: caloriesToTarget,
+                    isGoalReached: isReached,
+                  ),
                   style: GoogleFonts.poppins(
                     fontSize: 11,
                     color: Theme.of(context)

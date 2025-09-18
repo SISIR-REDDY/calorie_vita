@@ -896,6 +896,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         'waterGlassesGoal': 8,
         'stepsPerDayGoal': 10000,
         'sleepGoal': 8.0,
+        'fitnessGoal': fitnessGoal,
         'createdAt': DateTime.now().toIso8601String(),
         'lastUpdated': DateTime.now().toIso8601String(),
       };

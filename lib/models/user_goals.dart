@@ -5,6 +5,7 @@ class UserGoals {
   final int? waterGlassesGoal;
   final int? stepsPerDayGoal;
   final MacroGoals? macroGoals;
+  final String? fitnessGoal; // weight_loss, weight_gain, maintenance, muscle_building
   final DateTime? lastUpdated;
 
   const UserGoals({
@@ -14,6 +15,7 @@ class UserGoals {
     this.waterGlassesGoal,
     this.stepsPerDayGoal,
     this.macroGoals,
+    this.fitnessGoal,
     this.lastUpdated,
   });
 
@@ -27,6 +29,7 @@ class UserGoals {
       macroGoals: map['macroGoals'] != null
           ? MacroGoals.fromMap(map['macroGoals'])
           : null,
+      fitnessGoal: map['fitnessGoal']?.toString(),
       lastUpdated: map['lastUpdated']?.toDate(),
     );
   }
@@ -39,6 +42,7 @@ class UserGoals {
       'waterGlassesGoal': waterGlassesGoal,
       'stepsPerDayGoal': stepsPerDayGoal,
       'macroGoals': macroGoals?.toMap(),
+      'fitnessGoal': fitnessGoal,
       'lastUpdated': lastUpdated,
     };
   }
@@ -50,6 +54,7 @@ class UserGoals {
     int? waterGlassesGoal,
     int? stepsPerDayGoal,
     MacroGoals? macroGoals,
+    String? fitnessGoal,
     DateTime? lastUpdated,
   }) {
     return UserGoals(
@@ -59,6 +64,7 @@ class UserGoals {
       waterGlassesGoal: waterGlassesGoal ?? this.waterGlassesGoal,
       stepsPerDayGoal: stepsPerDayGoal ?? this.stepsPerDayGoal,
       macroGoals: macroGoals ?? this.macroGoals,
+      fitnessGoal: fitnessGoal ?? this.fitnessGoal,
       lastUpdated: lastUpdated ?? this.lastUpdated,
     );
   }
