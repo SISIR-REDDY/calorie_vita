@@ -316,14 +316,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         }
       }).onError((error) => print('Daily summaries stream error: $error'));
 
-      // Listen to macro breakdown with error handling
-      _analyticsService.macroBreakdownStream.listen((breakdown) {
-        if (mounted) {
-          setState(() {
-            _macroBreakdown = breakdown;
-          });
-        }
-      }).onError((error) => print('Macro breakdown stream error: $error'));
+      // Note: Macro breakdown is now handled by FastDataRefreshService for real-time updates
 
       // Listen to achievements with error handling
       _analyticsService.achievementsStream.listen((achievements) {

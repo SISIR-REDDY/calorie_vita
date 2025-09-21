@@ -93,7 +93,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   
   // UI update throttling
   DateTime? _lastUIUpdate;
-  static const Duration _minUIUpdateInterval = Duration(milliseconds: 800);
+  static const Duration _minUIUpdateInterval = Duration(milliseconds: 300); // Reduced from 800ms to 300ms
 
   // Rewards data
   UserProgress? _userProgress;
@@ -558,7 +558,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
     
     _uiUpdateTimer?.cancel();
-    _uiUpdateTimer = Timer(const Duration(milliseconds: 500), () {
+    _uiUpdateTimer = Timer(const Duration(milliseconds: 200), () { // Reduced from 500ms to 200ms
       if (mounted && !_hasPendingUIUpdate) {
         _hasPendingUIUpdate = true;
         _lastUIUpdate = DateTime.now();

@@ -75,14 +75,14 @@ class FastDataRefreshService {
     });
   }
 
-  /// Debounce UI updates to prevent flickering
+  /// Debounce UI updates to prevent flickering (reduced delay for faster updates)
   void _debounceUIUpdates(List<FoodHistoryEntry> entries, int consumedCalories) {
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 800), () {
+    _debounceTimer = Timer(const Duration(milliseconds: 200), () { // Reduced from 800ms to 200ms
       if (!_hasPendingUpdate) {
         _hasPendingUpdate = true;
         
-        // Update food entries
+        // Update food entries immediately
         _todaysFoodController.add(entries);
         
         // Update consumed calories if changed
@@ -196,7 +196,23 @@ class FastDataRefreshService {
       final success = await FoodHistoryService.addFoodEntry(entry);
       
       if (success) {
-        // Force immediate refresh
+        // Immediately update cached data and streams
+        _cachedTodaysFood.add(entry);
+        
+        // Calculate new consumed calories
+        final consumedCalories = _cachedTodaysFood.fold<int>(0, (total, e) => total + e.calories.round());
+        
+        // Update streams immediately
+        _todaysFoodController.add(_cachedTodaysFood);
+        if (consumedCalories != _cachedConsumedCalories) {
+          _cachedConsumedCalories = consumedCalories;
+          _consumedCaloriesController.add(consumedCalories);
+        }
+        
+        // Update macro breakdown immediately
+        _calculateMacroBreakdown(_cachedTodaysFood);
+        
+        // Also force refresh for consistency
         await forceRefresh();
         return true;
       }
