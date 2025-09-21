@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/food_history_entry.dart';
 import '../models/nutrition_info.dart';
+import '../models/food_entry.dart';
+import 'daily_summary_service.dart';
 
 /// Service for managing food history entries
 class FoodHistoryService {
@@ -30,6 +32,9 @@ class FoodHistoryService {
           .collection('entries')
           .doc(entry.id)
           .set(entry.toMap());
+
+      // Sync with daily summary service for consumed calories
+      await _syncWithDailySummary(entry);
 
       // Clean up old entries if we exceed the limit
       await _cleanupOldEntries();
@@ -129,6 +134,29 @@ class FoodHistoryService {
       print('❌ Error getting today\'s food entries: $e');
       return [];
     }
+  }
+
+  /// Get today's food entries as a stream
+  static Stream<List<FoodHistoryEntry>> getTodaysFoodEntriesStream() {
+    if (_userId == null) {
+      return Stream.value([]);
+    }
+
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    return _firestore
+        .collection(_collectionName)
+        .doc(_userId)
+        .collection('entries')
+        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .where('timestamp', isLessThan: Timestamp.fromDate(endOfDay))
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => FoodHistoryEntry.fromMap(doc.data() as Map<String, dynamic>))
+            .toList());
   }
 
   /// Get recent food entries (last 7 days)
@@ -265,6 +293,53 @@ class FoodHistoryService {
         .key;
   }
 
+  /// Sync food entry with daily summary service for consumed calories
+  static Future<void> _syncWithDailySummary(FoodHistoryEntry entry) async {
+    try {
+      if (_userId == null) return;
+
+      // Convert FoodHistoryEntry to FoodEntry for daily summary
+      final foodEntry = FoodEntry(
+        id: entry.id,
+        name: entry.foodName,
+        calories: entry.calories.round(),
+        timestamp: entry.timestamp,
+        imageUrl: entry.imagePath,
+        protein: entry.protein,
+        carbs: entry.carbs,
+        fat: entry.fat,
+        fiber: entry.fiber,
+        sugar: entry.sugar,
+      );
+
+      // Update daily summary with consumed calories
+      final dailySummaryService = DailySummaryService();
+      await dailySummaryService.onMealLogged(_userId!, foodEntry);
+
+      print('✅ Synced food entry with daily summary: ${entry.foodName}');
+    } catch (e) {
+      print('❌ Error syncing with daily summary: $e');
+    }
+  }
+
+  /// Get total consumed calories for today
+  static Future<int> getTodaysConsumedCalories() async {
+    try {
+      final entries = await getTodaysFoodEntries();
+      return entries.fold<int>(0, (total, entry) => total + entry.calories.round());
+    } catch (e) {
+      print('❌ Error calculating today\'s consumed calories: $e');
+      return 0;
+    }
+  }
+
+  /// Get total consumed calories for today as a stream
+  static Stream<int> getTodaysConsumedCaloriesStream() {
+    return getTodaysFoodEntriesStream().map((entries) {
+      return entries.fold<int>(0, (total, entry) => total + entry.calories.round());
+    });
+  }
+
   /// Clean up old entries to maintain limit
   static Future<void> _cleanupOldEntries() async {
     try {
@@ -311,28 +386,6 @@ class FoodHistoryService {
             .toList());
   }
 
-  /// Stream of today's food entries
-  static Stream<List<FoodHistoryEntry>> getTodaysFoodEntriesStream() {
-    if (_userId == null) {
-      return Stream.value([]);
-    }
-
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
-
-    return _firestore
-        .collection(_collectionName)
-        .doc(_userId)
-        .collection('entries')
-        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
-        .where('timestamp', isLessThan: Timestamp.fromDate(endOfDay))
-        .orderBy('timestamp', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => FoodHistoryEntry.fromMap(doc.data()))
-            .toList());
-  }
 
   /// Stream of recent food entries (today only for home screen)
   static Stream<List<FoodHistoryEntry>> getRecentFoodEntriesStream({int limit = 10}) {

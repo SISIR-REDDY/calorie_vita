@@ -13,6 +13,7 @@ import 'services/app_state_manager.dart';
 import 'services/global_google_fit_manager.dart';
 import 'services/setup_check_service.dart';
 import 'services/firebase_service.dart';
+import 'services/daily_reset_service.dart';
 
 class MainApp extends StatefulWidget {
   final bool firebaseInitialized;
@@ -46,6 +47,9 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
 
     // Initialize global Google Fit manager
     _initializeGoogleFitManager();
+    
+    // Initialize daily reset service
+    DailyResetService.initialize();
     
     // Check and show setup warning if needed
     _checkAndShowSetupWarning();

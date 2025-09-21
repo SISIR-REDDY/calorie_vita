@@ -9,6 +9,7 @@ import '../models/nutrition_info.dart';
 import 'snap_to_calorie_service.dart';
 import 'barcode_scanning_service.dart';
 import 'food_scanner_pipeline.dart';
+import 'ai_reasoning_service.dart';
 
 /// Optimized food scanner pipeline with performance improvements
 class OptimizedFoodScannerPipeline {
@@ -85,7 +86,11 @@ class OptimizedFoodScannerPipeline {
   }
 
   /// Process barcode with optimizations
-  static Future<FoodScannerResult> processBarcodeScan(String barcode) async {
+  static Future<FoodScannerResult> processBarcodeScan(
+    String barcode, {
+    String? userProfile,
+    Map<String, dynamic>? userGoals,
+  }) async {
     final stopwatch = Stopwatch()..start();
     
     try {
@@ -112,6 +117,16 @@ class OptimizedFoodScannerPipeline {
         );
       }
 
+      // Generate AI analysis for barcode scan
+      print('🤖 Generating AI analysis for barcode scan...');
+      final aiAnalysis = await _generateAIAnalysis(
+        nutritionInfo.foodName,
+        nutritionInfo.category ?? 'Unknown',
+        nutritionInfo,
+        userProfile,
+        userGoals,
+      );
+
       final result = FoodScannerResult(
         success: true,
         recognitionResult: FoodRecognitionResult(
@@ -126,7 +141,9 @@ class OptimizedFoodScannerPipeline {
           method: 'barcode_scan',
         ),
         nutritionInfo: nutritionInfo,
+        aiAnalysis: aiAnalysis,
         processingTime: stopwatch.elapsedMilliseconds,
+        isBarcodeScan: true,
       );
 
       // Cache successful results
@@ -253,15 +270,23 @@ Be concise and accurate. Return only valid JSON.
   /// Optimized barcode scanning with full cross-validation
   static Future<NutritionInfo?> _scanBarcodeOptimized(String barcode) async {
     try {
-      // Use the full barcode scanning service with cross-validation
-      // This ensures we get the best nutrition data with proper validation
-      print('🔍 Using full barcode scanning with cross-validation...');
-      final result = await BarcodeScanningService.scanBarcode(barcode);
+      // Use enhanced barcode scanning with improved accuracy
+      print('🔍 Using enhanced barcode scanning with improved accuracy...');
+      
+      // Try enhanced scanning first
+      var result = await BarcodeScanningService.scanBarcodeEnhanced(barcode);
+      
+      // If enhanced scanning fails, fall back to regular scanning
+      if (result == null) {
+        print('🔄 Enhanced scanning failed, trying regular barcode scanning...');
+        result = await BarcodeScanningService.scanBarcode(barcode);
+      }
       
       if (result != null) {
         print('✅ Barcode scan successful: ${result.foodName}');
         print('🔥 Calories: ${result.calories}, Protein: ${result.protein}g, Carbs: ${result.carbs}g, Fat: ${result.fat}g');
         print('📊 Source: ${result.source}');
+        print('✅ Is Valid: ${result.isValid}');
       } else {
         print('❌ No nutrition data found for barcode: $barcode');
       }
@@ -450,5 +475,53 @@ Be concise and accurate. Return only valid JSON.
       'cachedResults': _resultCache.length,
       'cacheTimestamps': _cacheTimestamps.length,
     };
+  }
+
+  /// Generate AI analysis for barcode scan
+  static Future<Map<String, dynamic>> _generateAIAnalysis(
+    String foodName,
+    String category,
+    NutritionInfo nutritionInfo,
+    String? userProfile,
+    Map<String, dynamic>? userGoals,
+  ) async {
+    try {
+      print('🤖 Generating AI analysis for: $foodName');
+      
+      // Create recognition and portion results for AI analysis
+      final recognitionResult = FoodRecognitionResult(
+        foodName: foodName,
+        confidence: 0.95,
+        category: category,
+        cuisine: 'Unknown',
+      );
+      
+      final portionResult = PortionEstimationResult(
+        estimatedWeight: nutritionInfo.weightGrams,
+        confidence: 0.9,
+        method: 'barcode_scan',
+      );
+      
+      // Use AI reasoning service for analysis
+      final aiAnalysis = await AIReasoningService.analyzeFoodWithAI(
+        recognitionResult: recognitionResult,
+        portionResult: portionResult,
+        nutritionInfo: nutritionInfo,
+        userProfile: userProfile,
+      );
+      
+      print('✅ AI analysis generated successfully');
+      return aiAnalysis;
+    } catch (e) {
+      print('❌ Error generating AI analysis: $e');
+      // Return basic analysis as fallback
+      return {
+        'insights': ['Product identified via barcode scan'],
+        'recommendations': ['Check portion size for accurate calorie tracking'],
+        'tips': ['Barcode data provides reliable nutrition information'],
+        'confidence': 0.8,
+        'source': 'barcode_scan',
+      };
+    }
   }
 }

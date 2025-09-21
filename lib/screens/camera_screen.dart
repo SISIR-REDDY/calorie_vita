@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,11 +8,13 @@ import '../services/optimized_food_scanner_pipeline.dart';
 import '../services/barcode_scanning_service.dart';
 import '../services/app_state_service.dart';
 import '../models/food_entry.dart';
+import '../models/food_history_entry.dart';
 import '../models/nutrition_info.dart';
 import '../models/portion_estimation_result.dart';
 import '../widgets/food_result_card.dart';
 import '../ui/app_colors.dart';
 import '../services/food_history_service.dart';
+import '../services/fast_data_refresh_service.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -71,10 +72,6 @@ class _CameraScreenState extends State<CameraScreen> {
           }
         });
         
-        // Save to food history if successful
-        if (result.success && result.nutritionInfo != null) {
-          await _saveToFoodHistory(result, 'camera_scan');
-        }
         
         // Show portion selector if needed
         if (result.success && result.portionResult != null && 
@@ -117,25 +114,14 @@ class _CameraScreenState extends State<CameraScreen> {
         // Process barcode through the optimized food scanner pipeline
         final result = await OptimizedFoodScannerPipeline.processBarcodeScan(barcode);
         
-        // Debug: Print nutrition data to help identify issues
+        // Check result and fix missing nutrition data if needed
         if (result != null && result.success && result.nutritionInfo != null) {
           final nutrition = result.nutritionInfo!;
-          print('🔍 DEBUG - Barcode scan result:');
-          print('📦 Product: ${nutrition.foodName}');
-          print('⚖️ Weight: ${nutrition.weightGrams}g');
-          print('🔥 Calories: ${nutrition.calories}');
-          print('🥩 Protein: ${nutrition.protein}g');
-          print('🍞 Carbs: ${nutrition.carbs}g');
-          print('🧈 Fat: ${nutrition.fat}g');
-          print('🌾 Fiber: ${nutrition.fiber}g');
-          print('🍯 Sugar: ${nutrition.sugar}g');
-          print('📊 Source: ${nutrition.source}');
-          print('🏷️ Category: ${nutrition.category}');
-          print('🏢 Brand: ${nutrition.brand}');
+          print('✅ Barcode scan successful: ${nutrition.foodName}');
           
           // Check if nutrition data is valid and try to fix if needed
           if (nutrition.calories == 0 || (nutrition.protein == 0 && nutrition.carbs == 0 && nutrition.fat == 0)) {
-            print('❌ WARNING: Missing nutrition data! Attempting to fix...');
+            print('⚠️ Missing nutrition data, attempting to fix...');
             
             // Try to get nutrition data from product name
             try {
@@ -169,10 +155,6 @@ class _CameraScreenState extends State<CameraScreen> {
           }
         });
         
-        // Save to food history if successful
-        if (result != null && result.success && result.nutritionInfo != null) {
-          await _saveToFoodHistory(result, 'barcode_scan');
-        }
       } catch (e) {
         print('❌ Barcode processing error: $e');
         setState(() {
@@ -199,48 +181,6 @@ class _CameraScreenState extends State<CameraScreen> {
     });
   }
 
-  void _testBarcodeScanning() async {
-    print('🧪 Testing barcode scanning...');
-    await BarcodeScanningService.testBarcodeScanning();
-  }
-
-  /// Test specific barcode for debugging
-  void _testSpecificBarcode(String barcode) async {
-    print('🧪 Testing specific barcode: $barcode');
-    setState(() {
-      _loading = true;
-      _error = null;
-      _scannerResult = null;
-    });
-    
-    try {
-      final result = await OptimizedFoodScannerPipeline.processBarcodeScan(barcode);
-      
-      print('🔍 Test result for barcode $barcode:');
-      print('Success: ${result?.success}');
-      if (result?.nutritionInfo != null) {
-        final nutrition = result!.nutritionInfo!;
-        print('Product: ${nutrition.foodName}');
-        print('Calories: ${nutrition.calories}');
-        print('Protein: ${nutrition.protein}');
-        print('Carbs: ${nutrition.carbs}');
-        print('Fat: ${nutrition.fat}');
-        print('Source: ${nutrition.source}');
-        print('Is Valid: ${nutrition.isValid}');
-      }
-      
-      setState(() {
-        _scannerResult = result;
-        _loading = false;
-      });
-    } catch (e) {
-      print('❌ Test error: $e');
-      setState(() {
-        _error = 'Test failed: $e';
-        _loading = false;
-      });
-    }
-  }
 
   /// Try to fix missing nutrition data by looking up the product name
   Future<NutritionInfo?> _tryFixMissingNutrition(NutritionInfo originalNutrition) async {
@@ -299,15 +239,32 @@ class _CameraScreenState extends State<CameraScreen> {
           };
         }
         
-        final success = await FoodHistoryService.addFoodFromNutritionInfo(
-          result.nutritionInfo!,
+        // Create food history entry
+        final entry = FoodHistoryEntry(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          foodName: result.nutritionInfo!.foodName,
+          calories: result.nutritionInfo!.calories,
+          protein: result.nutritionInfo!.protein,
+          carbs: result.nutritionInfo!.carbs,
+          fat: result.nutritionInfo!.fat,
+          fiber: result.nutritionInfo!.fiber,
+          sugar: result.nutritionInfo!.sugar,
+          weightGrams: result.nutritionInfo!.weightGrams,
+          category: result.nutritionInfo!.category,
+          brand: result.nutritionInfo!.brand,
+          notes: result.nutritionInfo!.notes,
           source: source,
+          timestamp: DateTime.now(),
           imagePath: _imageFile?.path,
           scanData: scanData,
         );
         
+        // Use fast data refresh service for immediate updates
+        final fastDataRefreshService = FastDataRefreshService();
+        final success = await fastDataRefreshService.addFoodEntryAndRefresh(entry);
+        
         if (success) {
-          print('✅ Food entry saved to history: ${result.nutritionInfo!.foodName}');
+          print('✅ Food entry saved to history with fast refresh: ${result.nutritionInfo!.foodName}');
         } else {
           print('❌ Failed to save food entry to history');
         }
@@ -551,34 +508,17 @@ class _CameraScreenState extends State<CameraScreen> {
     final portion = _scannerResult!.portionResult;
     final aiAnalysis = _scannerResult!.aiAnalysis;
 
-    // DEBUG: Print detailed nutrition data for UI rendering
-    print('🔍 UI DEBUG - Rendering nutrition data:');
-    print('📦 Product: ${nutrition.foodName}');
-    print('⚖️ Weight: ${nutrition.weightGrams}g');
-    print('🔥 Calories: ${nutrition.calories} (formatted: ${nutrition.formattedCalories})');
-    print('🥩 Protein: ${nutrition.protein}g (formatted: ${nutrition.formattedProtein})');
-    print('🍞 Carbs: ${nutrition.carbs}g (formatted: ${nutrition.formattedCarbs})');
-    print('🧈 Fat: ${nutrition.fat}g (formatted: ${nutrition.formattedFat})');
-    print('🌾 Fiber: ${nutrition.fiber}g (formatted: ${nutrition.formattedFiber})');
-    print('🍯 Sugar: ${nutrition.sugar}g (formatted: ${nutrition.formattedSugar})');
-    print('📊 Source: ${nutrition.source}');
-    print('🏷️ Category: ${nutrition.category}');
-    print('🏢 Brand: ${nutrition.brand}');
-    print('📝 Notes: ${nutrition.notes}');
-    print('❌ Error: ${nutrition.error}');
-    print('✅ Is Valid: ${nutrition.isValid}');
-    
-    // Check if nutrition data is actually valid
+    // Check if nutrition data is valid for UI rendering
     if (!nutrition.isValid) {
-      print('❌ CRITICAL: Nutrition data is marked as invalid!');
+      print('❌ Nutrition data is invalid');
     }
     
     if (nutrition.calories <= 0) {
-      print('❌ CRITICAL: No calories found!');
+      print('❌ No calories found');
     }
     
     if (nutrition.protein == 0 && nutrition.carbs == 0 && nutrition.fat == 0) {
-      print('❌ CRITICAL: No macro nutrients found!');
+      print('❌ No macro nutrients found');
     }
 
     // If nutrition data is invalid or missing, show a special message
@@ -616,6 +556,8 @@ class _CameraScreenState extends State<CameraScreen> {
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 2,
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -624,6 +566,8 @@ class _CameraScreenState extends State<CameraScreen> {
                                 color: Colors.white.withOpacity(0.9),
                                 fontSize: 14,
                               ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
                             if (nutrition.brand != null) ...[
                               const SizedBox(height: 2),
@@ -633,6 +577,8 @@ class _CameraScreenState extends State<CameraScreen> {
                                   color: Colors.white.withOpacity(0.8),
                                   fontSize: 12,
                                 ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
                               ),
                             ],
                           ],
@@ -765,6 +711,8 @@ class _CameraScreenState extends State<CameraScreen> {
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 2,
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -773,6 +721,8 @@ class _CameraScreenState extends State<CameraScreen> {
                                 color: Colors.white.withOpacity(0.9),
                                 fontSize: 14,
                               ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
                             if (nutrition.brand != null) ...[
                               const SizedBox(height: 2),
@@ -782,6 +732,8 @@ class _CameraScreenState extends State<CameraScreen> {
                                   color: Colors.white.withOpacity(0.8),
                                   fontSize: 12,
                                 ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
                               ),
                             ],
                           ],
@@ -951,108 +903,6 @@ class _CameraScreenState extends State<CameraScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: kPrimaryGradient,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: kCardShadow,
-            ),
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.save, color: Colors.white),
-              label: Text(
-                'Save to History',
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                ),
-              ),
-              onPressed: () async {
-                if (_scannerResult != null && _scannerResult!.success) {
-                  try {
-                    final nutrition = _scannerResult!.nutritionInfo!;
-
-                    // Create food entry
-                    final foodEntry = FoodEntry(
-                      id: DateTime.now().millisecondsSinceEpoch.toString(),
-                      name: nutrition.foodName,
-                      calories: nutrition.calories.round(),
-                      timestamp: DateTime.now(),
-                      imageUrl: null, // TODO: Upload image to Firebase Storage if needed
-                      protein: nutrition.protein,
-                      carbs: nutrition.carbs,
-                      fat: nutrition.fat,
-                      fiber: nutrition.fiber,
-                      sugar: nutrition.sugar,
-                    );
-
-                    // Save to app state (which will sync to Firestore)
-                    await AppStateService().saveFoodEntry(foodEntry);
-
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Food saved to history! Calories: ${foodEntry.calories}, Protein: ${nutrition.formattedProtein}, Carbs: ${nutrition.formattedCarbs}, Fat: ${nutrition.formattedFat}',
-                            style: GoogleFonts.poppins(),
-                          ),
-                          backgroundColor: kSuccessColor,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          duration: const Duration(seconds: 4),
-                        ),
-                      );
-
-                      // Navigate back or reset the camera
-                      _reset();
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Error saving food entry: $e',
-                            style: GoogleFonts.poppins(),
-                          ),
-                          backgroundColor: Colors.red,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      );
-                    }
-                  }
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'No food data to save!',
-                        style: GoogleFonts.poppins(),
-                      ),
-                      backgroundColor: Colors.orange,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -1152,45 +1002,6 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
               ),
               
-              // Debug buttons (only in debug mode)
-              if (kDebugMode) ...[
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _testSpecificBarcode('7622210734962'), // Example barcode
-                        icon: const Icon(Icons.bug_report, size: 16),
-                        label: Text(
-                          'Test Barcode',
-                          style: GoogleFonts.poppins(fontSize: 12),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(vertical: 8),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _testBarcodeScanning,
-                        icon: const Icon(Icons.science, size: 16),
-                        label: Text(
-                          'Debug Test',
-                          style: GoogleFonts.poppins(fontSize: 12),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.purple,
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(vertical: 8),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             ],
           ),
         ],
@@ -1244,6 +1055,8 @@ class _CameraScreenState extends State<CameraScreen> {
                 fontWeight: FontWeight.bold,
               ),
               textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
             const SizedBox(height: 4),
             Text(
@@ -1253,6 +1066,8 @@ class _CameraScreenState extends State<CameraScreen> {
                 fontSize: 12,
               ),
               textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
             ),
           ],
         ),
@@ -1277,6 +1092,8 @@ class _CameraScreenState extends State<CameraScreen> {
               fontWeight: FontWeight.w600,
               color: color,
             ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
           const SizedBox(height: 4),
           Text(
@@ -1286,6 +1103,8 @@ class _CameraScreenState extends State<CameraScreen> {
               fontWeight: FontWeight.bold,
               color: color,
             ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
         ],
       ),
@@ -1362,6 +1181,8 @@ class _CameraScreenState extends State<CameraScreen> {
               fontSize: 12,
               color: kTextSecondary,
             ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 3,
           ),
         )),
       ],

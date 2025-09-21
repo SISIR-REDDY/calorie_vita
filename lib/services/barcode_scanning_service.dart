@@ -1111,47 +1111,6 @@ class BarcodeScanningService {
     }
   }
 
-  /// Debug method to test barcode scanning and display nutrition data
-  static Future<void> debugBarcodeScanning(String barcode) async {
-    print('🧪 Debug: Testing barcode scanning for: $barcode');
-    
-    try {
-      final result = await scanBarcode(barcode);
-      
-      if (result != null) {
-        print('✅ Barcode scan successful!');
-        print('📦 Product: ${result.foodName}');
-        print('⚖️ Weight: ${result.weightGrams}g');
-        print('🔥 Calories: ${result.calories}');
-        print('🥩 Protein: ${result.protein}g');
-        print('🍞 Carbs: ${result.carbs}g');
-        print('🧈 Fat: ${result.fat}g');
-        print('🌾 Fiber: ${result.fiber}g');
-        print('🍯 Sugar: ${result.sugar}g');
-        print('📊 Source: ${result.source}');
-        print('🏷️ Category: ${result.category}');
-        print('🏢 Brand: ${result.brand}');
-        print('📝 Notes: ${result.notes}');
-        
-        // Check if nutrition data is valid
-        if (result.calories > 0) {
-          print('✅ Valid nutrition data found');
-        } else {
-          print('❌ No calories found - this might be the issue');
-        }
-        
-        if (result.protein == 0 && result.carbs == 0 && result.fat == 0) {
-          print('❌ No macro nutrients found - this might be the issue');
-        }
-        
-      } else {
-        print('❌ Barcode scan failed - no result returned');
-      }
-    } catch (e) {
-      print('❌ Debug error: $e');
-    }
-  }
-
   /// Get all available barcode scanning sources
   static List<String> getAvailableSources() {
     final sources = <String>[
@@ -2202,55 +2161,66 @@ Respond only with valid JSON for known products with verified nutrition or "null
   static Map<String, dynamic> _crossValidateResults(List<NutritionInfo?> results, String barcode) {
     final apiNames = ['Nutritionix', 'USDA FoodData Central', 'Edamam', 'Spoonacular', 'Open Food Facts', 'Barcode Lookup', 'UPC Database'];
     
-    // Filter out null results and collect valid ones
+    // Filter out null results and collect valid ones with enhanced validation
     final validResults = <Map<String, dynamic>>[];
     for (int i = 0; i < results.length; i++) {
       final result = results[i];
-      if (result != null && result.calories > 0) {
+      if (result != null && _isDataAccurate(result, apiNames[i])) {
         validResults.add({
           'result': result,
           'source': apiNames[i],
           'index': i,
+          'accuracy_score': _calculateAccuracyScore(result),
         });
       }
     }
     
     if (validResults.isEmpty) {
-      // No valid results found, return first non-null result or null
+      // No valid results found, try to find any result with basic validation
       for (int i = 0; i < results.length; i++) {
         if (results[i] != null) {
-          return {
-            'result': results[i],
-            'source': apiNames[i],
-            'confidence': 0.1,
-          };
+          final result = results[i]!;
+          if (result.calories > 0 || result.foodName.isNotEmpty) {
+            return {
+              'result': result,
+              'source': apiNames[i],
+              'confidence': 0.3, // Low confidence for unvalidated data
+            };
+          }
         }
       }
       return {'result': null, 'source': null, 'confidence': 0.0};
     }
     
-    // If only one result, return it
+    // If only one result, return it with enhanced confidence calculation
     if (validResults.length == 1) {
       final result = validResults.first;
+      final confidence = _calculateConfidence(result['result'], result['source']);
       return {
         'result': result['result'],
         'source': result['source'],
-        'confidence': _calculateConfidence(result['result'], result['source']),
+        'confidence': confidence,
       };
     }
     
-    // Multiple results - cross-validate and find consensus
-    print('🔍 Cross-validating ${validResults.length} results...');
+    // Multiple results - enhanced cross-validation
+    print('🔍 Cross-validating ${validResults.length} validated results...');
     
-    // Group results by similar calorie values (within 20% tolerance)
-    final calorieGroups = _groupByCalorieConsensus(validResults);
+    // Group results by similar calorie values (within 15% tolerance for better accuracy)
+    final calorieGroups = _groupByCalorieConsensus(validResults, tolerance: 0.15);
     
-    // Find the group with most results (consensus)
+    // Find the group with most results and highest average accuracy
     String? bestGroup;
-    int maxGroupSize = 0;
+    double bestGroupScore = 0.0;
+    
     for (final entry in calorieGroups.entries) {
-      if (entry.value.length > maxGroupSize) {
-        maxGroupSize = entry.value.length;
+      final groupResults = entry.value;
+      final groupSize = groupResults.length;
+      final avgAccuracy = groupResults.fold<double>(0.0, (sum, r) => sum + r['accuracy_score']) / groupSize;
+      final groupScore = groupSize * 0.6 + avgAccuracy * 0.4; // Weighted score
+      
+      if (groupScore > bestGroupScore) {
+        bestGroupScore = groupScore;
         bestGroup = entry.key;
       }
     }
@@ -2259,15 +2229,15 @@ Respond only with valid JSON for known products with verified nutrition or "null
       // We have consensus - pick the best result from the consensus group
       final consensusResults = calorieGroups[bestGroup]!;
       final bestResult = _selectBestFromGroup(consensusResults);
-      print('✅ Found consensus among ${consensusResults.length} sources');
+      print('✅ Found consensus among ${consensusResults.length} sources (score: ${bestGroupScore.toStringAsFixed(2)})');
       return {
         'result': bestResult['result'],
         'source': bestResult['source'],
-        'confidence': 0.9, // High confidence due to consensus
+        'confidence': 0.95, // Very high confidence due to consensus
       };
     } else {
-      // No clear consensus - pick the most reliable source
-      final bestResult = _selectMostReliableResult(validResults);
+      // No clear consensus - pick the most reliable source with enhanced scoring
+      final bestResult = _selectMostReliableResult(validResults, barcode);
       print('⚠️ No consensus found, using most reliable source: ${bestResult['source']}');
       return {
         'result': bestResult['result'],
@@ -2277,8 +2247,8 @@ Respond only with valid JSON for known products with verified nutrition or "null
     }
   }
 
-  /// Group results by calorie consensus (within 20% tolerance)
-  static Map<String, List<Map<String, dynamic>>> _groupByCalorieConsensus(List<Map<String, dynamic>> results) {
+  /// Group results by calorie consensus (with configurable tolerance)
+  static Map<String, List<Map<String, dynamic>>> _groupByCalorieConsensus(List<Map<String, dynamic>> results, {double tolerance = 0.2}) {
     final groups = <String, List<Map<String, dynamic>>>{};
     
     for (final result in results) {
@@ -2289,9 +2259,9 @@ Respond only with valid JSON for known products with verified nutrition or "null
       String? matchingGroup;
       for (final groupKey in groups.keys) {
         final groupCalories = double.parse(groupKey);
-        final tolerance = groupCalories * 0.2; // 20% tolerance
+        final toleranceValue = groupCalories * tolerance;
         
-        if ((calories - groupCalories).abs() <= tolerance) {
+        if ((calories - groupCalories).abs() <= toleranceValue) {
           matchingGroup = groupKey;
           break;
         }
@@ -2329,15 +2299,76 @@ Respond only with valid JSON for known products with verified nutrition or "null
   }
 
   /// Select the most reliable result when no consensus
-  static Map<String, dynamic> _selectMostReliableResult(List<Map<String, dynamic>> results) {
-    // Sort by reliability score
+  static Map<String, dynamic> _selectMostReliableResult(List<Map<String, dynamic>> results, [String? barcode]) {
+    // Sort by enhanced reliability score
     results.sort((a, b) {
-      final aScore = _calculateReliabilityScore(a['result'], a['source']);
-      final bScore = _calculateReliabilityScore(b['result'], b['source']);
+      final aScore = _calculateEnhancedReliabilityScore(a['result'], a['source'], barcode);
+      final bScore = _calculateEnhancedReliabilityScore(b['result'], b['source'], barcode);
       return bScore.compareTo(aScore);
     });
     
     return results.first;
+  }
+
+  /// Calculate accuracy score for a nutrition result
+  static double _calculateAccuracyScore(NutritionInfo result) {
+    double score = 0.0;
+    
+    // Check for realistic calorie density (50-800 kcal/100g)
+    if (result.weightGrams > 0) {
+      final calorieDensity = (result.calories / result.weightGrams) * 100;
+      if (calorieDensity >= 50 && calorieDensity <= 800) {
+        score += 0.3;
+      } else if (calorieDensity > 0) {
+        score += 0.1; // Some points for having calories
+      }
+    }
+    
+    // Check macro nutrient ratios
+    if (result.calories > 0) {
+      final macroCalories = (result.protein * 4) + (result.carbs * 4) + (result.fat * 9);
+      final macroRatio = macroCalories / result.calories;
+      if (macroRatio >= 0.7 && macroRatio <= 1.3) {
+        score += 0.3; // Good macro ratio
+      } else if (macroRatio > 0) {
+        score += 0.1; // Some points for having macros
+      }
+    }
+    
+    // Check data completeness
+    int completeFields = 0;
+    if (result.calories > 0) completeFields++;
+    if (result.protein > 0) completeFields++;
+    if (result.carbs > 0) completeFields++;
+    if (result.fat > 0) completeFields++;
+    if (result.fiber > 0) completeFields++;
+    if (result.sugar > 0) completeFields++;
+    if (result.foodName.isNotEmpty) completeFields++;
+    if (result.brand != null && result.brand!.isNotEmpty) completeFields++;
+    
+    score += (completeFields / 8.0) * 0.4; // Up to 40% for completeness
+    
+    return score.clamp(0.0, 1.0);
+  }
+
+  /// Calculate enhanced reliability score
+  static double _calculateEnhancedReliabilityScore(NutritionInfo result, String source, String? barcode) {
+    double score = 0.0;
+    
+    // Source reliability (0.0 to 1.0)
+    score += _getSourceReliability(source) * 0.4;
+    
+    // Data accuracy score
+    score += _calculateAccuracyScore(result) * 0.3;
+    
+    // Data completeness
+    score += (_getNutritionCompleteness(result) / 8.0) * 0.2;
+    
+    // Brand and name quality
+    if (result.brand != null && result.brand!.isNotEmpty) score += 0.05;
+    if (result.foodName.length > 3) score += 0.05;
+    
+    return score.clamp(0.0, 1.0);
   }
 
   /// Calculate reliability score for a result
@@ -2873,6 +2904,83 @@ Respond only with valid JSON for known products with verified nutrition or "null
     if (expiredKeys.isNotEmpty) {
       print('🧹 Cleared ${expiredKeys.length} expired cache entries');
     }
+  }
+
+  /// Enhanced barcode scanning with improved accuracy
+  static Future<NutritionInfo?> scanBarcodeEnhanced(String barcode) async {
+    print('🔍 Enhanced barcode scanning for: $barcode');
+    
+    // Clean the barcode
+    final cleanBarcode = barcode.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanBarcode.length < 8) {
+      print('❌ Invalid barcode length: ${cleanBarcode.length}');
+      return null;
+    }
+    
+    // Try multiple scanning strategies
+    final strategies = [
+      _scanWithHighReliabilityAPIs(cleanBarcode),
+      _scanWithMediumReliabilityAPIs(cleanBarcode),
+      _scanWithFallbackAPIs(cleanBarcode),
+    ];
+    
+    for (int i = 0; i < strategies.length; i++) {
+      try {
+        print('🔍 Trying strategy ${i + 1}...');
+        final result = await strategies[i];
+        if (result != null && _isDataAccurate(result, 'Enhanced Scan')) {
+          print('✅ Enhanced scan successful with strategy ${i + 1}');
+          return result;
+        }
+      } catch (e) {
+        print('❌ Strategy ${i + 1} failed: $e');
+      }
+    }
+    
+    print('❌ All enhanced scanning strategies failed');
+    return null;
+  }
+
+  /// Scan with high reliability APIs only
+  static Future<NutritionInfo?> _scanWithHighReliabilityAPIs(String barcode) async {
+    final futures = <Future<NutritionInfo?>>[
+      _scanWithNutritionix(barcode),
+      _scanWithFoodDataCentral(barcode),
+      _scanWithEdamam(barcode),
+    ];
+    
+    final results = await Future.wait(futures);
+    final validResults = results.where((r) => r != null).cast<NutritionInfo>().toList();
+    
+    if (validResults.isEmpty) return null;
+    
+    // Use enhanced cross-validation for high-reliability sources
+    final crossValidationResult = _crossValidateResults(results, barcode);
+    return crossValidationResult['result'];
+  }
+
+  /// Scan with medium reliability APIs
+  static Future<NutritionInfo?> _scanWithMediumReliabilityAPIs(String barcode) async {
+    final futures = <Future<NutritionInfo?>>[
+      _scanWithSpoonacular(barcode),
+      _scanWithOpenFoodFacts(barcode),
+    ];
+    
+    final results = await Future.wait(futures);
+    final crossValidationResult = _crossValidateResults(results, barcode);
+    return crossValidationResult['result'];
+  }
+
+  /// Scan with fallback APIs
+  static Future<NutritionInfo?> _scanWithFallbackAPIs(String barcode) async {
+    final futures = <Future<NutritionInfo?>>[
+      _scanWithBarcodeLookup(barcode),
+      _scanWithUPCDatabase(barcode),
+    ];
+    
+    final results = await Future.wait(futures);
+    final crossValidationResult = _crossValidateResults(results, barcode);
+    return crossValidationResult['result'];
   }
 
 }

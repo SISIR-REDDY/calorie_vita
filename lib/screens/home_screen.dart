@@ -25,6 +25,7 @@ import '../services/analytics_service.dart';
 import '../services/goals_event_bus.dart';
 import '../services/google_fit_service.dart';
 import '../services/google_fit_cache_service.dart';
+import '../services/optimized_google_fit_service.dart';
 import '../services/global_goals_manager.dart';
 import '../services/global_google_fit_manager.dart';
 import '../mixins/google_fit_sync_mixin.dart';
@@ -38,7 +39,9 @@ import 'trainer_screen.dart';
 import '../models/user_preferences.dart';
 import '../models/food_history_entry.dart';
 import '../services/food_history_service.dart';
+import '../services/fast_data_refresh_service.dart';
 import 'food_history_detail_screen.dart';
+import 'todays_food_screen.dart';
 
 /// Premium Home Screen with modern UI and comprehensive features
 class PremiumHomeScreen extends StatefulWidget {
@@ -69,9 +72,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   final RewardsService _rewardsService = RewardsService();
   final GoogleFitService _googleFitService = GoogleFitService();
   final GoogleFitCacheService _googleFitCacheService = GoogleFitCacheService();
+  final OptimizedGoogleFitService _optimizedGoogleFitService = OptimizedGoogleFitService();
   final GlobalGoogleFitManager _globalGoogleFitManager =
       GlobalGoogleFitManager();
   final TaskService _taskService = TaskService();
+  final FastDataRefreshService _fastDataRefreshService = FastDataRefreshService();
 
   // Data
   DailySummary? _dailySummary;
@@ -80,6 +85,15 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   String _motivationalQuote = '';
   final bool _isLoading = false; // Start with false to show UI immediately
   bool _isRefreshing = false; // Track background data loading
+  bool _isRefreshingFoodData = false; // Prevent multiple simultaneous food data refreshes
+  
+  // Debouncing for UI updates
+  Timer? _uiUpdateTimer;
+  bool _hasPendingUIUpdate = false;
+  
+  // UI update throttling
+  DateTime? _lastUIUpdate;
+  static const Duration _minUIUpdateInterval = Duration(milliseconds: 800);
 
   // Rewards data
   UserProgress? _userProgress;
@@ -110,6 +124,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   StreamSubscription<List<Task>>? _tasksSubscription;
   StreamSubscription<Map<String, dynamic>>? _googleFitLiveStreamSubscription;
   StreamSubscription? _googleFitCacheStreamSubscription;
+  StreamSubscription<int>? _consumedCaloriesSubscription;
+  StreamSubscription<List<FoodHistoryEntry>>? _todaysFoodSubscription;
+  StreamSubscription<Map<String, dynamic>>? _fastMacroBreakdownSubscription;
   Timer? _goalsCheckTimer;
   Timer? _googleFitRefreshTimer;
   Timer? _streakRefreshTimer;
@@ -131,6 +148,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     // Initialize immediately without waiting
     _initializeServicesAsync();
     _setupStreamListeners();
+    _setupFastDataRefresh();
     _loadData();
     _loadRewardsDataAsync();
     _initializeGoogleFitAsync();
@@ -145,6 +163,60 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     super.didChangeDependencies();
     // Refresh goals when screen becomes visible
     _forceRefreshGoals();
+    
+    // Refresh consumed calories and macro nutrients when screen becomes visible
+    _refreshFoodData();
+  }
+
+  /// Setup fast data refresh for immediate UI updates
+  Future<void> _setupFastDataRefresh() async {
+    try {
+      await _fastDataRefreshService.initialize();
+      
+      // Listen to consumed calories stream with debouncing
+      _consumedCaloriesSubscription = _fastDataRefreshService.consumedCaloriesStream.listen((calories) {
+        // Only update if calories actually changed
+        if (_dailySummary?.caloriesConsumed != calories) {
+          _debounceUIUpdate(() {
+            if (mounted && _dailySummary != null) {
+              _dailySummary = _dailySummary!.copyWith(caloriesConsumed: calories);
+            }
+          });
+        }
+      });
+
+      // Listen to today's food stream with debouncing
+      _todaysFoodSubscription = _fastDataRefreshService.todaysFoodStream.listen((foodEntries) {
+        // Only update if food entries actually changed
+        if (_hasFoodEntriesChanged(foodEntries)) {
+          _debounceUIUpdate(() {
+            // This will trigger UI rebuild with new food data
+          });
+        }
+      });
+
+      // Listen to macro breakdown stream with debouncing
+      _fastMacroBreakdownSubscription = _fastDataRefreshService.macroBreakdownStream.listen((breakdown) {
+        // Only update if macro data actually changed
+        if (_hasMacroDataChanged(breakdown)) {
+          _debounceUIUpdate(() {
+            if (mounted) {
+              _macroBreakdown = MacroBreakdown(
+                protein: breakdown['protein'] ?? 0.0,
+                carbs: breakdown['carbs'] ?? 0.0,
+                fat: breakdown['fat'] ?? 0.0,
+                fiber: breakdown['fiber'] ?? 0.0,
+                sugar: breakdown['sugar'] ?? 0.0,
+              );
+            }
+          });
+        }
+      });
+
+      print('✅ Fast data refresh service initialized');
+    } catch (e) {
+      print('❌ Error initializing fast data refresh: $e');
+    }
   }
 
   /// Initialize services asynchronously to not block UI
@@ -313,8 +385,13 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _streakRefreshTimer?.cancel();
     _googleFitLiveStreamSubscription?.cancel();
     _googleFitCacheStreamSubscription?.cancel();
+    _consumedCaloriesSubscription?.cancel();
+    _todaysFoodSubscription?.cancel();
+    _fastMacroBreakdownSubscription?.cancel();
+    _uiUpdateTimer?.cancel();
     _googleFitCacheService.stopLiveUpdates();
     _googleFitCacheService.dispose();
+    _fastDataRefreshService.dispose();
     _stopLiveSync();
     GlobalGoalsManager().clearCallback();
     super.dispose();
@@ -382,12 +459,140 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         date: DateTime.now(),
       );
 
+      // Note: Consumed calories and macro nutrients will be loaded via streams
+      // in _setupFastDataRefresh() to prevent conflicts and flickering
+
       // Load default motivational quote
       if (_motivationalQuote.isEmpty) {
         _loadMotivationalQuote();
       }
     } catch (e) {
       debugPrint('Error loading cached data: $e');
+    }
+  }
+
+  /// Load consumed calories from food history
+  Future<void> _loadConsumedCaloriesFromFoodHistory() async {
+    try {
+      // Get consumed calories from food history
+      final consumedCalories = await FoodHistoryService.getTodaysConsumedCalories();
+      
+      if (mounted) {
+        setState(() {
+          if (_dailySummary != null) {
+            _dailySummary = _dailySummary!.copyWith(caloriesConsumed: consumedCalories);
+          }
+        });
+      }
+      
+      print('✅ Loaded consumed calories from food history: $consumedCalories');
+    } catch (e) {
+      print('❌ Error loading consumed calories from food history: $e');
+    }
+  }
+
+  /// Load macro nutrients from food history
+  Future<void> _loadMacroNutrientsFromFoodHistory() async {
+    try {
+      // Get today's food entries
+      final entries = await FoodHistoryService.getTodaysFoodEntries();
+      
+      // Calculate macro breakdown
+      double totalProtein = 0.0;
+      double totalCarbs = 0.0;
+      double totalFat = 0.0;
+      double totalFiber = 0.0;
+      double totalSugar = 0.0;
+
+      for (final entry in entries) {
+        totalProtein += entry.protein;
+        totalCarbs += entry.carbs;
+        totalFat += entry.fat;
+        totalFiber += entry.fiber;
+        totalSugar += entry.sugar;
+      }
+
+      if (mounted) {
+        setState(() {
+          _macroBreakdown = MacroBreakdown(
+            protein: totalProtein,
+            carbs: totalCarbs,
+            fat: totalFat,
+            fiber: totalFiber,
+            sugar: totalSugar,
+          );
+        });
+      }
+      
+      print('✅ Loaded macro nutrients from food history: Protein: ${totalProtein.toStringAsFixed(1)}g, Carbs: ${totalCarbs.toStringAsFixed(1)}g, Fat: ${totalFat.toStringAsFixed(1)}g');
+    } catch (e) {
+      print('❌ Error loading macro nutrients from food history: $e');
+    }
+  }
+
+  /// Check if food entries have actually changed
+  bool _hasFoodEntriesChanged(List<dynamic> newEntries) {
+    // For now, always return true to trigger update
+    // This can be optimized later with more sophisticated comparison
+    return true;
+  }
+
+  /// Check if macro data has actually changed
+  bool _hasMacroDataChanged(Map<String, dynamic> newData) {
+    if (_macroBreakdown == null) return true;
+    
+    return _macroBreakdown!.protein != (newData['protein'] ?? 0.0) ||
+           _macroBreakdown!.carbs != (newData['carbs'] ?? 0.0) ||
+           _macroBreakdown!.fat != (newData['fat'] ?? 0.0) ||
+           _macroBreakdown!.fiber != (newData['fiber'] ?? 0.0) ||
+           _macroBreakdown!.sugar != (newData['sugar'] ?? 0.0);
+  }
+
+  /// Debounce UI updates to prevent flickering with throttling
+  void _debounceUIUpdate(VoidCallback updateCallback) {
+    // Check if enough time has passed since last update
+    final now = DateTime.now();
+    if (_lastUIUpdate != null && 
+        now.difference(_lastUIUpdate!) < _minUIUpdateInterval) {
+      return; // Skip this update to prevent too frequent updates
+    }
+    
+    _uiUpdateTimer?.cancel();
+    _uiUpdateTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted && !_hasPendingUIUpdate) {
+        _hasPendingUIUpdate = true;
+        _lastUIUpdate = DateTime.now();
+        setState(() {
+          updateCallback();
+        });
+        _hasPendingUIUpdate = false;
+      }
+    });
+  }
+
+  /// Refresh food data when screen becomes visible
+  Future<void> _refreshFoodData() async {
+    // Prevent multiple simultaneous refreshes
+    if (_isRefreshingFoodData) {
+      print('⚠️ Food data refresh already in progress, skipping...');
+      return;
+    }
+    
+    try {
+      _isRefreshingFoodData = true;
+      
+      // Force refresh to get fresh data and clear any stale cache
+      await _fastDataRefreshService.forceRefresh();
+      
+      // Also manually refresh consumed calories and macro data to ensure accuracy
+      await _loadConsumedCaloriesFromFoodHistory();
+      await _loadMacroNutrientsFromFoodHistory();
+      
+      print('✅ Refreshed food data when screen became visible');
+    } catch (e) {
+      print('❌ Error refreshing food data: $e');
+    } finally {
+      _isRefreshingFoodData = false;
     }
   }
 
@@ -471,7 +676,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Initialize Google Fit service and load data (with persistence and RAM clearing support)
   Future<void> _initializeGoogleFit() async {
     try {
+      // Initialize both services
       await _googleFitService.initialize();
+      await _optimizedGoogleFitService.initialize();
 
       // Check authentication status immediately
       final isAuthenticated = await _googleFitService.validateAuthentication();
@@ -480,14 +687,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       });
 
       if (_isGoogleFitConnected) {
-        // Load Google Fit data immediately for instant UI update
-        await _loadGoogleFitData();
+        // Load Google Fit data immediately for instant UI update using optimized service
+        await _loadGoogleFitDataOptimized();
 
         // Start live sync for real-time updates
         _startLiveSync();
         _startGoogleFitRefreshTimer();
 
-        print('Google Fit initialized and connected - UI updated instantly');
+        print('Google Fit initialized and connected - UI updated instantly with optimized service');
       } else {
         print('Google Fit not connected - user needs to authenticate');
       }
@@ -586,6 +793,53 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       _startGoogleFitRefreshTimer();
     } catch (e) {
       print('Error loading Google Fit data asynchronously: $e');
+    }
+  }
+
+  /// Load Google Fit data using optimized service with caching
+  Future<void> _loadGoogleFitDataOptimized() async {
+    if (!_isGoogleFitConnected) return;
+
+    setState(() {
+      _isGoogleFitLoading = true;
+    });
+
+    try {
+      // Use optimized service with caching
+      final fitnessData = await _optimizedGoogleFitService.getOptimizedFitnessData();
+
+      if (fitnessData != null) {
+        final steps = fitnessData['steps'] as int? ?? 0;
+        final calories = fitnessData['caloriesBurned'] as double? ?? 0.0;
+        final distance = fitnessData['distance'] as double? ?? 0.0;
+        final weight = fitnessData['weight'] as double?;
+
+        setState(() {
+          _googleFitSteps = steps;
+          _googleFitCaloriesBurned = calories;
+          _googleFitDistance = distance;
+          _activityLevel = fitnessData['activityLevel'] ?? 'Unknown';
+          _lastSyncTime = DateTime.now();
+        });
+
+        // Update daily summary with Google Fit data if available
+        if (_dailySummary != null) {
+          await _updateDailySummaryWithGoogleFitData();
+        }
+
+        print('Google Fit data loaded (optimized): Steps=$steps, Calories=$calories, Distance=$distance');
+      } else {
+        // Fallback to original service if optimized fails
+        await _loadGoogleFitDataFallback();
+      }
+    } catch (e) {
+      print('Error loading optimized Google Fit data: $e');
+      // Try fallback method
+      await _loadGoogleFitDataFallback();
+    } finally {
+      setState(() {
+        _isGoogleFitLoading = false;
+      });
     }
   }
 
@@ -3844,290 +4098,96 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-  /// Build food history section
+  /// Build food history section (simplified without streams to prevent flickering)
   Widget _buildFoodHistorySection() {
-    return StreamBuilder<List<FoodHistoryEntry>>(
-      stream: FoodHistoryService.getRecentFoodEntriesStream(limit: 5),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildFoodHistoryLoading();
-        }
-
-        if (snapshot.hasError) {
-          return _buildFoodHistoryError();
-        }
-
-        final entries = snapshot.data ?? [];
-        
-        if (entries.isEmpty) {
-          return _buildEmptyFoodHistory();
-        }
-
-        return SliverToBoxAdapter(
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Enhanced Section Header
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.primaryColor.withOpacity(0.1),
-                        AppColors.secondaryColor.withOpacity(0.05),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: AppColors.primaryColor.withOpacity(0.2),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return SliverToBoxAdapter(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Today's Food Summary Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primaryColor.withOpacity(0.1),
+                    AppColors.secondaryColor.withOpacity(0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: AppColors.primaryColor.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              Icons.restaurant_menu,
-                              color: AppColors.primaryColor,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Today\'s Food',
-                                style: GoogleFonts.inter(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: Theme.of(context).textTheme.bodyLarge?.color,
-                                ),
-                              ),
-                              Text(
-                                '${entries.length} items • ${_getTotalCalories(entries)} kcal',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: Theme.of(context).textTheme.bodyMedium?.color,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
                       Container(
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: AppColors.primaryColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: IconButton(
-                          onPressed: () => _showAllFoodHistory(),
-                          icon: Icon(
-                            Icons.arrow_forward_ios,
-                            color: AppColors.primaryColor,
-                            size: 16,
-                          ),
+                        child: Icon(
+                          Icons.restaurant_menu,
+                          color: AppColors.primaryColor,
+                          size: 20,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 16),
-                
-                // Enhanced Food entries list
-                ...entries.map((entry) => _buildEnhancedFoodHistoryItem(entry)).toList(),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  /// Get total calories from entries
-  int _getTotalCalories(List<FoodHistoryEntry> entries) {
-    return entries.fold<int>(0, (total, entry) => total + entry.calories.round());
-  }
-
-  /// Build enhanced food history item
-  Widget _buildEnhancedFoodHistoryItem(FoodHistoryEntry entry) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _navigateToFoodDetail(entry),
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Theme.of(context).dividerColor.withOpacity(0.1),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                // Enhanced food icon
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        _getFoodIconColor(entry).withOpacity(0.2),
-                        _getFoodIconColor(entry).withOpacity(0.1),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    _getFoodIcon(entry),
-                    color: _getFoodIconColor(entry),
-                    size: 24,
-                  ),
-                ),
-                
-                const SizedBox(width: 16),
-                
-                // Enhanced food details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        entry.foodName,
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).textTheme.bodyLarge?.color,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.access_time,
-                            size: 12,
-                            color: Theme.of(context).textTheme.bodyMedium?.color,
-                          ),
-                          const SizedBox(width: 4),
                           Text(
-                            entry.formattedTimestamp,
+                            'Today\'s Food',
+                            style: GoogleFonts.inter(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Theme.of(context).textTheme.bodyLarge?.color,
+                            ),
+                          ),
+                          Text(
+                            'Tap to view all food entries',
                             style: GoogleFonts.inter(
                               fontSize: 12,
                               color: Theme.of(context).textTheme.bodyMedium?.color,
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: _getSourceColor(entry.source).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              _getSourceIcon(entry.source),
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                color: _getSourceColor(entry.source),
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ],
                   ),
-                ),
-                
-                // Enhanced calories display
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.primaryColor.withOpacity(0.1),
-                        AppColors.secondaryColor.withOpacity(0.05),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.primaryColor.withOpacity(0.2),
-                      width: 1,
+                    child: IconButton(
+                      onPressed: () => _showAllFoodHistory(),
+                      icon: Icon(
+                        Icons.arrow_forward_ios,
+                        color: AppColors.primaryColor,
+                        size: 16,
+                      ),
                     ),
                   ),
-                  child: Column(
-                    children: [
-                      Text(
-                        '${entry.calories.toStringAsFixed(0)}',
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primaryColor,
-                        ),
-                      ),
-                      Text(
-                        'kcal',
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.primaryColor.withOpacity(0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(width: 8),
-                
-                // Arrow icon
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).dividerColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Icon(
-                    Icons.arrow_forward_ios,
-                    size: 12,
-                    color: Theme.of(context).textTheme.bodyMedium?.color,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
+
+
 
   /// Build food history item
   Widget _buildFoodHistoryItem(FoodHistoryEntry entry) {
@@ -4227,146 +4287,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-  /// Build loading state for food history
-  Widget _buildFoodHistoryLoading() {
-    return SliverToBoxAdapter(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Recent Food',
-              style: GoogleFonts.inter(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: Theme.of(context).textTheme.bodyLarge?.color,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...List.generate(3, (index) => Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              height: 72,
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
-            )),
-          ],
-        ),
-      ),
-    );
-  }
 
-  /// Build error state for food history
-  Widget _buildFoodHistoryError() {
-    return SliverToBoxAdapter(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Recent Food',
-              style: GoogleFonts.inter(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: Theme.of(context).textTheme.bodyLarge?.color,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                'Unable to load food history',
-                style: GoogleFonts.inter(
-                  color: Theme.of(context).textTheme.bodyMedium?.color,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Build empty state for food history
-  Widget _buildEmptyFoodHistory() {
-    return SliverToBoxAdapter(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Recent Food',
-              style: GoogleFonts.inter(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: Theme.of(context).textTheme.bodyLarge?.color,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.primaryColor.withOpacity(0.2),
-                  width: 1,
-                ),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.restaurant_outlined,
-                    size: 48,
-                    color: AppColors.primaryColor.withOpacity(0.5),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'No food entries yet',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).textTheme.bodyLarge?.color,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Scan food items to see them here',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: Theme.of(context).textTheme.bodyMedium?.color,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: () => _navigateToCamera(),
-                    icon: const Icon(Icons.camera_alt, size: 18),
-                    label: const Text('Scan Food'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   /// Get food icon based on category
   IconData _getFoodIcon(FoodHistoryEntry entry) {
@@ -4460,13 +4381,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   /// Show all food history
   void _showAllFoodHistory() {
-    // TODO: Implement full food history screen
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Full food history coming soon!',
-          style: GoogleFonts.inter(),
-        ),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const TodaysFoodScreen(),
       ),
     );
   }
