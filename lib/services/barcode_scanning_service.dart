@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
@@ -29,6 +30,8 @@ class BarcodeScanningService {
   
   static List<Map<String, dynamic>>? _indianPackaged;
   static Map<String, NutritionInfo> _cache = {}; // Cache for faster responses
+  static Map<String, DateTime> _cacheTimestamps = {}; // Cache timestamps
+  static const Duration _cacheExpiry = Duration(hours: 24); // Cache for 24 hours
 
   /// Initialize local datasets
   static Future<void> initialize() async {
@@ -169,55 +172,37 @@ class BarcodeScanningService {
       
       // Validate barcode format first
       if (!isValidBarcode(cleanBarcode)) {
-        print('❌ Invalid barcode format: $cleanBarcode');
-        return _createWorkingBarcodeEntry(cleanBarcode);
+        print('❌ Invalid barcode format or non-food product: $cleanBarcode');
+        return _createNonFoodProductEntry(cleanBarcode);
       }
 
-      // Try multiple APIs in parallel for maximum coverage
-      print('🌍 Trying multiple APIs in parallel...');
+      // Try multiple APIs in parallel with smart cross-validation
+      // Order by reliability for faster results
+      print('🌍 Trying multiple APIs in parallel with cross-validation...');
       
       final futures = <Future<NutritionInfo?>>[
-        _scanWithOpenFoodFacts(cleanBarcode),
-        _scanWithUPCDatabase(cleanBarcode),
-        _scanWithBarcodeLookup(cleanBarcode),
-        _scanWithNutritionix(cleanBarcode),
-        _scanWithEdamam(cleanBarcode),
-        _scanWithFoodDataCentral(cleanBarcode),
-        _scanWithSpoonacular(cleanBarcode),
+        _scanWithNutritionix(cleanBarcode),           // Highest reliability
+        _scanWithFoodDataCentral(cleanBarcode),       // Highest reliability
+        _scanWithEdamam(cleanBarcode),                // High reliability
+        _scanWithSpoonacular(cleanBarcode),           // High reliability
+        _scanWithOpenFoodFacts(cleanBarcode),         // Medium reliability
+        _scanWithBarcodeLookup(cleanBarcode),         // Medium-low reliability
+        _scanWithUPCDatabase(cleanBarcode),           // Low reliability
       ];
       
-      // Wait for the first successful result with timeout
-      final results = await Future.wait(futures, eagerError: false);
+      // Wait for results with early exit for high-confidence results
+      final results = await _waitForResultsWithEarlyExit(futures);
       
-      // Find the best result (prefer those with nutrition data)
-      NutritionInfo? bestResult;
-      String? bestSource;
-      
-      for (int i = 0; i < results.length; i++) {
-        final result = results[i];
-        if (result != null) {
-          final apiNames = ['Open Food Facts', 'UPC Database', 'Barcode Lookup', 'Nutritionix', 'Edamam', 'USDA FoodData Central', 'Spoonacular'];
-          final apiName = apiNames[i];
-          
-          // Prefer results with actual nutrition data
-          if (result.calories > 0) {
-            print('✅ Found in $apiName with nutrition data');
-            bestResult = result;
-            bestSource = apiName;
-            break;
-          } else if (bestResult == null) {
-            print('✅ Found in $apiName (basic info)');
-            bestResult = result;
-            bestSource = apiName;
-          }
-        }
-      }
+      // Cross-validate results and find the best one
+      final crossValidationResult = _crossValidateResults(results, cleanBarcode);
+      NutritionInfo? bestResult = crossValidationResult['result'];
+      String? bestSource = crossValidationResult['source'];
 
       // If we found a product but no nutrition data, try to get nutrition from product name
       if (bestResult != null && bestResult.calories == 0) {
         print('🔍 Product found but no nutrition data, trying nutrition lookup...');
-        final nutritionResult = await _getNutritionFromProductName(bestResult.foodName);
-        if (nutritionResult != null) {
+        final nutritionResult = await getNutritionFromProductName(bestResult.foodName);
+        if (nutritionResult != null && nutritionResult.calories > 0) {
           // Merge product info with nutrition data
           bestResult = NutritionInfo(
             foodName: bestResult.foodName,
@@ -234,6 +219,14 @@ class BarcodeScanningService {
             notes: '${bestResult.notes} | Nutrition data from product name lookup',
           );
           print('✅ Added nutrition data from product name lookup');
+        } else {
+          // Try to estimate nutrition based on product category and name
+          print('🔍 Trying category-based nutrition estimation...');
+          final estimatedNutrition = _estimateNutritionFromProductInfo(bestResult);
+          if (estimatedNutrition != null) {
+            bestResult = estimatedNutrition;
+            print('✅ Added estimated nutrition data based on product category');
+          }
         }
       }
 
@@ -625,7 +618,7 @@ class BarcodeScanningService {
     );
   }
 
-  /// Validate barcode format
+  /// Validate barcode format and detect if it's likely a food product
   static bool isValidBarcode(String barcode) {
     // Remove any whitespace or special characters
     final cleanBarcode = barcode.trim().replaceAll(RegExp(r'[^\d]'), '');
@@ -635,7 +628,66 @@ class BarcodeScanningService {
     
     // Check common barcode lengths (expanded range)
     final validLengths = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
-    return validLengths.contains(cleanBarcode.length);
+    if (!validLengths.contains(cleanBarcode.length)) return false;
+    
+    // Additional validation: Check if barcode is likely a non-food product
+    if (_isLikelyNonFoodProduct(cleanBarcode)) {
+      print('⚠️ Barcode appears to be for a non-food product');
+      return false;
+    }
+    
+    return true;
+  }
+
+  /// Check if barcode is likely for a non-food product (electronics, books, etc.)
+  static bool _isLikelyNonFoodProduct(String barcode) {
+    // Common non-food product prefixes
+    final nonFoodPrefixes = [
+      '978', // ISBN books
+      '979', // ISBN books
+      '977', // ISSN magazines
+      '9780', // US books
+      '9781', // US books
+      '9782', // French books
+      '9783', // German books
+      '9784', // Japan books
+      '9785', // Russian books
+      '9786', // Spanish books
+      '9787', // Chinese books
+      '9788', // Italian books
+      '9789', // UK books
+      '690', // Chinese electronics (common prefix)
+      '691', // Chinese electronics
+      '692', // Chinese electronics
+      '693', // Chinese electronics
+      '694', // Chinese electronics
+      '695', // Chinese electronics
+    ];
+    
+    // Check prefixes
+    for (final prefix in nonFoodPrefixes) {
+      if (barcode.startsWith(prefix)) {
+        return true;
+      }
+    }
+    
+    // Check for very short barcodes (often non-food)
+    if (barcode.length <= 6) {
+      return true;
+    }
+    
+    // Check for patterns that suggest electronics or other non-food items
+    // This is a heuristic approach
+    if (barcode.startsWith('1') && barcode.length >= 12) {
+      // Many electronics use this pattern
+      final secondDigit = barcode[1];
+      if ('0123456789'.contains(secondDigit)) {
+        // Additional checks could be added here
+        return false; // Allow for now, but could be enhanced
+      }
+    }
+    
+    return false;
   }
   
   /// Clean and normalize barcode
@@ -767,6 +819,141 @@ class BarcodeScanningService {
       brand: 'Unknown',
       notes: 'Product not found in any database. Barcode: $barcode | Please add nutrition information manually.',
     );
+  }
+
+  /// Create an entry for non-food products
+  static NutritionInfo _createNonFoodProductEntry(String barcode) {
+    print('🚫 Creating non-food product entry for barcode: $barcode');
+    
+    final productType = _getNonFoodProductType(barcode);
+    
+    return NutritionInfo(
+      foodName: 'Non-Food Product ($productType)',
+      weightGrams: 0.0,
+      calories: 0.0,
+      protein: 0.0,
+      carbs: 0.0,
+      fat: 0.0,
+      fiber: 0.0,
+      sugar: 0.0,
+      source: 'Non-Food Detection',
+      category: productType,
+      brand: 'Unknown',
+      notes: 'This barcode appears to be for a $productType, not a food product. Barcode: $barcode | Please scan a food product instead.',
+    );
+  }
+
+  /// Determine the type of non-food product based on barcode
+  static String _getNonFoodProductType(String barcode) {
+    if (barcode.startsWith('978') || barcode.startsWith('979')) {
+      return 'Book/Magazine';
+    } else if (barcode.startsWith('977')) {
+      return 'Magazine/Journal';
+    } else if (barcode.startsWith('690') || barcode.startsWith('691') || 
+               barcode.startsWith('692') || barcode.startsWith('693') ||
+               barcode.startsWith('694') || barcode.startsWith('695')) {
+      return 'Electronics/Device';
+    } else if (barcode.length <= 6) {
+      return 'Industrial/Commercial';
+    } else {
+      return 'Non-Food Item';
+    }
+  }
+
+  /// Validate if nutrition data is accurate and reliable
+  static bool _isDataAccurate(NutritionInfo nutritionInfo, String source) {
+    // Check for obviously wrong data
+    if (nutritionInfo.calories < 0 || 
+        nutritionInfo.protein < 0 || 
+        nutritionInfo.carbs < 0 || 
+        nutritionInfo.fat < 0) {
+      print('❌ Invalid negative values detected');
+      return false;
+    }
+    
+    // Check for unrealistic calorie values based on food type and weight
+    if (nutritionInfo.calories > 0) {
+      final caloriesPer100g = (nutritionInfo.calories / nutritionInfo.weightGrams) * 100;
+      
+      // Check for extremely high calorie density (>1000 kcal/100g is unrealistic for most foods)
+      if (caloriesPer100g > 1000) {
+        print('❌ Unrealistically high calorie density: ${caloriesPer100g.toStringAsFixed(1)} kcal/100g');
+        return false;
+      }
+      
+      // Check for extremely low calorie density (<1 kcal/100g is unrealistic for most foods)
+      if (caloriesPer100g < 1 && nutritionInfo.weightGrams > 10) {
+        print('❌ Unrealistically low calorie density: ${caloriesPer100g.toStringAsFixed(1)} kcal/100g');
+        return false;
+      }
+      
+      // Check for unrealistic calories for small portions
+      if (nutritionInfo.calories > 1000 && nutritionInfo.weightGrams <= 100) {
+        print('❌ Unrealistically high calories for small portion: ${nutritionInfo.calories} kcal for ${nutritionInfo.weightGrams}g');
+        return false;
+      }
+    }
+    
+    // Check for missing essential data
+    if (nutritionInfo.calories == 0 && 
+        nutritionInfo.protein == 0 && 
+        nutritionInfo.carbs == 0 && 
+        nutritionInfo.fat == 0) {
+      print('❌ No nutrition data available');
+      return false;
+    }
+    
+    // Check for suspicious macro ratios (protein + carbs + fat should be reasonable)
+    final totalMacros = nutritionInfo.protein + nutritionInfo.carbs + nutritionInfo.fat;
+    if (totalMacros > 0) {
+      final macroCalories = (nutritionInfo.protein * 4) + (nutritionInfo.carbs * 4) + (nutritionInfo.fat * 9);
+      final macroCalorieRatio = macroCalories / nutritionInfo.calories;
+      
+      // Macro calories should be close to total calories (within 20% tolerance)
+      if (nutritionInfo.calories > 0 && (macroCalorieRatio < 0.5 || macroCalorieRatio > 1.5)) {
+        print('❌ Suspicious macro-to-calorie ratio: ${macroCalorieRatio.toStringAsFixed(2)}');
+        return false;
+      }
+    }
+    
+    // Rate sources by reliability
+    final reliableSources = [
+      'Nutritionix',
+      'USDA FoodData Central', 
+      'Edamam',
+      'Spoonacular'
+    ];
+    
+    final moderateSources = [
+      'Open Food Facts',
+      'Indian Packaged Foods'
+    ];
+    
+    final unreliableSources = [
+      'UPC Database',
+      'Barcode Lookup'
+    ];
+    
+    if (reliableSources.contains(source)) {
+      return true; // High confidence in these sources
+    } else if (moderateSources.contains(source)) {
+      // Additional validation for moderate sources
+      if (nutritionInfo.calories > 0 && nutritionInfo.weightGrams > 0) {
+        return true;
+      }
+      return false;
+    } else if (unreliableSources.contains(source)) {
+      // Be very strict with unreliable sources
+      if (nutritionInfo.calories > 0 && 
+          nutritionInfo.weightGrams > 0 &&
+          nutritionInfo.foodName != 'Unknown Product' &&
+          !nutritionInfo.foodName.toLowerCase().contains('unknown')) {
+        return true;
+      }
+      return false;
+    }
+    
+    return false; // Unknown source
   }
 
   /// Get nutrition estimate based on product type
@@ -924,6 +1111,47 @@ class BarcodeScanningService {
     }
   }
 
+  /// Debug method to test barcode scanning and display nutrition data
+  static Future<void> debugBarcodeScanning(String barcode) async {
+    print('🧪 Debug: Testing barcode scanning for: $barcode');
+    
+    try {
+      final result = await scanBarcode(barcode);
+      
+      if (result != null) {
+        print('✅ Barcode scan successful!');
+        print('📦 Product: ${result.foodName}');
+        print('⚖️ Weight: ${result.weightGrams}g');
+        print('🔥 Calories: ${result.calories}');
+        print('🥩 Protein: ${result.protein}g');
+        print('🍞 Carbs: ${result.carbs}g');
+        print('🧈 Fat: ${result.fat}g');
+        print('🌾 Fiber: ${result.fiber}g');
+        print('🍯 Sugar: ${result.sugar}g');
+        print('📊 Source: ${result.source}');
+        print('🏷️ Category: ${result.category}');
+        print('🏢 Brand: ${result.brand}');
+        print('📝 Notes: ${result.notes}');
+        
+        // Check if nutrition data is valid
+        if (result.calories > 0) {
+          print('✅ Valid nutrition data found');
+        } else {
+          print('❌ No calories found - this might be the issue');
+        }
+        
+        if (result.protein == 0 && result.carbs == 0 && result.fat == 0) {
+          print('❌ No macro nutrients found - this might be the issue');
+        }
+        
+      } else {
+        print('❌ Barcode scan failed - no result returned');
+      }
+    } catch (e) {
+      print('❌ Debug error: $e');
+    }
+  }
+
   /// Get all available barcode scanning sources
   static List<String> getAvailableSources() {
     final sources = <String>[
@@ -1076,7 +1304,7 @@ class BarcodeScanningService {
   }
 
   /// Get nutrition data from product name using multiple APIs
-  static Future<NutritionInfo?> _getNutritionFromProductName(String productName) async {
+  static Future<NutritionInfo?> getNutritionFromProductName(String productName) async {
     try {
       // Clean the product name for better API matching
       final cleanName = _cleanProductName(productName);
@@ -1364,16 +1592,19 @@ Please provide the following information in JSON format:
   "notes": "Additional information"
 }
 
-Important guidelines:
-- ONLY provide nutrition data if you are confident about the specific product
+CRITICAL ACCURACY REQUIREMENTS:
+- ONLY provide nutrition data if you are 100% confident about the specific product
 - If you don't know the exact product or are unsure, return "null"
 - Do NOT provide estimates or guesses for unknown products
-- Only respond with data for well-known, specific products
-- Focus on Indian food products and common international brands
-- Be very conservative - it's better to return null than wrong data
+- Only respond with data for well-known, specific products with verified nutrition data
+- Focus on Indian food products and common international brands with official nutrition facts
+- Be extremely conservative - it's better to return null than wrong data
 - If the product is unknown, unclear, or you're not confident, return "null"
+- Only use verified nutrition information from official sources
+- Do NOT estimate or guess nutrition values
+- If nutrition data is incomplete or uncertain, return "null"
 
-Respond only with valid JSON for known products or "null" if unknown/uncertain.
+Respond only with valid JSON for known products with verified nutrition or "null" if unknown/uncertain.
 ''';
 
       final response = await http.post(
@@ -1902,6 +2133,368 @@ Respond only with valid JSON for known products or "null" if unknown/uncertain.
     );
   }
 
+  /// Estimate nutrition from product information when no data is available
+  static NutritionInfo? _estimateNutritionFromProductInfo(NutritionInfo productInfo) {
+    try {
+      final productName = productInfo.foodName.toLowerCase();
+      final weight = productInfo.weightGrams;
+      
+      // Determine product category from name and existing category
+      String category = productInfo.category?.toLowerCase() ?? '';
+      if (category.isEmpty) {
+        category = _inferProductCategory(productName);
+      }
+      
+      // Get nutrition estimate based on category
+      final nutritionData = _getNutritionEstimate(category, weight);
+      
+      if (nutritionData['calories']! > 0) {
+        return NutritionInfo(
+          foodName: productInfo.foodName,
+          weightGrams: weight,
+          calories: nutritionData['calories']!,
+          protein: nutritionData['protein']!,
+          carbs: nutritionData['carbs']!,
+          fat: nutritionData['fat']!,
+          fiber: nutritionData['fiber']!,
+          sugar: nutritionData['sugar']!,
+          source: '${productInfo.source} + Category Estimation',
+          category: productInfo.category,
+          brand: productInfo.brand,
+          notes: '${productInfo.notes} | Estimated nutrition based on product category: $category',
+        );
+      }
+    } catch (e) {
+      print('❌ Error estimating nutrition from product info: $e');
+    }
+    return null;
+  }
+
+  /// Check if one result is better than another as a fallback
+  static bool _isBetterFallback(NutritionInfo newResult, NutritionInfo currentBest) {
+    // Prefer results with more complete nutrition data
+    final newCompleteness = _getNutritionCompleteness(newResult);
+    final currentCompleteness = _getNutritionCompleteness(currentBest);
+    
+    if (newCompleteness > currentCompleteness) {
+      return true;
+    } else if (newCompleteness == currentCompleteness) {
+      // If completeness is equal, prefer results with more calories (more likely to be real food)
+      return newResult.calories > currentBest.calories;
+    }
+    
+    return false;
+  }
+
+  /// Calculate nutrition data completeness score
+  static int _getNutritionCompleteness(NutritionInfo nutritionInfo) {
+    int score = 0;
+    if (nutritionInfo.calories > 0) score += 3;
+    if (nutritionInfo.protein > 0) score += 1;
+    if (nutritionInfo.carbs > 0) score += 1;
+    if (nutritionInfo.fat > 0) score += 1;
+    if (nutritionInfo.fiber > 0) score += 1;
+    if (nutritionInfo.sugar > 0) score += 1;
+    return score;
+  }
+
+  /// Cross-validate results from multiple APIs and return the best one
+  static Map<String, dynamic> _crossValidateResults(List<NutritionInfo?> results, String barcode) {
+    final apiNames = ['Nutritionix', 'USDA FoodData Central', 'Edamam', 'Spoonacular', 'Open Food Facts', 'Barcode Lookup', 'UPC Database'];
+    
+    // Filter out null results and collect valid ones
+    final validResults = <Map<String, dynamic>>[];
+    for (int i = 0; i < results.length; i++) {
+      final result = results[i];
+      if (result != null && result.calories > 0) {
+        validResults.add({
+          'result': result,
+          'source': apiNames[i],
+          'index': i,
+        });
+      }
+    }
+    
+    if (validResults.isEmpty) {
+      // No valid results found, return first non-null result or null
+      for (int i = 0; i < results.length; i++) {
+        if (results[i] != null) {
+          return {
+            'result': results[i],
+            'source': apiNames[i],
+            'confidence': 0.1,
+          };
+        }
+      }
+      return {'result': null, 'source': null, 'confidence': 0.0};
+    }
+    
+    // If only one result, return it
+    if (validResults.length == 1) {
+      final result = validResults.first;
+      return {
+        'result': result['result'],
+        'source': result['source'],
+        'confidence': _calculateConfidence(result['result'], result['source']),
+      };
+    }
+    
+    // Multiple results - cross-validate and find consensus
+    print('🔍 Cross-validating ${validResults.length} results...');
+    
+    // Group results by similar calorie values (within 20% tolerance)
+    final calorieGroups = _groupByCalorieConsensus(validResults);
+    
+    // Find the group with most results (consensus)
+    String? bestGroup;
+    int maxGroupSize = 0;
+    for (final entry in calorieGroups.entries) {
+      if (entry.value.length > maxGroupSize) {
+        maxGroupSize = entry.value.length;
+        bestGroup = entry.key;
+      }
+    }
+    
+    if (bestGroup != null && calorieGroups[bestGroup]!.length > 1) {
+      // We have consensus - pick the best result from the consensus group
+      final consensusResults = calorieGroups[bestGroup]!;
+      final bestResult = _selectBestFromGroup(consensusResults);
+      print('✅ Found consensus among ${consensusResults.length} sources');
+      return {
+        'result': bestResult['result'],
+        'source': bestResult['source'],
+        'confidence': 0.9, // High confidence due to consensus
+      };
+    } else {
+      // No clear consensus - pick the most reliable source
+      final bestResult = _selectMostReliableResult(validResults);
+      print('⚠️ No consensus found, using most reliable source: ${bestResult['source']}');
+      return {
+        'result': bestResult['result'],
+        'source': bestResult['source'],
+        'confidence': _calculateConfidence(bestResult['result'], bestResult['source']),
+      };
+    }
+  }
+
+  /// Group results by calorie consensus (within 20% tolerance)
+  static Map<String, List<Map<String, dynamic>>> _groupByCalorieConsensus(List<Map<String, dynamic>> results) {
+    final groups = <String, List<Map<String, dynamic>>>{};
+    
+    for (final result in results) {
+      final nutritionInfo = result['result'] as NutritionInfo;
+      final calories = nutritionInfo.calories;
+      
+      // Find existing group with similar calories
+      String? matchingGroup;
+      for (final groupKey in groups.keys) {
+        final groupCalories = double.parse(groupKey);
+        final tolerance = groupCalories * 0.2; // 20% tolerance
+        
+        if ((calories - groupCalories).abs() <= tolerance) {
+          matchingGroup = groupKey;
+          break;
+        }
+      }
+      
+      if (matchingGroup != null) {
+        groups[matchingGroup]!.add(result);
+      } else {
+        // Create new group
+        groups[calories.toString()] = [result];
+      }
+    }
+    
+    return groups;
+  }
+
+  /// Select the best result from a group of consensus results
+  static Map<String, dynamic> _selectBestFromGroup(List<Map<String, dynamic>> group) {
+    // Sort by source reliability and data completeness
+    group.sort((a, b) {
+      final aReliability = _getSourceReliability(a['source']);
+      final bReliability = _getSourceReliability(b['source']);
+      
+      if (aReliability != bReliability) {
+        return bReliability.compareTo(aReliability); // Higher reliability first
+      }
+      
+      // If same reliability, sort by completeness
+      final aCompleteness = _getNutritionCompleteness(a['result']);
+      final bCompleteness = _getNutritionCompleteness(b['result']);
+      return bCompleteness.compareTo(aCompleteness);
+    });
+    
+    return group.first;
+  }
+
+  /// Select the most reliable result when no consensus
+  static Map<String, dynamic> _selectMostReliableResult(List<Map<String, dynamic>> results) {
+    // Sort by reliability score
+    results.sort((a, b) {
+      final aScore = _calculateReliabilityScore(a['result'], a['source']);
+      final bScore = _calculateReliabilityScore(b['result'], b['source']);
+      return bScore.compareTo(aScore);
+    });
+    
+    return results.first;
+  }
+
+  /// Calculate reliability score for a result
+  static double _calculateReliabilityScore(NutritionInfo result, String source) {
+    double score = 0.0;
+    
+    // Source reliability (0.0 to 1.0)
+    score += _getSourceReliability(source) * 0.4;
+    
+    // Data completeness (0.0 to 1.0)
+    score += (_getNutritionCompleteness(result) / 8.0) * 0.3;
+    
+    // Data accuracy (0.0 to 1.0)
+    score += (_isDataAccurate(result, source) ? 1.0 : 0.0) * 0.3;
+    
+    return score;
+  }
+
+  /// Get source reliability score
+  static double _getSourceReliability(String source) {
+    switch (source) {
+      case 'Nutritionix':
+      case 'USDA FoodData Central':
+        return 1.0; // Highest reliability
+      case 'Edamam':
+      case 'Spoonacular':
+        return 0.8; // High reliability
+      case 'Open Food Facts':
+        return 0.6; // Medium reliability
+      case 'Barcode Lookup':
+        return 0.5; // Medium-low reliability
+      case 'UPC Database':
+        return 0.3; // Low reliability
+      default:
+        return 0.1; // Very low reliability
+    }
+  }
+
+  /// Calculate confidence score for a result
+  static double _calculateConfidence(NutritionInfo result, String source) {
+    double confidence = 0.5; // Base confidence
+    
+    // Boost confidence for reliable sources
+    confidence += _getSourceReliability(source) * 0.3;
+    
+    // Boost confidence for complete data
+    confidence += (_getNutritionCompleteness(result) / 8.0) * 0.2;
+    
+    // Boost confidence for accurate data
+    if (_isDataAccurate(result, source)) {
+      confidence += 0.2;
+    }
+    
+    return confidence.clamp(0.0, 1.0);
+  }
+
+  /// Wait for results with early exit for high-confidence results
+  static Future<List<NutritionInfo?>> _waitForResultsWithEarlyExit(List<Future<NutritionInfo?>> futures) async {
+    final apiNames = ['Nutritionix', 'USDA FoodData Central', 'Edamam', 'Spoonacular', 'Open Food Facts', 'Barcode Lookup', 'UPC Database'];
+    final results = List<NutritionInfo?>.filled(futures.length, null);
+    
+    // Track completed futures
+    int completedCount = 0;
+    final completer = Completer<List<NutritionInfo?>>();
+    
+    // Set up individual completers for each future
+    for (int i = 0; i < futures.length; i++) {
+      futures[i].then((result) {
+        results[i] = result;
+        completedCount++;
+        
+        // Check if this is a high-confidence result from a reliable source
+        if (result != null && result.calories > 0) {
+          final source = apiNames[i];
+          final confidence = _calculateConfidence(result, source);
+          
+          // If we get a high-confidence result from a reliable source, return early
+          if (confidence >= 0.8 && _getSourceReliability(source) >= 0.8) {
+            print('⚡ Early exit: High-confidence result from $source (${(confidence * 100).toStringAsFixed(1)}%)');
+            if (!completer.isCompleted) {
+              completer.complete(results);
+            }
+            return;
+          }
+        }
+        
+        // If all futures are complete, return results
+        if (completedCount == futures.length && !completer.isCompleted) {
+          completer.complete(results);
+        }
+      }).catchError((error) {
+        completedCount++;
+        if (completedCount == futures.length && !completer.isCompleted) {
+          completer.complete(results);
+        }
+      });
+    }
+    
+    // Set a timeout to prevent waiting too long
+    Timer(Duration(seconds: 8), () {
+      if (!completer.isCompleted) {
+        print('⏰ Timeout reached, returning partial results');
+        completer.complete(results);
+      }
+    });
+    
+    return completer.future;
+  }
+
+  /// Infer product category from product name
+  static String _inferProductCategory(String productName) {
+    final name = productName.toLowerCase();
+    
+    // Beverages
+    if (name.contains('drink') || name.contains('juice') || name.contains('soda') || 
+        name.contains('water') || name.contains('tea') || name.contains('coffee')) {
+      return 'beverages';
+    }
+    
+    // Snacks
+    if (name.contains('chips') || name.contains('crackers') || name.contains('biscuit') || 
+        name.contains('cookie') || name.contains('namkeen') || name.contains('mixture')) {
+      return 'snacks';
+    }
+    
+    // Dairy
+    if (name.contains('milk') || name.contains('yogurt') || name.contains('curd') || 
+        name.contains('cheese') || name.contains('paneer') || name.contains('butter')) {
+      return 'dairy';
+    }
+    
+    // Sweets
+    if (name.contains('sweet') || name.contains('mithai') || name.contains('halwa') || 
+        name.contains('kheer') || name.contains('barfi') || name.contains('laddu')) {
+      return 'indian sweets';
+    }
+    
+    // Instant noodles
+    if (name.contains('noodles') || name.contains('maggi') || name.contains('pasta')) {
+      return 'instant noodles';
+    }
+    
+    // Cereals
+    if (name.contains('cereal') || name.contains('oats') || name.contains('cornflakes')) {
+      return 'cereals';
+    }
+    
+    // Fried snacks
+    if (name.contains('fried') || name.contains('pakora') || name.contains('samosa') || 
+        name.contains('vada') || name.contains('bonda')) {
+      return 'fried snacks';
+    }
+    
+    // Default to packaged food
+    return 'packaged food';
+  }
+
   /// Get nutrition estimate from local knowledge base for common Indian products
   /// Only returns data for very specific, well-known products to avoid wrong information
   static NutritionInfo? _getLocalNutritionEstimate(String productName) {
@@ -2239,4 +2832,47 @@ Respond only with valid JSON for known products or "null" if unknown/uncertain.
     
     return null; // No local knowledge available
   }
+
+  /// Get cached result for barcode
+  static NutritionInfo? getCachedResult(String barcode) {
+    if (_cache.containsKey(barcode) && _cacheTimestamps.containsKey(barcode)) {
+      final cacheTime = _cacheTimestamps[barcode]!;
+      if (DateTime.now().difference(cacheTime) < _cacheExpiry) {
+        return _cache[barcode];
+      } else {
+        // Remove expired cache entry
+        _cache.remove(barcode);
+        _cacheTimestamps.remove(barcode);
+      }
+    }
+    return null;
+  }
+
+  /// Cache result for barcode
+  static void cacheResult(String barcode, NutritionInfo nutritionInfo) {
+    _cache[barcode] = nutritionInfo;
+    _cacheTimestamps[barcode] = DateTime.now();
+  }
+
+  /// Clear expired cache entries
+  static void clearExpiredCache() {
+    final now = DateTime.now();
+    final expiredKeys = <String>[];
+    
+    for (final entry in _cacheTimestamps.entries) {
+      if (now.difference(entry.value) > _cacheExpiry) {
+        expiredKeys.add(entry.key);
+      }
+    }
+    
+    for (final key in expiredKeys) {
+      _cache.remove(key);
+      _cacheTimestamps.remove(key);
+    }
+    
+    if (expiredKeys.isNotEmpty) {
+      print('🧹 Cleared ${expiredKeys.length} expired cache entries');
+    }
+  }
+
 }

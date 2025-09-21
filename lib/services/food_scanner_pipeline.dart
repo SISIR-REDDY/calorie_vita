@@ -7,6 +7,7 @@ import 'portion_estimation_service.dart';
 import 'nutrition_lookup_service.dart';
 import 'barcode_scanning_service.dart';
 import 'ai_reasoning_service.dart';
+import 'snap_to_calorie_service.dart';
 
 /// Main food scanner pipeline that integrates all components
 class FoodScannerPipeline {
@@ -42,41 +43,28 @@ class FoodScannerPipeline {
         await initialize();
       }
 
-      // Step 1: Food Recognition
-      print('🔍 Step 1: Recognizing food...');
-      final recognitionResult = await FoodRecognitionService.recognizeFoodFromImage(imageFile);
-      
-      if (!recognitionResult.isSuccessful) {
-        return FoodScannerResult(
-          success: false,
-          error: 'Food recognition failed: ${recognitionResult.error}',
-        );
-      }
-
-      // Step 2: Portion Estimation
-      print('📏 Step 2: Estimating portion size...');
-      PortionEstimationResult portionResult;
-      
-      if (PortionEstimationService.isArAvailable) {
-        portionResult = await PortionEstimationService.estimatePortionWithAR();
-      } else {
-        // Fallback to food type estimation
-        portionResult = PortionEstimationService.estimatePortionByFoodType(
-          recognitionResult.foodName,
-          recognitionResult.category,
-          recognitionResult.confidence,
-        );
-      }
-
-      // Step 3: Nutrition Lookup
-      print('🥗 Step 3: Looking up nutrition information...');
-      final nutritionInfo = await NutritionLookupService.lookupNutrition(
-        recognitionResult.foodName,
-        portionResult.estimatedWeight,
-        recognitionResult.category,
+      // Use enhanced snap-to-calorie pipeline for better accuracy
+      print('🔍 Using enhanced snap-to-calorie pipeline with AI suggestions...');
+      final snapResult = await SnapToCalorieService.processFoodImage(
+        imageFile,
+        userProfile: userProfile,
+        userGoals: userGoals,
+        dietaryRestrictions: userGoals?['dietary_restrictions']?.cast<String>(),
+        includeSuggestions: true,
       );
+      
+      if (!snapResult.isSuccessful) {
+        // Fallback to original pipeline
+        print('⚠️ Snap-to-calorie failed, falling back to original pipeline...');
+        return await _processWithOriginalPipeline(imageFile);
+      }
 
-      // Step 4: AI Reasoning and Analysis
+      // Convert snap-to-calorie result to legacy format for compatibility
+      final recognitionResult = _convertSnapToLegacyRecognition(snapResult);
+      final portionResult = _convertSnapToLegacyPortion(snapResult);
+      final nutritionInfo = await _convertSnapToLegacyNutrition(snapResult);
+
+      // AI Analysis
       print('🤖 Step 4: AI analysis and recommendations...');
       final aiAnalysis = await AIReasoningService.analyzeFoodWithAI(
         recognitionResult: recognitionResult,
@@ -92,6 +80,7 @@ class FoodScannerPipeline {
         nutritionInfo: nutritionInfo,
         aiAnalysis: aiAnalysis,
         processingTime: DateTime.now().millisecondsSinceEpoch,
+        snapToCalorieResult: snapResult, // Include the enhanced result
       );
     } catch (e) {
       print('❌ Error in food scanner pipeline: $e');
@@ -100,6 +89,65 @@ class FoodScannerPipeline {
         error: 'Pipeline processing failed: $e',
       );
     }
+  }
+
+  /// Original pipeline as fallback
+  static Future<FoodScannerResult> _processWithOriginalPipeline(
+    File imageFile, {
+    String? userProfile,
+    Map<String, dynamic>? userGoals,
+  }) async {
+    // Step 1: Food Recognition
+    print('🔍 Step 1: Recognizing food...');
+    final recognitionResult = await FoodRecognitionService.recognizeFoodFromImage(imageFile);
+    
+    if (!recognitionResult.isSuccessful) {
+      return FoodScannerResult(
+        success: false,
+        error: 'Food recognition failed: ${recognitionResult.error}',
+      );
+    }
+
+    // Step 2: Portion Estimation
+    print('📏 Step 2: Estimating portion size...');
+    PortionEstimationResult portionResult;
+    
+    if (PortionEstimationService.isArAvailable) {
+      portionResult = await PortionEstimationService.estimatePortionWithAR();
+    } else {
+      // Fallback to food type estimation
+      portionResult = PortionEstimationService.estimatePortionByFoodType(
+        recognitionResult.foodName,
+        recognitionResult.category,
+        recognitionResult.confidence,
+      );
+    }
+
+    // Step 3: Nutrition Lookup
+    print('🥗 Step 3: Looking up nutrition information...');
+    final nutritionInfo = await NutritionLookupService.lookupNutrition(
+      recognitionResult.foodName,
+      portionResult.estimatedWeight,
+      recognitionResult.category,
+    );
+
+    // Step 4: AI Reasoning and Analysis
+    print('🤖 Step 4: AI analysis and recommendations...');
+    final aiAnalysis = await AIReasoningService.analyzeFoodWithAI(
+      recognitionResult: recognitionResult,
+      portionResult: portionResult,
+      nutritionInfo: nutritionInfo,
+      userProfile: userProfile,
+    );
+
+    return FoodScannerResult(
+      success: true,
+      recognitionResult: recognitionResult,
+      portionResult: portionResult,
+      nutritionInfo: nutritionInfo,
+      aiAnalysis: aiAnalysis,
+      processingTime: DateTime.now().millisecondsSinceEpoch,
+    );
   }
 
   /// Process barcode scan through the complete pipeline
@@ -221,6 +269,29 @@ class FoodScannerPipeline {
     }
   }
 
+  /// Process food image and return snap-to-calorie JSON output directly
+  static Future<Map<String, dynamic>?> processSnapToCalorie(
+    File imageFile, {
+    String? userProfile,
+    Map<String, dynamic>? userGoals,
+    List<String>? dietaryRestrictions,
+    bool includeSuggestions = true,
+  }) async {
+    try {
+      final snapResult = await SnapToCalorieService.processFoodImage(
+        imageFile,
+        userProfile: userProfile,
+        userGoals: userGoals,
+        dietaryRestrictions: dietaryRestrictions,
+        includeSuggestions: includeSuggestions,
+      );
+      return snapResult.toJson();
+    } catch (e) {
+      print('❌ Error in snap-to-calorie processing: $e');
+      return null;
+    }
+  }
+
   /// Get pipeline status
   static Map<String, dynamic> getPipelineStatus() {
     return {
@@ -231,6 +302,7 @@ class FoodScannerPipeline {
         'nutritionLookup': true,
         'barcodeScanning': true,
         'aiReasoning': true,
+        'snapToCalorie': true,
       },
       'capabilities': [
         'Food recognition from images',
@@ -238,6 +310,7 @@ class FoodScannerPipeline {
         'Nutrition lookup (Indian + USDA)',
         'Barcode scanning (Open Food Facts)',
         'AI analysis and recommendations',
+        'Enhanced snap-to-calorie pipeline',
       ],
     };
   }
@@ -251,6 +324,175 @@ class FoodScannerPipeline {
   static List<PortionOption> getPredefinedPortions() {
     return PortionEstimationService.getPredefinedPortions();
   }
+
+  /// Convert snap-to-calorie result to legacy recognition format
+  static FoodRecognitionResult _convertSnapToLegacyRecognition(SnapToCalorieResult snapResult) {
+    if (snapResult.items.isEmpty) {
+      return FoodRecognitionResult(
+        foodName: 'Unknown Food',
+        confidence: 0.0,
+        category: 'Unknown',
+        cuisine: 'Unknown',
+        error: 'No items identified',
+      );
+    }
+
+    final primaryItem = snapResult.items.first;
+    return FoodRecognitionResult(
+      foodName: primaryItem.name,
+      confidence: primaryItem.confidence,
+      category: _inferCategory(primaryItem.name),
+      cuisine: 'Indian', // Default for our use case
+    );
+  }
+
+  /// Convert snap-to-calorie result to legacy portion format
+  static PortionEstimationResult _convertSnapToLegacyPortion(SnapToCalorieResult snapResult) {
+    if (snapResult.items.isEmpty) {
+      return PortionEstimationResult(
+        estimatedWeight: 0.0,
+        confidence: 0.0,
+        method: 'Unknown',
+      );
+    }
+
+    final totalWeight = snapResult.items.fold(0.0, (sum, item) => sum + item.massG.value);
+    final avgConfidence = snapResult.overallConfidence;
+    
+    return PortionEstimationResult(
+      estimatedWeight: totalWeight,
+      confidence: avgConfidence,
+      method: 'snap_to_calorie',
+    );
+  }
+
+  /// Convert snap-to-calorie result to legacy nutrition format
+  static Future<NutritionInfo> _convertSnapToLegacyNutrition(SnapToCalorieResult snapResult) async {
+    if (snapResult.items.isEmpty) {
+      return NutritionInfo(
+        foodName: 'Unknown Food',
+        calories: 0.0,
+        weightGrams: 0.0,
+        protein: 0.0,
+        carbs: 0.0,
+        fat: 0.0,
+        fiber: 0.0,
+        sugar: 0.0,
+        source: 'snap_to_calorie_service',
+      );
+    }
+
+    final primaryItem = snapResult.items.first;
+    final totalCalories = snapResult.totalCalories;
+    final totalWeight = snapResult.items.fold(0.0, (sum, item) => sum + item.massG.value);
+    
+    // Estimate macros based on food type (with nutrition lookup)
+    final macros = await _estimateMacros(primaryItem.name, totalWeight);
+    
+    return NutritionInfo(
+      foodName: primaryItem.name,
+      calories: totalCalories,
+      weightGrams: totalWeight,
+      protein: macros['protein'] ?? 0.0,
+      carbs: macros['carbs'] ?? 0.0,
+      fat: macros['fat'] ?? 0.0,
+      fiber: macros['fiber'] ?? 0.0,
+      sugar: (macros['carbs'] ?? 0.0) * 0.3, // Estimate sugar as 30% of carbs
+      source: 'snap_to_calorie_service',
+      category: _inferCategory(primaryItem.name),
+      cuisine: 'Indian',
+    );
+  }
+
+  /// Infer food category from name
+  static String _inferCategory(String foodName) {
+    final name = foodName.toLowerCase();
+    if (name.contains('rice')) return 'Grains';
+    if (name.contains('dal') || name.contains('lentil')) return 'Legumes';
+    if (name.contains('chicken') || name.contains('meat')) return 'Protein';
+    if (name.contains('curry') || name.contains('sabzi')) return 'Vegetables';
+    if (name.contains('roti') || name.contains('naan') || name.contains('bread')) return 'Bread';
+    if (name.contains('paneer')) return 'Dairy';
+    return 'Other';
+  }
+
+  /// Estimate macros for food using nutrition lookup service
+  static Future<Map<String, double>> _estimateMacros(String foodName, double weight) async {
+    try {
+      // Try to get accurate nutrition data first
+      final nutritionInfo = await NutritionLookupService.lookupNutrition(
+        foodName,
+        weight,
+        null, // category will be inferred
+      );
+      
+      if (nutritionInfo.calories > 0) {
+        return {
+          'protein': nutritionInfo.protein,
+          'carbs': nutritionInfo.carbs,
+          'fat': nutritionInfo.fat,
+          'fiber': nutritionInfo.fiber,
+        };
+      }
+    } catch (e) {
+      print('❌ Error looking up macros for $foodName: $e');
+    }
+    
+    // Fallback to category-based estimation
+    final name = foodName.toLowerCase();
+    
+    if (name.contains('rice') || name.contains('biryani') || name.contains('pulao')) {
+      return {
+        'protein': (weight * 2.7) / 100,
+        'carbs': (weight * 28.0) / 100,
+        'fat': (weight * 0.3) / 100,
+        'fiber': (weight * 0.4) / 100,
+      };
+    } else if (name.contains('dal') || name.contains('lentil') || name.contains('chana')) {
+      return {
+        'protein': (weight * 24.0) / 100,
+        'carbs': (weight * 63.0) / 100,
+        'fat': (weight * 2.0) / 100,
+        'fiber': (weight * 10.0) / 100,
+      };
+    } else if (name.contains('chicken') || name.contains('mutton') || name.contains('fish')) {
+      return {
+        'protein': (weight * 27.0) / 100,
+        'carbs': (weight * 0.0) / 100,
+        'fat': (weight * 14.0) / 100,
+        'fiber': (weight * 0.0) / 100,
+      };
+    } else if (name.contains('paneer') || name.contains('cheese')) {
+      return {
+        'protein': (weight * 18.0) / 100,
+        'carbs': (weight * 1.0) / 100,
+        'fat': (weight * 20.0) / 100,
+        'fiber': (weight * 0.0) / 100,
+      };
+    } else if (name.contains('roti') || name.contains('naan') || name.contains('bread')) {
+      return {
+        'protein': (weight * 8.0) / 100,
+        'carbs': (weight * 50.0) / 100,
+        'fat': (weight * 2.0) / 100,
+        'fiber': (weight * 2.0) / 100,
+      };
+    } else if (name.contains('curry') || name.contains('sabzi') || name.contains('vegetable')) {
+      return {
+        'protein': (weight * 2.0) / 100,
+        'carbs': (weight * 8.0) / 100,
+        'fat': (weight * 0.5) / 100,
+        'fiber': (weight * 3.0) / 100,
+      };
+    } else {
+      // Default estimation
+      return {
+        'protein': (weight * 10.0) / 100,
+        'carbs': (weight * 20.0) / 100,
+        'fat': (weight * 5.0) / 100,
+        'fiber': (weight * 2.0) / 100,
+      };
+    }
+  }
 }
 
 /// Result of the food scanner pipeline
@@ -263,6 +505,7 @@ class FoodScannerResult {
   final Map<String, dynamic>? aiAnalysis;
   final int? processingTime;
   final bool isBarcodeScan;
+  final SnapToCalorieResult? snapToCalorieResult;
 
   FoodScannerResult({
     required this.success,
@@ -273,6 +516,7 @@ class FoodScannerResult {
     this.aiAnalysis,
     this.processingTime,
     this.isBarcodeScan = false,
+    this.snapToCalorieResult,
   });
 
   /// Get formatted processing time
@@ -304,6 +548,7 @@ class FoodScannerResult {
       'aiAnalysis': aiAnalysis,
       'processingTime': processingTime,
       'isBarcodeScan': isBarcodeScan,
+      'snapToCalorieResult': snapToCalorieResult?.toJson(),
     };
   }
 

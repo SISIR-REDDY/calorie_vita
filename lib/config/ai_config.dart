@@ -5,9 +5,9 @@ class AIConfig {
 
   static const String chatModel = 'openai/gpt-3.5-turbo';
   static const String visionModel =
-      'microsoft/phi-3-vision-128k-instruct'; // Cost-effective vision model
+      'openai/gpt-4o'; // Reliable vision model for image analysis
   static const String backupVisionModel =
-      'meta-llama/llama-3.2-11b-vision-instruct'; // Backup option
+      'anthropic/claude-3-5-sonnet'; // Backup option
 
   static const int maxTokens = 800;
   static const int chatMaxTokens = 250;

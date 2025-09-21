@@ -67,6 +67,72 @@ const Color kDarkSoftGray = Color(0xFF334155); // Dark soft gray
 // Dark background colors
 const Color kDarkAppBackground = Color(0xFF0F172A); // Dark app background
 
+/// App Colors class for easy access to color constants
+class AppColors {
+  // Primary colors
+  static const Color primaryColor = kPrimaryColor;
+  static const Color primaryLight = kPrimaryLight;
+  static const Color primaryDark = kPrimaryDark;
+  
+  // Secondary colors
+  static const Color secondaryColor = kSecondaryColor;
+  static const Color secondaryLight = kSecondaryLight;
+  
+  // Accent colors
+  static const Color accentColor = kAccentColor;
+  static const Color accentLight = kAccentLight;
+  static const Color accentBlue = kAccentBlue;
+  static const Color accentGreen = kAccentGreen;
+  static const Color accentGold = kAccentGold;
+  static const Color accentPurple = kAccentPurple;
+  
+  // Surface colors
+  static const Color surfaceColor = kSurfaceColor;
+  static const Color surfaceLight = kSurfaceLight;
+  static const Color surfaceDark = kSurfaceDark;
+  
+  // Text colors
+  static const Color textPrimary = kTextPrimary;
+  static const Color textSecondary = kTextSecondary;
+  static const Color textTertiary = kTextTertiary;
+  static const Color textDark = kTextDark;
+  static const Color textGrey = kTextGrey;
+  
+  // Border and divider colors
+  static const Color borderColor = kBorderColor;
+  static const Color dividerColor = kDividerColor;
+  
+  // Status colors
+  static const Color successColor = kSuccessColor;
+  static const Color warningColor = kWarningColor;
+  static const Color errorColor = kErrorColor;
+  static const Color infoColor = kInfoColor;
+  
+  // Additional colors
+  static const Color softWhite = kSoftWhite;
+  static const Color softGray = kSoftGray;
+  static const Color appBackground = kAppBackground;
+  
+  // Dark theme colors
+  static const Color darkSurfaceColor = kDarkSurfaceColor;
+  static const Color darkSurfaceLight = kDarkSurfaceLight;
+  static const Color darkSurfaceDark = kDarkSurfaceDark;
+  static const Color darkTextPrimary = kDarkTextPrimary;
+  static const Color darkTextSecondary = kDarkTextSecondary;
+  static const Color darkTextTertiary = kDarkTextTertiary;
+  static const Color darkTextDark = kDarkTextDark;
+  static const Color darkTextGrey = kDarkTextGrey;
+  static const Color darkBorderColor = kDarkBorderColor;
+  static const Color darkDividerColor = kDarkDividerColor;
+  static const Color darkSuccessColor = kDarkSuccessColor;
+  static const Color darkWarningColor = kDarkWarningColor;
+  static const Color darkErrorColor = kDarkErrorColor;
+  static const Color darkInfoColor = kDarkInfoColor;
+  static const Color darkSoftWhite = kDarkSoftWhite;
+  static const Color darkSoftGray = kDarkSoftGray;
+  static const Color darkAppBackground = kDarkAppBackground;
+}
+
 // Light Theme Gradients
 const LinearGradient kPrimaryGradient = LinearGradient(
   colors: [kPrimaryColor, kPrimaryLight],
