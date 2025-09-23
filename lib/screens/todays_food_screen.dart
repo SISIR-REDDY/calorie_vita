@@ -5,6 +5,7 @@ import '../ui/app_colors.dart';
 import '../models/food_history_entry.dart';
 import '../services/food_history_service.dart';
 import 'food_history_detail_screen.dart';
+import 'camera_screen.dart';
 
 /// Today's Food screen showing all food items consumed today
 class TodaysFoodScreen extends StatefulWidget {
@@ -175,7 +176,7 @@ class _TodaysFoodScreenState extends State<TodaysFoodScreen> {
           ),
           const SizedBox(height: 32),
           ElevatedButton.icon(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => _navigateToCamera(),
             icon: const Icon(Icons.camera_alt),
             label: const Text('Scan Food'),
             style: ElevatedButton.styleFrom(
@@ -531,6 +532,14 @@ class _TodaysFoodScreenState extends State<TodaysFoodScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => FoodHistoryDetailScreen(entry: entry),
+      ),
+    );
+  }
+
+  void _navigateToCamera() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const CameraScreen(),
       ),
     );
   }
