@@ -405,19 +405,32 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     try {
       await _todaysFoodDataService.initialize();
       
-      // Load cached data immediately for instant UI display
+      // INSTANT: Load cached data immediately for instant UI display
+      final cachedCalories = _todaysFoodDataService.getCachedConsumedCalories();
       final cachedMacros = _todaysFoodDataService.getCachedMacroNutrients();
-      if (cachedMacros.isNotEmpty) {
+      
+      if (cachedCalories > 0 || cachedMacros.isNotEmpty) {
         setState(() {
-          _macroBreakdown = MacroBreakdown(
-            protein: cachedMacros['protein'] ?? 0.0,
-            carbs: cachedMacros['carbs'] ?? 0.0,
-            fat: cachedMacros['fat'] ?? 0.0,
-            fiber: cachedMacros['fiber'] ?? 0.0,
-            sugar: cachedMacros['sugar'] ?? 0.0,
-          );
+          // Update consumed calories immediately
+          if (_dailySummaries.isNotEmpty) {
+            final todaySummary = _dailySummaries.last;
+            _dailySummaries[_dailySummaries.length - 1] = todaySummary.copyWith(
+              caloriesConsumed: cachedCalories,
+            );
+          }
+          
+          // Update macro breakdown immediately
+          if (cachedMacros.isNotEmpty) {
+            _macroBreakdown = MacroBreakdown(
+              protein: cachedMacros['protein'] ?? 0.0,
+              carbs: cachedMacros['carbs'] ?? 0.0,
+              fat: cachedMacros['fat'] ?? 0.0,
+              fiber: cachedMacros['fiber'] ?? 0.0,
+              sugar: cachedMacros['sugar'] ?? 0.0,
+            );
+          }
         });
-        print('✅ Analytics: Loaded cached macro data immediately');
+        print('✅ Analytics: Loaded cached data immediately - Calories: $cachedCalories');
       }
       
       // Listen to consumed calories stream (same data as TodaysFoodScreen)

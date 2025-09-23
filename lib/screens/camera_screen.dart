@@ -259,14 +259,24 @@ class _CameraScreenState extends State<CameraScreen> {
           scanData: scanData,
         );
         
-        // Use fast data refresh service for immediate updates
+        // ULTRA FAST: Use fast data refresh service for immediate updates
         final fastDataRefreshService = FastDataRefreshService();
         final success = await fastDataRefreshService.addFoodEntryAndRefresh(entry);
         
         if (success) {
-          print('✅ Food entry saved to history with fast refresh: ${result.nutritionInfo!.foodName}');
+          print('🚀 ULTRA FAST: Food entry saved instantly: ${result.nutritionInfo!.foodName}');
+          // ULTRA FAST: Show success immediately (no waiting)
+          setState(() {
+            _loading = false;
+            _scannerResult = null;
+            _showPortionSelector = false;
+          });
         } else {
           print('❌ Failed to save food entry to history');
+          setState(() {
+            _loading = false;
+            _error = 'Failed to save food entry';
+          });
         }
       }
     } catch (e) {

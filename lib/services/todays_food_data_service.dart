@@ -26,14 +26,25 @@ class TodaysFoodDataService {
 
   /// Initialize the service
   Future<void> initialize() async {
+    // INSTANT: Load existing data immediately for instant UI display
+    try {
+      final existingEntries = await FoodHistoryService.getTodaysFoodEntries();
+      if (existingEntries.isNotEmpty) {
+        calculateAndUpdateData(existingEntries);
+        print('✅ TodaysFoodDataService: Loaded ${existingEntries.length} existing entries immediately');
+      }
+    } catch (e) {
+      print('❌ Error loading existing food entries: $e');
+    }
+    
     // Listen to today's food entries stream (same as TodaysFoodScreen)
     _foodEntriesSubscription = FoodHistoryService.getTodaysFoodEntriesStream().listen((entries) {
-      _calculateAndUpdateData(entries);
+      calculateAndUpdateData(entries);
     });
   }
 
   /// Calculate consumed calories and macro nutrients from food entries
-  void _calculateAndUpdateData(List<FoodHistoryEntry> entries) {
+  void calculateAndUpdateData(List<FoodHistoryEntry> entries) {
     // Calculate consumed calories (same logic as TodaysFoodScreen._calculateTotals)
     final consumedCalories = entries.fold<int>(0, (total, entry) => total + entry.calories.round());
     
@@ -51,13 +62,28 @@ class TodaysFoodDataService {
     print('   Calories: $consumedCalories');
     print('   Protein: ${macroNutrients['protein']}g, Carbs: ${macroNutrients['carbs']}g, Fat: ${macroNutrients['fat']}g');
 
-    // Update cache
+    // Update cache immediately
     _cachedConsumedCalories = consumedCalories;
     _cachedMacroNutrients = macroNutrients;
 
-    // Emit updates
+    // Emit updates immediately (no await, no delay)
     _consumedCaloriesController.add(consumedCalories);
     _macroNutrientsController.add(macroNutrients);
+    
+    print('⚡ TodaysFoodDataService: Streams updated immediately');
+  }
+
+  /// ULTRA FAST: Update with pre-calculated values (no calculations needed)
+  void updateWithPreCalculatedValues(int consumedCalories, Map<String, double> macroNutrients) {
+    // Update cache immediately (no calculations)
+    _cachedConsumedCalories = consumedCalories;
+    _cachedMacroNutrients = macroNutrients;
+
+    // Emit updates immediately (no calculations, no delays)
+    _consumedCaloriesController.add(consumedCalories);
+    _macroNutrientsController.add(macroNutrients);
+    
+    print('🚀 TodaysFoodDataService: ULTRA FAST update - Calories: $consumedCalories');
   }
 
   /// Get cached consumed calories (for immediate UI updates)

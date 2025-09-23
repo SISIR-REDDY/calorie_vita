@@ -5,12 +5,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/food_history_entry.dart';
 import '../services/food_history_service.dart';
 import '../services/daily_summary_service.dart';
+import '../services/todays_food_data_service.dart';
 
 /// Service for fast data refresh and real-time updates
 class FastDataRefreshService {
   static final FastDataRefreshService _instance = FastDataRefreshService._internal();
   factory FastDataRefreshService() => _instance;
   FastDataRefreshService._internal();
+  
+  // ULTRA FAST: Pre-initialize TodaysFoodDataService to avoid object creation overhead
+  static final TodaysFoodDataService _todaysFoodDataService = TodaysFoodDataService();
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -189,34 +193,54 @@ class FastDataRefreshService {
     return _cachedMacroBreakdown;
   }
 
-  /// Add food entry and refresh immediately
+  /// Add food entry and refresh immediately (ULTRA FAST)
   Future<bool> addFoodEntryAndRefresh(FoodHistoryEntry entry) async {
     try {
-      // Add to food history
-      final success = await FoodHistoryService.addFoodEntry(entry);
+      // ULTRA FAST: Pre-calculate values before adding to cache
+      final entryCalories = entry.calories.round();
+      final entryProtein = entry.protein;
+      final entryCarbs = entry.carbs;
+      final entryFat = entry.fat;
+      final entryFiber = entry.fiber;
+      final entrySugar = entry.sugar;
       
-      if (success) {
-        // Immediately update cached data and streams
-        _cachedTodaysFood.add(entry);
-        
-        // Calculate new consumed calories
-        final consumedCalories = _cachedTodaysFood.fold<int>(0, (total, e) => total + e.calories.round());
-        
-        // Update streams immediately
-        _todaysFoodController.add(_cachedTodaysFood);
-        if (consumedCalories != _cachedConsumedCalories) {
-          _cachedConsumedCalories = consumedCalories;
-          _consumedCaloriesController.add(consumedCalories);
+      // Add to cache
+      _cachedTodaysFood.add(entry);
+      
+      // ULTRA FAST: Incremental calculation (no fold, just add)
+      final newConsumedCalories = _cachedConsumedCalories + entryCalories;
+      final newMacroBreakdown = <String, double>{
+        'protein': (_cachedMacroBreakdown['protein'] ?? 0.0) + entryProtein,
+        'carbs': (_cachedMacroBreakdown['carbs'] ?? 0.0) + entryCarbs,
+        'fat': (_cachedMacroBreakdown['fat'] ?? 0.0) + entryFat,
+        'fiber': (_cachedMacroBreakdown['fiber'] ?? 0.0) + entryFiber,
+        'sugar': (_cachedMacroBreakdown['sugar'] ?? 0.0) + entrySugar,
+      };
+      
+      // Update cache immediately
+      _cachedConsumedCalories = newConsumedCalories;
+      _cachedMacroBreakdown = newMacroBreakdown;
+      
+      // ULTRA FAST: Batch stream updates (no individual checks)
+      _todaysFoodController.add(_cachedTodaysFood);
+      _consumedCaloriesController.add(newConsumedCalories);
+      _macroBreakdownController.add(newMacroBreakdown);
+      
+      // ULTRA FAST: Update TodaysFoodDataService with pre-calculated values (no object creation)
+      _todaysFoodDataService.updateWithPreCalculatedValues(newConsumedCalories, newMacroBreakdown);
+      
+      // ULTRA FAST: Firestore save in background (completely non-blocking)
+      FoodHistoryService.addFoodEntry(entry).then((success) {
+        if (success) {
+          print('✅ Food entry saved to Firestore: ${entry.foodName}');
+        } else {
+          print('❌ Failed to save food entry to Firestore');
         }
-        
-        // Update macro breakdown immediately
-        _calculateMacroBreakdown(_cachedTodaysFood);
-        
-        // Also force refresh for consistency
-        await forceRefresh();
-        return true;
-      }
-      return false;
+      }).catchError((e) {
+        print('❌ Error saving to Firestore: $e');
+      });
+      
+      return true; // Return immediately for instant UI response
     } catch (e) {
       debugPrint('Error adding food entry and refreshing: $e');
       return false;

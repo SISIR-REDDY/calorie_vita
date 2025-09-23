@@ -177,6 +177,31 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     try {
       await _todaysFoodDataService.initialize();
       
+      // INSTANT: Load cached data immediately for instant UI display
+      final cachedCalories = _todaysFoodDataService.getCachedConsumedCalories();
+      final cachedMacros = _todaysFoodDataService.getCachedMacroNutrients();
+      
+      if (cachedCalories > 0 || cachedMacros.isNotEmpty) {
+        setState(() {
+          // Update consumed calories immediately
+          if (_dailySummary != null) {
+            _dailySummary = _dailySummary!.copyWith(caloriesConsumed: cachedCalories);
+          }
+          
+          // Update macro breakdown immediately
+          if (cachedMacros.isNotEmpty) {
+            _macroBreakdown = MacroBreakdown(
+              protein: cachedMacros['protein'] ?? 0.0,
+              carbs: cachedMacros['carbs'] ?? 0.0,
+              fat: cachedMacros['fat'] ?? 0.0,
+              fiber: cachedMacros['fiber'] ?? 0.0,
+              sugar: cachedMacros['sugar'] ?? 0.0,
+            );
+          }
+        });
+        print('✅ Home: Loaded cached data immediately - Calories: $cachedCalories');
+      }
+      
       // Listen to consumed calories stream (same data as TodaysFoodScreen)
       _todaysFoodCaloriesSubscription = _todaysFoodDataService.consumedCaloriesStream.listen((calories) {
         _debounceUIUpdate(() {
