@@ -1582,7 +1582,7 @@ Respond only with valid JSON for known products with verified nutrition or "null
               'content': prompt,
             }
           ],
-          'max_tokens': 500,
+          'max_tokens': 100,
           'temperature': 0.3, // Lower temperature for more consistent results
         }),
       );

@@ -869,6 +869,34 @@ class _CameraScreenState extends State<CameraScreen> {
                         _buildAIAnalysis(aiAnalysis!),
                       ],
                       
+                      // Source information
+                      if (nutrition.source != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: kSurfaceLight,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 16,
+                                color: kTextSecondary,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Source: ${nutrition.source}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: kTextSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

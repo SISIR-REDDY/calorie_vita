@@ -246,13 +246,17 @@ Be specific, helpful, and encouraging in your analysis.''',
       body: jsonEncode({
         'model': _chatModel,
         'messages': messages,
-        'max_tokens': 800,
+        'max_tokens': 100,
         'temperature': 0.7,
       }),
     );
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
+    } else if (response.statusCode == 402) {
+      throw Exception('AI_CREDITS_EXCEEDED');
+    } else if (response.statusCode == 429) {
+      throw Exception('AI_RATE_LIMIT');
     } else {
       throw Exception('AI API request failed: ${response.statusCode} - ${response.body}');
     }

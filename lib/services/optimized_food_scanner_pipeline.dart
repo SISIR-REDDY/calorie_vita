@@ -404,7 +404,7 @@ Be concise and accurate. Return only valid JSON.
             ],
           }
         ],
-        'max_tokens': 300, // Reduced for faster response
+        'max_tokens': 100, // Reduced for faster response
         'temperature': 0.1, // Lower for more consistent results
       };
 

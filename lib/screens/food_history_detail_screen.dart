@@ -339,8 +339,6 @@ class _FoodHistoryDetailScreenState extends State<FoodHistoryDetailScreen> {
             const SizedBox(height: 8),
           ],
           
-          _buildInfoRow('Source', widget.entry.sourceDisplayName),
-          const SizedBox(height: 8),
           
           _buildInfoRow('Date Added', _formatDate(widget.entry.timestamp)),
           

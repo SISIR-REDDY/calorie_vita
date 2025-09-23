@@ -1,5 +1,5 @@
 class AIConfig {
-  static const String apiKey = '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';
+  static const String apiKey = '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';
 
   static const String baseUrl = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -9,10 +9,10 @@ class AIConfig {
   static const String backupVisionModel =
       'anthropic/claude-3-5-sonnet'; // Backup option
 
-  static const int maxTokens = 800;
-  static const int chatMaxTokens = 250;
-  static const int analyticsMaxTokens = 300;
-  static const int visionMaxTokens = 1500;
+  static const int maxTokens = 100;
+  static const int chatMaxTokens = 100;
+  static const int analyticsMaxTokens = 100;
+  static const int visionMaxTokens = 200;
   static const double temperature = 0.7;
   static const double visionTemperature = 0.3;
 

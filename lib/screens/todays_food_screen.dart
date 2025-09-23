@@ -479,22 +479,6 @@ class _TodaysFoodScreenState extends State<TodaysFoodScreen> {
                               color: Colors.grey[600],
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: _getSourceColor(entry.source).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              _getSourceLabel(entry.source),
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                                color: _getSourceColor(entry.source),
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ],

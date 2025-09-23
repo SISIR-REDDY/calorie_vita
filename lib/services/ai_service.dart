@@ -102,7 +102,12 @@ Be genuine, supportive, and motivating like a real trainer who cares about their
           'Sorry, I couldn\'t process your request.';
     } catch (e) {
       print('Error in askTrainerSisir: $e');
-      return '⚠️ AI service unavailable, please try again later.';
+      if (e.toString().contains('AI_CREDITS_EXCEEDED')) {
+        return '💡 AI credits exhausted. Please upgrade your plan or try again later.';
+      } else if (e.toString().contains('AI_RATE_LIMIT')) {
+        return '⏱️ AI service is busy. Please wait a moment and try again.';
+      }
+      return '⚠️ AI service temporarily unavailable. Please try again later.';
     }
   }
 
@@ -168,7 +173,12 @@ Be professional, concise, and actionable. Do not use ** or any markdown formatti
           'Unable to generate insights at this time.';
     } catch (e) {
       print('Error in getAnalyticsInsights: $e');
-      return '⚠️ AI service unavailable, please try again later.';
+      if (e.toString().contains('AI_CREDITS_EXCEEDED')) {
+        return '📊 Analytics insights temporarily unavailable due to service limits.';
+      } else if (e.toString().contains('AI_RATE_LIMIT')) {
+        return '⏱️ Analytics service is busy. Please try again in a moment.';
+      }
+      return '📊 Analytics insights temporarily unavailable. Please try again later.';
     }
   }
 
@@ -237,7 +247,12 @@ Be professional, specific, and motivating. Do not use ** or any markdown formatt
           'Unable to generate recommendations at this time.';
     } catch (e) {
       print('Error in getPersonalizedRecommendations: $e');
-      return '⚠️ AI service unavailable, please try again later.';
+      if (e.toString().contains('AI_CREDITS_EXCEEDED')) {
+        return '💡 Personalized recommendations temporarily unavailable due to service limits.';
+      } else if (e.toString().contains('AI_RATE_LIMIT')) {
+        return '⏱️ Recommendation service is busy. Please try again in a moment.';
+      }
+      return '💡 Personalized recommendations temporarily unavailable. Please try again later.';
     }
   }
 
@@ -271,6 +286,13 @@ Be professional, specific, and motivating. Do not use ** or any markdown formatt
       }
     } catch (e) {
       print('Error in detectCaloriesFromImage: $e');
+      String errorMessage = '⚠️ AI service unavailable, please try again later.';
+      if (e.toString().contains('AI_CREDITS_EXCEEDED')) {
+        errorMessage = '💡 Image analysis temporarily unavailable due to service limits.';
+      } else if (e.toString().contains('AI_RATE_LIMIT')) {
+        errorMessage = '⏱️ Image analysis service is busy. Please try again in a moment.';
+      }
+      
       return {
         'food': 'Unable to analyze',
         'calories': 0,
@@ -279,7 +301,7 @@ Be professional, specific, and motivating. Do not use ** or any markdown formatt
         'fat': '0g',
         'serving_size': '1 serving',
         'confidence': 0.0,
-        'error': '⚠️ AI service unavailable, please try again later.',
+        'error': errorMessage,
       };
     }
   }
@@ -622,6 +644,13 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
       };
     } catch (e) {
       print('Error in getNutritionFromBarcode: $e');
+      String errorMessage = '⚠️ AI service unavailable, please try again later.';
+      if (e.toString().contains('AI_CREDITS_EXCEEDED')) {
+        errorMessage = '💡 Barcode analysis temporarily unavailable due to service limits.';
+      } else if (e.toString().contains('AI_RATE_LIMIT')) {
+        errorMessage = '⏱️ Barcode analysis service is busy. Please try again in a moment.';
+      }
+      
       return {
         'food': 'Unable to analyze barcode',
         'calories': 0,
@@ -630,7 +659,7 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
         'fat': '0g',
         'serving_size': '1 serving',
         'confidence': 0.0,
-        'error': '⚠️ AI service unavailable, please try again later.',
+        'error': errorMessage,
         'barcode': barcode,
       };
     }
@@ -662,27 +691,41 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
       temperature = AIConfig.temperature;
     }
 
-    final response = await http.post(
-      Uri.parse(_baseUrl),
-      headers: {
-        'Authorization': 'Bearer $_apiKey',
-        'Content-Type': 'application/json',
-        'HTTP-Referer': AIConfig.appUrl,
-        'X-Title': AIConfig.appName,
-      },
-      body: jsonEncode({
-        'model': model,
-        'messages': messages,
-        'max_tokens': maxTokens,
-        'temperature': temperature,
-      }),
-    );
+    try {
+      final response = await http.post(
+        Uri.parse(_baseUrl),
+        headers: {
+          'Authorization': 'Bearer $_apiKey',
+          'Content-Type': 'application/json',
+          'HTTP-Referer': AIConfig.appUrl,
+          'X-Title': AIConfig.appName,
+        },
+        body: jsonEncode({
+          'model': model,
+          'messages': messages,
+          'max_tokens': maxTokens,
+          'temperature': temperature,
+        }),
+      ).timeout(const Duration(seconds: 15));
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
-    } else {
-      throw Exception(
-          'API request failed with status ${response.statusCode}: ${response.body}');
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else if (response.statusCode == 402) {
+        // Credit limit exceeded
+        throw Exception('AI_CREDITS_EXCEEDED');
+      } else if (response.statusCode == 429) {
+        // Rate limit exceeded
+        throw Exception('AI_RATE_LIMIT');
+      } else {
+        throw Exception(
+            'API request failed with status ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      if (e.toString().contains('AI_CREDITS_EXCEEDED') || 
+          e.toString().contains('AI_RATE_LIMIT')) {
+        rethrow;
+      }
+      throw Exception('Network error: $e');
     }
   }
 
