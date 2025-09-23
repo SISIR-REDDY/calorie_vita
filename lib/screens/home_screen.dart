@@ -40,6 +40,7 @@ import '../models/user_preferences.dart';
 import '../models/food_history_entry.dart';
 import '../services/food_history_service.dart';
 import '../services/fast_data_refresh_service.dart';
+import '../services/todays_food_data_service.dart';
 import 'food_history_detail_screen.dart';
 import 'todays_food_screen.dart';
 
@@ -77,6 +78,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       GlobalGoogleFitManager();
   final TaskService _taskService = TaskService();
   final FastDataRefreshService _fastDataRefreshService = FastDataRefreshService();
+  final TodaysFoodDataService _todaysFoodDataService = TodaysFoodDataService();
 
   // Data
   DailySummary? _dailySummary;
@@ -127,6 +129,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   StreamSubscription<int>? _consumedCaloriesSubscription;
   StreamSubscription<List<FoodHistoryEntry>>? _todaysFoodSubscription;
   StreamSubscription<Map<String, dynamic>>? _fastMacroBreakdownSubscription;
+  StreamSubscription<int>? _todaysFoodCaloriesSubscription;
+  StreamSubscription<Map<String, double>>? _todaysFoodMacroSubscription;
   Timer? _goalsCheckTimer;
   Timer? _googleFitRefreshTimer;
   Timer? _streakRefreshTimer;
@@ -148,7 +152,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     // Initialize immediately without waiting
     _initializeServicesAsync();
     _setupStreamListeners();
-    _setupFastDataRefresh();
+    _setupTodaysFoodDataService();
     _loadData();
     _loadRewardsDataAsync();
     _initializeGoogleFitAsync();
@@ -168,54 +172,38 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _refreshFoodData();
   }
 
-  /// Setup fast data refresh for immediate UI updates
-  Future<void> _setupFastDataRefresh() async {
+  /// Setup today's food data service for immediate UI updates
+  Future<void> _setupTodaysFoodDataService() async {
     try {
-      await _fastDataRefreshService.initialize();
+      await _todaysFoodDataService.initialize();
       
-      // Listen to consumed calories stream with debouncing
-      _consumedCaloriesSubscription = _fastDataRefreshService.consumedCaloriesStream.listen((calories) {
-        // Only update if calories actually changed
-        if (_dailySummary?.caloriesConsumed != calories) {
-          _debounceUIUpdate(() {
-            if (mounted && _dailySummary != null) {
-              _dailySummary = _dailySummary!.copyWith(caloriesConsumed: calories);
-            }
-          });
-        }
+      // Listen to consumed calories stream (same data as TodaysFoodScreen)
+      _todaysFoodCaloriesSubscription = _todaysFoodDataService.consumedCaloriesStream.listen((calories) {
+        _debounceUIUpdate(() {
+          if (mounted && _dailySummary != null) {
+            _dailySummary = _dailySummary!.copyWith(caloriesConsumed: calories);
+          }
+        });
       });
 
-      // Listen to today's food stream with debouncing
-      _todaysFoodSubscription = _fastDataRefreshService.todaysFoodStream.listen((foodEntries) {
-        // Only update if food entries actually changed
-        if (_hasFoodEntriesChanged(foodEntries)) {
-          _debounceUIUpdate(() {
-            // This will trigger UI rebuild with new food data
-          });
-        }
+      // Listen to macro nutrients stream (same data as TodaysFoodScreen)
+      _todaysFoodMacroSubscription = _todaysFoodDataService.macroNutrientsStream.listen((macros) {
+        _debounceUIUpdate(() {
+          if (mounted) {
+            _macroBreakdown = MacroBreakdown(
+              protein: macros['protein'] ?? 0.0,
+              carbs: macros['carbs'] ?? 0.0,
+              fat: macros['fat'] ?? 0.0,
+              fiber: macros['fiber'] ?? 0.0,
+              sugar: macros['sugar'] ?? 0.0,
+            );
+          }
+        });
       });
 
-      // Listen to macro breakdown stream with debouncing
-      _fastMacroBreakdownSubscription = _fastDataRefreshService.macroBreakdownStream.listen((breakdown) {
-        // Only update if macro data actually changed
-        if (_hasMacroDataChanged(breakdown)) {
-          _debounceUIUpdate(() {
-            if (mounted) {
-              _macroBreakdown = MacroBreakdown(
-                protein: breakdown['protein'] ?? 0.0,
-                carbs: breakdown['carbs'] ?? 0.0,
-                fat: breakdown['fat'] ?? 0.0,
-                fiber: breakdown['fiber'] ?? 0.0,
-                sugar: breakdown['sugar'] ?? 0.0,
-              );
-            }
-          });
-        }
-      });
-
-      print('✅ Fast data refresh service initialized');
+      print('✅ Today\'s food data service initialized');
     } catch (e) {
-      print('❌ Error initializing fast data refresh: $e');
+      print('❌ Error initializing today\'s food data service: $e');
     }
   }
 
@@ -388,10 +376,13 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _consumedCaloriesSubscription?.cancel();
     _todaysFoodSubscription?.cancel();
     _fastMacroBreakdownSubscription?.cancel();
+    _todaysFoodCaloriesSubscription?.cancel();
+    _todaysFoodMacroSubscription?.cancel();
     _uiUpdateTimer?.cancel();
     _googleFitCacheService.stopLiveUpdates();
     _googleFitCacheService.dispose();
     _fastDataRefreshService.dispose();
+    _todaysFoodDataService.dispose();
     _stopLiveSync();
     GlobalGoalsManager().clearCallback();
     super.dispose();

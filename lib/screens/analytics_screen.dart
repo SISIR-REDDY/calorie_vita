@@ -11,6 +11,7 @@ import '../services/google_fit_service.dart';
 import '../services/global_google_fit_manager.dart';
 import '../services/optimized_google_fit_service.dart';
 import '../services/fast_data_refresh_service.dart';
+import '../services/todays_food_data_service.dart';
 import '../mixins/google_fit_sync_mixin.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
@@ -41,6 +42,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   final GlobalGoogleFitManager _googleFitManager = GlobalGoogleFitManager();
   final OptimizedGoogleFitService _optimizedGoogleFitService = OptimizedGoogleFitService();
   final FastDataRefreshService _fastDataRefreshService = FastDataRefreshService();
+  final TodaysFoodDataService _todaysFoodDataService = TodaysFoodDataService();
 
   // State management
   bool _isLoading = false; // Start with false to show UI immediately
@@ -58,6 +60,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   StreamSubscription<Map<String, dynamic>?>? _profileDataSubscription;
   StreamSubscription<Map<String, dynamic>>? _fastMacroBreakdownSubscription;
   StreamSubscription<UserGoals?>? _goalsSubscription;
+  StreamSubscription<Map<String, double>>? _todaysFoodMacroSubscription;
+  StreamSubscription<int>? _todaysFoodCaloriesSubscription;
 
   // Real-time data
   List<DailySummary> _dailySummaries = [];
@@ -84,7 +88,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     super.initState();
     _initializeAnalytics();
     initializeGoogleFitSync();
-    _setupFastDataRefresh();
+    _setupTodaysFoodDataService();
   }
 
   @override
@@ -92,8 +96,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     _profileDataSubscription?.cancel();
     _fastMacroBreakdownSubscription?.cancel();
     _goalsSubscription?.cancel();
+    _todaysFoodMacroSubscription?.cancel();
+    _todaysFoodCaloriesSubscription?.cancel();
     _analyticsService.dispose();
     _fastDataRefreshService.dispose();
+    _todaysFoodDataService.dispose();
     super.dispose();
   }
 
@@ -393,30 +400,63 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     }
   }
 
-  /// Setup fast data refresh for immediate macro updates
-  Future<void> _setupFastDataRefresh() async {
+  /// Setup today's food data service for immediate updates
+  Future<void> _setupTodaysFoodDataService() async {
     try {
-      await _fastDataRefreshService.initialize();
+      await _todaysFoodDataService.initialize();
       
-      // Listen to macro breakdown stream from FastDataRefreshService
-      _fastMacroBreakdownSubscription = _fastDataRefreshService.macroBreakdownStream.listen((breakdown) {
+      // Load cached data immediately for instant UI display
+      final cachedMacros = _todaysFoodDataService.getCachedMacroNutrients();
+      if (cachedMacros.isNotEmpty) {
+        setState(() {
+          _macroBreakdown = MacroBreakdown(
+            protein: cachedMacros['protein'] ?? 0.0,
+            carbs: cachedMacros['carbs'] ?? 0.0,
+            fat: cachedMacros['fat'] ?? 0.0,
+            fiber: cachedMacros['fiber'] ?? 0.0,
+            sugar: cachedMacros['sugar'] ?? 0.0,
+          );
+        });
+        print('✅ Analytics: Loaded cached macro data immediately');
+      }
+      
+      // Listen to consumed calories stream (same data as TodaysFoodScreen)
+      _todaysFoodCaloriesSubscription = _todaysFoodDataService.consumedCaloriesStream.listen((calories) {
         if (mounted) {
+          // Update the daily summaries with consumed calories from today's food
           setState(() {
-            _macroBreakdown = MacroBreakdown(
-              protein: breakdown['protein'] ?? 0.0,
-              carbs: breakdown['carbs'] ?? 0.0,
-              fat: breakdown['fat'] ?? 0.0,
-              fiber: breakdown['fiber'] ?? 0.0,
-              sugar: breakdown['sugar'] ?? 0.0,
-            );
+            if (_dailySummaries.isNotEmpty) {
+              // Update today's summary with consumed calories from food entries
+              final todaySummary = _dailySummaries.last;
+              _dailySummaries[_dailySummaries.length - 1] = todaySummary.copyWith(
+                caloriesConsumed: calories,
+              );
+            }
           });
-          print('✅ Analytics: Macro breakdown updated from FastDataRefreshService');
+          print('✅ Analytics: Consumed calories updated from TodaysFoodDataService: $calories');
         }
       });
       
-      print('✅ Fast data refresh service initialized for analytics');
+      // Listen to macro nutrients stream (same data as TodaysFoodScreen)
+      _todaysFoodMacroSubscription = _todaysFoodDataService.macroNutrientsStream.listen((macros) {
+        if (mounted) {
+          setState(() {
+            _macroBreakdown = MacroBreakdown(
+              protein: macros['protein'] ?? 0.0,
+              carbs: macros['carbs'] ?? 0.0,
+              fat: macros['fat'] ?? 0.0,
+              fiber: macros['fiber'] ?? 0.0,
+              sugar: macros['sugar'] ?? 0.0,
+            );
+          });
+          print('✅ Analytics: Macro breakdown updated from TodaysFoodDataService');
+          print('   Protein: ${macros['protein'] ?? 0.0}g, Carbs: ${macros['carbs'] ?? 0.0}g, Fat: ${macros['fat'] ?? 0.0}g');
+        }
+      });
+      
+      print('✅ Today\'s food data service initialized for analytics');
     } catch (e) {
-      print('❌ Error initializing fast data refresh for analytics: $e');
+      print('❌ Error initializing today\'s food data service for analytics: $e');
     }
   }
 
@@ -1673,6 +1713,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   Widget _buildMacroBreakdown() {
     final userGoals = _appStateService.userGoals;
     final macroGoals = userGoals?.macroGoals;
+    
+    // Debug logging
+    print('🔍 Analytics Macro Breakdown UI - Protein: ${_macroBreakdown.protein}g, Carbs: ${_macroBreakdown.carbs}g, Fat: ${_macroBreakdown.fat}g');
     
     return Container(
       padding: const EdgeInsets.all(20),
