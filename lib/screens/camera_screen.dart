@@ -11,10 +11,12 @@ import '../models/food_entry.dart';
 import '../models/food_history_entry.dart';
 import '../models/nutrition_info.dart';
 import '../models/portion_estimation_result.dart';
+import '../models/food_recognition_result.dart';
 import '../widgets/food_result_card.dart';
+import '../widgets/manual_food_entry_dialog.dart';
 import '../ui/app_colors.dart';
 import '../services/food_history_service.dart';
-import '../services/fast_data_refresh_service.dart';
+import '../services/manual_food_entry_service.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -32,8 +34,11 @@ class _CameraScreenState extends State<CameraScreen> {
   bool _showBarcodeScanner = false;
   bool _showPortionSelector = false;
   double _selectedPortion = 150.0; // Default portion in grams
+  bool _barcodeProcessing = false; // Prevent multiple barcode detections
+  bool _scannerDisabled = false; // Completely disable scanner after detection
 
   final ImagePicker _picker = ImagePicker();
+  MobileScannerController? _scannerController;
 
   /// Parse macro value from string (e.g., "15g" -> 15.0)
   double _parseMacroValue(dynamic value) {
@@ -72,6 +77,10 @@ class _CameraScreenState extends State<CameraScreen> {
           }
         });
         
+        // Auto-save successful scan results
+        if (result.success && result.nutritionInfo != null) {
+          _autoSaveFood(result, 'camera_scan');
+        }
         
         // Show portion selector if needed
         if (result.success && result.portionResult != null && 
@@ -98,13 +107,28 @@ class _CameraScreenState extends State<CameraScreen> {
       _error = null;
       _scannerResult = null;
       _showPortionSelector = false;
+      _barcodeProcessing = false; // Reset processing flag
+      _scannerDisabled = false; // Reset scanner disabled flag
     });
+    
+    // Initialize scanner controller
+    _scannerController = MobileScannerController();
   }
 
   void _onBarcodeDetected(BarcodeCapture capture) async {
     final barcode = capture.barcodes.firstOrNull?.rawValue;
-    if (barcode != null) {
+    if (barcode != null && _showBarcodeScanner && !_barcodeProcessing && !_scannerDisabled) { // Only process if still in barcode scanner mode and not already processing
       print('📱 Barcode detected: $barcode');
+      
+      // Set processing flag to prevent multiple detections
+      _barcodeProcessing = true;
+      _scannerDisabled = true; // Completely disable scanner
+      
+      // Stop and dispose the scanner immediately to prevent automatic switching
+      _scannerController?.stop();
+      _scannerController?.dispose();
+      _scannerController = null;
+      
       setState(() {
         _showBarcodeScanner = false;
         _loading = true;
@@ -155,6 +179,11 @@ class _CameraScreenState extends State<CameraScreen> {
           }
         });
         
+        // Auto-save successful barcode scan results
+        if (result != null && result.success && result.nutritionInfo != null) {
+          _autoSaveFood(result, 'barcode_scan');
+        }
+        
       } catch (e) {
         print('❌ Barcode processing error: $e');
         setState(() {
@@ -163,6 +192,7 @@ class _CameraScreenState extends State<CameraScreen> {
       } finally {
         setState(() {
           _loading = false;
+          _barcodeProcessing = false; // Reset processing flag
         });
       }
     }
@@ -178,7 +208,19 @@ class _CameraScreenState extends State<CameraScreen> {
       _showBarcodeScanner = false;
       _showPortionSelector = false;
       _selectedPortion = 150.0;
+      _barcodeProcessing = false; // Reset processing flag
+      _scannerDisabled = false; // Reset scanner disabled flag
     });
+    
+    // Dispose scanner controller
+    _scannerController?.dispose();
+    _scannerController = null;
+  }
+
+  @override
+  void dispose() {
+    _scannerController?.dispose();
+    super.dispose();
   }
 
 
@@ -259,16 +301,14 @@ class _CameraScreenState extends State<CameraScreen> {
           scanData: scanData,
         );
         
-        // ULTRA FAST: Use fast data refresh service for immediate updates
-        final fastDataRefreshService = FastDataRefreshService();
-        final success = await fastDataRefreshService.addFoodEntryAndRefresh(entry);
+        // Save directly to FoodHistoryService to ensure today's food screen updates
+        final success = await FoodHistoryService.addFoodEntry(entry);
         
         if (success) {
-          print('🚀 ULTRA FAST: Food entry saved instantly: ${result.nutritionInfo!.foodName}');
-          // ULTRA FAST: Show success immediately (no waiting)
+          print('✅ Food entry saved to history: ${result.nutritionInfo!.foodName}');
+          // Don't clear the scanner result - keep showing the food details
           setState(() {
             _loading = false;
-            _scannerResult = null;
             _showPortionSelector = false;
           });
         } else {
@@ -316,6 +356,121 @@ class _CameraScreenState extends State<CameraScreen> {
           isBarcodeScan: _scannerResult!.isBarcodeScan,
         );
       });
+    }
+  }
+
+  /// Show manual food entry dialog when AI fails
+  void _showManualEntryDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => ManualFoodEntryDialog(
+        onFoodSelected: (nutritionInfo) {
+          // Create a successful scanner result with manual entry
+          final manualResult = FoodScannerResult(
+            success: true,
+            recognitionResult: FoodRecognitionResult(
+              foodName: nutritionInfo.foodName,
+              category: nutritionInfo.category ?? 'Unknown',
+              cuisine: 'Unknown',
+              confidence: 1.0,
+            ),
+            portionResult: PortionEstimationResult(
+              estimatedWeight: nutritionInfo.weightGrams,
+              confidence: 1.0,
+              method: 'Manual entry',
+            ),
+            nutritionInfo: nutritionInfo,
+            aiAnalysis: null,
+            processingTime: DateTime.now().millisecondsSinceEpoch,
+            isBarcodeScan: false,
+          );
+          
+          setState(() {
+            _scannerResult = manualResult;
+          });
+          
+          // Auto-save manual food entry
+          _autoSaveFood(manualResult, 'manual_entry');
+        },
+      ),
+    );
+  }
+
+  /// Automatically save food to history (silent operation)
+  Future<void> _autoSaveFood(FoodScannerResult result, String source) async {
+    if (!result.success || result.nutritionInfo == null) {
+      return;
+    }
+
+    try {
+      // Save to food history silently
+      await _saveToFoodHistory(result, source);
+      print('✅ Auto-saved food: ${result.nutritionInfo!.foodName}');
+    } catch (e) {
+      print('❌ Error auto-saving food: $e');
+    }
+  }
+
+  /// Add scanned food to history (manual operation - kept for compatibility)
+  Future<void> _addFoodToHistory() async {
+    if (_scannerResult == null || !_scannerResult!.success || _scannerResult!.nutritionInfo == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No food data to add'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+    });
+
+    try {
+      // Determine source based on scan type
+      String source = 'manual_entry';
+      if (_scannerResult!.isBarcodeScan == true) {
+        source = 'barcode_scan';
+      } else if (_imageFile != null) {
+        source = 'camera_scan';
+      }
+
+      // Save to food history
+      await _saveToFoodHistory(_scannerResult!, source);
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ ${_scannerResult!.nutritionInfo!.foodName} added to food history!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error adding food: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -378,6 +533,7 @@ class _CameraScreenState extends State<CameraScreen> {
     return Stack(
       children: [
         MobileScanner(
+          controller: _scannerController,
           onDetect: _onBarcodeDetected,
         ),
         Positioned(
@@ -491,24 +647,147 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Widget _buildErrorState() {
+    // Check if error is due to AI credits exhaustion
+    final isAICreditsExhausted = _error?.contains('service limits') == true || 
+                                _error?.contains('AI_CREDITS_EXCEEDED') == true ||
+                                _error?.contains('temporarily unavailable') == true;
+    
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 20),
-      child: FoodResultCard(
-        title: 'Error',
-        comment: _error,
-        onRetry: _reset,
+      child: Column(
+        children: [
+          FoodResultCard(
+            title: 'Error',
+            comment: _error,
+            onRetry: _reset,
+          ),
+          
+          if (isAICreditsExhausted) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.restaurant_menu,
+                    color: Colors.blue,
+                    size: 32,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'AI Service Temporarily Unavailable',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue[800],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'You can still add food manually while we restore AI services.',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: Colors.blue[700],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: _showManualEntryDialog,
+                    icon: const Icon(Icons.add_circle_outline, color: Colors.white),
+                    label: Text(
+                      'Add Food Manually',
+                      style: GoogleFonts.poppins(color: Colors.white),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
 
   Widget _buildResultState() {
     if (_scannerResult == null || !_scannerResult!.success) {
+      // Check if error is due to AI credits exhaustion
+      final errorMessage = _scannerResult?.error ?? 'Unknown error';
+      final isAICreditsExhausted = errorMessage.contains('service limits') || 
+                                  errorMessage.contains('AI_CREDITS_EXCEEDED') ||
+                                  errorMessage.contains('temporarily unavailable');
+      
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 20),
-        child: FoodResultCard(
-          title: 'Error',
-          comment: _scannerResult?.error ?? 'Unknown error',
-          onRetry: _reset,
+        child: Column(
+          children: [
+            FoodResultCard(
+              title: 'Error',
+              comment: errorMessage,
+              onRetry: _reset,
+            ),
+            
+            if (isAICreditsExhausted) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.restaurant_menu,
+                      color: Colors.blue,
+                      size: 32,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'AI Service Temporarily Unavailable',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue[800],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'You can still add food manually while we restore AI services.',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: Colors.blue[700],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: _showManualEntryDialog,
+                      icon: const Icon(Icons.add_circle_outline, color: Colors.white),
+                      label: Text(
+                        'Add Food Manually',
+                        style: GoogleFonts.poppins(color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
       );
     }
@@ -878,6 +1157,7 @@ class _CameraScreenState extends State<CameraScreen> {
                         const SizedBox(height: 20),
                         _buildAIAnalysis(aiAnalysis!),
                       ],
+                      
                       
                     ],
                   ),
