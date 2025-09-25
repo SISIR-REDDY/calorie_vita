@@ -97,9 +97,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   Timer? _uiUpdateTimer;
   bool _hasPendingUIUpdate = false;
   
-  // UI update throttling
+  // UI update throttling - Optimized for sub-second updates
   DateTime? _lastUIUpdate;
-  static const Duration _minUIUpdateInterval = Duration(milliseconds: 300); // Reduced from 800ms to 300ms
+  static const Duration _minUIUpdateInterval = Duration(milliseconds: 100); // Ultra-fast updates
 
   // Rewards data
   UserProgress? _userProgress;
@@ -277,10 +277,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       // Check connection status
       final isConnected = _unifiedGoogleFitManager.isConnected;
       
-      // Load current data immediately to prevent zero display
+      // INSTANT: Load current data immediately (0ms delay)
       final currentData = _unifiedGoogleFitManager.getCurrentData();
       
       if (currentData != null && mounted) {
+        // Update UI immediately without debouncing for instant display
         setState(() {
           _googleFitSteps = currentData.steps ?? 0;
           _googleFitCaloriesBurned = currentData.caloriesBurned ?? 0.0;
@@ -290,13 +291,18 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           _lastSyncTime = DateTime.now();
         });
         
-        // Update daily summary with Google Fit data
+        // Update daily summary with Google Fit data immediately
         _updateDailySummaryWithGoogleFitData();
-        print('✅ Google Fit data loaded: Steps: ${currentData.steps}, Calories: ${currentData.caloriesBurned}');
+        print('⚡ Home: INSTANT Google Fit data loaded - Steps: ${currentData.steps}, Calories: ${currentData.caloriesBurned}');
       } else {
-        // Try to connect if not connected
+        print('⚠️ Home: No cached Google Fit data, will load fresh data...');
+        // Try to connect if not connected (non-blocking)
         if (!isConnected) {
-          await _unifiedGoogleFitManager.connect();
+          _unifiedGoogleFitManager.connect().then((connected) {
+            if (connected) {
+              print('✅ Home: Google Fit connected successfully');
+            }
+          });
         }
       }
       
@@ -668,7 +674,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
     
     _uiUpdateTimer?.cancel();
-    _uiUpdateTimer = Timer(const Duration(milliseconds: 200), () { // Reduced from 500ms to 200ms
+    _uiUpdateTimer = Timer(const Duration(milliseconds: 50), () { // Ultra-fast: 50ms for sub-second updates
       if (mounted && !_hasPendingUIUpdate) {
         _hasPendingUIUpdate = true;
         _lastUIUpdate = DateTime.now();

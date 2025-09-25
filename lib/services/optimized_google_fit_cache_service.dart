@@ -69,21 +69,25 @@ class OptimizedGoogleFitCacheService {
   /// Check if background sync is active
   bool get isBackgroundSyncActive => _isBackgroundSyncActive;
 
-  /// Initialize the cache service
+  /// Initialize the cache service - Optimized for sub-second loading
   Future<void> initialize() async {
     if (_isInitialized) return;
 
     try {
-      print('🚀 OptimizedGoogleFitCacheService: Initializing...');
+      print('⚡ OptimizedGoogleFitCacheService: Ultra-fast initialization...');
 
-      // Initialize underlying services
-      await Future.wait([
+      // INSTANT: Load cached data into memory FIRST (0ms delay)
+      await _loadCachedDataIntoMemory();
+
+      // Initialize underlying services in background (non-blocking)
+      Future.wait([
         _googleFitService.initialize(),
         _optimizedGoogleFitService.initialize(),
-      ]);
-
-      // Load cached data into memory
-      await _loadCachedDataIntoMemory();
+      ]).then((_) {
+        print('✅ OptimizedGoogleFitCacheService: Services initialized');
+      }).catchError((e) {
+        print('❌ OptimizedGoogleFitCacheService: Service init error: $e');
+      });
 
       // Start background sync
       _startBackgroundSync();
@@ -92,7 +96,7 @@ class OptimizedGoogleFitCacheService {
       _startMemoryRefreshTimer();
 
       _isInitialized = true;
-      print('✅ OptimizedGoogleFitCacheService: Initialized successfully');
+      print('⚡ OptimizedGoogleFitCacheService: INSTANT initialization complete');
     } catch (e) {
       print('❌ OptimizedGoogleFitCacheService: Initialization failed: $e');
       rethrow;
@@ -174,25 +178,35 @@ class OptimizedGoogleFitCacheService {
     }
   }
 
-  /// Load cached data into memory on initialization
+  /// Load cached data into memory on initialization - Ultra-fast loading
   Future<void> _loadCachedDataIntoMemory() async {
     try {
-      // Try local storage first (faster than Firebase)
-      final localData = await _getLocalStorageCache();
+      // INSTANT: Try local storage first (fastest access)
+      final localData = await _getLocalStorageCache().timeout(
+        const Duration(milliseconds: 100), // Ultra-fast timeout
+        onTimeout: () {
+          print('⚠️ Local cache timeout, using fallback');
+          return null;
+        },
+      );
+      
       if (localData != null) {
         _memoryCache = localData;
         _memoryCacheTimestamp = DateTime.now();
-        print('💾 Loaded local cache into memory');
+        print('⚡ INSTANT: Local cache loaded into memory (<100ms)');
         return;
       }
 
-      // Fallback to Firebase cache
-      final firebaseData = await _getFirebaseCache();
-      if (firebaseData != null) {
-        _memoryCache = firebaseData;
-        _memoryCacheTimestamp = DateTime.now();
-        print('🔥 Loaded Firebase cache into memory');
-      }
+      // Fallback to Firebase cache (non-blocking)
+      _getFirebaseCache().then((firebaseData) {
+        if (firebaseData != null) {
+          _memoryCache = firebaseData;
+          _memoryCacheTimestamp = DateTime.now();
+          print('🔥 Firebase cache loaded into memory');
+        }
+      }).catchError((e) {
+        print('⚠️ Firebase cache error: $e');
+      });
     } catch (e) {
       print('⚠️ Error loading cached data into memory: $e');
     }
