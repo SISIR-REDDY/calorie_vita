@@ -2,6 +2,7 @@ import 'dart:async';
 import 'google_fit_service.dart';
 import 'optimized_google_fit_service.dart';
 import 'optimized_google_fit_cache_service.dart';
+import 'optimized_google_fit_workout_service.dart';
 import 'global_google_fit_manager.dart';
 import 'google_fit_performance_optimizer.dart';
 import '../models/google_fit_data.dart';
@@ -13,10 +14,11 @@ class UnifiedGoogleFitManager {
   factory UnifiedGoogleFitManager() => _instance;
   UnifiedGoogleFitManager._internal();
 
-  // Services
+  // Services - Optimized for workout tracking
   final GoogleFitService _googleFitService = GoogleFitService();
   final OptimizedGoogleFitService _optimizedGoogleFitService = OptimizedGoogleFitService();
   final OptimizedGoogleFitCacheService _optimizedCacheService = OptimizedGoogleFitCacheService();
+  final OptimizedGoogleFitWorkoutService _workoutService = OptimizedGoogleFitWorkoutService();
   final GlobalGoogleFitManager _globalGoogleFitManager = GlobalGoogleFitManager();
   final GoogleFitPerformanceOptimizer _performanceOptimizer = GoogleFitPerformanceOptimizer();
 
@@ -53,6 +55,24 @@ class UnifiedGoogleFitManager {
   GoogleFitData? get currentData => _currentData;
   DateTime? get lastUpdateTime => _lastUpdateTime;
 
+  /// Get optimized workout data - Fastest method for UI updates
+  Future<GoogleFitData?> getOptimizedWorkoutData() async {
+    if (!_isConnected) return null;
+
+    try {
+      // Use the optimized workout service for fastest data retrieval
+      final data = await _workoutService.getTodayFitnessData();
+      if (data != null) {
+        _updateData(data);
+        return data;
+      }
+    } catch (e) {
+      print('❌ Optimized workout data fetch failed: $e');
+    }
+
+    return _currentData;
+  }
+
   /// Initialize the unified manager
   Future<void> initialize() async {
     if (_isInitialized) return;
@@ -60,11 +80,12 @@ class UnifiedGoogleFitManager {
     try {
       print('🚀 UnifiedGoogleFitManager: Initializing...');
 
-      // Initialize all services
+      // Initialize all services - Optimized for workout tracking
       await Future.wait([
         _googleFitService.initialize(),
         _optimizedGoogleFitService.initialize(),
         _optimizedCacheService.initialize(),
+        _workoutService.initialize(),
         _globalGoogleFitManager.initialize(),
       ]);
 
@@ -114,8 +135,8 @@ class UnifiedGoogleFitManager {
           date: DateTime.now(),
           steps: globalData['steps'] as int?,
           caloriesBurned: (globalData['caloriesBurned'] as num?)?.toDouble(),
-          distance: (globalData['distance'] as num?)?.toDouble(),
-          weight: (globalData['weight'] as num?)?.toDouble(),
+          workoutSessions: globalData['workoutSessions'] as int?,
+          workoutDuration: (globalData['workoutDuration'] as num?)?.toDouble(),
         );
         _performanceOptimizer.cacheData('unified_google_fit', googleFitData);
         _updateData(googleFitData);
@@ -248,8 +269,8 @@ class UnifiedGoogleFitManager {
           date: DateTime.now(),
           steps: data['steps'] as int?,
           caloriesBurned: (data['caloriesBurned'] as num?)?.toDouble(),
-          distance: (data['distance'] as num?)?.toDouble(),
-          weight: (data['weight'] as num?)?.toDouble(),
+          workoutSessions: data['workoutSessions'] as int?,
+          workoutDuration: (data['workoutDuration'] as num?)?.toDouble(),
         );
       }
       return null;
@@ -268,8 +289,8 @@ class UnifiedGoogleFitManager {
           date: DateTime.now(),
           steps: data['steps'] as int?,
           caloriesBurned: (data['caloriesBurned'] as num?)?.toDouble(),
-          distance: (data['distance'] as num?)?.toDouble(),
-          weight: (data['weight'] as num?)?.toDouble(),
+          workoutSessions: data['workoutSessions'] as int?,
+          workoutDuration: (data['workoutDuration'] as num?)?.toDouble(),
         );
       }
       return null;
@@ -286,16 +307,14 @@ class UnifiedGoogleFitManager {
       final futures = await Future.wait([
         _googleFitService.getDailySteps(today),
         _googleFitService.getDailyCaloriesBurned(today),
-        _googleFitService.getDailyDistance(today),
-        _googleFitService.getCurrentWeight(),
       ], eagerError: false);
 
       return GoogleFitData(
         date: today,
         steps: futures[0] as int?,
         caloriesBurned: futures[1] as double?,
-        distance: futures[2] as double?,
-        weight: futures[3] as double?,
+        workoutSessions: 0, // Will be updated by workout detection
+        workoutDuration: 0.0,
       );
     } catch (e) {
       print('⚠️ Original service failed: $e');

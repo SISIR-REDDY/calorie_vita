@@ -1,17 +1,17 @@
-/// Model class for Google Fit fitness data
+/// Model class for Google Fit fitness data - Optimized for steps and calories only
 class GoogleFitData {
   final DateTime date;
   final int? steps;
   final double? caloriesBurned;
-  final double? distance; // in kilometers
-  final double? weight; // in kilograms
+  final int? workoutSessions; // Number of workout sessions detected
+  final double? workoutDuration; // Total workout duration in minutes
 
   const GoogleFitData({
     required this.date,
     this.steps,
     this.caloriesBurned,
-    this.distance,
-    this.weight,
+    this.workoutSessions,
+    this.workoutDuration,
   });
 
   /// Create GoogleFitData from JSON
@@ -20,8 +20,8 @@ class GoogleFitData {
       date: DateTime.parse(json['date']),
       steps: json['steps'] as int?,
       caloriesBurned: (json['caloriesBurned'] as num?)?.toDouble(),
-      distance: (json['distance'] as num?)?.toDouble(),
-      weight: (json['weight'] as num?)?.toDouble(),
+      workoutSessions: json['workoutSessions'] as int?,
+      workoutDuration: (json['workoutDuration'] as num?)?.toDouble(),
     );
   }
 
@@ -31,8 +31,8 @@ class GoogleFitData {
       'date': date.toIso8601String().split('T')[0],
       'steps': steps,
       'caloriesBurned': caloriesBurned,
-      'distance': distance,
-      'weight': weight,
+      'workoutSessions': workoutSessions,
+      'workoutDuration': workoutDuration,
     };
   }
 
@@ -41,15 +41,15 @@ class GoogleFitData {
     DateTime? date,
     int? steps,
     double? caloriesBurned,
-    double? distance,
-    double? weight,
+    int? workoutSessions,
+    double? workoutDuration,
   }) {
     return GoogleFitData(
       date: date ?? this.date,
       steps: steps ?? this.steps,
       caloriesBurned: caloriesBurned ?? this.caloriesBurned,
-      distance: distance ?? this.distance,
-      weight: weight ?? this.weight,
+      workoutSessions: workoutSessions ?? this.workoutSessions,
+      workoutDuration: workoutDuration ?? this.workoutDuration,
     );
   }
 
@@ -70,16 +70,21 @@ class GoogleFitData {
     return '${caloriesBurned!.toStringAsFixed(0)} cal';
   }
 
-  /// Get formatted distance
-  String get formattedDistance {
-    if (distance == null) return 'N/A';
-    return '${distance!.toStringAsFixed(2)} km';
+  /// Get formatted workout sessions
+  String get formattedWorkoutSessions {
+    if (workoutSessions == null) return 'N/A';
+    return '${workoutSessions} sessions';
   }
 
-  /// Get formatted weight
-  String get formattedWeight {
-    if (weight == null) return 'N/A';
-    return '${weight!.toStringAsFixed(1)} kg';
+  /// Get formatted workout duration
+  String get formattedWorkoutDuration {
+    if (workoutDuration == null) return 'N/A';
+    if (workoutDuration! >= 60) {
+      final hours = (workoutDuration! / 60).floor();
+      final minutes = (workoutDuration! % 60).round();
+      return '${hours}h ${minutes}m';
+    }
+    return '${workoutDuration!.toStringAsFixed(0)}m';
   }
 
   /// Check if data is complete (has at least steps or calories)
@@ -97,7 +102,7 @@ class GoogleFitData {
 
   @override
   String toString() {
-    return 'GoogleFitData(date: $date, steps: $steps, caloriesBurned: $caloriesBurned, distance: $distance, weight: $weight)';
+    return 'GoogleFitData(date: $date, steps: $steps, caloriesBurned: $caloriesBurned, workoutSessions: $workoutSessions, workoutDuration: $workoutDuration)';
   }
 
   @override
@@ -108,8 +113,8 @@ class GoogleFitData {
         other.date == date &&
         other.steps == steps &&
         other.caloriesBurned == caloriesBurned &&
-        other.distance == distance &&
-        other.weight == weight;
+        other.workoutSessions == workoutSessions &&
+        other.workoutDuration == workoutDuration;
   }
 
   @override
@@ -117,29 +122,33 @@ class GoogleFitData {
     return date.hashCode ^
         steps.hashCode ^
         caloriesBurned.hashCode ^
-        distance.hashCode ^
-        weight.hashCode;
+        workoutSessions.hashCode ^
+        workoutDuration.hashCode;
   }
 }
 
-/// Model for weekly fitness summary
+/// Model for weekly fitness summary - Optimized for steps, calories, and workouts
 class WeeklyFitnessSummary {
   final List<GoogleFitData> dailyData;
   final int totalSteps;
   final double totalCaloriesBurned;
-  final double totalDistance;
+  final int totalWorkoutSessions;
+  final double totalWorkoutDuration;
   final double averageSteps;
   final double averageCalories;
-  final double averageDistance;
+  final double averageWorkoutSessions;
+  final double averageWorkoutDuration;
 
   const WeeklyFitnessSummary({
     required this.dailyData,
     required this.totalSteps,
     required this.totalCaloriesBurned,
-    required this.totalDistance,
+    required this.totalWorkoutSessions,
+    required this.totalWorkoutDuration,
     required this.averageSteps,
     required this.averageCalories,
-    required this.averageDistance,
+    required this.averageWorkoutSessions,
+    required this.averageWorkoutDuration,
   });
 
   /// Create from list of daily data
@@ -151,10 +160,12 @@ class WeeklyFitnessSummary {
         dailyData: dailyData,
         totalSteps: 0,
         totalCaloriesBurned: 0,
-        totalDistance: 0,
+        totalWorkoutSessions: 0,
+        totalWorkoutDuration: 0,
         averageSteps: 0,
         averageCalories: 0,
-        averageDistance: 0,
+        averageWorkoutSessions: 0,
+        averageWorkoutDuration: 0,
       );
     }
 
@@ -162,8 +173,10 @@ class WeeklyFitnessSummary {
         validData.fold<int>(0, (sum, data) => sum + (data.steps ?? 0));
     final totalCalories = validData.fold<double>(
         0, (sum, data) => sum + (data.caloriesBurned ?? 0));
-    final totalDist =
-        validData.fold<double>(0, (sum, data) => sum + (data.distance ?? 0));
+    final totalWorkouts = validData.fold<int>(
+        0, (sum, data) => sum + (data.workoutSessions ?? 0));
+    final totalDuration = validData.fold<double>(
+        0, (sum, data) => sum + (data.workoutDuration ?? 0));
 
     final dataCount = validData.length;
 
@@ -171,10 +184,12 @@ class WeeklyFitnessSummary {
       dailyData: dailyData,
       totalSteps: totalSteps,
       totalCaloriesBurned: totalCalories,
-      totalDistance: totalDist,
+      totalWorkoutSessions: totalWorkouts,
+      totalWorkoutDuration: totalDuration,
       averageSteps: totalSteps / dataCount,
       averageCalories: totalCalories / dataCount,
-      averageDistance: totalDist / dataCount,
+      averageWorkoutSessions: totalWorkouts / dataCount,
+      averageWorkoutDuration: totalDuration / dataCount,
     );
   }
 
@@ -192,8 +207,18 @@ class WeeklyFitnessSummary {
   String get formattedTotalCalories =>
       '${totalCaloriesBurned.toStringAsFixed(0)} cal';
 
-  /// Get formatted total distance
-  String get formattedTotalDistance => '${totalDistance.toStringAsFixed(2)} km';
+  /// Get formatted total workout sessions
+  String get formattedTotalWorkoutSessions => '$totalWorkoutSessions sessions';
+
+  /// Get formatted total workout duration
+  String get formattedTotalWorkoutDuration {
+    if (totalWorkoutDuration >= 60) {
+      final hours = (totalWorkoutDuration / 60).floor();
+      final minutes = (totalWorkoutDuration % 60).round();
+      return '${hours}h ${minutes}m';
+    }
+    return '${totalWorkoutDuration.toStringAsFixed(0)}m';
+  }
 
   /// Get average activity level
   String get averageActivityLevel {

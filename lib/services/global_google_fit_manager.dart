@@ -206,8 +206,8 @@ class GlobalGoogleFitManager {
           'timestamp': DateTime.now().toIso8601String(),
           'steps': data.steps ?? 0,
           'caloriesBurned': data.caloriesBurned ?? 0.0,
-          'distance': data.distance ?? 0.0,
-          'weight': data.weight,
+          'workoutSessions': data.workoutSessions ?? 0,
+          'workoutDuration': data.workoutDuration ?? 0.0,
           'isAutoSync': true,
         };
 
@@ -241,8 +241,8 @@ class GlobalGoogleFitManager {
                   'timestamp': DateTime.now().toIso8601String(),
                   'steps': cacheData.steps ?? 0,
                   'caloriesBurned': cacheData.caloriesBurned ?? 0.0,
-                  'distance': cacheData.distance ?? 0.0,
-                  'weight': cacheData.weight,
+                  'workoutSessions': cacheData.workoutSessions ?? 0,
+                  'workoutDuration': cacheData.workoutDuration ?? 0.0,
                   'isAutoSync': true,
                 };
 
@@ -265,8 +265,8 @@ class GlobalGoogleFitManager {
                 'timestamp': DateTime.now().toIso8601String(),
                 'steps': data.steps ?? 0,
                 'caloriesBurned': data.caloriesBurned ?? 0.0,
-                'distance': data.distance ?? 0.0,
-                'weight': data.weight,
+                'workoutSessions': data.workoutSessions ?? 0,
+                'workoutDuration': data.workoutDuration ?? 0.0,
                 'isAutoSync': true,
               };
 
@@ -310,8 +310,8 @@ class GlobalGoogleFitManager {
           'timestamp': DateTime.now().toIso8601String(),
           'steps': data.steps ?? 0,
           'caloriesBurned': data.caloriesBurned ?? 0.0,
-          'distance': data.distance ?? 0.0,
-          'weight': data.weight,
+          'workoutSessions': data.workoutSessions ?? 0,
+          'workoutDuration': data.workoutDuration ?? 0.0,
           'isForceSync': true,
         };
 
@@ -340,8 +340,8 @@ class GlobalGoogleFitManager {
           'timestamp': DateTime.now().toIso8601String(),
           'steps': data.steps ?? 0,
           'caloriesBurned': data.caloriesBurned ?? 0.0,
-          'distance': data.distance ?? 0.0,
-          'weight': data.weight,
+          'workoutSessions': data.workoutSessions ?? 0,
+          'workoutDuration': data.workoutDuration ?? 0.0,
           'isCached': true,
         };
       }
@@ -353,8 +353,8 @@ class GlobalGoogleFitManager {
           'timestamp': DateTime.now().toIso8601String(),
           'steps': fallbackData.steps ?? 0,
           'caloriesBurned': fallbackData.caloriesBurned ?? 0.0,
-          'distance': fallbackData.distance ?? 0.0,
-          'weight': fallbackData.weight,
+          'workoutSessions': fallbackData.workoutSessions ?? 0,
+          'workoutDuration': fallbackData.workoutDuration ?? 0.0,
           'isCached': true,
         };
       }

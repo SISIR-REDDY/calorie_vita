@@ -309,15 +309,15 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
           ),
           const SizedBox(height: 12),
 
-          // Distance and Activity Level Row
+          // Workout Sessions and Activity Level Row
           Row(
             children: [
               Expanded(
                 child: _buildMetricCard(
-                  'Distance',
-                  _todayData!.formattedDistance,
-                  Icons.straighten,
-                  Colors.blue,
+                  'Workouts',
+                  _todayData!.formattedWorkoutSessions,
+                  Icons.fitness_center,
+                  Colors.purple,
                 ),
               ),
               const SizedBox(width: 12),

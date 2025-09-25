@@ -77,8 +77,8 @@ mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
         date: DateTime.now(),
         steps: syncData['steps'] as int?,
         caloriesBurned: (syncData['caloriesBurned'] as num?)?.toDouble(),
-        distance: (syncData['distance'] as num?)?.toDouble(),
-        weight: (syncData['weight'] as num?)?.toDouble(),
+        workoutSessions: syncData['workoutSessions'] as int?,
+        workoutDuration: (syncData['workoutDuration'] as num?)?.toDouble(),
       );
     } catch (e) {
       print('GoogleFitSyncMixin: Failed to convert sync data: $e');

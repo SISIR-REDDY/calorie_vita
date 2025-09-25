@@ -81,11 +81,7 @@ class GoogleFitPerformanceOptimizer {
       return false;
     }
     
-    // Validate distance
-    if (data.distance != null && data.distance! > _maxDistanceThreshold) {
-      print('⚠️ Google Fit data validation: Distance too high (${data.distance}), ignoring');
-      return false;
-    }
+    // Distance validation removed - focusing on workout tracking
     
     return true;
   }
@@ -132,8 +128,8 @@ class GoogleFitPerformanceOptimizer {
     // Merge with other valid data (take highest values for fitness metrics)
     int? mergedSteps = baseData.steps;
     double? mergedCalories = baseData.caloriesBurned;
-    double? mergedDistance = baseData.distance;
-    double? mergedWeight = baseData.weight;
+    int? mergedWorkoutSessions = baseData.workoutSessions;
+    double? mergedWorkoutDuration = baseData.workoutDuration;
     
     for (final data in validData.skip(1)) {
       if (data.steps != null && (mergedSteps == null || data.steps! > mergedSteps)) {
@@ -142,11 +138,11 @@ class GoogleFitPerformanceOptimizer {
       if (data.caloriesBurned != null && (mergedCalories == null || data.caloriesBurned! > mergedCalories)) {
         mergedCalories = data.caloriesBurned;
       }
-      if (data.distance != null && (mergedDistance == null || data.distance! > mergedDistance)) {
-        mergedDistance = data.distance;
+      if (data.workoutSessions != null && (mergedWorkoutSessions == null || data.workoutSessions! > mergedWorkoutSessions)) {
+        mergedWorkoutSessions = data.workoutSessions;
       }
-      if (data.weight != null && (mergedWeight == null || data.weight! > mergedWeight)) {
-        mergedWeight = data.weight;
+      if (data.workoutDuration != null && (mergedWorkoutDuration == null || data.workoutDuration! > mergedWorkoutDuration)) {
+        mergedWorkoutDuration = data.workoutDuration;
       }
     }
     
@@ -154,8 +150,8 @@ class GoogleFitPerformanceOptimizer {
       date: baseData.date,
       steps: mergedSteps,
       caloriesBurned: mergedCalories,
-      distance: mergedDistance,
-      weight: mergedWeight,
+      workoutSessions: mergedWorkoutSessions,
+      workoutDuration: mergedWorkoutDuration,
     );
   }
 
@@ -226,8 +222,8 @@ class GoogleFitPerformanceOptimizer {
       date: newData.date,
       steps: smoothedSteps,
       caloriesBurned: smoothedCalories,
-      distance: newData.distance,
-      weight: newData.weight,
+      workoutSessions: newData.workoutSessions,
+      workoutDuration: newData.workoutDuration,
     );
   }
 

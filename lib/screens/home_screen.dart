@@ -106,11 +106,12 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   List<UserReward> _recentRewards = [];
   bool _isStreakLoading = true;
 
-  // Google Fit data
+  // Google Fit data - Optimized for steps, calories, and workouts only
   bool _isGoogleFitConnected = false;
   int? _googleFitSteps;
   double? _googleFitCaloriesBurned;
-  double? _googleFitDistance;
+  int? _googleFitWorkoutSessions;
+  double? _googleFitWorkoutDuration;
   String _activityLevel = 'Unknown';
   bool _isLiveSyncing = false;
   bool _isGoogleFitLoading = false;
@@ -265,20 +266,30 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     try {
       await _unifiedGoogleFitManager.initialize();
       
+      // Check connection status
+      final isConnected = _unifiedGoogleFitManager.isConnected;
+      
       // Load current data immediately to prevent zero display
       final currentData = _unifiedGoogleFitManager.getCurrentData();
+      
       if (currentData != null && mounted) {
         setState(() {
           _googleFitSteps = currentData.steps ?? 0;
           _googleFitCaloriesBurned = currentData.caloriesBurned ?? 0.0;
-          _googleFitDistance = currentData.distance ?? 0.0;
+          _googleFitWorkoutSessions = currentData.workoutSessions ?? 0;
+          _googleFitWorkoutDuration = currentData.workoutDuration ?? 0.0;
           _activityLevel = _calculateActivityLevel(currentData.steps);
           _lastSyncTime = DateTime.now();
         });
         
         // Update daily summary with Google Fit data
         _updateDailySummaryWithGoogleFitData();
-        print('✅ Home screen: Initial data loaded instantly');
+        print('✅ Google Fit data loaded: Steps: ${currentData.steps}, Calories: ${currentData.caloriesBurned}');
+      } else {
+        // Try to connect if not connected
+        if (!isConnected) {
+          await _unifiedGoogleFitManager.connect();
+        }
       }
       
       // Listen to unified Google Fit data stream with debouncing
@@ -289,7 +300,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             setState(() {
               _googleFitSteps = data.steps ?? 0;
               _googleFitCaloriesBurned = data.caloriesBurned ?? 0.0;
-              _googleFitDistance = data.distance ?? 0.0;
+              _googleFitWorkoutSessions = data.workoutSessions ?? 0;
+              _googleFitWorkoutDuration = data.workoutDuration ?? 0.0;
               _activityLevel = _calculateActivityLevel(data.steps);
               _lastSyncTime = DateTime.now();
             });
@@ -823,7 +835,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         setState(() {
           _googleFitSteps = cachedData.steps ?? 0;
           _googleFitCaloriesBurned = cachedData.caloriesBurned ?? 0.0;
-          _googleFitDistance = cachedData.distance ?? 0.0;
+          _googleFitWorkoutSessions = cachedData.workoutSessions ?? 0;
+          _googleFitWorkoutDuration = cachedData.workoutDuration ?? 0.0;
           _activityLevel = _calculateActivityLevel(cachedData.steps);
           _lastSyncTime = DateTime.now();
         });
@@ -842,7 +855,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           setState(() {
             _googleFitSteps = data.steps ?? 0;
             _googleFitCaloriesBurned = data.caloriesBurned ?? 0.0;
-            _googleFitDistance = data.distance ?? 0.0;
+            _googleFitWorkoutSessions = data.workoutSessions ?? 0;
+            _googleFitWorkoutDuration = data.workoutDuration ?? 0.0;
             _activityLevel = _calculateActivityLevel(data.steps);
             _lastSyncTime = DateTime.now();
           });
@@ -866,14 +880,15 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     super.onGoogleFitDataUpdate(syncData);
 
     if (mounted) {
-      setState(() {
-        _googleFitSteps = syncData['steps'] as int? ?? 0;
-        _googleFitCaloriesBurned =
-            (syncData['caloriesBurned'] as num?)?.toDouble() ?? 0.0;
-        _googleFitDistance = (syncData['distance'] as num?)?.toDouble() ?? 0.0;
-        _activityLevel = _calculateActivityLevel(syncData['steps'] as int?);
-        _lastSyncTime = DateTime.now();
-      });
+        setState(() {
+          _googleFitSteps = syncData['steps'] as int? ?? 0;
+          _googleFitCaloriesBurned =
+              (syncData['caloriesBurned'] as num?)?.toDouble() ?? 0.0;
+          _googleFitWorkoutSessions = syncData['workoutSessions'] as int? ?? 0;
+          _googleFitWorkoutDuration = (syncData['workoutDuration'] as num?)?.toDouble() ?? 0.0;
+          _activityLevel = _calculateActivityLevel(syncData['steps'] as int?);
+          _lastSyncTime = DateTime.now();
+        });
 
       // Update daily summary if available
       if (_dailySummary != null) {
@@ -922,26 +937,21 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   /// Load Google Fit data and update UI (optimized with caching)
   Future<void> _loadGoogleFitData() async {
-    if (!_isGoogleFitConnected) return;
-
-    setState(() {
-      _isGoogleFitLoading = true;
-    });
-
     try {
-      // Use the batch method for faster response
-      final batchData = await _googleFitService.getTodayFitnessDataBatch();
+      setState(() {
+        _isGoogleFitLoading = true;
+      });
 
-      if (batchData != null) {
-        final steps = batchData['steps'] as int? ?? 0;
-        final calories = batchData['caloriesBurned'] as double? ?? 0.0;
-        final distance = batchData['distance'] as double? ?? 0.0;
+      // Force refresh data from unified manager
+      final workoutData = await _unifiedGoogleFitManager.forceRefresh();
 
+      if (workoutData != null) {
         setState(() {
-          _googleFitSteps = steps;
-          _googleFitCaloriesBurned = calories;
-          _googleFitDistance = distance;
-          _activityLevel = batchData['activityLevel'] ?? 'Unknown';
+          _googleFitSteps = workoutData.steps ?? 0;
+          _googleFitCaloriesBurned = workoutData.caloriesBurned ?? 0.0;
+          _googleFitWorkoutSessions = workoutData.workoutSessions ?? 0;
+          _googleFitWorkoutDuration = workoutData.workoutDuration ?? 0.0;
+          _activityLevel = _calculateActivityLevel(workoutData.steps);
           _lastSyncTime = DateTime.now();
         });
 
@@ -950,14 +960,13 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           await _updateDailySummaryWithGoogleFitData();
         }
 
-        print(
-            'Google Fit data loaded (batch): Steps=$steps, Calories=$calories, Distance=$distance');
+        print('✅ Google Fit data loaded: Steps=${workoutData.steps}, Calories=${workoutData.caloriesBurned}');
       } else {
-        // Fallback to individual calls if batch fails
+        // Fallback to individual calls if optimized service fails
         await _loadGoogleFitDataFallback();
       }
     } catch (e) {
-      print('Error loading Google Fit data: $e');
+      print('❌ Error loading Google Fit data: $e');
       // Try fallback method
       await _loadGoogleFitDataFallback();
     } finally {
@@ -987,17 +996,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               }) ??
               0.0;
 
-      final distance =
-          await _googleFitService.getDailyDistance(today).catchError((e) {
-                print('Distance fetch failed: $e');
-                return 0.0;
-              }) ??
-              0.0;
-
       setState(() {
         _googleFitSteps = steps;
         _googleFitCaloriesBurned = calories;
-        _googleFitDistance = distance;
+        _googleFitWorkoutSessions = 0; // Will be updated by workout detection
+        _googleFitWorkoutDuration = 0.0;
         _activityLevel = _calculateActivityLevel(steps);
         _lastSyncTime = DateTime.now();
       });
@@ -1007,13 +1010,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       }
 
       print(
-          'Google Fit data loaded (fallback): Steps=$steps, Calories=$calories, Distance=$distance');
+          'Google Fit data loaded (fallback): Steps=$steps, Calories=$calories, Workouts=${_googleFitWorkoutSessions}');
     } catch (e) {
       print('Fallback Google Fit loading failed: $e');
       setState(() {
         _googleFitSteps = 0;
         _googleFitCaloriesBurned = 0.0;
-        _googleFitDistance = 0.0;
+        _googleFitWorkoutSessions = 0;
+        _googleFitWorkoutDuration = 0.0;
         _activityLevel = 'Unknown';
         _lastSyncTime = DateTime.now();
       });
@@ -1032,7 +1036,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   /// Update daily summary with Google Fit data
   Future<void> _updateDailySummaryWithGoogleFitData() async {
-    if (_dailySummary == null || !_isGoogleFitConnected) return;
+    if (_dailySummary == null) return;
 
     try {
       // Create updated daily summary with Google Fit data
@@ -1058,7 +1062,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         _dailySummary = updatedSummary;
       });
     } catch (e) {
-      print('Error updating daily summary with Google Fit data: $e');
+      print('❌ Error updating daily summary with Google Fit data: $e');
     }
   }
 
@@ -2301,27 +2305,28 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     ],
                   ),
                 ),
-                // Date badge
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: kSuccessColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: kSuccessColor.withValues(alpha: 0.3),
-                      width: 1,
+                // Live status badge
+                if (_isGoogleFitConnected)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: kSuccessColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: kSuccessColor.withValues(alpha: 0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      'Live',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: kSuccessColor,
+                      ),
                     ),
                   ),
-                  child: Text(
-                    'Live',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: kSuccessColor,
-                    ),
-                  ),
-                ),
               ],
             ),
             const SizedBox(height: 24),
@@ -2369,6 +2374,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       ),
     );
   }
+
 
   Widget _buildEnhancedSummaryCard(String label, String value, String unit,
       IconData icon, Color color, String description) {

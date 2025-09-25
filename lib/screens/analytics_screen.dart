@@ -83,7 +83,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   List<Map<String, dynamic>> _insights = [];
   List<Map<String, dynamic>> _recommendations = [];
 
-  // Google Fit data
+  // Google Fit data - Optimized for steps, calories, and workouts only
   GoogleFitData? _todayGoogleFitData;
   List<GoogleFitData> _weeklyGoogleFitData = [];
   bool _isGoogleFitConnected = false;
@@ -265,13 +265,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
       }
 
-      // Initialize empty Google Fit data to show placeholders
+      // Initialize empty Google Fit data to show placeholders - Optimized for workouts
       _todayGoogleFitData ??= GoogleFitData(
         date: DateTime.now(),
         steps: 0,
         caloriesBurned: 0.0,
-        distance: 0.0,
-        weight: null,
+        workoutSessions: 0,
+        workoutDuration: 0.0,
       );
       _weeklyGoogleFitData = _weeklyGoogleFitData.isEmpty
           ? _generateDefaultWeeklyGoogleFitData()
@@ -300,7 +300,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     });
   }
 
-  /// Generate default weekly Google Fit data
+  /// Generate default weekly Google Fit data - Optimized for workouts
   List<GoogleFitData> _generateDefaultWeeklyGoogleFitData() {
     final now = DateTime.now();
     return List.generate(7, (index) {
@@ -308,8 +308,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         date: now.subtract(Duration(days: 6 - index)),
         steps: 0,
         caloriesBurned: 0.0,
-        distance: 0.0,
-        weight: null,
+        workoutSessions: 0,
+        workoutDuration: 0.0,
       );
     });
   }
@@ -577,7 +577,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     }
   }
 
-  /// Load Google Fit data using optimized cache service
+  /// Load Google Fit data using optimized workout service - Fastest method
   Future<void> _loadGoogleFitData() async {
     try {
       setState(() {
@@ -598,8 +598,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       
       if (_isGoogleFitConnected) {
         try {
-          // Use optimized cache service for fastest data loading
-          final todayData = await _optimizedCacheService.getTodayData();
+          // Use optimized workout service for fastest data loading
+          final todayData = await _unifiedGoogleFitManager.getOptimizedWorkoutData();
           
           if (todayData != null) {
             setState(() {
@@ -607,7 +607,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               _isGoogleFitLoading = false;
             });
             
-            print('Google Fit today data loaded (optimized cache): ${_todayGoogleFitData?.steps} steps');
+            print('✅ Google Fit workout data loaded: ${_todayGoogleFitData?.steps} steps, ${_todayGoogleFitData?.workoutSessions} workouts');
           } else {
             // Fallback to original service
             await _loadGoogleFitDataFallback();
@@ -618,7 +618,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             print('Weekly Google Fit data loading failed: $error');
           });
         } catch (dataError) {
-          print('Error loading optimized cache Google Fit data: $dataError');
+          print('Error loading optimized workout data: $dataError');
           await _loadGoogleFitDataFallback();
         }
       } else {
@@ -653,8 +653,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           date: today,
           steps: batchData['steps'] as int? ?? 0,
           caloriesBurned: batchData['caloriesBurned'] as double? ?? 0.0,
-          distance: batchData['distance'] as double? ?? 0.0,
-          weight: batchData['weight'] as double?,
+          workoutSessions: batchData['workoutSessions'] as int? ?? 0,
+          workoutDuration: (batchData['workoutDuration'] as num?)?.toDouble() ?? 0.0,
         );
       } else {
         final futures = await Future.wait([
@@ -675,8 +675,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           date: today,
           steps: futures[0] as int? ?? 0,
           caloriesBurned: futures[1] as double? ?? 0.0,
-          distance: futures[2] as double? ?? 0.0,
-          weight: futures[3] as double?,
+          workoutSessions: 0, // Will be updated by workout detection
+          workoutDuration: 0.0,
         );
       }
       
@@ -693,8 +693,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           date: DateTime.now(),
           steps: 0,
           caloriesBurned: 0.0,
-          distance: 0.0,
-          weight: null,
+          workoutSessions: 0,
+          workoutDuration: 0.0,
         );
         _isGoogleFitLoading = false;
       });
@@ -736,19 +736,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       final futures = await Future.wait([
         _googleFitService.getDailySteps(date),
         _googleFitService.getDailyCaloriesBurned(date),
-        _googleFitService.getDailyDistance(date),
       ]);
 
       final steps = futures[0] as int? ?? 0;
       final calories = futures[1] as double? ?? 0.0;
-      final distance = futures[2] as double? ?? 0.0;
 
       weeklyData.add(GoogleFitData(
         date: date,
         steps: steps,
         caloriesBurned: calories,
-        distance: distance,
-        weight: null,
+        workoutSessions: 0, // Will be updated by workout detection
+        workoutDuration: 0.0,
       ));
     } catch (e) {
       // Add empty data if loading fails
@@ -756,8 +754,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         date: date,
         steps: 0,
         caloriesBurned: 0,
-        distance: 0,
-        weight: null,
+        workoutSessions: 0,
+        workoutDuration: 0.0,
       ));
     }
   }
@@ -805,15 +803,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             date: _todayGoogleFitData!.date,
             steps: newSteps ?? _todayGoogleFitData!.steps,
             caloriesBurned: newCalories ?? _todayGoogleFitData!.caloriesBurned,
-            distance: newDistance ?? _todayGoogleFitData!.distance,
-            weight: _todayGoogleFitData!.weight,
+            workoutSessions: _todayGoogleFitData!.workoutSessions,
+            workoutDuration: _todayGoogleFitData!.workoutDuration,
           );
 
           // Only update if data has actually changed
           if (updatedData.steps != _todayGoogleFitData!.steps ||
               updatedData.caloriesBurned !=
                   _todayGoogleFitData!.caloriesBurned ||
-              updatedData.distance != _todayGoogleFitData!.distance) {
+              updatedData.workoutSessions != _todayGoogleFitData!.workoutSessions ||
+              updatedData.workoutDuration != _todayGoogleFitData!.workoutDuration) {
             setState(() {
               _todayGoogleFitData = updatedData;
             });
@@ -1009,22 +1008,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         case 'Daily':
           // Load today's data
           final today = DateTime.now();
-          final futures = await Future.wait([
-            _googleFitService.getDailySteps(today),
-            _googleFitService.getDailyCaloriesBurned(today),
-            _googleFitService.getDailyDistance(today),
-            _googleFitService.getCurrentWeight(),
-          ]);
+        final futures = await Future.wait([
+          _googleFitService.getDailySteps(today),
+          _googleFitService.getDailyCaloriesBurned(today),
+        ]);
 
-          setState(() {
-            _todayGoogleFitData = GoogleFitData(
-              date: today,
-              steps: futures[0] as int? ?? 0,
-              caloriesBurned: futures[1] as double? ?? 0.0,
-              distance: futures[2] as double? ?? 0.0,
-              weight: futures[3] as double?,
-            );
-          });
+        setState(() {
+          _todayGoogleFitData = GoogleFitData(
+            date: today,
+            steps: futures[0] as int? ?? 0,
+            caloriesBurned: futures[1] as double? ?? 0.0,
+            workoutSessions: 0, // Will be updated by workout detection
+            workoutDuration: 0.0,
+          );
+        });
           break;
 
         case 'Weekly':
@@ -1529,12 +1526,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           if (todayData.steps != null && todayData.steps! > totalSteps) {
             totalSteps = todayData.steps!;
           }
+          // Use Google Fit workout sessions instead of calories-based calculation
+          if (todayData.workoutSessions != null && todayData.workoutSessions! > 0) {
+            totalWorkouts = todayData.workoutSessions!;
+          }
+        } else {
+          // Fallback to calories-based workout detection
+          totalWorkouts = _dailySummaries.isNotEmpty &&
+                  _dailySummaries.last.caloriesBurned > 0
+              ? 1
+              : 0;
         }
-
-        totalWorkouts = _dailySummaries.isNotEmpty &&
-                _dailySummaries.last.caloriesBurned > 0
-            ? 1
-            : 0;
         break;
 
       case 'Weekly':
@@ -1550,6 +1552,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         if (_isGoogleFitConnected && _weeklyGoogleFitData.isNotEmpty) {
           int fitCalories = 0;
           int fitSteps = 0;
+          int fitWorkouts = 0;
           for (final fitData in _weeklyGoogleFitData.take(7)) {
             if (fitData.caloriesBurned != null && fitData.caloriesBurned! > 0) {
               fitCalories += fitData.caloriesBurned!.round();
@@ -1557,16 +1560,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             if (fitData.steps != null && fitData.steps! > 0) {
               fitSteps += fitData.steps!;
             }
+            if (fitData.workoutSessions != null && fitData.workoutSessions! > 0) {
+              fitWorkouts += fitData.workoutSessions!;
+            }
           }
           // Use Google Fit data if it's higher than app data
           if (fitCalories > totalCalories) totalCalories = fitCalories;
           if (fitSteps > totalSteps) totalSteps = fitSteps;
+          if (fitWorkouts > 0) totalWorkouts = fitWorkouts;
+        } else {
+          // Fallback to calories-based workout detection
+          totalWorkouts = _dailySummaries
+              .take(7)
+              .where((summary) => summary.caloriesBurned > 0)
+              .length;
         }
-
-        totalWorkouts = _dailySummaries
-            .take(7)
-            .where((summary) => summary.caloriesBurned > 0)
-            .length;
         break;
     }
 

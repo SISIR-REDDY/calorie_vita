@@ -105,8 +105,8 @@ class GoogleFitCacheService {
         date: today,
         steps: futures[0] as int?,
         caloriesBurned: futures[1] as double?,
-        distance: futures[2] as double?,
-        weight: futures[3] as double?,
+        workoutSessions: 0, // Will be updated by workout detection
+        workoutDuration: 0.0,
       );
     } catch (e) {
       print('Error fetching fresh Google Fit data: $e');
@@ -134,8 +134,8 @@ class GoogleFitCacheService {
           date: (data['timestamp'] as Timestamp).toDate(),
           steps: data['steps'] as int?,
           caloriesBurned: (data['caloriesBurned'] as num?)?.toDouble(),
-          distance: (data['distance'] as num?)?.toDouble(),
-          weight: (data['weight'] as num?)?.toDouble(),
+          workoutSessions: data['workoutSessions'] as int?,
+          workoutDuration: (data['workoutDuration'] as num?)?.toDouble(),
         );
       }
     } catch (e) {
@@ -167,8 +167,8 @@ class GoogleFitCacheService {
           .set({
         'steps': data.steps,
         'caloriesBurned': data.caloriesBurned,
-        'distance': data.distance,
-        'weight': data.weight,
+        'workoutSessions': data.workoutSessions,
+        'workoutDuration': data.workoutDuration,
         'timestamp': Timestamp.fromDate(data.date),
         'lastUpdated': Timestamp.now(),
       });
@@ -288,8 +288,8 @@ class GoogleFitCacheService {
             date: date,
             steps: data['steps'] as int?,
             caloriesBurned: (data['caloriesBurned'] as num?)?.toDouble(),
-            distance: (data['distance'] as num?)?.toDouble(),
-            weight: (data['weight'] as num?)?.toDouble(),
+            workoutSessions: data['workoutSessions'] as int?,
+            workoutDuration: (data['workoutDuration'] as num?)?.toDouble(),
           ));
         } else {
           // Fetch from API if not cached
@@ -301,8 +301,8 @@ class GoogleFitCacheService {
               steps: fitnessData['steps'] as int?,
               caloriesBurned:
                   (fitnessData['caloriesBurned'] as num?)?.toDouble(),
-              distance: (fitnessData['distance'] as num?)?.toDouble(),
-              weight: null,
+              workoutSessions: 0, // Will be updated by workout detection
+              workoutDuration: 0.0,
             );
             weeklyData.add(googleFitData);
 

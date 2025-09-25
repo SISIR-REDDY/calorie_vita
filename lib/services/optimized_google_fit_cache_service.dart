@@ -306,8 +306,8 @@ class OptimizedGoogleFitCacheService {
           date: (data['timestamp'] as Timestamp).toDate(),
           steps: data['steps'] as int?,
           caloriesBurned: (data['caloriesBurned'] as num?)?.toDouble(),
-          distance: (data['distance'] as num?)?.toDouble(),
-          weight: (data['weight'] as num?)?.toDouble(),
+          workoutSessions: data['workoutSessions'] as int?,
+          workoutDuration: (data['workoutDuration'] as num?)?.toDouble(),
         );
       }
     } catch (e) {
@@ -355,8 +355,8 @@ class OptimizedGoogleFitCacheService {
           .set({
         'steps': data.steps,
         'caloriesBurned': data.caloriesBurned,
-        'distance': data.distance,
-        'weight': data.weight,
+        'workoutSessions': data.workoutSessions,
+        'workoutDuration': data.workoutDuration,
         'timestamp': Timestamp.fromDate(data.date),
         'lastUpdated': Timestamp.now(),
       });
@@ -375,8 +375,8 @@ class OptimizedGoogleFitCacheService {
           date: DateTime.now(),
           steps: optimizedData['steps'] as int?,
           caloriesBurned: (optimizedData['caloriesBurned'] as num?)?.toDouble(),
-          distance: (optimizedData['distance'] as num?)?.toDouble(),
-          weight: (optimizedData['weight'] as num?)?.toDouble(),
+          workoutSessions: optimizedData['workoutSessions'] as int?,
+          workoutDuration: (optimizedData['workoutDuration'] as num?)?.toDouble(),
         );
       }
 
@@ -393,8 +393,8 @@ class OptimizedGoogleFitCacheService {
         date: today,
         steps: futures[0] as int?,
         caloriesBurned: futures[1] as double?,
-        distance: futures[2] as double?,
-        weight: futures[3] as double?,
+        workoutSessions: 0, // Will be updated by workout detection
+        workoutDuration: 0.0,
       );
     } catch (e) {
       print('❌ Error fetching fresh data from API: $e');
@@ -524,8 +524,8 @@ class OptimizedGoogleFitCacheService {
                 date: date,
                 steps: data['steps'] as int?,
                 caloriesBurned: (data['caloriesBurned'] as num?)?.toDouble(),
-                distance: (data['distance'] as num?)?.toDouble(),
-                weight: (data['weight'] as num?)?.toDouble(),
+                workoutSessions: data['workoutSessions'] as int?,
+          workoutDuration: (data['workoutDuration'] as num?)?.toDouble(),
               ));
               continue;
             }
@@ -546,8 +546,8 @@ class OptimizedGoogleFitCacheService {
             date: date,
             steps: 0,
             caloriesBurned: 0.0,
-            distance: 0.0,
-            weight: null,
+            workoutSessions: 0,
+            workoutDuration: 0.0,
           ));
         }
       }
