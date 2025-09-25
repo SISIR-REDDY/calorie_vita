@@ -26,9 +26,12 @@ import '../services/goals_event_bus.dart';
 import '../services/google_fit_service.dart';
 import '../services/google_fit_cache_service.dart';
 import '../services/optimized_google_fit_service.dart';
+import '../services/optimized_google_fit_cache_service.dart';
 import '../services/global_goals_manager.dart';
 import '../services/global_google_fit_manager.dart';
+import '../services/unified_google_fit_manager.dart';
 import '../mixins/google_fit_sync_mixin.dart';
+import '../models/google_fit_data.dart';
 import '../services/simple_goals_notifier.dart';
 import '../services/rewards_service.dart';
 import '../models/reward_system.dart';
@@ -74,8 +77,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   final GoogleFitService _googleFitService = GoogleFitService();
   final GoogleFitCacheService _googleFitCacheService = GoogleFitCacheService();
   final OptimizedGoogleFitService _optimizedGoogleFitService = OptimizedGoogleFitService();
-  final GlobalGoogleFitManager _globalGoogleFitManager =
-      GlobalGoogleFitManager();
+  final OptimizedGoogleFitCacheService _optimizedCacheService = OptimizedGoogleFitCacheService();
+  final GlobalGoogleFitManager _globalGoogleFitManager = GlobalGoogleFitManager();
+  final UnifiedGoogleFitManager _unifiedGoogleFitManager = UnifiedGoogleFitManager();
   final TaskService _taskService = TaskService();
   final FastDataRefreshService _fastDataRefreshService = FastDataRefreshService();
   final TodaysFoodDataService _todaysFoodDataService = TodaysFoodDataService();
@@ -124,8 +128,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   StreamSubscription<UserGoals?>? _goalsSubscription;
   StreamSubscription<UserGoals>? _goalsEventBusSubscription;
   StreamSubscription<List<Task>>? _tasksSubscription;
-  StreamSubscription<Map<String, dynamic>>? _googleFitLiveStreamSubscription;
-  StreamSubscription? _googleFitCacheStreamSubscription;
+  StreamSubscription<GoogleFitData?>? _unifiedGoogleFitSubscription;
+  StreamSubscription<bool>? _unifiedGoogleFitConnectionSubscription;
+  StreamSubscription<bool>? _unifiedGoogleFitLoadingSubscription;
   StreamSubscription<int>? _consumedCaloriesSubscription;
   StreamSubscription<List<FoodHistoryEntry>>? _todaysFoodSubscription;
   StreamSubscription<Map<String, dynamic>>? _fastMacroBreakdownSubscription;
@@ -155,7 +160,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _setupTodaysFoodDataService();
     _loadData();
     _loadRewardsDataAsync();
-    _initializeGoogleFitAsync();
+    _initializeUnifiedGoogleFit();
+    _preloadGoogleFitData();
     initializeGoogleFitSync();
     
     // Set up periodic streak refresh to ensure data stays current
@@ -244,12 +250,78 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         .catchError((e) => debugPrint('Rewards data loading error: $e'));
   }
 
-  /// Initialize Google Fit asynchronously
-  Future<void> _initializeGoogleFitAsync() async {
-    _initializeGoogleFit()
-        .catchError((e) => debugPrint('Google Fit initialization error: $e'));
-    _initializeGoogleFitCache().catchError(
-        (e) => debugPrint('Google Fit cache initialization error: $e'));
+  /// Preload Google Fit data for instant display
+  Future<void> _preloadGoogleFitData() async {
+    try {
+      await _unifiedGoogleFitManager.preloadData();
+      print('✅ Home screen: Google Fit data preloaded');
+    } catch (e) {
+      print('❌ Home screen: Google Fit data preload failed: $e');
+    }
+  }
+
+  /// Initialize unified Google Fit manager
+  Future<void> _initializeUnifiedGoogleFit() async {
+    try {
+      await _unifiedGoogleFitManager.initialize();
+      
+      // Load current data immediately to prevent zero display
+      final currentData = _unifiedGoogleFitManager.getCurrentData();
+      if (currentData != null && mounted) {
+        setState(() {
+          _googleFitSteps = currentData.steps ?? 0;
+          _googleFitCaloriesBurned = currentData.caloriesBurned ?? 0.0;
+          _googleFitDistance = currentData.distance ?? 0.0;
+          _activityLevel = _calculateActivityLevel(currentData.steps);
+          _lastSyncTime = DateTime.now();
+        });
+        
+        // Update daily summary with Google Fit data
+        _updateDailySummaryWithGoogleFitData();
+        print('✅ Home screen: Initial data loaded instantly');
+      }
+      
+      // Listen to unified Google Fit data stream with debouncing
+      _unifiedGoogleFitSubscription = _unifiedGoogleFitManager.dataStream.listen((data) {
+        if (mounted && data != null) {
+          // Use debounced update to prevent UI flickering
+          _debounceUIUpdate(() {
+            setState(() {
+              _googleFitSteps = data.steps ?? 0;
+              _googleFitCaloriesBurned = data.caloriesBurned ?? 0.0;
+              _googleFitDistance = data.distance ?? 0.0;
+              _activityLevel = _calculateActivityLevel(data.steps);
+              _lastSyncTime = DateTime.now();
+            });
+            
+            // Update daily summary with Google Fit data
+            _updateDailySummaryWithGoogleFitData();
+          });
+        }
+      });
+      
+      // Listen to connection status
+      _unifiedGoogleFitConnectionSubscription = _unifiedGoogleFitManager.connectionStream.listen((isConnected) {
+        if (mounted) {
+          setState(() {
+            _isGoogleFitConnected = isConnected;
+          });
+        }
+      });
+      
+      // Listen to loading status
+      _unifiedGoogleFitLoadingSubscription = _unifiedGoogleFitManager.loadingStream.listen((isLoading) {
+        if (mounted) {
+          setState(() {
+            _isGoogleFitLoading = isLoading;
+          });
+        }
+      });
+      
+      print('✅ Unified Google Fit manager initialized');
+    } catch (e) {
+      print('❌ Unified Google Fit initialization failed: $e');
+    }
   }
 
   Future<void> _initializeServices() async {
@@ -396,8 +468,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _goalsCheckTimer?.cancel();
     _googleFitRefreshTimer?.cancel();
     _streakRefreshTimer?.cancel();
-    _googleFitLiveStreamSubscription?.cancel();
-    _googleFitCacheStreamSubscription?.cancel();
+    _unifiedGoogleFitSubscription?.cancel();
+    _unifiedGoogleFitConnectionSubscription?.cancel();
+    _unifiedGoogleFitLoadingSubscription?.cancel();
     _consumedCaloriesSubscription?.cancel();
     _todaysFoodSubscription?.cancel();
     _fastMacroBreakdownSubscription?.cancel();
@@ -407,6 +480,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _googleFitCacheService.stopLiveUpdates();
     _googleFitCacheService.dispose();
     _fastDataRefreshService.dispose();
+    _unifiedGoogleFitManager.dispose();
     _todaysFoodDataService.dispose();
     _stopLiveSync();
     GlobalGoalsManager().clearCallback();
@@ -727,9 +801,43 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     try {
       await _googleFitCacheService.initialize();
 
-      // Listen to cached data stream for real-time updates
-      _googleFitCacheStreamSubscription =
-          _googleFitCacheService.liveDataStream.listen((data) {
+      // Note: Google Fit cache stream is now handled by unified manager
+
+      // Start live updates for enhanced real-time experience
+      _googleFitCacheService.startLiveUpdates();
+
+      print('Google Fit cache service initialized with real-time updates');
+    } catch (e) {
+      print('Error initializing Google Fit cache service: $e');
+    }
+  }
+
+  /// Initialize optimized Google Fit cache service for faster data loading
+  Future<void> _initializeOptimizedGoogleFitCache() async {
+    try {
+      await _optimizedCacheService.initialize();
+
+      // Get cached data immediately for instant UI display
+      final cachedData = _optimizedCacheService.getCachedData();
+      if (cachedData != null && mounted) {
+        setState(() {
+          _googleFitSteps = cachedData.steps ?? 0;
+          _googleFitCaloriesBurned = cachedData.caloriesBurned ?? 0.0;
+          _googleFitDistance = cachedData.distance ?? 0.0;
+          _activityLevel = _calculateActivityLevel(cachedData.steps);
+          _lastSyncTime = DateTime.now();
+        });
+
+        // Update daily summary if available
+        if (_dailySummary != null) {
+          _updateDailySummaryWithGoogleFitData();
+        }
+        
+        print('✅ Optimized Google Fit cache: Instant data loaded - Steps: ${cachedData.steps}');
+      }
+
+      // Listen to optimized cache stream for real-time updates
+      _optimizedCacheService.liveDataStream.listen((data) {
         if (mounted) {
           setState(() {
             _googleFitSteps = data.steps ?? 0;
@@ -746,12 +854,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         }
       });
 
-      // Start live updates for enhanced real-time experience
-      _googleFitCacheService.startLiveUpdates();
-
-      print('Google Fit cache service initialized with real-time updates');
+      print('✅ Optimized Google Fit cache service initialized with instant data loading');
     } catch (e) {
-      print('Error initializing Google Fit cache service: $e');
+      print('❌ Error initializing optimized Google Fit cache service: $e');
     }
   }
 
@@ -801,62 +906,18 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
-  /// Load Google Fit data asynchronously
+  /// Load Google Fit data asynchronously - now handled by unified manager
+  @Deprecated('Use unified manager instead')
   Future<void> _loadGoogleFitDataAsync() async {
-    try {
-      await _loadGoogleFitData();
-      _startLiveSync();
-      _startGoogleFitRefreshTimer();
-    } catch (e) {
-      print('Error loading Google Fit data asynchronously: $e');
-    }
+    // This is now handled by the unified manager
+    print('⚠️ Legacy Google Fit data loading called - using unified manager instead');
   }
 
-  /// Load Google Fit data using optimized service with caching
+  /// Load Google Fit data using optimized service - now handled by unified manager
+  @Deprecated('Use unified manager instead')
   Future<void> _loadGoogleFitDataOptimized() async {
-    if (!_isGoogleFitConnected) return;
-
-    setState(() {
-      _isGoogleFitLoading = true;
-    });
-
-    try {
-      // Use optimized service with caching
-      final fitnessData = await _optimizedGoogleFitService.getOptimizedFitnessData();
-
-      if (fitnessData != null) {
-        final steps = fitnessData['steps'] as int? ?? 0;
-        final calories = fitnessData['caloriesBurned'] as double? ?? 0.0;
-        final distance = fitnessData['distance'] as double? ?? 0.0;
-        final weight = fitnessData['weight'] as double?;
-
-        setState(() {
-          _googleFitSteps = steps;
-          _googleFitCaloriesBurned = calories;
-          _googleFitDistance = distance;
-          _activityLevel = fitnessData['activityLevel'] ?? 'Unknown';
-          _lastSyncTime = DateTime.now();
-        });
-
-        // Update daily summary with Google Fit data if available
-        if (_dailySummary != null) {
-          await _updateDailySummaryWithGoogleFitData();
-        }
-
-        print('Google Fit data loaded (optimized): Steps=$steps, Calories=$calories, Distance=$distance');
-      } else {
-        // Fallback to original service if optimized fails
-        await _loadGoogleFitDataFallback();
-      }
-    } catch (e) {
-      print('Error loading optimized Google Fit data: $e');
-      // Try fallback method
-      await _loadGoogleFitDataFallback();
-    } finally {
-      setState(() {
-        _isGoogleFitLoading = false;
-      });
-    }
+    // This is now handled by the unified manager
+    print('⚠️ Legacy optimized Google Fit data loading called - using unified manager instead');
   }
 
   /// Load Google Fit data and update UI (optimized with caching)
@@ -1001,17 +1062,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
-  /// Connect to Google Fit
+  /// Connect to Google Fit using unified manager
   Future<void> _connectToGoogleFit() async {
     try {
-      final success = await _googleFitService.authenticate();
+      final success = await _unifiedGoogleFitManager.connect();
       if (success) {
-        setState(() {
-          _isGoogleFitConnected = true;
-        });
-        await _loadGoogleFitData();
-        _startLiveSync();
-
         // Show success message
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1019,6 +1074,16 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               content: Text(
                   'Google Fit connected successfully! Your data will sync automatically.'),
               backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        // Show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to connect to Google Fit. Please try again.'),
+              backgroundColor: Colors.red,
             ),
           );
         }
@@ -1036,10 +1101,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
-  /// Refresh Google Fit data (called periodically or on user interaction)
+  /// Refresh Google Fit data using unified manager
   Future<void> _refreshGoogleFitData() async {
     if (_isGoogleFitConnected) {
-      await _loadGoogleFitData();
+      await _unifiedGoogleFitManager.forceRefresh();
     }
   }
 
@@ -1049,48 +1114,13 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
     _googleFitService.startLiveSync();
 
-    // Listen to live data stream with immediate updates
-    _googleFitLiveStreamSubscription?.cancel();
-    _googleFitLiveStreamSubscription =
-        _googleFitService.liveDataStream?.listen((liveData) {
-      if (mounted && liveData['isLive'] == true) {
-        // Immediate UI update for faster response
-        setState(() {
-          _isLiveSyncing = true;
-          _lastSyncTime = DateTime.now();
-
-          // Update data immediately
-          if (liveData['steps'] != null) _googleFitSteps = liveData['steps'];
-          if (liveData['caloriesBurned'] != null)
-            _googleFitCaloriesBurned = liveData['caloriesBurned'];
-          if (liveData['distance'] != null)
-            _googleFitDistance = liveData['distance'];
-          if (liveData['activityLevel'] != null)
-            _activityLevel = liveData['activityLevel'];
-        });
-
-        // Update daily summary immediately
-        if (_dailySummary != null) {
-          _updateDailySummaryWithGoogleFitData();
-        }
-
-        // Quick reset of live sync indicator
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) {
-            setState(() {
-              _isLiveSyncing = false;
-            });
-          }
-        });
-      }
-    });
+    // Note: Live data stream is now handled by unified manager
   }
 
   /// Stop live sync
   void _stopLiveSync() {
     _googleFitService.stopLiveSync();
-    _googleFitLiveStreamSubscription?.cancel();
-    _googleFitLiveStreamSubscription = null;
+    // Note: Live stream subscription is now handled by unified manager
     _isLiveSyncing = false;
   }
 

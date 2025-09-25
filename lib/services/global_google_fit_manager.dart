@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'google_fit_service.dart';
 import 'enhanced_google_fit_service.dart';
 import 'google_fit_cache_service.dart';
+import 'optimized_google_fit_cache_service.dart';
 
 /// Global Google Fit manager for automatic sync across all screens
 class GlobalGoogleFitManager {
@@ -15,6 +16,7 @@ class GlobalGoogleFitManager {
   final GoogleFitService _googleFitService = GoogleFitService();
   final EnhancedGoogleFitService _enhancedGoogleFitService = EnhancedGoogleFitService();
   final GoogleFitCacheService _cacheService = GoogleFitCacheService();
+  final OptimizedGoogleFitCacheService _optimizedCacheService = OptimizedGoogleFitCacheService();
 
   // Initialization state
   bool _isInitialized = false;
@@ -69,6 +71,7 @@ class GlobalGoogleFitManager {
         _googleFitService.initialize(),
         _enhancedGoogleFitService.initialize(),
         _cacheService.initialize(),
+        _optimizedCacheService.initialize(),
       ]).timeout(_initTimeout);
 
       // Check authentication status using enhanced service
@@ -196,68 +199,89 @@ class GlobalGoogleFitManager {
     
     _isSyncInProgress = true;
 
-    // Use enhanced service for better data sync
-    _enhancedGoogleFitService.getTodayFitnessDataBatch().then((data) {
+    // Use optimized cache service for fastest data access
+    _optimizedCacheService.getTodayData().then((data) {
       if (data != null) {
         final syncData = {
-          'timestamp': data['timestamp'] ?? DateTime.now().toIso8601String(),
-          'steps': data['steps'] ?? 0,
-          'caloriesBurned': data['caloriesBurned'] ?? 0.0,
-          'distance': data['distance'] ?? 0.0,
-          'weight': data['weight'],
-          'activityLevel': data['activityLevel'],
+          'timestamp': DateTime.now().toIso8601String(),
+          'steps': data.steps ?? 0,
+          'caloriesBurned': data.caloriesBurned ?? 0.0,
+          'distance': data.distance ?? 0.0,
+          'weight': data.weight,
           'isAutoSync': true,
         };
 
         _currentFitnessData = syncData;
         _syncDataController.add(syncData);
         print(
-            '🔄 GlobalGoogleFitManager: Enhanced sync completed - Steps: ${data['steps']}');
+            '🔄 GlobalGoogleFitManager: Optimized sync completed - Steps: ${data.steps}');
       } else {
-        // Fallback to cache service
-        _cacheService.forceRefresh().then((cacheData) {
-          if (cacheData != null) {
+        // Fallback to enhanced service
+        _enhancedGoogleFitService.getTodayFitnessDataBatch().then((enhancedData) {
+          if (enhancedData != null) {
             final syncData = {
-              'timestamp': DateTime.now().toIso8601String(),
-              'steps': cacheData.steps ?? 0,
-              'caloriesBurned': cacheData.caloriesBurned ?? 0.0,
-              'distance': cacheData.distance ?? 0.0,
-              'weight': cacheData.weight,
+              'timestamp': enhancedData['timestamp'] ?? DateTime.now().toIso8601String(),
+              'steps': enhancedData['steps'] ?? 0,
+              'caloriesBurned': enhancedData['caloriesBurned'] ?? 0.0,
+              'distance': enhancedData['distance'] ?? 0.0,
+              'weight': enhancedData['weight'],
+              'activityLevel': enhancedData['activityLevel'],
               'isAutoSync': true,
             };
 
             _currentFitnessData = syncData;
             _syncDataController.add(syncData);
             print(
-                '🔄 GlobalGoogleFitManager: Cache sync completed - Steps: ${cacheData.steps}');
+                '🔄 GlobalGoogleFitManager: Enhanced sync completed - Steps: ${enhancedData['steps']}');
+          } else {
+            // Final fallback to original cache service
+            _cacheService.forceRefresh().then((cacheData) {
+              if (cacheData != null) {
+                final syncData = {
+                  'timestamp': DateTime.now().toIso8601String(),
+                  'steps': cacheData.steps ?? 0,
+                  'caloriesBurned': cacheData.caloriesBurned ?? 0.0,
+                  'distance': cacheData.distance ?? 0.0,
+                  'weight': cacheData.weight,
+                  'isAutoSync': true,
+                };
+
+                _currentFitnessData = syncData;
+                _syncDataController.add(syncData);
+                print(
+                    '🔄 GlobalGoogleFitManager: Cache sync completed - Steps: ${cacheData.steps}');
+              }
+            }).catchError((e) {
+              print('❌ GlobalGoogleFitManager: All sync methods failed: $e');
+            });
           }
         }).catchError((e) {
-          print('❌ GlobalGoogleFitManager: Cache sync also failed: $e');
+          print('❌ GlobalGoogleFitManager: Enhanced sync failed, trying cache: $e');
+          
+          // Fallback to cache service
+          _cacheService.forceRefresh().then((data) {
+            if (data != null) {
+              final syncData = {
+                'timestamp': DateTime.now().toIso8601String(),
+                'steps': data.steps ?? 0,
+                'caloriesBurned': data.caloriesBurned ?? 0.0,
+                'distance': data.distance ?? 0.0,
+                'weight': data.weight,
+                'isAutoSync': true,
+              };
+
+              _currentFitnessData = syncData;
+              _syncDataController.add(syncData);
+              print(
+                  '🔄 GlobalGoogleFitManager: Fallback sync completed - Steps: ${data.steps}');
+            }
+          }).catchError((fallbackError) {
+            print('❌ GlobalGoogleFitManager: All sync methods failed: $fallbackError');
+          });
         });
       }
     }).catchError((e) {
-      print('❌ GlobalGoogleFitManager: Enhanced sync failed, trying cache: $e');
-      
-      // Fallback to cache service
-      _cacheService.forceRefresh().then((data) {
-        if (data != null) {
-          final syncData = {
-            'timestamp': DateTime.now().toIso8601String(),
-            'steps': data.steps ?? 0,
-            'caloriesBurned': data.caloriesBurned ?? 0.0,
-            'distance': data.distance ?? 0.0,
-            'weight': data.weight,
-            'isAutoSync': true,
-          };
-
-          _currentFitnessData = syncData;
-          _syncDataController.add(syncData);
-          print(
-              '🔄 GlobalGoogleFitManager: Fallback sync completed - Steps: ${data.steps}');
-        }
-      }).catchError((fallbackError) {
-        print('❌ GlobalGoogleFitManager: All sync methods failed: $fallbackError');
-      });
+      print('❌ GlobalGoogleFitManager: Optimized sync failed: $e');
     }).whenComplete(() {
       _isSyncInProgress = false;
     });
@@ -278,7 +302,8 @@ class GlobalGoogleFitManager {
 
     try {
       print('🔄 GlobalGoogleFitManager: Force sync initiated');
-      final data = await _cacheService.forceRefresh();
+      // Use optimized cache service for force sync
+      final data = await _optimizedCacheService.forceRefresh();
 
       if (data != null) {
         final syncData = {
@@ -308,7 +333,8 @@ class GlobalGoogleFitManager {
     if (!_isConnected) return null;
 
     try {
-      final data = await _cacheService.getTodayData();
+      // Try optimized cache service first
+      final data = _optimizedCacheService.getCachedData();
       if (data != null) {
         return {
           'timestamp': DateTime.now().toIso8601String(),
@@ -316,6 +342,19 @@ class GlobalGoogleFitManager {
           'caloriesBurned': data.caloriesBurned ?? 0.0,
           'distance': data.distance ?? 0.0,
           'weight': data.weight,
+          'isCached': true,
+        };
+      }
+
+      // Fallback to original cache service
+      final fallbackData = await _cacheService.getTodayData();
+      if (fallbackData != null) {
+        return {
+          'timestamp': DateTime.now().toIso8601String(),
+          'steps': fallbackData.steps ?? 0,
+          'caloriesBurned': fallbackData.caloriesBurned ?? 0.0,
+          'distance': fallbackData.distance ?? 0.0,
+          'weight': fallbackData.weight,
           'isCached': true,
         };
       }
@@ -413,6 +452,7 @@ class GlobalGoogleFitManager {
     _connectionStateController.close();
     _syncDataController.close();
     _cacheService.dispose();
+    _optimizedCacheService.dispose();
 
     print('🗑️ GlobalGoogleFitManager: Disposed');
   }

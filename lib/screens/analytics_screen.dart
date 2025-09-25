@@ -10,6 +10,8 @@ import '../services/app_state_service.dart';
 import '../services/google_fit_service.dart';
 import '../services/global_google_fit_manager.dart';
 import '../services/optimized_google_fit_service.dart';
+import '../services/optimized_google_fit_cache_service.dart';
+import '../services/unified_google_fit_manager.dart';
 import '../services/fast_data_refresh_service.dart';
 import '../services/todays_food_data_service.dart';
 import '../mixins/google_fit_sync_mixin.dart';
@@ -41,6 +43,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   final GoogleFitService _googleFitService = GoogleFitService();
   final GlobalGoogleFitManager _googleFitManager = GlobalGoogleFitManager();
   final OptimizedGoogleFitService _optimizedGoogleFitService = OptimizedGoogleFitService();
+  final OptimizedGoogleFitCacheService _optimizedCacheService = OptimizedGoogleFitCacheService();
+  final UnifiedGoogleFitManager _unifiedGoogleFitManager = UnifiedGoogleFitManager();
   final FastDataRefreshService _fastDataRefreshService = FastDataRefreshService();
   final TodaysFoodDataService _todaysFoodDataService = TodaysFoodDataService();
 
@@ -56,12 +60,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   String? _cachedInsightsPeriod;
   String? _cachedInsightsData;
 
+  // UI update debouncing
+  Timer? _uiUpdateTimer;
+  bool _hasPendingUIUpdate = false;
+  static const Duration _minUIUpdateInterval = Duration(milliseconds: 300);
+
   // Stream subscriptions
   StreamSubscription<Map<String, dynamic>?>? _profileDataSubscription;
   StreamSubscription<Map<String, dynamic>>? _fastMacroBreakdownSubscription;
   StreamSubscription<UserGoals?>? _goalsSubscription;
   StreamSubscription<Map<String, double>>? _todaysFoodMacroSubscription;
   StreamSubscription<int>? _todaysFoodCaloriesSubscription;
+  StreamSubscription<GoogleFitData?>? _unifiedGoogleFitSubscription;
+  StreamSubscription<bool>? _unifiedGoogleFitConnectionSubscription;
+  StreamSubscription<bool>? _unifiedGoogleFitLoadingSubscription;
 
   // Real-time data
   List<DailySummary> _dailySummaries = [];
@@ -87,6 +99,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   void initState() {
     super.initState();
     _initializeAnalytics();
+    _initializeUnifiedGoogleFit();
+    _preloadGoogleFitData();
     initializeGoogleFitSync();
     _setupTodaysFoodDataService();
   }
@@ -98,10 +112,87 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     _goalsSubscription?.cancel();
     _todaysFoodMacroSubscription?.cancel();
     _todaysFoodCaloriesSubscription?.cancel();
+    _unifiedGoogleFitSubscription?.cancel();
+    _unifiedGoogleFitConnectionSubscription?.cancel();
+    _unifiedGoogleFitLoadingSubscription?.cancel();
+    _uiUpdateTimer?.cancel();
     _analyticsService.dispose();
     _fastDataRefreshService.dispose();
     _todaysFoodDataService.dispose();
+    _unifiedGoogleFitManager.dispose();
     super.dispose();
+  }
+
+  /// Debounce UI updates to prevent flickering
+  void _debounceUIUpdate(VoidCallback updateCallback) {
+    _uiUpdateTimer?.cancel();
+    _uiUpdateTimer = Timer(_minUIUpdateInterval, () {
+      if (mounted && !_hasPendingUIUpdate) {
+        _hasPendingUIUpdate = true;
+        updateCallback();
+        _hasPendingUIUpdate = false;
+      }
+    });
+  }
+
+  /// Preload Google Fit data for instant display
+  Future<void> _preloadGoogleFitData() async {
+    try {
+      await _unifiedGoogleFitManager.preloadData();
+      print('✅ Analytics screen: Google Fit data preloaded');
+    } catch (e) {
+      print('❌ Analytics screen: Google Fit data preload failed: $e');
+    }
+  }
+
+  /// Initialize unified Google Fit manager for analytics
+  Future<void> _initializeUnifiedGoogleFit() async {
+    try {
+      await _unifiedGoogleFitManager.initialize();
+      
+      // Load current data immediately to prevent zero display
+      final currentData = _unifiedGoogleFitManager.getCurrentData();
+      if (currentData != null && mounted) {
+        setState(() {
+          _todayGoogleFitData = currentData;
+        });
+        print('✅ Analytics screen: Initial data loaded instantly');
+      }
+      
+      // Listen to unified Google Fit data stream with debouncing
+      _unifiedGoogleFitSubscription = _unifiedGoogleFitManager.dataStream.listen((data) {
+        if (mounted && data != null) {
+          // Use debounced update to prevent UI flickering
+          _debounceUIUpdate(() {
+            setState(() {
+              _todayGoogleFitData = data;
+            });
+          });
+        }
+      });
+      
+      // Listen to connection status
+      _unifiedGoogleFitConnectionSubscription = _unifiedGoogleFitManager.connectionStream.listen((isConnected) {
+        if (mounted) {
+          setState(() {
+            _isGoogleFitConnected = isConnected;
+          });
+        }
+      });
+      
+      // Listen to loading status
+      _unifiedGoogleFitLoadingSubscription = _unifiedGoogleFitManager.loadingStream.listen((isLoading) {
+        if (mounted) {
+          setState(() {
+            _isGoogleFitLoading = isLoading;
+          });
+        }
+      });
+      
+      print('✅ Unified Google Fit manager initialized for analytics');
+    } catch (e) {
+      print('❌ Unified Google Fit initialization failed for analytics: $e');
+    }
   }
 
   /// Override mixin method to handle Google Fit data updates
@@ -282,12 +373,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   /// Load Google Fit data asynchronously (lowest priority)
   Future<void> _loadGoogleFitDataAsync() async {
     try {
-      await _googleFitService.initialize().timeout(const Duration(seconds: 3),
-          onTimeout: () => print('Google Fit initialization timed out'));
+      // Initialize optimized cache service for faster data access
+      await _optimizedCacheService.initialize().timeout(const Duration(seconds: 3),
+          onTimeout: () => print('Optimized cache service initialization timed out'));
 
-      // Load Google Fit data in background
+      // Load Google Fit data in background using optimized cache
       _loadGoogleFitData()
-          .timeout(const Duration(seconds: 5),
+          .timeout(const Duration(seconds: 3),
               onTimeout: () => print('Google Fit data loading timed out'))
           .catchError((e) => print('Google Fit loading error: $e'));
     } catch (e) {
@@ -485,15 +577,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     }
   }
 
-  /// Load Google Fit data using optimized service
+  /// Load Google Fit data using optimized cache service
   Future<void> _loadGoogleFitData() async {
     try {
       setState(() {
         _isGoogleFitLoading = true;
       });
-      
-      // Initialize optimized service if not already done
-      await _optimizedGoogleFitService.initialize();
       
       // Check authentication with network timeout
       final isAuthenticated = await _googleFitService
@@ -509,25 +598,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       
       if (_isGoogleFitConnected) {
         try {
-          // Use optimized service for faster data loading
-          final fitnessData = await _optimizedGoogleFitService.getOptimizedFitnessData();
+          // Use optimized cache service for fastest data loading
+          final todayData = await _optimizedCacheService.getTodayData();
           
-          if (fitnessData != null) {
-            final today = DateTime.now();
-            final todayData = GoogleFitData(
-              date: today,
-              steps: fitnessData['steps'] as int? ?? 0,
-              caloriesBurned: fitnessData['caloriesBurned'] as double? ?? 0.0,
-              distance: fitnessData['distance'] as double? ?? 0.0,
-              weight: fitnessData['weight'] as double?,
-            );
-            
+          if (todayData != null) {
             setState(() {
               _todayGoogleFitData = todayData;
               _isGoogleFitLoading = false;
             });
             
-            print('Google Fit today data loaded (optimized): ${_todayGoogleFitData?.steps} steps');
+            print('Google Fit today data loaded (optimized cache): ${_todayGoogleFitData?.steps} steps');
           } else {
             // Fallback to original service
             await _loadGoogleFitDataFallback();
@@ -538,7 +618,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             print('Weekly Google Fit data loading failed: $error');
           });
         } catch (dataError) {
-          print('Error loading optimized Google Fit data: $dataError');
+          print('Error loading optimized cache Google Fit data: $dataError');
           await _loadGoogleFitDataFallback();
         }
       } else {

@@ -150,6 +150,15 @@ class GoogleFitCacheService {
       final dateKey =
           '${data.date.year}-${data.date.month.toString().padLeft(2, '0')}-${data.date.day.toString().padLeft(2, '0')}';
 
+      // First, delete any existing data for this date to ensure clean replacement
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('googleFitCache')
+          .doc(dateKey)
+          .delete();
+
+      // Then set the new data (no merge to ensure complete replacement)
       await _firestore
           .collection('users')
           .doc(userId)
@@ -162,7 +171,7 @@ class GoogleFitCacheService {
         'weight': data.weight,
         'timestamp': Timestamp.fromDate(data.date),
         'lastUpdated': Timestamp.now(),
-      }, SetOptions(merge: true));
+      });
     } catch (e) {
       print('Error saving to Firebase cache: $e');
     }
@@ -225,7 +234,11 @@ class GoogleFitCacheService {
     final now = DateTime.now();
     final cacheAge = now.difference(_lastCacheUpdate!);
 
-    return cacheAge < _cacheExpiry && _isToday(_cachedTodayData!.date);
+    // Check if cache is for today and not expired
+    final isToday = _isToday(_cachedTodayData!.date);
+    final isNotExpired = cacheAge < _cacheExpiry;
+
+    return isToday && isNotExpired;
   }
 
   /// Check if date is today

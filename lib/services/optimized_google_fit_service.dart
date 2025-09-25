@@ -39,6 +39,9 @@ class OptimizedGoogleFitService {
   bool _isLoading = false;
   Completer<Map<String, dynamic>?>? _loadingCompleter;
 
+  /// Check if service is connected
+  bool get isConnected => _isAuthenticated && _authClient != null && _googleSignIn?.currentUser != null;
+
   /// Initialize the optimized Google Fit service
   Future<void> initialize() async {
     try {
