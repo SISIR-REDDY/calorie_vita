@@ -767,8 +767,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         _isRefreshing = true;
       });
 
-      // Only reload Google Fit data if connected and not already syncing
-      if (_isGoogleFitConnected && !_isRefreshing) {
+      // Only reload Google Fit data if connected
+      if (_isGoogleFitConnected) {
         await _loadGoogleFitData();
       }
 
@@ -925,8 +925,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
   /// Refresh data for current period
   Future<void> _refreshData() async {
-    if (_isRefreshing) return;
+    if (_isRefreshing) {
+      print('⚠️ Analytics: Refresh already in progress, skipping...');
+      return;
+    }
 
+    print('🔄 Analytics: Starting data refresh...');
     setState(() {
       _isRefreshing = true;
       _error = null;
@@ -943,7 +947,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
       // Refresh Google Fit data if connected
       if (_isGoogleFitConnected) {
+        print('🔄 Analytics: Refreshing Google Fit data...');
         futures.add(_loadGoogleFitDataForPeriod(_selectedPeriod));
+      } else {
+        print('⚠️ Analytics: Google Fit not connected, skipping Google Fit refresh');
       }
 
       // Refresh user profile data
@@ -955,16 +962,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       // Generate fresh AI insights after data refresh
       _generateAIInsights();
 
-      print('Analytics data refreshed successfully');
+      print('✅ Analytics: Data refreshed successfully');
     } catch (e) {
       setState(() {
         _error = 'Failed to refresh data: ${e.toString()}';
       });
-      print('Error refreshing analytics data: $e');
+      print('❌ Error refreshing analytics data: $e');
     } finally {
       setState(() {
         _isRefreshing = false;
       });
+      print('🔄 Analytics: Refresh completed');
     }
   }
 
@@ -1004,24 +1012,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   /// Load Google Fit data for specific period (optimized)
   Future<void> _loadGoogleFitDataForPeriod(String period) async {
     try {
+      print('🔄 Analytics: Loading Google Fit data for period: $period');
+      
       switch (period) {
         case 'Daily':
-          // Load today's data
-          final today = DateTime.now();
-        final futures = await Future.wait([
-          _googleFitService.getDailySteps(today),
-          _googleFitService.getDailyCaloriesBurned(today),
-        ]);
-
-        setState(() {
-          _todayGoogleFitData = GoogleFitData(
-            date: today,
-            steps: futures[0] as int? ?? 0,
-            caloriesBurned: futures[1] as double? ?? 0.0,
-            workoutSessions: 0, // Will be updated by workout detection
-            workoutDuration: 0.0,
-          );
-        });
+          // Use optimized workout service for fastest data loading
+          final todayData = await _unifiedGoogleFitManager.getOptimizedWorkoutData();
+          
+          if (todayData != null) {
+            setState(() {
+              _todayGoogleFitData = todayData;
+            });
+            print('✅ Analytics: Today\'s Google Fit data loaded: ${todayData.steps} steps, ${todayData.caloriesBurned} calories');
+          } else {
+            print('⚠️ Analytics: No Google Fit data available for today');
+          }
           break;
 
         case 'Weekly':
@@ -1030,7 +1035,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           break;
       }
     } catch (e) {
-      print('Error loading Google Fit data for period $period: $e');
+      print('❌ Error loading Google Fit data for period $period: $e');
     }
   }
 
@@ -1439,12 +1444,22 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                           _googleFitService.isLiveSyncing)
                         const SizedBox(width: 8),
                       IconButton(
-                        onPressed: _refreshData,
-                        icon: const Icon(
-                          Icons.refresh,
-                          color: Colors.white,
-                          size: 20,
-                        ),
+                        onPressed: _isRefreshing ? null : _refreshData,
+                        icon: _isRefreshing
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Icon(
+                                Icons.refresh,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                        tooltip: _isRefreshing ? 'Refreshing...' : 'Refresh data',
                       ),
                     ],
                   ),

@@ -182,32 +182,40 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Setup today's food data service for immediate UI updates
   Future<void> _setupTodaysFoodDataService() async {
     try {
-      await _todaysFoodDataService.initialize();
-      
-      // INSTANT: Load cached data immediately for instant UI display
+      // INSTANT: Load cached data BEFORE initialization for fastest UI
       final cachedCalories = _todaysFoodDataService.getCachedConsumedCalories();
       final cachedMacros = _todaysFoodDataService.getCachedMacroNutrients();
       
+      // Update UI immediately with cached data (0ms delay)
       if (cachedCalories > 0 || cachedMacros.isNotEmpty) {
-        setState(() {
-          // Update consumed calories immediately
-          if (_dailySummary != null) {
-            _dailySummary = _dailySummary!.copyWith(caloriesConsumed: cachedCalories);
-          }
-          
-          // Update macro breakdown immediately
-          if (cachedMacros.isNotEmpty) {
-            _macroBreakdown = MacroBreakdown(
-              protein: cachedMacros['protein'] ?? 0.0,
-              carbs: cachedMacros['carbs'] ?? 0.0,
-              fat: cachedMacros['fat'] ?? 0.0,
-              fiber: cachedMacros['fiber'] ?? 0.0,
-              sugar: cachedMacros['sugar'] ?? 0.0,
-            );
-          }
-        });
-        print('✅ Home: Loaded cached data immediately - Calories: $cachedCalories');
+        if (mounted) {
+          setState(() {
+            // Update consumed calories immediately
+            if (_dailySummary != null) {
+              _dailySummary = _dailySummary!.copyWith(caloriesConsumed: cachedCalories);
+            }
+            
+            // Update macro breakdown immediately
+            if (cachedMacros.isNotEmpty) {
+              _macroBreakdown = MacroBreakdown(
+                protein: cachedMacros['protein'] ?? 0.0,
+                carbs: cachedMacros['carbs'] ?? 0.0,
+                fat: cachedMacros['fat'] ?? 0.0,
+                fiber: cachedMacros['fiber'] ?? 0.0,
+                sugar: cachedMacros['sugar'] ?? 0.0,
+              );
+            }
+          });
+        }
+        print('⚡ Home: INSTANT cached data loaded - Calories: $cachedCalories');
       }
+      
+      // Initialize service in background (non-blocking)
+      _todaysFoodDataService.initialize().then((_) {
+        print('✅ Home: Food data service initialized');
+      }).catchError((e) {
+        print('❌ Home: Food data service init error: $e');
+      });
       
       // Listen to consumed calories stream (same data as TodaysFoodScreen)
       _todaysFoodCaloriesSubscription = _todaysFoodDataService.consumedCaloriesStream.listen((calories) {
@@ -2408,14 +2416,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [color, color.withValues(alpha: 0.8)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                   boxShadow: [
                     BoxShadow(
                       color: color.withValues(alpha: 0.3),
@@ -2424,18 +2432,18 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     ),
                   ],
                 ),
-                child: Icon(icon, color: Colors.white, size: 16),
+                child: Icon(icon, color: Colors.white, size: 14),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   label,
                   style: GoogleFonts.poppins(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: Theme.of(context).colorScheme.onSurface,
                   ),
-                  overflow: TextOverflow.ellipsis,
+                  overflow: TextOverflow.visible,
                   maxLines: 1,
                 ),
               ),
