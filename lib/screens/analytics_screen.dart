@@ -632,7 +632,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           }
           
           // Load weekly data in background
-          _loadWeeklyGoogleFitData().catchError((error) {
+          _loadWeeklyGoogleFitData(forceRefresh: false).catchError((error) {
             print('Weekly Google Fit data loading failed: $error');
           });
         } catch (dataError) {
@@ -719,10 +719,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     }
   }
 
-  /// Load weekly Google Fit data for analytics (optimized for speed)
-  Future<void> _loadWeeklyGoogleFitData() async {
+  /// Load weekly Google Fit data for analytics (optimized for speed with force refresh)
+  Future<void> _loadWeeklyGoogleFitData({bool forceRefresh = false}) async {
     try {
       if (_isGoogleFitConnected) {
+        print('🔄 Analytics: Loading weekly Google Fit data (forceRefresh: $forceRefresh)');
+        
         // Load weekly data in parallel for faster response
         final now = DateTime.now();
         final weeklyData = <GoogleFitData>[];
@@ -731,7 +733,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         // Load data for each day of the week in parallel
         for (int i = 0; i < 7; i++) {
           final date = now.subtract(Duration(days: i));
-          futures.add(_loadSingleDayGoogleFitData(date, weeklyData));
+          futures.add(_loadSingleDayGoogleFitData(date, weeklyData, forceRefresh: forceRefresh));
         }
 
         await Future.wait(futures);
@@ -739,17 +741,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         setState(() {
           _weeklyGoogleFitData = weeklyData;
         });
-        print(
-            'Loaded ${_weeklyGoogleFitData.length} days of Google Fit data in parallel');
+        
+        final totalSteps = weeklyData.fold<int>(0, (sum, data) => sum + (data.steps ?? 0));
+        final totalCalories = weeklyData.fold<double>(0, (sum, data) => sum + (data.caloriesBurned ?? 0));
+        final totalWorkouts = weeklyData.fold<int>(0, (sum, data) => sum + (data.workoutSessions ?? 0));
+        
+        print('✅ Analytics: Loaded ${_weeklyGoogleFitData.length} days of Google Fit data - Total: $totalSteps steps, $totalCalories calories, $totalWorkouts workouts');
       }
     } catch (e) {
-      print('Error loading weekly Google Fit data: $e');
+      print('❌ Error loading weekly Google Fit data: $e');
     }
   }
 
-  /// Load single day Google Fit data (helper method for parallel loading)
+  /// Load single day Google Fit data (helper method for parallel loading with force refresh)
   Future<void> _loadSingleDayGoogleFitData(
-      DateTime date, List<GoogleFitData> weeklyData) async {
+      DateTime date, List<GoogleFitData> weeklyData, {bool forceRefresh = false}) async {
     try {
       final futures = await Future.wait([
         _googleFitService.getDailySteps(date),
@@ -766,6 +772,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         workoutSessions: 0, // Will be updated by workout detection
         workoutDuration: 0.0,
       ));
+      
+      if (forceRefresh) {
+        print('🔄 Analytics: Refreshed data for ${date.toIso8601String().split('T')[0]} - Steps: $steps, Calories: $calories');
+      }
     } catch (e) {
       // Add empty data if loading fails
       weeklyData.add(GoogleFitData(
@@ -775,6 +785,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         workoutSessions: 0,
         workoutDuration: 0.0,
       ));
+      
+      if (forceRefresh) {
+        print('⚠️ Analytics: Failed to refresh data for ${date.toIso8601String().split('T')[0]}: $e');
+      }
     }
   }
 
@@ -965,8 +979,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
       // Refresh Google Fit data if connected
       if (_isGoogleFitConnected) {
-        print('🔄 Analytics: Refreshing Google Fit data...');
-        futures.add(_loadGoogleFitDataForPeriod(_selectedPeriod));
+        print('🔄 Analytics: Refreshing Google Fit data for $_selectedPeriod view...');
+        futures.add(_loadGoogleFitDataForPeriod(_selectedPeriod, forceRefresh: true));
       } else {
         print('⚠️ Analytics: Google Fit not connected, skipping Google Fit refresh');
       }
@@ -1008,7 +1022,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       final futures = <Future>[];
 
       if (_isGoogleFitConnected) {
-        futures.add(_loadGoogleFitDataForPeriod(period));
+        futures.add(_loadGoogleFitDataForPeriod(period, forceRefresh: true));
       }
       futures.add(_refreshAnalyticsForPeriod());
 
@@ -1027,29 +1041,38 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     }
   }
 
-  /// Load Google Fit data for specific period (optimized)
-  Future<void> _loadGoogleFitDataForPeriod(String period) async {
+  /// Load Google Fit data for specific period (optimized with force refresh)
+  Future<void> _loadGoogleFitDataForPeriod(String period, {bool forceRefresh = false}) async {
     try {
-      print('🔄 Analytics: Loading Google Fit data for period: $period');
+      print('🔄 Analytics: Loading Google Fit data for period: $period (forceRefresh: $forceRefresh)');
       
       switch (period) {
         case 'Daily':
           // Use optimized workout service for fastest data loading
-          final todayData = await _unifiedGoogleFitManager.getOptimizedWorkoutData();
+          GoogleFitData? todayData;
+          
+          if (forceRefresh) {
+            // Force refresh from Google Fit API
+            todayData = await _unifiedGoogleFitManager.forceRefresh();
+            print('🔄 Analytics: Force refreshed today\'s data from Google Fit API');
+          } else {
+            // Use cached data for faster loading
+            todayData = await _unifiedGoogleFitManager.getOptimizedWorkoutData();
+          }
           
           if (todayData != null) {
             setState(() {
               _todayGoogleFitData = todayData;
             });
-            print('✅ Analytics: Today\'s Google Fit data loaded: ${todayData.steps} steps, ${todayData.caloriesBurned} calories');
+            print('✅ Analytics: Today\'s Google Fit data loaded: ${todayData.steps} steps, ${todayData.caloriesBurned} calories, ${todayData.workoutSessions} workouts');
           } else {
             print('⚠️ Analytics: No Google Fit data available for today');
           }
           break;
 
         case 'Weekly':
-          // Load weekly data in parallel
-          await _loadWeeklyGoogleFitData();
+          // Load weekly data with force refresh if requested
+          await _loadWeeklyGoogleFitData(forceRefresh: forceRefresh);
           break;
       }
     } catch (e) {

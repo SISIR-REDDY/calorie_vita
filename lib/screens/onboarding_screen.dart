@@ -205,9 +205,21 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kAppBackground,
-      body: SafeArea(
+    return PopScope(
+      canPop: false, // Prevent default back behavior
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          // Handle back button press
+          if (_currentStep > 0) {
+            _previousStep();
+          } else {
+            _goBackToWelcomeScreen();
+          }
+        }
+      },
+      child: Scaffold(
+        backgroundColor: kAppBackground,
+        body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: SlideTransition(
@@ -225,6 +237,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               ],
             ),
           ),
+        ),
         ),
       ),
     );
@@ -749,7 +762,16 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       setState(() {
         _currentStep--;
       });
+    } else {
+      // If on initial step, go back to welcome screen
+      _goBackToWelcomeScreen();
     }
+  }
+
+  /// Navigate back to welcome screen
+  void _goBackToWelcomeScreen() {
+    // Navigate to welcome screen
+    Navigator.of(context).pushReplacementNamed('/welcome');
   }
 
   void _nextStep() {
