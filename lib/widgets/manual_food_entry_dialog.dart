@@ -181,7 +181,7 @@ class _ManualFoodEntryDialogState extends State<ManualFoodEntryDialog> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${food['calories']} cal',
+                              '${food['calories']} kcal',
                               style: GoogleFonts.poppins(
                                 fontSize: 10,
                                 color: Colors.blue[600],

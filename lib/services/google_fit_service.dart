@@ -63,6 +63,7 @@ class GoogleFitService {
   /// Initialize Google Fit service with Google Sign-In (enhanced for RAM clearing)
   Future<void> initialize() async {
     try {
+      print('🚀 GoogleFitService: Initializing...');
       _googleSignIn = GoogleSignIn(
         scopes: [
           _fitnessApiScope,
@@ -70,13 +71,18 @@ class GoogleFitService {
           _fitnessLocationScope,
         ],
       );
+      print('✅ GoogleFitService: GoogleSignIn configured');
 
       // Always check for persistent authentication on initialization
+      print('🔐 GoogleFitService: Checking persistent authentication...');
       await _checkPersistentAuthentication();
+      print('📡 GoogleFitService: Authentication status: $_isAuthenticated');
 
       _logger.i('Google Fit service initialized');
+      print('✅ GoogleFitService: Initialization complete');
     } catch (e) {
       _logger.e('Failed to initialize Google Fit service: $e');
+      print('❌ GoogleFitService: Initialization failed: $e');
       rethrow;
     }
   }
@@ -84,7 +90,10 @@ class GoogleFitService {
   /// Check for persistent authentication (handles RAM clearing)
   Future<void> _checkPersistentAuthentication() async {
     try {
-      if (_googleSignIn == null) return;
+      if (_googleSignIn == null) {
+        print('❌ GoogleFitService: GoogleSignIn is null');
+        return;
+      }
 
       // If already authenticated and client exists, skip re-authentication
       if (_isAuthenticated &&
@@ -92,16 +101,20 @@ class GoogleFitService {
           _googleSignIn!.currentUser != null) {
         _logger
             .d('Google Fit already authenticated, skipping re-authentication');
+        print('✅ GoogleFitService: Already authenticated, skipping re-auth');
         return;
       }
 
       // Try silent sign-in first
+      print('🔍 GoogleFitService: Attempting silent sign-in...');
       final currentUser = await _googleSignIn!.signInSilently();
       if (currentUser != null) {
         _isAuthenticated = true;
         _logger.i('Google Fit persistent authentication restored');
+        print('✅ GoogleFitService: Silent sign-in successful');
 
         // Initialize HTTP client with restored authentication
+        print('🔧 GoogleFitService: Initializing auth client...');
         await _initializeAuthClient();
 
         // Wait a moment for authentication to fully establish
@@ -109,9 +122,12 @@ class GoogleFitService {
 
         // Start live sync immediately if authenticated
         if (!_isLiveSyncing) {
+          print('🔄 GoogleFitService: Starting live sync...');
           startLiveSync();
         }
         return;
+      } else {
+        print('⚠️ GoogleFitService: Silent sign-in failed - user not signed in');
       }
 
       // If silent sign-in fails, try to get current sign-in status
@@ -250,11 +266,17 @@ class GoogleFitService {
         'endTimeMillis': endOfDay.millisecondsSinceEpoch.toString(),
       };
 
+      // Validate client before making request
+      if (_authClient == null) {
+        _logger.w('HTTP client is null, cannot make request');
+        return null;
+      }
+
       final response = await _authClient!.post(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(requestBody),
-      );
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -318,11 +340,17 @@ class GoogleFitService {
         'endTimeMillis': endOfDay.millisecondsSinceEpoch.toString(),
       };
 
+      // Validate client before making request
+      if (_authClient == null) {
+        _logger.w('HTTP client is null, cannot make request');
+        return null;
+      }
+
       final response = await _authClient!.post(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(requestBody),
-      );
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -386,11 +414,17 @@ class GoogleFitService {
         'endTimeMillis': endOfDay.millisecondsSinceEpoch.toString(),
       };
 
+      // Validate client before making request
+      if (_authClient == null) {
+        _logger.w('HTTP client is null, cannot make request');
+        return null;
+      }
+
       final response = await _authClient!.post(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(requestBody),
-      );
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -432,7 +466,13 @@ class GoogleFitService {
 
     try {
       const url = '$_baseUrl/users/me/dataSources';
-      final response = await _authClient!.get(Uri.parse(url));
+      // Validate client before making request
+      if (_authClient == null) {
+        _logger.w('HTTP client is null, cannot make request');
+        return null;
+      }
+
+      final response = await _authClient!.get(Uri.parse(url)).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -556,10 +596,10 @@ class GoogleFitService {
   /// Initialize HTTP client with authentication
   Future<void> _initializeAuthClient() async {
     try {
-      // Don't recreate client if it already exists and is valid
-      if (_authClient != null && _googleSignIn?.currentUser != null) {
-        _logger.d('HTTP client already exists and is valid');
-        return;
+      // Always create a fresh client to avoid stale connections
+      if (_authClient != null) {
+        _authClient!.close();
+        _authClient = null;
       }
 
       if (_googleSignIn?.currentUser == null) {
@@ -568,6 +608,13 @@ class GoogleFitService {
       }
 
       final auth = await _googleSignIn!.currentUser!.authentication;
+      
+      // Validate access token
+      if (auth.accessToken == null || auth.accessToken!.isEmpty) {
+        _logger.w('Invalid access token');
+        return;
+      }
+
       _authClient = authenticatedClient(
         http.Client(),
         AccessCredentials(

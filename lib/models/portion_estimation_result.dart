@@ -67,7 +67,7 @@ class PortionEstimationResult {
 
   @override
   String toString() {
-    return 'PortionEstimationResult(weight: ${formattedWeight}, confidence: ${confidencePercentage}%, method: $method)';
+    return 'PortionEstimationResult(weight: $formattedWeight, confidence: $confidencePercentage%, method: $method)';
   }
 
   @override

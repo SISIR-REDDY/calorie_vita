@@ -20,7 +20,6 @@ class OptimizedFirebaseService {
   final Map<String, dynamic> _cache = {};
   final Map<String, DateTime> _cacheTimestamps = {};
   static const Duration _cacheExpiry = Duration(minutes: 15);
-  static const Duration _criticalDataCacheExpiry = Duration(minutes: 30);
   static const int _maxCacheSize = 500;
 
   // Offline support
@@ -31,11 +30,6 @@ class OptimizedFirebaseService {
   final Map<String, int> _operationCounts = {};
   final Map<String, Duration> _operationTimes = {};
   
-  // Request batching and debouncing
-  final Map<String, Timer> _debounceTimers = {};
-  final Map<String, List<Map<String, dynamic>>> _pendingBatches = {};
-  static const Duration _batchDelay = Duration(milliseconds: 500);
-  static const int _maxBatchSize = 10;
 
   /// Initialize the service with proper configuration
   Future<void> initialize() async {

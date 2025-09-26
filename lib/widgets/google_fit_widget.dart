@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/google_fit_service.dart';
-import '../services/google_fit_cache_service.dart';
 import '../models/google_fit_data.dart';
 import '../ui/app_colors.dart';
 import 'enhanced_loading_widgets.dart';
@@ -15,7 +14,7 @@ class GoogleFitWidget extends StatefulWidget {
 
 class _GoogleFitWidgetState extends State<GoogleFitWidget> {
   final GoogleFitService _googleFitService = GoogleFitService();
-  final GoogleFitCacheService _cacheService = GoogleFitCacheService();
+  // GoogleFitCacheService removed for simplification
 
   bool _isLoading = false;
   bool _isAuthenticated = false;
@@ -77,8 +76,9 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
     });
 
     try {
-      // Use cache service for faster loading
-      final data = await _cacheService.getTodayData(forceRefresh: true);
+      // Use Google Fit service directly
+      final dataMap = await _googleFitService.getTodayFitnessDataBatch();
+      final data = dataMap != null ? GoogleFitData.fromJson(dataMap) : null;
 
       setState(() {
         _todayData = data;

@@ -67,13 +67,13 @@ class GoogleFitData {
   /// Get formatted calories burned
   String get formattedCalories {
     if (caloriesBurned == null) return 'N/A';
-    return '${caloriesBurned!.toStringAsFixed(0)} cal';
+    return '${caloriesBurned!.toStringAsFixed(0)} kcal';
   }
 
   /// Get formatted workout sessions
   String get formattedWorkoutSessions {
     if (workoutSessions == null) return 'N/A';
-    return '${workoutSessions} sessions';
+    return '$workoutSessions sessions';
   }
 
   /// Get formatted workout duration
@@ -205,7 +205,7 @@ class WeeklyFitnessSummary {
 
   /// Get formatted total calories
   String get formattedTotalCalories =>
-      '${totalCaloriesBurned.toStringAsFixed(0)} cal';
+      '${totalCaloriesBurned.toStringAsFixed(0)} kcal';
 
   /// Get formatted total workout sessions
   String get formattedTotalWorkoutSessions => '$totalWorkoutSessions sessions';

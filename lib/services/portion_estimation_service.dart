@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:flutter/services.dart';
 // import 'package:arcore_flutter_plugin/arcore_flutter_plugin.dart';
 // import 'package:arkit_plugin/arkit_plugin.dart';
 import '../models/portion_estimation_result.dart';

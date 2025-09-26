@@ -1,12 +1,10 @@
 import 'dart:io';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../config/ai_config.dart';
 import '../models/food_recognition_result.dart';
 import '../models/portion_estimation_result.dart';
 import '../models/nutrition_info.dart';
-import 'snap_to_calorie_service.dart';
 import 'barcode_scanning_service.dart';
 import 'food_scanner_pipeline.dart';
 import 'ai_reasoning_service.dart';
@@ -298,44 +296,8 @@ Be concise and accurate. Return only valid JSON.
     }
   }
 
-  /// Try OpenFoodFacts with timeout
-  static Future<NutritionInfo?> _tryOpenFoodFacts(String barcode) async {
-    try {
-      final response = await http.get(
-        Uri.parse('https://world.openfoodfacts.org/api/v0/product/$barcode.json'),
-      ).timeout(const Duration(seconds: 5));
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['status'] == 1 && data['product'] != null) {
-          return _parseOpenFoodFactsProduct(data['product']);
-        }
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
 
-  /// Try local datasets
-  static Future<NutritionInfo?> _tryLocalDatasets(String barcode) async {
-    try {
-      return await BarcodeScanningService.scanBarcode(barcode);
-    } catch (e) {
-      return null;
-    }
-  }
-
-  /// Try Nutritionix with timeout
-  static Future<NutritionInfo?> _tryNutritionix(String barcode) async {
-    try {
-      // This would use Nutritionix API if configured
-      // For now, return null to avoid API key issues
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
 
   /// Parse OpenFoodFacts product data
   static NutritionInfo _parseOpenFoodFactsProduct(Map<String, dynamic> product) {

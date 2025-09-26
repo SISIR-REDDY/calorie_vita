@@ -1,6 +1,5 @@
 enum CalorieUnit {
   kcal,
-  cal,
 }
 
 extension CalorieUnitExtension on CalorieUnit {
@@ -8,8 +7,6 @@ extension CalorieUnitExtension on CalorieUnit {
     switch (this) {
       case CalorieUnit.kcal:
         return 'kcal';
-      case CalorieUnit.cal:
-        return 'cal';
     }
   }
 
@@ -17,8 +14,6 @@ extension CalorieUnitExtension on CalorieUnit {
     switch (this) {
       case CalorieUnit.kcal:
         return 'Kilocalories';
-      case CalorieUnit.cal:
-        return 'Calories';
     }
   }
 
@@ -26,8 +21,6 @@ extension CalorieUnitExtension on CalorieUnit {
     switch (this) {
       case CalorieUnit.kcal:
         return kcalValue;
-      case CalorieUnit.cal:
-        return kcalValue * 1000;
     }
   }
 
@@ -35,8 +28,6 @@ extension CalorieUnitExtension on CalorieUnit {
     switch (this) {
       case CalorieUnit.kcal:
         return value;
-      case CalorieUnit.cal:
-        return value / 1000;
     }
   }
 }

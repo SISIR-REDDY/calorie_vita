@@ -87,6 +87,7 @@ class SimpleStreakService {
         longestStreak: 0,
         lastAchievedDate: DateTime.now().subtract(const Duration(days: 1)),
         achievedToday: false,
+        streakStartDate: DateTime.now().subtract(const Duration(days: 1)),
         totalDaysAchieved: 0,
       );
     }
@@ -131,6 +132,7 @@ class SimpleStreakService {
             longestStreak: 0,
             lastAchievedDate: today.subtract(const Duration(days: 1)),
             achievedToday: false,
+            streakStartDate: today.subtract(const Duration(days: 1)),
             totalDaysAchieved: 0,
           );
 
@@ -244,8 +246,8 @@ class SimpleStreakService {
       'totalActiveStreaks': _currentStreaks.totalActiveStreaks,
       'longestOverallStreak': _currentStreaks.longestOverallStreak,
       'totalDaysActive': _currentStreaks.totalDaysActive,
-      'activeStreaks': _currentStreaks.activeStreaks.length,
-      'streaksNeedingAttention': _currentStreaks.streaksNeedingAttention.length,
+      // 'activeStreaks': _currentStreaks.activeStreaks.length,
+      // 'streaksNeedingAttention': _currentStreaks.streaksNeedingAttention.length,
     };
   }
 

@@ -75,7 +75,7 @@ class NutritionInfo {
   }
 
   /// Get formatted calories string
-  String get formattedCalories => '${calories.toStringAsFixed(0)} cal';
+  String get formattedCalories => '${calories.toStringAsFixed(0)} kcal';
 
   /// Get formatted protein string
   String get formattedProtein => '${protein.toStringAsFixed(1)}g';
@@ -169,7 +169,7 @@ class NutritionInfo {
 
   @override
   String toString() {
-    return 'NutritionInfo(food: $foodName, weight: ${formattedWeight}, calories: ${formattedCalories}, protein: ${formattedProtein}, carbs: ${formattedCarbs}, fat: ${formattedFat})';
+    return 'NutritionInfo(food: $foodName, weight: $formattedWeight, calories: $formattedCalories, protein: $formattedProtein, carbs: $formattedCarbs, fat: $formattedFat)';
   }
 
   @override

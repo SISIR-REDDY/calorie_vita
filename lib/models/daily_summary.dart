@@ -70,6 +70,17 @@ class DailySummary {
 
   /// Create from JSON
   factory DailySummary.fromJson(Map<String, dynamic> json) {
+    // Handle Firestore Timestamp conversion
+    DateTime date;
+    if (json['date'] is int) {
+      date = DateTime.fromMillisecondsSinceEpoch(json['date']);
+    } else if (json['date'] != null) {
+      // Handle Firestore Timestamp
+      date = (json['date'] as dynamic).toDate();
+    } else {
+      date = DateTime.now();
+    }
+    
     return DailySummary(
       caloriesConsumed: json['caloriesConsumed'] ?? 0,
       caloriesBurned: json['caloriesBurned'] ?? 0,
@@ -78,8 +89,7 @@ class DailySummary {
       stepsGoal: json['stepsGoal'] ?? 10000,
       waterGlasses: json['waterGlasses'] ?? 0,
       waterGlassesGoal: json['waterGlassesGoal'] ?? 8,
-      date: DateTime.fromMillisecondsSinceEpoch(
-          json['date'] ?? DateTime.now().millisecondsSinceEpoch),
+      date: date,
     );
   }
 

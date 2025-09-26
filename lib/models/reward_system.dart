@@ -113,7 +113,7 @@ class UserReward {
       'category': category?.name,
       'earnedAt': earnedAt?.millisecondsSinceEpoch,
       'isUnlocked': isUnlocked,
-      'color': color.value,
+      'color': color.toARGB32(),
     };
   }
 

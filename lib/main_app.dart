@@ -27,7 +27,6 @@ class MainApp extends StatefulWidget {
 class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   final AppStateManager _appStateManager = AppStateManager();
   final GlobalGoogleFitManager _googleFitManager = GlobalGoogleFitManager();
-  bool _isInitialized = false;
   bool _hasShownSetupWarning = false;
 
   @override
@@ -185,39 +184,6 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildErrorScreen() {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              'Connection Error',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Please check your internet connection and try again.',
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                // Restart the app
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => const MainApp()),
-                );
-              },
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {

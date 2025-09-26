@@ -16,8 +16,6 @@ class FastDataRefreshService {
   // ULTRA FAST: Pre-initialize TodaysFoodDataService to avoid object creation overhead
   static final TodaysFoodDataService _todaysFoodDataService = TodaysFoodDataService();
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final DailySummaryService _dailySummaryService = DailySummaryService();
 
   // Stream controllers for real-time updates

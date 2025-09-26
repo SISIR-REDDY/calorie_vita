@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../models/task.dart';
 import '../ui/app_colors.dart';
 import '../services/dynamic_icon_service.dart';
 
@@ -28,7 +27,6 @@ class _TaskPopupState extends State<TaskPopup> with TickerProviderStateMixin {
   final TextEditingController _descriptionController = TextEditingController();
   final DynamicIconService _iconService = DynamicIconService();
 
-  String _selectedEmoji = '📝';
   bool _isLoading = false;
 
   @override
@@ -73,7 +71,7 @@ class _TaskPopupState extends State<TaskPopup> with TickerProviderStateMixin {
   void _updateEmoji() {
     if (_titleController.text.isNotEmpty) {
       setState(() {
-        _selectedEmoji = _iconService.generateIcon(_titleController.text);
+        _iconService.generateIcon(_titleController.text);
       });
     }
   }

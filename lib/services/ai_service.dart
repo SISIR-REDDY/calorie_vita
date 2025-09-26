@@ -845,7 +845,7 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
     }
     
     if (fitnessData['caloriesBurned'] != null) {
-      buffer.writeln('• Calories Burned: ${fitnessData['caloriesBurned']} cal');
+      buffer.writeln('• Calories Burned: ${fitnessData['caloriesBurned']} kcal');
     }
     
     if (fitnessData['distance'] != null) {

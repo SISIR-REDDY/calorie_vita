@@ -23,11 +23,9 @@ class CalorieUnitsService {
   /// Initialize the service with current user preferences
   Future<void> initialize() async {
     try {
-      // Listen to the preferences stream to get the current preferences
-      _appStateService.preferencesStream.listen((preferences) {
-        _currentUnit = preferences.calorieUnit;
-        _unitController.add(_currentUnit); // Notify listeners of unit change
-      });
+      // Always use kcal as the default unit
+      _currentUnit = CalorieUnit.kcal;
+      _unitController.add(_currentUnit);
     } catch (e) {
       // Default to kcal if preferences can't be loaded
       _currentUnit = CalorieUnit.kcal;
@@ -69,8 +67,6 @@ class CalorieUnitsService {
     switch (_currentUnit) {
       case CalorieUnit.kcal:
         return '${convertedValue.round()} ${_currentUnit.displayName}';
-      case CalorieUnit.cal:
-        return '${convertedValue.round()} ${_currentUnit.displayName}';
     }
   }
 
@@ -80,8 +76,6 @@ class CalorieUnitsService {
 
     switch (_currentUnit) {
       case CalorieUnit.kcal:
-        return '${convertedValue.round()}';
-      case CalorieUnit.cal:
         return '${convertedValue.round()}';
     }
   }
@@ -108,9 +102,6 @@ class CalorieUnitsService {
         case CalorieUnit.kcal:
           formattedValue = convertedValue.round().toString();
           break;
-        case CalorieUnit.cal:
-          formattedValue = convertedValue.round().toString();
-          break;
       }
     }
 
@@ -122,12 +113,10 @@ class CalorieUnitsService {
     switch (_currentUnit) {
       case CalorieUnit.kcal:
         return 1.0;
-      case CalorieUnit.cal:
-        return 1000.0;
     }
   }
 
-  /// Check if the current unit is metric (kcal) or imperial (cal)
+  /// Check if the current unit is metric (kcal)
   bool get isMetricUnit {
     return _currentUnit == CalorieUnit.kcal;
   }
@@ -137,8 +126,6 @@ class CalorieUnitsService {
     switch (_currentUnit) {
       case CalorieUnit.kcal:
         return 'Kilocalories (most common)';
-      case CalorieUnit.cal:
-        return 'Calories (small unit)';
     }
   }
 

@@ -1,10 +1,6 @@
 import 'dart:async';
 import 'google_fit_service.dart';
-import 'optimized_google_fit_service.dart';
-import 'optimized_google_fit_cache_service.dart';
-import 'optimized_google_fit_workout_service.dart';
 import 'global_google_fit_manager.dart';
-import 'google_fit_performance_optimizer.dart';
 import '../models/google_fit_data.dart';
 
 /// Unified Google Fit Manager to prevent data conflicts and improve performance
@@ -14,13 +10,12 @@ class UnifiedGoogleFitManager {
   factory UnifiedGoogleFitManager() => _instance;
   UnifiedGoogleFitManager._internal();
 
-  // Services - Optimized for workout tracking
+  // Prevent multiple disposals
+  bool _isDisposed = false;
+
+  // Services - Live data only
   final GoogleFitService _googleFitService = GoogleFitService();
-  final OptimizedGoogleFitService _optimizedGoogleFitService = OptimizedGoogleFitService();
-  final OptimizedGoogleFitCacheService _optimizedCacheService = OptimizedGoogleFitCacheService();
-  final OptimizedGoogleFitWorkoutService _workoutService = OptimizedGoogleFitWorkoutService();
   final GlobalGoogleFitManager _globalGoogleFitManager = GlobalGoogleFitManager();
-  final GoogleFitPerformanceOptimizer _performanceOptimizer = GoogleFitPerformanceOptimizer();
 
   // State management
   bool _isInitialized = false;
@@ -40,8 +35,6 @@ class UnifiedGoogleFitManager {
   static const Duration _refreshInterval = Duration(minutes: 2);
   static const Duration _connectionCheckInterval = Duration(minutes: 5);
 
-  // Data validation
-  static const Duration _dataValidityDuration = Duration(minutes: 5);
 
   /// Streams
   Stream<GoogleFitData?> get dataStream => _dataController.stream;
@@ -55,19 +48,16 @@ class UnifiedGoogleFitManager {
   GoogleFitData? get currentData => _currentData;
   DateTime? get lastUpdateTime => _lastUpdateTime;
 
-  /// Get optimized workout data - Fastest method for UI updates
-  Future<GoogleFitData?> getOptimizedWorkoutData() async {
+  /// Get live Google Fit data
+  Future<GoogleFitData?> getLiveData() async {
     if (!_isConnected) return null;
 
     try {
-      // Use the optimized workout service for fastest data retrieval
-      final data = await _workoutService.getTodayFitnessData();
-      if (data != null) {
-        _updateData(data);
-        return data;
-      }
+      // Use live Google Fit service for real-time data
+      await _loadLiveData();
+      // Data is updated internally by _loadLiveData
     } catch (e) {
-      print('❌ Optimized workout data fetch failed: $e');
+      print('❌ Live Google Fit data fetch failed: $e');
     }
 
     return _currentData;
@@ -75,27 +65,33 @@ class UnifiedGoogleFitManager {
 
   /// Initialize the unified manager
   Future<void> initialize() async {
-    if (_isInitialized) return;
+    if (_isInitialized || _isDisposed) {
+      print('⚠️ UnifiedGoogleFitManager: Already initialized or disposed, skipping...');
+      return;
+    }
 
     try {
       print('🚀 UnifiedGoogleFitManager: Initializing...');
 
-      // Initialize all services - Optimized for workout tracking
+      // Initialize services - Live data only
+      print('🔧 UnifiedGoogleFitManager: Initializing services...');
       await Future.wait([
         _googleFitService.initialize(),
-        _optimizedGoogleFitService.initialize(),
-        _optimizedCacheService.initialize(),
-        _workoutService.initialize(),
         _globalGoogleFitManager.initialize(),
       ]);
+      print('✅ UnifiedGoogleFitManager: All services initialized');
 
       // Check connection status
+      print('🔍 UnifiedGoogleFitManager: Checking connection status...');
       await _checkConnectionStatus();
+      print('📡 UnifiedGoogleFitManager: Connection status: $_isConnected');
 
-      // Load cached data immediately for instant display
-      await _loadCachedDataImmediately();
+      // Load live data immediately
+      print('📡 UnifiedGoogleFitManager: Loading live data...');
+      await _loadLiveData();
 
       // Start background refresh
+      print('🔄 UnifiedGoogleFitManager: Starting background refresh...');
       _startBackgroundRefresh();
 
       _isInitialized = true;
@@ -106,47 +102,35 @@ class UnifiedGoogleFitManager {
     }
   }
 
-  /// Load cached data immediately for instant display
-  Future<void> _loadCachedDataImmediately() async {
+  /// Load live data immediately
+  Future<void> _loadLiveData() async {
     try {
-      print('📱 UnifiedGoogleFitManager: Loading cached data immediately...');
+      print('📡 UnifiedGoogleFitManager: Loading live data immediately...');
       
-      // Try to get cached data from performance optimizer first
-      final cachedData = _performanceOptimizer.getCachedData('unified_google_fit');
-      if (cachedData != null) {
-        _updateData(cachedData);
-        print('✅ UnifiedGoogleFitManager: Cached data loaded instantly');
+      // Load live data from Google Fit service
+      final liveData = await _loadLiveDataFromService();
+      if (liveData != null) {
+        _updateData(liveData);
+        print('✅ UnifiedGoogleFitManager: Live data loaded');
         return;
       }
 
-      // Try optimized cache service
-      final optimizedCacheData = await _optimizedCacheService.getTodayData();
-      if (optimizedCacheData != null) {
-        _performanceOptimizer.cacheData('unified_google_fit', optimizedCacheData);
-        _updateData(optimizedCacheData);
-        print('✅ UnifiedGoogleFitManager: Optimized cache data loaded');
-        return;
-      }
-
-      // Try global manager cache
-      final globalData = await _globalGoogleFitManager.getCurrentData();
-      if (globalData != null) {
-        final googleFitData = GoogleFitData(
-          date: DateTime.now(),
-          steps: globalData['steps'] as int?,
-          caloriesBurned: (globalData['caloriesBurned'] as num?)?.toDouble(),
-          workoutSessions: globalData['workoutSessions'] as int?,
-          workoutDuration: (globalData['workoutDuration'] as num?)?.toDouble(),
-        );
-        _performanceOptimizer.cacheData('unified_google_fit', googleFitData);
-        _updateData(googleFitData);
-        print('✅ UnifiedGoogleFitManager: Global manager cache data loaded');
-        return;
-      }
-
-      print('⚠️ UnifiedGoogleFitManager: No cached data available');
+      print('⚠️ UnifiedGoogleFitManager: No live data available');
     } catch (e) {
-      print('❌ UnifiedGoogleFitManager: Error loading cached data: $e');
+      print('❌ UnifiedGoogleFitManager: Error loading live data: $e');
+    }
+  }
+
+  /// Update data and notify listeners safely
+  void _updateData(GoogleFitData data) {
+    if (_isDisposed) return;
+    
+    _currentData = data;
+    _lastUpdateTime = DateTime.now();
+    
+    // Only add to stream if controller is not closed
+    if (!_dataController.isClosed) {
+      _dataController.add(data);
     }
   }
 
@@ -155,13 +139,18 @@ class UnifiedGoogleFitManager {
     try {
       final wasConnected = _isConnected;
       
-      // Check multiple services for connection status
-      _isConnected = _googleFitService.isConnected || 
-                    _optimizedGoogleFitService.isConnected ||
-                    _globalGoogleFitManager.isConnected;
+      // Check services for connection status
+      final googleFitConnected = _googleFitService.isConnected;
+      final globalConnected = _globalGoogleFitManager.isConnected;
+      
+      print('🔍 UnifiedGoogleFitManager: Service connection status - GoogleFit: $googleFitConnected, Global: $globalConnected');
+      
+      _isConnected = googleFitConnected || globalConnected;
 
       if (wasConnected != _isConnected) {
-        _connectionController.add(_isConnected);
+        if (!_connectionController.isClosed) {
+          _connectionController.add(_isConnected);
+        }
         
         if (_isConnected) {
           print('✅ UnifiedGoogleFitManager: Connected');
@@ -169,139 +158,52 @@ class UnifiedGoogleFitManager {
         } else {
           print('⚠️ UnifiedGoogleFitManager: Disconnected');
           _currentData = null;
-          _dataController.add(null);
+          if (!_dataController.isClosed) {
+            _dataController.add(null);
+          }
         }
+      } else {
+        print('📡 UnifiedGoogleFitManager: Connection status unchanged: $_isConnected');
       }
     } catch (e) {
       print('❌ UnifiedGoogleFitManager: Connection check failed: $e');
     }
   }
 
-  /// Load Google Fit data with priority order and performance optimization
+  /// Load Google Fit data from live sources
   Future<GoogleFitData?> _loadData() async {
-    if (!_isConnected || _isLoading) return _currentData;
+    if (!_isConnected || _isLoading || _isDisposed) return _currentData;
 
     _isLoading = true;
-    _loadingController.add(true);
+    if (!_loadingController.isClosed) {
+      _loadingController.add(true);
+    }
 
     try {
-      print('🔄 UnifiedGoogleFitManager: Loading data...');
+      print('🔄 UnifiedGoogleFitManager: Loading live data...');
 
-      // Check cache first
-      final cachedData = _performanceOptimizer.getCachedData('unified_google_fit');
-      if (cachedData != null) {
-        print('📱 Using cached data from performance optimizer');
-        _updateData(cachedData);
-        return cachedData;
+      // Load live data from Google Fit service
+      final liveData = await _loadLiveDataFromService();
+      if (liveData != null) {
+        _updateData(liveData);
+        return liveData;
       }
 
-      // Collect data from all sources
-      final dataSources = <GoogleFitData>[];
-      
-      // Priority 1: Try optimized cache service (fastest)
-      if (_performanceOptimizer.shouldMakeApiCall('optimized_cache')) {
-        final data = await _loadFromOptimizedCache();
-        if (data != null) dataSources.add(data);
-        _performanceOptimizer.recordApiCall('optimized_cache');
-      }
-
-      // Priority 2: Try global manager
-      if (_performanceOptimizer.shouldMakeApiCall('global_manager')) {
-        final data = await _loadFromGlobalManager();
-        if (data != null) dataSources.add(data);
-        _performanceOptimizer.recordApiCall('global_manager');
-      }
-
-      // Priority 3: Try optimized service
-      if (_performanceOptimizer.shouldMakeApiCall('optimized_service')) {
-        final data = await _loadFromOptimizedService();
-        if (data != null) dataSources.add(data);
-        _performanceOptimizer.recordApiCall('optimized_service');
-      }
-
-      // Priority 4: Try original service
-      if (_performanceOptimizer.shouldMakeApiCall('original_service')) {
-        final data = await _loadFromOriginalService();
-        if (data != null) dataSources.add(data);
-        _performanceOptimizer.recordApiCall('original_service');
-      }
-
-      // Merge and validate data from all sources
-      final mergedData = _performanceOptimizer.mergeDataSources(dataSources);
-      if (mergedData != null) {
-        // Smooth data to prevent UI flickering
-        final smoothedData = _performanceOptimizer.smoothData(mergedData, _currentData);
-        
-        // Cache the data
-        _performanceOptimizer.cacheData('unified_google_fit', smoothedData!);
-        
-        _updateData(smoothedData);
-        return smoothedData;
-      }
-
-      print('⚠️ UnifiedGoogleFitManager: No valid data found');
+      print('⚠️ UnifiedGoogleFitManager: No live data found');
       return _currentData;
     } catch (e) {
       print('❌ UnifiedGoogleFitManager: Data loading failed: $e');
       return _currentData;
     } finally {
       _isLoading = false;
-      _loadingController.add(false);
-    }
-  }
-
-  /// Load from optimized cache service
-  Future<GoogleFitData?> _loadFromOptimizedCache() async {
-    try {
-      return await _optimizedCacheService.getTodayData();
-    } catch (e) {
-      print('⚠️ Optimized cache failed: $e');
-      return null;
-    }
-  }
-
-  /// Load from global manager
-  Future<GoogleFitData?> _loadFromGlobalManager() async {
-    try {
-      final data = await _globalGoogleFitManager.getCurrentData();
-      if (data != null) {
-        return GoogleFitData(
-          date: DateTime.now(),
-          steps: data['steps'] as int?,
-          caloriesBurned: (data['caloriesBurned'] as num?)?.toDouble(),
-          workoutSessions: data['workoutSessions'] as int?,
-          workoutDuration: (data['workoutDuration'] as num?)?.toDouble(),
-        );
+      if (!_loadingController.isClosed) {
+        _loadingController.add(false);
       }
-      return null;
-    } catch (e) {
-      print('⚠️ Global manager failed: $e');
-      return null;
     }
   }
 
-  /// Load from optimized service
-  Future<GoogleFitData?> _loadFromOptimizedService() async {
-    try {
-      final data = await _optimizedGoogleFitService.getOptimizedFitnessData();
-      if (data != null) {
-        return GoogleFitData(
-          date: DateTime.now(),
-          steps: data['steps'] as int?,
-          caloriesBurned: (data['caloriesBurned'] as num?)?.toDouble(),
-          workoutSessions: data['workoutSessions'] as int?,
-          workoutDuration: (data['workoutDuration'] as num?)?.toDouble(),
-        );
-      }
-      return null;
-    } catch (e) {
-      print('⚠️ Optimized service failed: $e');
-      return null;
-    }
-  }
-
-  /// Load from original service
-  Future<GoogleFitData?> _loadFromOriginalService() async {
+  /// Load live data from Google Fit service
+  Future<GoogleFitData?> _loadLiveDataFromService() async {
     try {
       final today = DateTime.now();
       final futures = await Future.wait([
@@ -317,18 +219,11 @@ class UnifiedGoogleFitManager {
         workoutDuration: 0.0,
       );
     } catch (e) {
-      print('⚠️ Original service failed: $e');
+      print('⚠️ Live Google Fit service failed: $e');
       return null;
     }
   }
 
-  /// Update data and notify listeners
-  void _updateData(GoogleFitData data) {
-    _currentData = data;
-    _lastUpdateTime = DateTime.now();
-    _dataController.add(data);
-    print('✅ UnifiedGoogleFitManager: Data updated - Steps: ${data.steps}, Calories: ${data.caloriesBurned}');
-  }
 
 
   /// Start background refresh
@@ -377,8 +272,12 @@ class UnifiedGoogleFitManager {
       await _googleFitService.signOut();
       _isConnected = false;
       _currentData = null;
-      _connectionController.add(false);
-      _dataController.add(null);
+      if (!_connectionController.isClosed) {
+        _connectionController.add(false);
+      }
+      if (!_dataController.isClosed) {
+        _dataController.add(null);
+      }
       print('🔌 UnifiedGoogleFitManager: Disconnected');
     } catch (e) {
       print('❌ UnifiedGoogleFitManager: Disconnect failed: $e');
@@ -390,16 +289,16 @@ class UnifiedGoogleFitManager {
     return _currentData;
   }
 
-  /// Preload data for instant display (call this when app starts)
+  /// Preload live data for instant display (call this when app starts)
   Future<void> preloadData() async {
     if (!_isInitialized) {
       await initialize();
     }
     
-    // Force load cached data immediately
-    await _loadCachedDataImmediately();
+    // Force load live data immediately
+    await _loadLiveData();
     
-    // If no cached data, try to load fresh data in background
+    // If no live data, try to load fresh data in background
     if (_currentData == null) {
       _loadData();
     }
@@ -407,12 +306,26 @@ class UnifiedGoogleFitManager {
 
   /// Dispose resources
   void dispose() {
+    if (_isDisposed) {
+      print('⚠️ UnifiedGoogleFitManager: Already disposed, skipping...');
+      return;
+    }
+
+    _isDisposed = true;
     _refreshTimer?.cancel();
     _connectionCheckTimer?.cancel();
-    _dataController.close();
-    _connectionController.close();
-    _loadingController.close();
-    _performanceOptimizer.dispose();
+    
+    // Only close controllers if they haven't been closed already
+    if (!_dataController.isClosed) {
+      _dataController.close();
+    }
+    if (!_connectionController.isClosed) {
+      _connectionController.close();
+    }
+    if (!_loadingController.isClosed) {
+      _loadingController.close();
+    }
+    
     print('🗑️ UnifiedGoogleFitManager: Disposed');
   }
 }

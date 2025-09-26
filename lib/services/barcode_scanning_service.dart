@@ -2540,7 +2540,7 @@ Respond only with valid JSON for known products with verified nutrition or "null
         return NutritionInfo(
           foodName: productName,
           weightGrams: 200.0,
-          calories: 170.0, // 85 cal per 100ml * 2
+          calories: 170.0, // 85 kcal per 100ml * 2
           protein: 6.4,
           carbs: 25.0,
           fat: 5.6,
@@ -2760,7 +2760,7 @@ Respond only with valid JSON for known products with verified nutrition or "null
       return NutritionInfo(
         foodName: productName,
         weightGrams: 70.0,
-        calories: 315.0, // 450 cal per 100g * 0.7
+        calories: 315.0, // 450 kcal per 100g * 0.7
         protein: 8.4, // 12g per 100g * 0.7
         carbs: 49.0, // 70g per 100g * 0.7
         fat: 10.5, // 15g per 100g * 0.7

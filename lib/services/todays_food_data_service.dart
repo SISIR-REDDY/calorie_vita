@@ -66,9 +66,13 @@ class TodaysFoodDataService {
     _cachedConsumedCalories = consumedCalories;
     _cachedMacroNutrients = macroNutrients;
 
-    // Emit updates immediately (no await, no delay)
-    _consumedCaloriesController.add(consumedCalories);
-    _macroNutrientsController.add(macroNutrients);
+    // Emit updates immediately (no await, no delay) - check if controllers are closed
+    if (!_consumedCaloriesController.isClosed) {
+      _consumedCaloriesController.add(consumedCalories);
+    }
+    if (!_macroNutrientsController.isClosed) {
+      _macroNutrientsController.add(macroNutrients);
+    }
     
     print('⚡ TodaysFoodDataService: Streams updated immediately');
   }
@@ -80,8 +84,12 @@ class TodaysFoodDataService {
     _cachedMacroNutrients = macroNutrients;
 
     // Emit updates immediately (no calculations, no delays)
-    _consumedCaloriesController.add(consumedCalories);
-    _macroNutrientsController.add(macroNutrients);
+    if (!_consumedCaloriesController.isClosed) {
+      _consumedCaloriesController.add(consumedCalories);
+    }
+    if (!_macroNutrientsController.isClosed) {
+      _macroNutrientsController.add(macroNutrients);
+    }
     
     print('🚀 TodaysFoodDataService: ULTRA FAST update - Calories: $consumedCalories');
   }

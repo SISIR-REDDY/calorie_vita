@@ -25,30 +25,7 @@ class FirebaseService {
     }
   }
 
-  /// Check if device has network connectivity
-  Future<bool> _hasNetworkConnection() async {
-    try {
-      final connectivityResult = await _connectivity.checkConnectivity();
-      return !connectivityResult.contains(ConnectivityResult.none);
-    } catch (e) {
-      print('Error checking connectivity: $e');
-      return false;
-    }
-  }
 
-  /// Handle Firebase errors with user-friendly messages
-  void _handleFirebaseError(String operation, dynamic error) {
-    if (error.toString().contains('unavailable') || 
-        error.toString().contains('UNAVAILABLE')) {
-      print('$operation failed: Firebase service temporarily unavailable');
-    } else if (error.toString().contains('permission-denied')) {
-      print('$operation failed: Permission denied');
-    } else if (error.toString().contains('not-found')) {
-      print('$operation failed: Resource not found');
-    } else {
-      print('$operation failed: $error');
-    }
-  }
 
   // Get food entries for a specific user
   Stream<List<FoodEntry>> getUserFoodEntries(String userId) {

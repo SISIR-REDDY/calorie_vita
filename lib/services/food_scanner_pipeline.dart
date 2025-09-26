@@ -95,7 +95,6 @@ class FoodScannerPipeline {
   static Future<FoodScannerResult> _processWithOriginalPipeline(
     File imageFile, {
     String? userProfile,
-    Map<String, dynamic>? userGoals,
   }) async {
     // Step 1: Food Recognition
     print('🔍 Step 1: Recognizing food...');
