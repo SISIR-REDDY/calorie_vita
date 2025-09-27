@@ -20,6 +20,7 @@ import '../services/task_service.dart';
 import '../models/task.dart';
 import '../widgets/task_popup.dart';
 import '../widgets/task_card.dart';
+import '../widgets/profile_widgets.dart';
 import '../services/calorie_units_service.dart';
 import '../services/analytics_service.dart';
 import '../services/goals_event_bus.dart';
@@ -82,7 +83,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   MacroBreakdown? _macroBreakdown;
   UserPreferences _preferences = const UserPreferences();
   String _motivationalQuote = '';
-  final bool _isLoading = false; // Start with false to show UI immediately
+  bool _isLoading = false; // Track loading state
   bool _isRefreshing = false; // Track background data loading
   bool _isRefreshingFoodData = false; // Prevent multiple simultaneous food data refreshes
   
@@ -98,6 +99,15 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   UserProgress? _userProgress;
   List<UserReward> _recentRewards = [];
   bool _isStreakLoading = true;
+  
+  // Debug panel
+  bool _showDebugPanel = false;
+  
+  // Initialization tracking
+  bool _hasInitialized = false;
+  
+  // Data refresh tracking
+  DateTime? _lastFoodDataRefresh;
 
   // Google Fit data - Optimized for steps, calories, and workouts only
   bool _isGoogleFitConnected = false;
@@ -151,18 +161,17 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     super.initState();
     _setupAnimations();
 
-    // Initialize immediately without waiting
-    _initializeServicesAsync();
-    _setupStreamListeners();
-    _setupTodaysFoodDataService();
-    _loadData();
-    _loadRewardsDataAsync();
-    
-    // Initialize Google Fit services in proper order
-    _initializeGoogleFitServices();
-    
-    // Load instant data from global cache to prevent UI lag
+    // Load instant data first to prevent UI lag
     _loadInstantDataFromCache();
+    
+    // Initialize services asynchronously to prevent blocking
+    _initializeServicesAsync();
+    
+    // Set up essential listeners only (reduced from full setup)
+    _setupEssentialListeners();
+    
+    // Load data with proper loading states
+    _loadDataWithLoadingState();
     
     
     // Set up periodic streak refresh to ensure data stays current
@@ -172,11 +181,19 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Refresh goals when screen becomes visible
-    _forceRefreshGoals();
-    
-    // Refresh consumed calories and macro nutrients when screen becomes visible
-    _refreshFoodData();
+    // Only refresh if this is the first time dependencies change
+    // This prevents excessive refresh when switching between screens
+    if (!_hasInitialized) {
+      _hasInitialized = true;
+      // Refresh goals when screen becomes visible
+      _forceRefreshGoals();
+      
+      // Refresh consumed calories and macro nutrients when screen becomes visible
+      _refreshFoodData();
+      
+      // Refresh Google Fit data when screen becomes visible
+      _loadGoogleFitDataImmediate();
+    }
   }
 
   /// Setup today's food data service for immediate UI updates
@@ -325,6 +342,33 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       final authStatus = await _googleFitService.validateAuthentication();
       print('🔐 Home: Google Fit authentication status: $authStatus');
       
+      // If not authenticated, try to authenticate
+      if (!authStatus) {
+        print('🔧 Home: Attempting to authenticate with Google Fit...');
+        final authenticated = await _googleFitService.authenticate();
+        print('🔧 Home: Google Fit authentication result: $authenticated');
+        
+        // If authentication successful, try to get data again
+        if (authenticated) {
+          final today = DateTime.now();
+          final steps = await _googleFitService.getDailySteps(today);
+          final calories = await _googleFitService.getDailyCaloriesBurned(today);
+          print('🔧 Home: Post-auth data - Steps: $steps, Calories: $calories');
+          
+          if (steps != null || calories != null) {
+            if (mounted) {
+              setState(() {
+                _googleFitSteps = steps ?? _googleFitSteps ?? 0;
+                _googleFitCaloriesBurned = calories?.toDouble() ?? _googleFitCaloriesBurned ?? 0.0;
+                _isGoogleFitConnected = true;
+              });
+              _updateDailySummaryWithGoogleFitData();
+              print('✅ Home: Post-auth UI updated with Google Fit data');
+            }
+          }
+        }
+      }
+      
       // Test data retrieval
       if (authStatus) {
         final today = DateTime.now();
@@ -333,6 +377,23 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         
         final calories = await _googleFitService.getDailyCaloriesBurned(today);
         print('🔥 Home: Calories data: $calories');
+        
+        // If we got data, update the UI immediately
+        if (steps != null || calories != null) {
+          if (mounted) {
+            setState(() {
+              _googleFitSteps = steps ?? _googleFitSteps ?? 0;
+              _googleFitCaloriesBurned = calories?.toDouble() ?? _googleFitCaloriesBurned ?? 0.0;
+              _isGoogleFitConnected = true;
+            });
+            print('✅ Home: Updated UI with Google Fit data - Steps: $steps, Calories: $calories');
+            
+            // Also update daily summary immediately
+            _updateDailySummaryWithGoogleFitData();
+          }
+        } else {
+          print('⚠️ Home: No Google Fit data received');
+        }
       }
       
       // Test unified manager
@@ -390,43 +451,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         }
       }
       
-      // Listen to unified Google Fit data stream with debouncing
-      _unifiedGoogleFitSubscription = _unifiedGoogleFitManager.dataStream.listen((data) {
-        if (mounted && data != null) {
-          // Use debounced update to prevent UI flickering
-          _debounceUIUpdate(() {
-            setState(() {
-              _googleFitSteps = data.steps ?? 0;
-              _googleFitCaloriesBurned = data.caloriesBurned ?? 0.0;
-              _googleFitWorkoutSessions = data.workoutSessions ?? 0;
-              _googleFitWorkoutDuration = data.workoutDuration ?? 0.0;
-              _activityLevel = _calculateActivityLevel(data.steps);
-              _lastSyncTime = DateTime.now();
-            });
-            
-            // Update daily summary with Google Fit data
-            _updateDailySummaryWithGoogleFitData();
-          });
-        }
-      });
-      
-      // Listen to connection status
-      _unifiedGoogleFitConnectionSubscription = _unifiedGoogleFitManager.connectionStream.listen((isConnected) {
-        if (mounted) {
-          setState(() {
-            _isGoogleFitConnected = isConnected;
-          });
-        }
-      });
-      
-      // Listen to loading status
-      _unifiedGoogleFitLoadingSubscription = _unifiedGoogleFitManager.loadingStream.listen((isLoading) {
-        if (mounted) {
-          setState(() {
-            _isGoogleFitLoading = isLoading;
-          });
-        }
-      });
+      // Google Fit listeners are now set up in _setupGoogleFitListeners()
       
       print('✅ Unified Google Fit manager initialized');
       
@@ -445,12 +470,15 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     await _taskService.initialize();
     await _calorieUnitsService.initialize();
     _currentUserId = _realTimeInputService.getCurrentUserId();
+    
+    // Initialize Google Fit services
+    await _initializeGoogleFitServices();
   }
 
-  void _setupStreamListeners() {
-    // Listen to real-time data updates (non-blocking)
+  /// Set up only essential listeners to reduce buffering
+  void _setupEssentialListeners() {
     try {
-      // Listen to daily summary updates from real-time service
+      // Only set up critical listeners first
       if (_currentUserId != null) {
         _realTimeInputService
             .getTodaySummary(_currentUserId!)
@@ -626,8 +654,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _animationController.forward();
   }
 
-  Future<void> _loadData() async {
+  /// Load data with proper loading states to prevent buffering
+  Future<void> _loadDataWithLoadingState() async {
     try {
+      // Show loading state
+      if (mounted) {
+        setState(() => _isLoading = true);
+      }
+
       // Load cached data first (non-blocking)
       _loadCachedDataImmediate();
 
@@ -642,9 +676,79 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       
       // Force refresh goals to ensure UI is up to date
       _forceRefreshGoals();
+      
+      // Hide loading state immediately after essential data is loaded
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+      
+      // Load additional data in background without blocking UI
+      _loadBackgroundData();
+      
     } catch (e) {
       // Handle error silently in production
       debugPrint('Error loading home data: $e');
+      
+      // Hide loading state even on error
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  /// Load additional data in background without blocking UI
+  void _loadBackgroundData() {
+    // Load non-essential data in background
+    Future.microtask(() async {
+      try {
+        // Only refresh Google Fit data if connected (avoid unnecessary API calls)
+        if (_isGoogleFitConnected) {
+          await _refreshGoogleFitData();
+        }
+        
+        // Refresh food data (lightweight)
+        await _refreshFoodData();
+        
+        // Refresh streak data (lightweight)
+        await _loadStreakData();
+        
+        // Refresh rewards data (lightweight)
+        await _loadRewardsData();
+      } catch (e) {
+        debugPrint('Background data loading error: $e');
+      }
+    });
+  }
+
+  /// Load Google Fit data immediately if available
+  void _loadGoogleFitDataImmediate() {
+    try {
+      // Get current data from unified manager if available
+      final currentData = _unifiedGoogleFitManager.getCurrentData();
+      if (currentData != null) {
+        setState(() {
+          _googleFitSteps = currentData.steps ?? 0;
+          _googleFitCaloriesBurned = currentData.caloriesBurned ?? 0.0;
+          _googleFitWorkoutSessions = currentData.workoutSessions ?? 0;
+          _googleFitWorkoutDuration = currentData.workoutDuration ?? 0.0;
+          _activityLevel = _calculateActivityLevel(currentData.steps);
+          _isGoogleFitConnected = _unifiedGoogleFitManager.isConnected;
+        });
+        print('✅ Home: Loaded Google Fit data immediately - Steps: ${currentData.steps}, Calories: ${currentData.caloriesBurned}');
+      } else {
+        // Set default values if no data available
+        setState(() {
+          _googleFitSteps = 0;
+          _googleFitCaloriesBurned = 0.0;
+          _googleFitWorkoutSessions = 0;
+          _googleFitWorkoutDuration = 0.0;
+          _activityLevel = 'Unknown';
+          _isGoogleFitConnected = false;
+        });
+        print('⚠️ Home: No Google Fit data available for immediate loading');
+      }
+    } catch (e) {
+      print('❌ Home: Error loading Google Fit data immediately: $e');
     }
   }
 
@@ -662,6 +766,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         waterGlassesGoal: 8,
         date: DateTime.now(),
       );
+
+      // Load Google Fit data immediately if available
+      _loadGoogleFitDataImmediate();
 
       // Note: Consumed calories and macro nutrients will be loaded via streams
       // in _setupFastDataRefresh() to prevent conflicts and flickering
@@ -734,6 +841,21 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
+  /// Load today's food entries for UI display
+  Future<void> _loadTodaysFoodEntries() async {
+    try {
+      final entries = await FoodHistoryService.getTodaysFoodEntries();
+      if (mounted) {
+        setState(() {
+          _todaysFoodEntries = entries;
+        });
+      }
+      print('✅ Loaded ${entries.length} food entries for UI');
+    } catch (e) {
+      print('❌ Error loading today\'s food entries: $e');
+    }
+  }
+
   /// Check if food entries have actually changed
   bool _hasFoodEntriesChanged(List<dynamic> newEntries) {
     // For now, always return true to trigger update
@@ -778,21 +900,39 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   Future<void> _refreshFoodData() async {
     // Prevent multiple simultaneous refreshes
     if (_isRefreshingFoodData) {
-      print('⚠️ Food data refresh already in progress, skipping...');
       return;
     }
     
     try {
       _isRefreshingFoodData = true;
       
-      // Force refresh to get fresh data and clear any stale cache
-      await _fastDataRefreshService.forceRefresh();
+      // Only force refresh if data is stale (avoid unnecessary API calls)
+      final now = DateTime.now();
+      if (_lastFoodDataRefresh == null || 
+          now.difference(_lastFoodDataRefresh!).inMinutes > 5) {
+        // Use timeout to prevent blocking
+        await _fastDataRefreshService.forceRefresh().timeout(
+          const Duration(seconds: 2),
+          onTimeout: () {
+            print('⚠️ Food data refresh timeout');
+          },
+        );
+        _lastFoodDataRefresh = now;
+      }
       
-      // Also manually refresh consumed calories and macro data to ensure accuracy
-      await _loadConsumedCaloriesFromFoodHistory();
-      await _loadMacroNutrientsFromFoodHistory();
+      // Load data with timeout to prevent blocking
+      await Future.wait([
+        _loadConsumedCaloriesFromFoodHistory(),
+        _loadMacroNutrientsFromFoodHistory(),
+        _loadTodaysFoodEntries(),
+      ]).timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          print('⚠️ Food data loading timeout');
+          return <void>[];
+        },
+      );
       
-      print('✅ Refreshed food data when screen became visible');
     } catch (e) {
       print('❌ Error refreshing food data: $e');
     } finally {
@@ -850,32 +990,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
-  /// Load rewards data
-  Future<void> _loadRewardsData() async {
-    try {
-      await _rewardsService.initialize();
-
-      // Listen to progress updates
-      _rewardsService.progressStream.listen((progress) {
-        if (mounted) {
-          setState(() {
-            _userProgress = progress;
-          });
-        }
-      });
-
-      // Listen to new rewards
-      _rewardsService.newRewardsStream.listen((rewards) {
-        if (mounted) {
-          setState(() {
-            _recentRewards = rewards.take(3).toList(); // Show only recent 3
-          });
-        }
-      });
-    } catch (e) {
-      print('Error loading rewards data: $e');
-    }
-  }
 
   /// Initialize Google Fit service and load data (with persistence and RAM clearing support)
   Future<void> _initializeGoogleFit() async {
@@ -1214,8 +1328,43 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   /// Refresh Google Fit data using unified manager
   Future<void> _refreshGoogleFitData() async {
-    if (_isGoogleFitConnected) {
-      await _unifiedGoogleFitManager.forceRefresh();
+    try {
+      // Only test connection if not already connected
+      if (!_isGoogleFitConnected) {
+        await _testGoogleFitConnection().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () {
+            print('⚠️ Google Fit connection timeout');
+          },
+        );
+      }
+      
+      // Force refresh from unified manager with timeout
+      if (_isGoogleFitConnected) {
+        final data = await _unifiedGoogleFitManager.forceRefresh().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () {
+            print('⚠️ Google Fit data refresh timeout');
+            return null;
+          },
+        );
+        
+        if (data != null && mounted) {
+          setState(() {
+            _googleFitSteps = data.steps ?? 0;
+            _googleFitCaloriesBurned = data.caloriesBurned ?? 0.0;
+            _googleFitWorkoutSessions = data.workoutSessions ?? 0;
+            _googleFitWorkoutDuration = data.workoutDuration ?? 0.0;
+            _activityLevel = _calculateActivityLevel(data.steps);
+            _lastSyncTime = DateTime.now();
+          });
+          
+          // Update daily summary with Google Fit data
+          _updateDailySummaryWithGoogleFitData();
+        }
+      }
+    } catch (e) {
+      print('❌ Error refreshing Google Fit data: $e');
     }
   }
 
@@ -1283,6 +1432,50 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
+  /// Set up Google Fit listeners
+  void _setupGoogleFitListeners() {
+    // Listen to unified Google Fit data stream with debouncing
+    _unifiedGoogleFitSubscription?.cancel();
+    _unifiedGoogleFitSubscription = _unifiedGoogleFitManager.dataStream.listen((data) {
+      if (mounted && data != null) {
+        // Use debounced update to prevent UI flickering
+        _debounceUIUpdate(() {
+          setState(() {
+            _googleFitSteps = data.steps ?? 0;
+            _googleFitCaloriesBurned = data.caloriesBurned ?? 0.0;
+            _googleFitWorkoutSessions = data.workoutSessions ?? 0;
+            _googleFitWorkoutDuration = data.workoutDuration ?? 0.0;
+            _activityLevel = _calculateActivityLevel(data.steps);
+            _lastSyncTime = DateTime.now();
+          });
+          
+          // Update daily summary with Google Fit data
+          _updateDailySummaryWithGoogleFitData();
+        });
+      }
+    });
+    
+    // Listen to connection status
+    _unifiedGoogleFitConnectionSubscription?.cancel();
+    _unifiedGoogleFitConnectionSubscription = _unifiedGoogleFitManager.connectionStream.listen((isConnected) {
+      if (mounted) {
+        setState(() {
+          _isGoogleFitConnected = isConnected;
+        });
+      }
+    });
+    
+    // Listen to loading status
+    _unifiedGoogleFitLoadingSubscription?.cancel();
+    _unifiedGoogleFitLoadingSubscription = _unifiedGoogleFitManager.loadingStream.listen((isLoading) {
+      if (mounted) {
+        setState(() {
+          _isGoogleFitLoading = isLoading;
+        });
+      }
+    });
+  }
+
   /// Set up real-time data listeners from AppStateService
   void _setupDataListeners() {
     // Listen to daily summary updates
@@ -1326,6 +1519,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     });
 
     // Health data functionality removed
+
+    // Set up Google Fit listeners
+    _setupGoogleFitListeners();
 
     // Listen to goals updates
     debugPrint('Setting up goals stream listener in _setupDataListeners');
@@ -1909,21 +2105,144 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   Future<void> _loadStreakData() async {
     try {
-      // Provide immediate fallback data for better UX
-      _streakSummary = _getDefaultStreakData();
-      setState(() => _isStreakLoading = false);
-
-      // Load actual streak data from the enhanced streak service
+      // Initialize enhanced streak service with timeout
+      await _enhancedStreakService.initialize().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {
+          debugPrint('⚠️ Streak service initialization timeout');
+        },
+      );
+      
+      // Get current streak data
       _streakSummary = _enhancedStreakService.currentStreaks;
+      
       if (mounted) {
         setState(() => _isStreakLoading = false);
       }
     } catch (e) {
-      debugPrint('Error loading streak data: $e');
+      debugPrint('❌ Error loading streak data: $e');
+      // Provide fallback data
+      _streakSummary = _getDefaultStreakData();
       if (mounted) {
         setState(() => _isStreakLoading = false);
       }
     }
+  }
+
+  /// Load rewards data based on current streak data
+  Future<void> _loadRewardsData() async {
+    try {
+      // Calculate user progress based on current streak data
+      final currentStreak = _streakSummary.longestOverallStreak;
+      final currentLevel = RewardSystem.getCurrentLevel(currentStreak);
+      final nextLevel = RewardSystem.getNextLevel(currentLevel);
+      final daysToNextLevel = RewardSystem.getDaysToNextLevel(currentStreak, currentLevel);
+      final levelProgress = RewardSystem.getLevelProgress(currentStreak, currentLevel);
+      
+      // Get unlocked rewards (simplified - could be enhanced with actual reward tracking)
+      final unlockedRewards = _getUnlockedRewards(currentStreak);
+      
+      _userProgress = UserProgress(
+        currentStreak: currentStreak,
+        longestStreak: _streakSummary.longestOverallStreak,
+        currentLevel: currentLevel,
+        daysToNextLevel: daysToNextLevel,
+        levelProgress: levelProgress,
+        unlockedRewards: unlockedRewards,
+        categoryProgress: _calculateCategoryProgress(),
+      );
+      
+      debugPrint('🏆 Loaded rewards: Level ${currentLevel.title}, ${unlockedRewards.length} rewards unlocked');
+    } catch (e) {
+      debugPrint('❌ Error loading rewards data: $e');
+      _userProgress = UserProgress.initial();
+    }
+  }
+
+  /// Get unlocked rewards based on current streak data
+  List<UserReward> _getUnlockedRewards(int currentStreak) {
+    final allRewards = RewardSystem.getAllRewards();
+    final unlockedRewards = <UserReward>[];
+    
+    for (final reward in allRewards) {
+      bool shouldUnlock = false;
+      
+      // Check streak-based rewards using actual streak data
+      if (reward.type == RewardType.streak) {
+        switch (reward.id) {
+          case 'water_streak_7':
+            shouldUnlock = (_streakSummary.goalStreaks[DailyGoalType.waterIntake]?.currentStreak ?? 0) >= 7;
+            break;
+          case 'water_streak_30':
+            shouldUnlock = (_streakSummary.goalStreaks[DailyGoalType.waterIntake]?.currentStreak ?? 0) >= 30;
+            break;
+          case 'water_streak_100':
+            shouldUnlock = (_streakSummary.goalStreaks[DailyGoalType.waterIntake]?.currentStreak ?? 0) >= 100;
+            break;
+          case 'water_streak_365':
+            shouldUnlock = (_streakSummary.goalStreaks[DailyGoalType.waterIntake]?.currentStreak ?? 0) >= 365;
+            break;
+          case 'meal_streak_7':
+            shouldUnlock = (_streakSummary.goalStreaks[DailyGoalType.calorieGoal]?.currentStreak ?? 0) >= 7;
+            break;
+          case 'meal_streak_30':
+            shouldUnlock = (_streakSummary.goalStreaks[DailyGoalType.calorieGoal]?.currentStreak ?? 0) >= 30;
+            break;
+          case 'meal_streak_100':
+            shouldUnlock = (_streakSummary.goalStreaks[DailyGoalType.calorieGoal]?.currentStreak ?? 0) >= 100;
+            break;
+          case 'meal_streak_365':
+            shouldUnlock = (_streakSummary.goalStreaks[DailyGoalType.calorieGoal]?.currentStreak ?? 0) >= 365;
+            break;
+          case 'exercise_streak_7':
+            shouldUnlock = (_streakSummary.goalStreaks[DailyGoalType.exercise]?.currentStreak ?? 0) >= 7;
+            break;
+          case 'exercise_streak_30':
+            shouldUnlock = (_streakSummary.goalStreaks[DailyGoalType.exercise]?.currentStreak ?? 0) >= 30;
+            break;
+          case 'exercise_streak_100':
+            shouldUnlock = (_streakSummary.goalStreaks[DailyGoalType.exercise]?.currentStreak ?? 0) >= 100;
+            break;
+          case 'exercise_streak_365':
+            shouldUnlock = (_streakSummary.goalStreaks[DailyGoalType.exercise]?.currentStreak ?? 0) >= 365;
+            break;
+        }
+      }
+      
+      // Check special achievements using overall streak data
+      if (reward.type == RewardType.special) {
+        switch (reward.id) {
+          case 'perfect_week':
+            shouldUnlock = currentStreak >= 7;
+            break;
+          case 'hot_streak':
+            shouldUnlock = currentStreak >= 100;
+            break;
+          case 'consistency_king':
+            shouldUnlock = currentStreak >= 30;
+            break;
+        }
+      }
+      
+      if (shouldUnlock) {
+        unlockedRewards.add(reward.copyWith(
+          isUnlocked: true,
+          earnedAt: DateTime.now(),
+        ));
+      }
+    }
+    
+    return unlockedRewards;
+  }
+
+  /// Calculate category progress based on streak data
+  Map<String, int> _calculateCategoryProgress() {
+    return {
+      'logging': _streakSummary.goalStreaks[DailyGoalType.calorieGoal]?.totalDaysAchieved ?? 0,
+      'exercise': _streakSummary.goalStreaks[DailyGoalType.exercise]?.totalDaysAchieved ?? 0,
+      'water': _streakSummary.goalStreaks[DailyGoalType.waterIntake]?.totalDaysAchieved ?? 0,
+      'steps': _streakSummary.goalStreaks[DailyGoalType.steps]?.totalDaysAchieved ?? 0,
+    };
   }
 
   /// Load tasks data with fallback
@@ -2139,7 +2458,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           child: SlideTransition(
             position: _slideAnimation,
             child: RefreshIndicator(
-              onRefresh: _loadData,
+              onRefresh: _loadDataWithLoadingState,
               child: CustomScrollView(
                 slivers: [
                   // Greeting Section
@@ -3329,31 +3648,17 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             ],
           ),
           const SizedBox(height: 20),
-          // GoalStreakCard widgets removed for simplification
-          // if (_isStreakLoading)
-          //   ...List.generate(
-          //     4,
-          //     (index) => Padding(
-          //       padding: const EdgeInsets.only(bottom: 12),
-          //       child: GoalStreakCard(
-          //         streak: _streakSummary.goalStreaks.values.first,
-          //         isLoading: true,
-          //         onTap: () {},
-          //       ),
-          //     ),
-          //   )
-          // else
-          //   ..._streakSummary.goalStreaks.values.map(
-          //     (streak) => Padding(
-          //       padding: const EdgeInsets.only(bottom: 12),
-          //       child: GoalStreakCard(
-          //         streak: streak,
-          //         onTap: () {
-          //           // Handle goal tap if needed
-          //         },
-          //       ),
-          //     ),
-          //   ),
+          
+          // Display actual goal streaks
+          if (_isStreakLoading)
+            ...List.generate(4, (index) => ProfileWidgets.buildLoadingStreakCard(context))
+          else
+            ..._streakSummary.goalStreaks.values.map(
+              (streak) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: ProfileWidgets.buildGoalStreakCard(context, streak),
+              ),
+            ),
         ],
       ),
     );
@@ -3482,10 +3787,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   _buildGoalStreaksSection(),
                   const SizedBox(height: 32),
 
-                  // Streak Motivation - Widget removed for simplification
-                  // StreakMotivationWidget(
-                  //   streakSummary: _streakSummary,
-                  // ),
+                  // Rewards & Achievements Section
+                  ProfileWidgets.buildRewardsSection(context, _userProgress),
                   const SizedBox(height: 40),
                 ],
               ),
@@ -3926,7 +4229,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             ),
           );
           // Refresh the data
-          _loadData();
+          _loadDataWithLoadingState();
         }
       }
     } catch (e) {

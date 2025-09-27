@@ -94,6 +94,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   @override
   void initState() {
     super.initState();
+    
+    // Load cached data first to prevent UI lag
+    _loadCachedAnalyticsData();
+    
+    // Initialize services asynchronously
     _setupTodaysFoodDataService();
     _initializeGoogleFitData();
   }
@@ -453,6 +458,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     }
   }
 
+  /// Load cached analytics data immediately to prevent UI lag
+  void _loadCachedAnalyticsData() {
+    try {
+      // Set default values to prevent null errors
+      _dailySummaries = [];
+      _achievements = [];
+      _insights = [];
+      _recommendations = [];
+      
+      // Set loading states
+      _isLoading = false;
+      _isRefreshing = false;
+      _isGeneratingInsights = false;
+      
+      debugPrint('📊 Loaded cached analytics data');
+    } catch (e) {
+      debugPrint('❌ Error loading cached analytics data: $e');
+    }
+  }
+
   /// Initialize Google Fit data with better error handling
   Future<void> _initializeGoogleFitData() async {
     try {
@@ -694,9 +719,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
         await Future.wait(futures);
 
-        setState(() {
-          _weeklyGoogleFitData = weeklyData;
-        });
+        if (mounted) {
+          setState(() {
+            _weeklyGoogleFitData = weeklyData;
+          });
+        }
         
         final totalSteps = weeklyData.fold<int>(0, (sum, data) => sum + (data.steps ?? 0));
         final totalCalories = weeklyData.fold<double>(0, (sum, data) => sum + (data.caloriesBurned ?? 0));

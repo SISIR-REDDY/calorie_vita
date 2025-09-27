@@ -35,15 +35,33 @@ class EnhancedStreakService {
     totalDaysActive: 0,
   );
 
-  /// Initialize enhanced streak service
+  /// Initialize enhanced streak service with timeout to prevent blocking
   Future<void> initialize() async {
     try {
       final user = _auth.currentUser;
-      if (user == null) return;
+      if (user == null) {
+        debugPrint('⚠️ No authenticated user, using default streak data');
+        _currentStreaks = _getDefaultStreakData();
+        return;
+      }
 
-      await _calculateAndUpdateStreaks();
+      debugPrint('🔥 Initializing enhanced streak service for user: ${user.uid}');
+
+      // Add timeout to prevent blocking the UI
+      await _calculateAndUpdateStreaks().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('⚠️ Streak calculation timed out, using fallback data');
+          _currentStreaks = _getDefaultStreakData();
+        },
+      );
+
+      debugPrint('✅ Enhanced streak service initialized successfully');
     } catch (e) {
+      debugPrint('❌ Error initializing enhanced streak service: $e');
       _errorHandler.handleDataError('enhanced_streak_init', e);
+      // Provide fallback data
+      _currentStreaks = _getDefaultStreakData();
     }
   }
 
@@ -63,10 +81,18 @@ class EnhancedStreakService {
       final dailySummaries = await _getDailySummaries(user.uid, days: 30);
       debugPrint('Found ${dailySummaries.length} daily summaries');
       
-      // Calculate streaks for each goal type
+      // Calculate streaks for each goal type (only main goals)
       final goalStreaks = <DailyGoalType, GoalStreak>{};
       
-      for (final goalType in DailyGoalType.values) {
+      // Only process main daily goals, exclude sleep and weight tracking
+      final mainGoalTypes = [
+        DailyGoalType.calorieGoal,
+        DailyGoalType.steps, // Add steps tracking
+        DailyGoalType.exercise,
+        DailyGoalType.waterIntake,
+      ];
+      
+      for (final goalType in mainGoalTypes) {
         goalStreaks[goalType] = _calculateStreakForGoal(
           goalType, 
           dailySummaries, 
@@ -183,28 +209,37 @@ class EnhancedStreakService {
         achieved = summary.caloriesConsumed >= calorieGoal;
         break;
       
+      case DailyGoalType.steps:
+        // Check if steps goal is met
+        final stepsGoal = userGoals.stepsPerDayGoal ?? 10000;
+        achieved = summary.steps >= stepsGoal;
+        break;
+      
       case DailyGoalType.exercise:
-        // Consider exercise achieved if calories burned > 0
-        achieved = summary.caloriesBurned > 0;
+        // Consider exercise achieved if calories burned > 0 or steps > 5000
+        achieved = summary.caloriesBurned > 0 || summary.steps > 5000;
         break;
       
       case DailyGoalType.waterIntake:
-        // Check if water intake goal is met (simplified)
-        achieved = summary.caloriesConsumed > 0; // Simplified check
+        // Check if water intake goal is met
+        final waterGoal = userGoals.waterGlassesGoal ?? 8;
+        achieved = summary.waterGlasses >= waterGoal;
         break;
       
       case DailyGoalType.sleep:
-        // Check if sleep goal is met (simplified)
-        achieved = summary.caloriesConsumed > 0; // Simplified check
+        // Check if sleep goal is met (simplified - could be enhanced with actual sleep data)
+        // For now, consider it achieved if user logged any activity
+        achieved = summary.caloriesConsumed > 0;
         break;
       
       case DailyGoalType.weightTracking:
-        // Check if weight tracking goal is met (simplified)
-        achieved = summary.caloriesConsumed > 0; // Simplified check
+        // Check if weight tracking goal is met (simplified - could be enhanced with actual weight data)
+        // For now, consider it achieved if user logged any activity
+        achieved = summary.caloriesConsumed > 0;
         break;
     }
     
-    debugPrint('Goal ${goalType.displayName}: ${achieved ? "ACHIEVED" : "NOT ACHIEVED"} (Calories: ${summary.caloriesConsumed}, Steps: ${summary.steps}, Burned: ${summary.caloriesBurned})');
+    debugPrint('Goal ${goalType.displayName}: ${achieved ? "ACHIEVED" : "NOT ACHIEVED"} (Calories: ${summary.caloriesConsumed}, Steps: ${summary.steps}, Burned: ${summary.caloriesBurned}, Water: ${summary.waterGlasses})');
     return achieved;
   }
 
@@ -284,7 +319,30 @@ class EnhancedStreakService {
 
   /// Refresh streaks (call this when daily summary is updated)
   Future<void> refreshStreaks() async {
-    await _calculateAndUpdateStreaks();
+    try {
+      debugPrint('🔄 Refreshing streaks...');
+      await _calculateAndUpdateStreaks();
+      
+      // Notify listeners of updated streak data
+      _streakController.add(_currentStreaks);
+      
+      debugPrint('✅ Streaks refreshed successfully');
+    } catch (e) {
+      debugPrint('❌ Error refreshing streaks: $e');
+      _errorHandler.handleDataError('streak_refresh', e);
+    }
+  }
+
+  /// Force refresh streaks with new data
+  Future<void> forceRefreshStreaks() async {
+    debugPrint('🔄 Force refreshing streaks...');
+    try {
+      await _calculateAndUpdateStreaks();
+      debugPrint('✅ Force refresh completed');
+    } catch (e) {
+      debugPrint('❌ Error in force refresh: $e');
+      rethrow;
+    }
   }
 
   /// Get current streak summary
@@ -327,6 +385,55 @@ class EnhancedStreakService {
     } catch (e) {
       _errorHandler.handleDataError('reset_streaks', e);
     }
+  }
+
+  /// Get default streak data when initialization fails
+  UserStreakSummary _getDefaultStreakData() {
+    final now = DateTime.now();
+    return UserStreakSummary(
+      goalStreaks: {
+        DailyGoalType.calorieGoal: GoalStreak(
+          goalType: DailyGoalType.calorieGoal,
+          currentStreak: 0,
+          longestStreak: 0,
+          achievedToday: false,
+          lastAchievedDate: now,
+          streakStartDate: now,
+          totalDaysAchieved: 0,
+        ),
+        DailyGoalType.steps: GoalStreak(
+          goalType: DailyGoalType.steps,
+          currentStreak: 0,
+          longestStreak: 0,
+          achievedToday: false,
+          lastAchievedDate: now,
+          streakStartDate: now,
+          totalDaysAchieved: 0,
+        ),
+        DailyGoalType.exercise: GoalStreak(
+          goalType: DailyGoalType.exercise,
+          currentStreak: 0,
+          longestStreak: 0,
+          achievedToday: false,
+          lastAchievedDate: now,
+          streakStartDate: now,
+          totalDaysAchieved: 0,
+        ),
+        DailyGoalType.waterIntake: GoalStreak(
+          goalType: DailyGoalType.waterIntake,
+          currentStreak: 0,
+          longestStreak: 0,
+          achievedToday: false,
+          lastAchievedDate: now,
+          streakStartDate: now,
+          totalDaysAchieved: 0,
+        ),
+      },
+      totalActiveStreaks: 0,
+      longestOverallStreak: 0,
+      lastActivityDate: now,
+      totalDaysActive: 0,
+    );
   }
 
   /// Dispose resources

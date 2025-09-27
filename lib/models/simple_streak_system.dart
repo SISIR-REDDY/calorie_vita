@@ -3,6 +3,7 @@
 /// Enum for different types of daily goals
 enum DailyGoalType {
   calorieGoal,
+  steps,
   waterIntake,
   exercise,
   sleep,
@@ -14,6 +15,8 @@ extension DailyGoalTypeExtension on DailyGoalType {
     switch (this) {
       case DailyGoalType.calorieGoal:
         return 'Calorie Goal';
+      case DailyGoalType.steps:
+        return 'Steps';
       case DailyGoalType.waterIntake:
         return 'Water Intake';
       case DailyGoalType.exercise:
