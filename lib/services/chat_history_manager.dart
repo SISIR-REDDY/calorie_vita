@@ -60,26 +60,40 @@ class ChatHistoryManager {
     _isLoading = true;
     
     try {
+      // Use the same collection path as trainer_screen.dart
+      // Query without orderBy to avoid index requirement
       final querySnapshot = await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('trainerChats')
-          .orderBy('timestamp', descending: true)
+          .collection('chat_sessions')
+          .where('userId', isEqualTo: userId)
           .limit(limit)
           .get()
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 8));
 
       final sessions = querySnapshot.docs.map((doc) {
         final data = doc.data();
+        final messages = data['messages'] as List<dynamic>? ?? [];
+        final firstMessage = messages.isNotEmpty ? messages.first : {};
+        
         return {
           'id': doc.id,
-          'sender': data['sender'] ?? '',
-          'text': data['text'] ?? '',
-          'timestamp': data['timestamp']?.toDate() ?? DateTime.now(),
-          'sessionId': data['sessionId'] ?? 'default',
+          'sender': firstMessage['sender'] ?? 'user',
+          'text': firstMessage['text'] ?? data['title'] ?? '',
+          'timestamp': data['timestamp'] is int 
+              ? DateTime.fromMillisecondsSinceEpoch(data['timestamp'])
+              : DateTime.now(),
+          'sessionId': doc.id,
           'isFromCache': false,
+          'title': data['title'] ?? '',
+          'messages': messages,
         };
       }).toList();
+
+      // Sort sessions by timestamp in descending order (newest first)
+      sessions.sort((a, b) {
+        final aTime = a['timestamp'] as DateTime;
+        final bTime = b['timestamp'] as DateTime;
+        return bTime.compareTo(aTime);
+      });
 
       // Update cache
       _cachedSessions = sessions;
@@ -160,32 +174,30 @@ class ChatHistoryManager {
     return DateTime.now().difference(_lastSyncTime!) < _cacheExpiry;
   }
 
-  /// Save a new chat message with immediate cache update
-  Future<void> saveChatMessage(Map<String, dynamic> messageData) async {
+  /// Save a new chat session with immediate cache update
+  Future<void> saveChatSession(Map<String, dynamic> sessionData) async {
     final user = _auth.currentUser;
     if (user == null) return;
 
     try {
-      // Add to Firebase
+      // Add to Firebase using the same collection as trainer_screen.dart
       await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('trainerChats')
-          .add({
-        ...messageData,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+          .collection('chat_sessions')
+          .doc(sessionData['id'])
+          .set(sessionData)
+          .timeout(const Duration(seconds: 5));
 
       // Update local cache immediately
-      final newMessage = {
-        ...messageData,
-        'timestamp': messageData['timestamp'] ?? DateTime.now(),
+      final newSession = {
+        ...sessionData,
         'isFromCache': false,
       };
       
-      _cachedSessions.insert(0, newMessage);
+      // Remove existing session with same ID if present
+      _cachedSessions.removeWhere((s) => s['id'] == sessionData['id']);
+      _cachedSessions.insert(0, newSession);
       
-      // Keep only the most recent messages
+      // Keep only the most recent sessions
       if (_cachedSessions.length > _maxCachedSessions) {
         _cachedSessions = _cachedSessions.take(_maxCachedSessions).toList();
       }
@@ -194,16 +206,16 @@ class ChatHistoryManager {
       await _saveToCache(_cachedSessions);
       
     } catch (e) {
-      print('Error saving chat message: $e');
+      print('Error saving chat session: $e');
       
       // Still add to cache for offline support
-      final newMessage = {
-        ...messageData,
-        'timestamp': messageData['timestamp'] ?? DateTime.now(),
+      final newSession = {
+        ...sessionData,
         'isFromCache': true,
       };
       
-      _cachedSessions.insert(0, newMessage);
+      _cachedSessions.removeWhere((s) => s['id'] == sessionData['id']);
+      _cachedSessions.insert(0, newSession);
       await _saveToCache(_cachedSessions);
     }
   }
@@ -214,19 +226,20 @@ class ChatHistoryManager {
     if (user == null) return;
 
     try {
-      // Clear from Firebase
-      final batch = _firestore.batch();
+      // Clear from Firebase using the same collection as trainer_screen.dart
       final chatDocs = await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('trainerChats')
-          .get();
+          .collection('chat_sessions')
+          .where('userId', isEqualTo: user.uid)
+          .get()
+          .timeout(const Duration(seconds: 5));
 
-      for (final doc in chatDocs.docs) {
-        batch.delete(doc.reference);
+      if (chatDocs.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        for (final doc in chatDocs.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit().timeout(const Duration(seconds: 5));
       }
-
-      await batch.commit();
 
       // Clear local cache
       _cachedSessions.clear();
@@ -234,6 +247,32 @@ class ChatHistoryManager {
       
     } catch (e) {
       print('Error clearing chat history: $e');
+    }
+  }
+
+  /// Delete a specific chat session
+  Future<void> deleteChatSession(String sessionId) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      // Delete from Firebase
+      await _firestore
+          .collection('chat_sessions')
+          .doc(sessionId)
+          .delete()
+          .timeout(const Duration(seconds: 3));
+
+      // Remove from local cache
+      _cachedSessions.removeWhere((s) => s['id'] == sessionId);
+      await _saveToCache(_cachedSessions);
+      
+    } catch (e) {
+      print('Error deleting chat session: $e');
+      
+      // Still remove from cache for offline support
+      _cachedSessions.removeWhere((s) => s['id'] == sessionId);
+      await _saveToCache(_cachedSessions);
     }
   }
 

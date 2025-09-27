@@ -89,7 +89,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
 
   bool isDark = false;
   bool isLoading = false;
-  bool isPremium = false; // Simulated premium status
+  bool isPremium = true; // Set to true for demo purposes
   bool isLoadingHistory = false;
   Map<String, dynamic>? _userProfile;
 
@@ -106,6 +106,8 @@ class _AITrainerScreenState extends State<AITrainerScreen>
   DateTime? _lastHistoryLoad;
   String? _lastLoadedUserId; // Track the last loaded user ID
   Map<String, dynamic>? _currentFitnessData;
+  StateSetter? _currentModalState; // Store current modal state for updates
+  final ValueNotifier<List<ChatSession>> _chatSessionsNotifier = ValueNotifier<List<ChatSession>>([]);
 
   @override
   void initState() {
@@ -142,9 +144,16 @@ class _AITrainerScreenState extends State<AITrainerScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    // Clear modal state reference to prevent setState after dispose
+    _currentModalState = null;
+    // Dispose ValueNotifier
+    _chatSessionsNotifier.dispose();
     // Save current session when leaving the screen (silently)
     if (currentSessionId != null && messages.length > 1) {
-      _saveCurrentSessionSilently();
+      // Fire and forget - don't await in dispose
+      _saveCurrentSessionSilently().catchError((e) {
+        print('Error saving session on dispose: $e');
+      });
     }
     super.dispose();
   }
@@ -160,9 +169,11 @@ class _AITrainerScreenState extends State<AITrainerScreen>
 
   Future<void> _checkPremiumStatus() async {
     // Simulate premium check - in real app, this would check user's subscription
-    setState(() {
-      isPremium = true; // Set to true for demo purposes
-    });
+    if (mounted) {
+      setState(() {
+        isPremium = true; // Set to true for demo purposes
+      });
+    }
   }
 
   Future<void> _loadUserProfile() async {
@@ -170,9 +181,11 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       final user = _auth.currentUser;
       if (user != null) {
         final profile = await _firebaseService.getUserProfile(user.uid);
-        setState(() {
-          _userProfile = profile;
-        });
+        if (mounted) {
+          setState(() {
+            _userProfile = profile;
+          });
+        }
       }
     } catch (e) {
       print('Error loading user profile: $e');
@@ -185,41 +198,42 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     // Don't reload if already loading
     if (isLoadingHistory) return;
 
-    setState(() {
-      isLoadingHistory = true;
-    });
+    if (mounted) {
+      setState(() {
+        isLoadingHistory = true;
+      });
+    }
 
     try {
       // Use the enhanced chat history manager
       final history = await _chatHistoryManager.getChatHistory(
         forceRefresh: forceRefresh,
-        limit: 50,
+        limit: 20, // Reduced limit for better performance
       );
 
       // Convert to ChatSession objects
       final sessions = history.map((data) {
         try {
-          final messageText = data['text'] ?? '';
-          final title = messageText.length > 30 
-              ? '${messageText.substring(0, 30)}...' 
-              : messageText;
+          final title = data['title'] ?? '';
+          final messages = data['messages'] as List<dynamic>? ?? [];
+          
+          // Convert messages to Message objects
+          final messageList = messages.map((msg) => Message(
+            sender: msg['sender'] ?? 'user',
+            text: msg['text'] ?? '',
+            timestamp: msg['timestamp'] is int 
+                ? DateTime.fromMillisecondsSinceEpoch(msg['timestamp'])
+                : DateTime.now(),
+          )).toList();
           
           return ChatSession(
             id: data['id'] ?? '',
             userId: _auth.currentUser?.uid ?? '',
             title: title,
-            messages: [
-              Message(
-                sender: data['sender'] ?? 'user',
-                text: messageText,
-                timestamp: data['timestamp'] is DateTime 
-                    ? data['timestamp'] as DateTime
-                    : DateTime.parse(data['timestamp'].toString()),
-              ),
-            ],
-            timestamp: data['timestamp'] is DateTime 
-                ? data['timestamp'] as DateTime
-                : DateTime.parse(data['timestamp'].toString()),
+            messages: messageList,
+            timestamp: data['timestamp'] is int 
+                ? DateTime.fromMillisecondsSinceEpoch(data['timestamp'])
+                : DateTime.now(),
           );
         } catch (e) {
           print('Error converting chat data: $e');
@@ -259,7 +273,10 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     if (currentUser != null && currentUser.uid != _lastLoadedUserId) {
       print('User changed, reloading chat history for: ${currentUser.uid}');
       _lastLoadedUserId = currentUser.uid;
-      await _forceReloadChatHistory();
+      // Only reload if we don't have any current sessions
+      if (chatSessions.isEmpty) {
+        await _forceReloadChatHistory();
+      }
     }
   }
 
@@ -338,14 +355,10 @@ class _AITrainerScreenState extends State<AITrainerScreen>
   /// Force refresh the chat history UI
   void _refreshChatHistoryUI() {
     if (mounted) {
-      // Add a small delay to ensure the state has been updated
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (mounted) {
-          setState(() {
-            // Force rebuild by updating a dummy variable
-            // This ensures the chat history bottom sheet refreshes
-          });
-        }
+      // Immediate UI refresh without delay
+      setState(() {
+        // Force rebuild by updating a dummy variable
+        // This ensures the chat history bottom sheet refreshes
       });
     }
   }
@@ -378,40 +391,48 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       );
 
       // Update local history immediately for instant UI update
-      setState(() {
-        currentSessionId = sessionId;
-        chatSessions.removeWhere((s) => s.id == sessionId);
-        chatSessions.insert(0, session);
-        if (chatSessions.length > 5) {
-          chatSessions = chatSessions.take(5).toList();
-        }
-      });
+      if (mounted) {
+        setState(() {
+          currentSessionId = sessionId;
+          chatSessions.removeWhere((s) => s.id == sessionId);
+          chatSessions.insert(0, session);
+          if (chatSessions.length > 10) {
+            chatSessions = chatSessions.take(10).toList();
+          }
+        });
+      }
       
-      // Cache the updated sessions
-      _cacheChatSessions();
+      // Use ChatHistoryManager for consistent storage
+      await _chatHistoryManager.saveChatSession(session.toMap());
+      
+      // Update modal if it's open and still mounted
+      if (_currentModalState != null && mounted) {
+        try {
+          _currentModalState!(() {});
+        } catch (e) {
+          print('Error updating modal state: $e');
+          _currentModalState = null; // Clear invalid reference
+        }
+      }
 
-      // Save session in background with timeout
-      _firestore
-          .collection('chat_sessions')
-          .doc(sessionId)
-          .set(session.toMap())
-          .timeout(
-            const Duration(seconds: 5),
-            onTimeout: () {
-              print('Session save timed out: $sessionId');
-            },
-          )
-          .then((_) {
-            print('Chat session saved successfully: $sessionId');
-            // Cleanup old sessions in background (non-blocking)
-            _cleanupOldSessions();
-          })
-          .catchError((e) {
-            print('Error saving chat session: $e');
-          });
+      // Cleanup old sessions in background (non-blocking)
+      _cleanupOldSessions();
 
     } catch (e) {
       print('Error preparing chat session: $e');
+      // Show error message to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving chat: $e'),
+            backgroundColor: Colors.red[600],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -443,38 +464,47 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       );
 
       // Update local history immediately for instant UI update (without triggering refresh)
-      setState(() {
-        currentSessionId = sessionId;
-        chatSessions.removeWhere((s) => s.id == sessionId);
-        chatSessions.insert(0, session);
-        if (chatSessions.length > 5) {
-          chatSessions = chatSessions.take(5).toList();
-        }
-      });
+      if (mounted) {
+        setState(() {
+          currentSessionId = sessionId;
+          chatSessions.removeWhere((s) => s.id == sessionId);
+          chatSessions.insert(0, session);
+          if (chatSessions.length > 10) {
+            chatSessions = chatSessions.take(10).toList();
+          }
+        });
+      }
       
-      // Cache the updated sessions
-      _cacheChatSessions();
+      // Use ChatHistoryManager for consistent storage (silently)
+      _chatHistoryManager.saveChatSession(session.toMap());
+      
+      // Update modal if it's open and still mounted
+      if (_currentModalState != null && mounted) {
+        try {
+          _currentModalState!(() {});
+        } catch (e) {
+          print('Error updating modal state: $e');
+          _currentModalState = null; // Clear invalid reference
+        }
+      }
 
-      // Save session in background with timeout (silently)
-      _firestore
-          .collection('chat_sessions')
-          .doc(sessionId)
-          .set(session.toMap())
-          .timeout(
-            const Duration(seconds: 5),
-            onTimeout: () {
-              print('Session save timed out: $sessionId');
-            },
-          )
-          .then((_) {
-            print('Chat session saved successfully: $sessionId');
-            _cleanupOldSessions();
-          })
-          .catchError((error) {
-            print('Error saving chat session: $error');
-          });
+      // Cleanup old sessions in background (non-blocking)
+      _cleanupOldSessions();
     } catch (e) {
       print('Error preparing chat session: $e');
+      // Show error message to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving chat: $e'),
+            backgroundColor: Colors.red[600],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -512,10 +542,12 @@ class _AITrainerScreenState extends State<AITrainerScreen>
   }
 
   Future<void> _loadSession(ChatSession session) async {
-    setState(() {
-      messages = List.from(session.messages);
-      currentSessionId = session.id;
-    });
+    if (mounted) {
+      setState(() {
+        messages = List.from(session.messages);
+        currentSessionId = session.id;
+      });
+    }
 
     // Scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -529,16 +561,18 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     });
   }
 
-  void _sendMessage() async {
+  Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
-    setState(() {
-      messages
-          .add(Message(sender: 'user', text: text, timestamp: DateTime.now()));
-      isLoading = true;
-      _controller.clear();
-    });
+    if (mounted) {
+      setState(() {
+        messages
+            .add(Message(sender: 'user', text: text, timestamp: DateTime.now()));
+        isLoading = true;
+      });
+    }
+    _controller.clear();
 
     await Future.delayed(const Duration(milliseconds: 300));
     _scrollController.animateTo(
@@ -549,6 +583,9 @@ class _AITrainerScreenState extends State<AITrainerScreen>
 
     String reply;
     try {
+      // Check if still mounted before making AI call
+      if (!mounted) return;
+      
       // Convert messages to conversation history format
       final conversationHistory = messages
           .where((msg) =>
@@ -570,65 +607,87 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       reply = 'Sorry, there was a problem connecting to the AI service.';
     }
 
-    setState(() {
-      messages.add(
-          Message(sender: 'Sisir', text: reply, timestamp: DateTime.now()));
-      isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        messages.add(
+            Message(sender: 'Sisir', text: reply, timestamp: DateTime.now()));
+        isLoading = false;
+      });
+    }
 
-    await Future.delayed(const Duration(milliseconds: 300));
-    _scrollController.animateTo(
-      _scrollController.position.maxScrollExtent + 100,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOut,
-    );
+    if (mounted) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent + 100,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
 
-    // Save session after getting response
-    await _saveCurrentSession();
+    // Save session after getting response (with error handling)
+    try {
+      if (mounted) {
+        await _saveCurrentSession();
+      }
+    } catch (e) {
+      print('Error saving session after message: $e');
+      // Don't show error to user as this is background operation
+    }
   }
 
   void _startNewChat() {
     // Save current session before starting new one (without triggering refresh)
     if (currentSessionId != null && messages.length > 1) {
-      _saveCurrentSessionSilently();
+      // Fire and forget - don't await in synchronous method
+      _saveCurrentSessionSilently().catchError((e) {
+        print('Error saving session before new chat: $e');
+      });
     }
 
-    setState(() {
-      messages = [
-        Message(
-            sender: 'Sisir',
+    if (mounted) {
+      setState(() {
+        messages = [
+          Message(
+              sender: 'Sisir',
             text:
                 'Hey there! I\'m Trainer Sisir, your personal fitness and nutrition coach. I\'m here to help you reach your health goals with personalized advice and support. What would you like to work on today? 💪',
             timestamp: DateTime.now()),
-      ];
-      currentSessionId = null;
-    });
+        ];
+        currentSessionId = null;
+      });
+    }
   }
 
   void _showChatHistory() {
     // Check if user has changed and reload if needed
     _checkUserAndReloadHistory();
     
+    // Initialize ValueNotifier with current chatSessions
+    _chatSessionsNotifier.value = List.from(chatSessions);
+    
     // Show the bottom sheet immediately with existing data
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _buildHistoryBottomSheet(),
-    );
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          // Store the setModalState for use in save operations
+          _currentModalState = setModalState;
+          return _buildHistoryBottomSheet(setModalState);
+        },
+      ),
+    ).whenComplete(() {
+      // Clear the modal state reference when modal is dismissed
+      _currentModalState = null;
+    });
 
-    // Only refresh if we don't have recent data (use same cache time as load method)
-    // Don't force refresh if we already have data to avoid buffering
-    if (_lastHistoryLoad == null ||
-        DateTime.now().difference(_lastHistoryLoad!).inSeconds > 30) {
-      // Load in background without showing loading state
-      _loadChatHistory(forceRefresh: false);
-    }
+    // Don't reload chat history when popup opens to preserve current state
+    // The chatSessions list already contains the most recent data
   }
 
-  Widget _buildHistoryBottomSheet() {
+  Widget _buildHistoryBottomSheet([StateSetter? setModalState]) {
     return Container(
-      key: ValueKey('chat_history_${chatSessions.length}_${chatSessions.map((s) => s.id).join('_')}'),
       height: MediaQuery.of(context).size.height * 0.7,
       decoration: BoxDecoration(
         color: isDark ? Colors.grey[900] : Colors.white,
@@ -669,7 +728,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
                 const Spacer(),
                 if (isPremium && chatSessions.isNotEmpty)
                   TextButton.icon(
-                    onPressed: _showDeleteAllDialog,
+                    onPressed: () => _showDeleteAllDialog(setModalState),
                     icon: Icon(
                       Icons.delete_sweep,
                       color: Colors.red[600],
@@ -705,14 +764,14 @@ class _AITrainerScreenState extends State<AITrainerScreen>
             ),
           ),
           Expanded(
-            child: _buildHistoryContent(),
+            child: _buildHistoryContent(setModalState),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildHistoryContent() {
+  Widget _buildHistoryContent([StateSetter? setModalState]) {
     if (!isPremium) {
       return _buildPremiumLockScreen();
     }
@@ -803,21 +862,21 @@ class _AITrainerScreenState extends State<AITrainerScreen>
             ),
           ),
         ),
-        Expanded(
-          child: Stack(
-            children: [
-              ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: chatSessions.length,
-                itemBuilder: (context, index) {
-                  final session = chatSessions[index];
-                  return _buildSessionCard(session);
-                },
-              ),
-              // No refresh indicator - operations happen in background
-            ],
+          Expanded(
+            child: ValueListenableBuilder<List<ChatSession>>(
+              valueListenable: _chatSessionsNotifier,
+              builder: (context, sessions, child) {
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: sessions.length,
+                  itemBuilder: (context, index) {
+                    final session = sessions[index];
+                    return _buildSessionCard(session, setModalState);
+                  },
+                );
+              },
+            ),
           ),
-        ),
       ],
     );
   }
@@ -886,7 +945,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     );
   }
 
-  Widget _buildSessionCard(ChatSession session) {
+  Widget _buildSessionCard(ChatSession session, [StateSetter? setModalState]) {
     final isCurrentSession = currentSessionId == session.id;
 
     return Container(
@@ -957,7 +1016,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
                 color: Colors.red[400],
                 size: 18,
               ),
-              onPressed: () => _showDeleteDialog(session),
+              onPressed: () => _showDeleteDialog(session, setModalState),
               tooltip: 'Delete chat',
             ),
           ],
@@ -1003,7 +1062,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     );
   }
 
-  void _showDeleteDialog(ChatSession session) {
+  void _showDeleteDialog(ChatSession session, [StateSetter? setModalState]) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -1033,7 +1092,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _deleteSession(session);
+                _deleteSession(session, setModalState);
               },
               child: Text(
                 'Delete',
@@ -1046,7 +1105,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     );
   }
 
-  void _showDeleteAllDialog() {
+  void _showDeleteAllDialog([StateSetter? setModalState]) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -1076,7 +1135,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _deleteAllSessions();
+                _deleteAllSessions(setModalState);
               },
               child: Text(
                 'Clear All',
@@ -1089,25 +1148,21 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     );
   }
 
-  Future<void> _deleteSession(ChatSession session) async {
-    // Store original state for potential rollback
-    final originalSessions = List<ChatSession>.from(chatSessions);
-    final originalCurrentSessionId = currentSessionId;
-    
+  void _deleteSession(ChatSession session, [StateSetter? setModalState]) {
     // Optimistic update - remove from UI immediately
-    setState(() {
-      chatSessions.removeWhere((s) => s.id == session.id);
-      isLoadingHistory = false; // Ensure no loading state after deletion
-      if (currentSessionId == session.id) {
-        _startNewChat();
-      }
-    });
-    
-    // Cache the updated sessions
-    _cacheChatSessions();
-
-    // Force refresh the UI to show changes immediately
-    _refreshChatHistoryUI();
+    if (mounted) {
+      // Update ValueNotifier first for instant modal update
+      final updatedSessions = chatSessions.where((s) => s.id != session.id).toList();
+      _chatSessionsNotifier.value = updatedSessions;
+      
+      setState(() {
+        chatSessions = updatedSessions;
+        isLoadingHistory = false;
+        if (currentSessionId == session.id) {
+          _startNewChat();
+        }
+      });
+    }
 
     // Show success message immediately
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1118,54 +1173,30 @@ class _AITrainerScreenState extends State<AITrainerScreen>
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
         ),
-        duration: const Duration(milliseconds: 800),
+        duration: const Duration(milliseconds: 600),
       ),
     );
 
-    // Delete from Firestore in background (non-blocking)
-    _firestore.collection('chat_sessions').doc(session.id).delete().timeout(
-      const Duration(seconds: 3),
-      onTimeout: () {
-        print('Delete operation timed out for session: ${session.id}');
-      },
-    ).then((_) {
-      print('Session deleted from Firestore: ${session.id}');
-    }).catchError((e) {
-      print('Error deleting session from Firestore: $e');
-      // Show error message but don't revert UI (optimistic update)
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Failed to delete from server, but removed locally'),
-            backgroundColor: Colors.orange[600],
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            duration: const Duration(milliseconds: 1500),
-          ),
-        );
-      }
+    // Delete using ChatHistoryManager for consistent cache/Firebase update (fire and forget)
+    _chatHistoryManager.deleteChatSession(session.id).catchError((e) {
+      print('Error deleting session: $e');
     });
   }
 
-  Future<void> _deleteAllSessions() async {
-    // Store original state for potential rollback
-    final originalSessions = List<ChatSession>.from(chatSessions);
-    final originalCurrentSessionId = currentSessionId;
-    
+  void _deleteAllSessions([StateSetter? setModalState]) {
     // Optimistic update - clear UI immediately
-    setState(() {
-      chatSessions.clear();
-      isLoadingHistory = false; // Ensure no loading state after clearing
-      _startNewChat();
-    });
-    
-    // Clear cache and cache the empty state
-    _clearChatSessionsCache();
+    if (mounted) {
+      // Update ValueNotifier first for instant modal update
+      _chatSessionsNotifier.value = [];
+      
+      setState(() {
+        chatSessions.clear();
+        isLoadingHistory = false; // Ensure no loading state after clearing
+        _startNewChat();
+      });
+    }
 
-    // Force refresh the UI to show changes immediately
-    _refreshChatHistoryUI();
+    // ValueNotifier already handles modal updates, no need for setModalState
 
     // Show success message immediately
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1180,55 +1211,11 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       ),
     );
 
-    // Delete from Firestore in background (non-blocking)
-    final user = _auth.currentUser;
-    if (user != null) {
-      _firestore
-          .collection('chat_sessions')
-          .where('userId', isEqualTo: user.uid)
-          .get()
-          .timeout(
-            const Duration(seconds: 5),
-            onTimeout: () {
-              print('Query operation timed out for delete all');
-              return Future.value(); // Return empty future
-            },
-          )
-          .then((querySnapshot) {
-            if (querySnapshot.docs.isNotEmpty) {
-              final batch = _firestore.batch();
-              for (final doc in querySnapshot.docs) {
-                batch.delete(doc.reference);
-              }
-              return batch.commit().timeout(
-                const Duration(seconds: 5),
-                onTimeout: () {
-                  print('Batch delete operation timed out');
-                },
-              );
-            }
-          })
-          .then((_) {
-            print('All sessions deleted from Firestore');
-          })
-          .catchError((e) {
-            print('Error deleting all sessions from Firestore: $e');
-            // Show error message but don't revert UI (optimistic update)
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Failed to clear from server, but cleared locally'),
-                  backgroundColor: Colors.orange[600],
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  duration: const Duration(milliseconds: 1500),
-                ),
-              );
-            }
-          });
-    }
+    // Delete using ChatHistoryManager for consistent cache/Firebase update (fire and forget)
+    _chatHistoryManager.clearChatHistory().catchError((e) {
+      print('Error clearing all sessions: $e');
+      // Don't show error to user since UI already updated optimistically
+    });
   }
 
   @override
@@ -1333,7 +1320,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 10),
                       ),
-                      onSubmitted: (_) => _sendMessage(),
+                      onSubmitted: (_) async => await _sendMessage(),
                     ),
                   ),
                   const SizedBox(width: 6),
