@@ -209,13 +209,14 @@ class UnifiedGoogleFitManager {
       final futures = await Future.wait([
         _googleFitService.getDailySteps(today),
         _googleFitService.getDailyCaloriesBurned(today),
+        _googleFitService.getWorkoutSessions(today),
       ], eagerError: false);
 
       return GoogleFitData(
         date: today,
         steps: futures[0] as int?,
         caloriesBurned: futures[1] as double?,
-        workoutSessions: 0, // Will be updated by workout detection
+        workoutSessions: futures[2] as int? ?? 0,
         workoutDuration: 0.0,
       );
     } catch (e) {

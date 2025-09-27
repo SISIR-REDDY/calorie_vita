@@ -380,8 +380,8 @@ class GoogleFitService {
     }
   }
 
-  /// Get daily distance traveled for a specific date
-  Future<double?> getDailyDistance(DateTime date) async {
+  /// Get workout sessions for a specific date
+  Future<int?> getWorkoutSessions(DateTime date) async {
     if (!_isAuthenticated ||
         _authClient == null ||
         _googleSignIn?.currentUser == null) {
@@ -404,9 +404,9 @@ class GoogleFitService {
       final requestBody = {
         'aggregateBy': [
           {
-            'dataTypeName': 'com.google.distance.delta',
+            'dataTypeName': 'com.google.activity.segment',
             'dataSourceId':
-                'derived:com.google.distance.delta:com.google.android.gms:merge_distance_delta'
+                'derived:com.google.activity.segment:com.google.android.gms:merge_activity_segments'
           }
         ],
         'bucketByTime': {'durationMillis': 86400000}, // 24 hours
@@ -435,86 +435,39 @@ class GoogleFitService {
           if (dataset.isNotEmpty) {
             final dataPoint = dataset.first['point'] as List;
             if (dataPoint.isNotEmpty) {
-              final value = dataPoint.first['value'] as List;
-              if (value.isNotEmpty) {
-                // Convert from meters to kilometers
-                final meters =
-                    (value.first['fpVal'] as num?)?.toDouble() ?? 0.0;
-                return meters / 1000.0;
+              // Count workout sessions (activities other than still, sleeping, etc.)
+              int workoutCount = 0;
+              for (final point in dataPoint) {
+                final values = point['value'] as List?;
+                if (values != null && values.isNotEmpty) {
+                  final value = values.first;
+                  final activityType = value['intVal'] as int?;
+                  
+                  // Activity types that count as workouts
+                  if (activityType != null && 
+                      activityType != 0 && // still
+                      activityType != 72 && // sleeping
+                      activityType != 109) { // unknown
+                    workoutCount++;
+                  }
+                }
               }
+              return workoutCount;
             }
           }
         }
       } else {
         _logger.e(
-            'Failed to get distance data: ${response.statusCode} - ${response.body}');
+            'Failed to get workout sessions data: ${response.statusCode} - ${response.body}');
       }
 
       return null;
     } catch (e) {
-      _handleNetworkError('Getting daily distance', e);
+      _handleNetworkError('Getting workout sessions', e);
       return null;
     }
   }
 
-  /// Get current weight from Google Fit
-  Future<double?> getCurrentWeight() async {
-    if (!_isAuthenticated || _authClient == null) {
-      _logger.w('Not authenticated with Google Fit');
-      return null;
-    }
-
-    try {
-      const url = '$_baseUrl/users/me/dataSources';
-      // Validate client before making request
-      if (_authClient == null) {
-        _logger.w('HTTP client is null, cannot make request');
-        return null;
-      }
-
-      final response = await _authClient!.get(Uri.parse(url)).timeout(const Duration(seconds: 30));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final dataSources = data['dataSource'] as List?;
-
-        if (dataSources != null) {
-          // Find weight data source
-          for (final source in dataSources) {
-            if (source['dataType']['name'] == 'com.google.weight') {
-              final sourceId = source['dataStreamId'] as String;
-
-              // Get latest weight data
-              final weightUrl =
-                  '$_baseUrl/users/me/dataSources/$sourceId/datasets/latest';
-              final weightResponse =
-                  await _authClient!.get(Uri.parse(weightUrl));
-
-              if (weightResponse.statusCode == 200) {
-                final weightData = jsonDecode(weightResponse.body);
-                final points = weightData['point'] as List?;
-
-                if (points != null && points.isNotEmpty) {
-                  final latestPoint = points.last;
-                  final value = latestPoint['value'] as List;
-                  if (value.isNotEmpty) {
-                    // Convert from kilograms to the user's preferred unit
-                    return (value.first['fpVal'] as num?)?.toDouble();
-                  }
-                }
-              }
-              break;
-            }
-          }
-        }
-      }
-
-      return null;
-    } catch (e) {
-      _logger.e('Error getting current weight: $e');
-      return null;
-    }
-  }
 
   /// Get fitness data for a date range
   Future<Map<String, dynamic>?> getFitnessData(
@@ -527,12 +480,12 @@ class GoogleFitService {
     try {
       final steps = await getDailySteps(startDate);
       final calories = await getDailyCaloriesBurned(startDate);
-      final distance = await getDailyDistance(startDate);
+      final workoutSessions = await getWorkoutSessions(startDate);
 
       return {
         'steps': steps,
         'caloriesBurned': calories,
-        'distance': distance,
+        'workoutSessions': workoutSessions,
         'date': startDate.toIso8601String().split('T')[0],
       };
     } catch (e) {
@@ -700,20 +653,20 @@ class GoogleFitService {
       final futures = await Future.wait([
         getDailySteps(today),
         getDailyCaloriesBurned(today),
-        getDailyDistance(today),
+        getWorkoutSessions(today),
       ]).timeout(
           const Duration(seconds: 8)); // Increased timeout for reliability
 
       final steps = futures[0] as int? ?? 0;
       final calories = futures[1] as double? ?? 0.0;
-      final distance = futures[2] as double? ?? 0.0;
+      final workoutSessions = futures[2] as int? ?? 0;
 
       // Create live data package
       final liveData = {
         'timestamp': DateTime.now().toIso8601String(),
         'steps': steps,
         'caloriesBurned': calories,
-        'distance': distance,
+        'workoutSessions': workoutSessions,
         'activityLevel': _calculateActivityLevel(steps),
         'isLive': true,
         'cached': false, // Mark as fresh data
@@ -777,12 +730,8 @@ class GoogleFitService {
           _logger.w('Calories fetch failed: $e');
           return null;
         }),
-        getDailyDistance(today).catchError((e) {
-          _logger.w('Distance fetch failed: $e');
-          return null;
-        }),
-        getCurrentWeight().catchError((e) {
-          _logger.w('Weight fetch failed: $e');
+        getWorkoutSessions(today).catchError((e) {
+          _logger.w('Workout sessions fetch failed: $e');
           return null;
         }),
       ], eagerError: false);
@@ -791,8 +740,7 @@ class GoogleFitService {
         'timestamp': today.toIso8601String(),
         'steps': results[0] as int?,
         'caloriesBurned': results[1] as double?,
-        'distance': results[2] as double?,
-        'weight': results[3] as double?,
+        'workoutSessions': results[2] as int?,
         'activityLevel': _calculateActivityLevel(results[0] as int?),
       };
     } catch (e) {

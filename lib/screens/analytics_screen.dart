@@ -664,17 +664,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               .getDailyCaloriesBurned(today)
               .timeout(const Duration(seconds: 3), onTimeout: () => 0.0),
           _googleFitService
-              .getDailyDistance(today)
-              .timeout(const Duration(seconds: 3), onTimeout: () => 0.0),
-          _googleFitService
-              .getCurrentWeight()
-              .timeout(const Duration(seconds: 3), onTimeout: () => null),
+              .getWorkoutSessions(today)
+              .timeout(const Duration(seconds: 3), onTimeout: () => 0),
         ]);
         todayData = GoogleFitData(
           date: today,
           steps: futures[0] as int? ?? 0,
           caloriesBurned: futures[1] as double? ?? 0.0,
-          workoutSessions: 0, // Will be updated by workout detection
+          workoutSessions: futures[2] as int? ?? 0,
           workoutDuration: 0.0,
         );
       }
@@ -743,21 +740,23 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       final futures = await Future.wait([
         _googleFitService.getDailySteps(date),
         _googleFitService.getDailyCaloriesBurned(date),
+        _googleFitService.getWorkoutSessions(date),
       ]);
 
       final steps = futures[0] as int? ?? 0;
       final calories = futures[1] as double? ?? 0.0;
+      final workoutSessions = futures[2] as int? ?? 0;
 
       weeklyData.add(GoogleFitData(
         date: date,
         steps: steps,
         caloriesBurned: calories,
-        workoutSessions: 0, // Will be updated by workout detection
+        workoutSessions: workoutSessions,
         workoutDuration: 0.0,
       ));
       
       if (forceRefresh) {
-        print('🔄 Analytics: Refreshed data for ${date.toIso8601String().split('T')[0]} - Steps: $steps, Calories: $calories');
+        print('🔄 Analytics: Refreshed data for ${date.toIso8601String().split('T')[0]} - Steps: $steps, Calories: $calories, Workouts: $workoutSessions');
       }
     } catch (e) {
       // Add empty data if loading fails
