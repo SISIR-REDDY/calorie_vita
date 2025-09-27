@@ -1149,6 +1149,9 @@ class _AITrainerScreenState extends State<AITrainerScreen>
   }
 
   void _deleteSession(ChatSession session, [StateSetter? setModalState]) {
+    // Check if this is the current session before deleting
+    final isCurrentSession = currentSessionId == session.id;
+    
     // Optimistic update - remove from UI immediately
     if (mounted) {
       // Update ValueNotifier first for instant modal update
@@ -1158,8 +1161,17 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       setState(() {
         chatSessions = updatedSessions;
         isLoadingHistory = false;
-        if (currentSessionId == session.id) {
-          _startNewChat();
+        
+        // If this was the current session, reset to new chat state immediately
+        if (isCurrentSession) {
+          messages = [
+            Message(
+                sender: 'Sisir',
+              text:
+                  'Hey there! I\'m Trainer Sisir, your personal fitness and nutrition coach. I\'m here to help you reach your health goals with personalized advice and support. What would you like to work on today? 💪',
+              timestamp: DateTime.now()),
+          ];
+          currentSessionId = null;
         }
       });
     }
