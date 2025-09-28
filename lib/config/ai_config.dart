@@ -3,18 +3,16 @@ class AIConfig {
 
   static const String baseUrl = 'https://openrouter.ai/api/v1/chat/completions';
 
-  static const String chatModel = 'openai/gpt-3.5-turbo';
-  static const String visionModel =
-      'openai/gpt-4o'; // Reliable vision model for image analysis
-  static const String backupVisionModel =
-      'anthropic/claude-3-5-sonnet'; // Backup option
+  static const String chatModel = 'xai/grok-beta';
+  static const String visionModel = 'google/gemini-2.0-flash-exp'; // Fast and accurate vision model for food recognition
+  static const String backupVisionModel = 'google/gemini-1.5-flash'; // Fast backup option
 
   static const int maxTokens = 100;
   static const int chatMaxTokens = 100;
   static const int analyticsMaxTokens = 100;
-  static const int visionMaxTokens = 200;
+  static const int visionMaxTokens = 300; // Increased for more detailed food analysis
   static const double temperature = 0.7;
-  static const double visionTemperature = 0.3;
+  static const double visionTemperature = 0.1; // Lower for more consistent food recognition
 
   /// App identification for OpenRouter
   static const String appName = 'Calorie Vita';

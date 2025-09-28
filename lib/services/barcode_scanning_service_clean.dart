@@ -238,7 +238,7 @@ class BarcodeScanningService {
     }
   }
 
-  /// Search for packaged food in local dataset with accurate calorie calculation
+  /// Search for packaged food in local dataset
   static NutritionInfo? _searchLocalPackagedFood(String barcode) {
     if (_indianPackaged == null) return null;
     
@@ -246,19 +246,12 @@ class BarcodeScanningService {
       if (product['barcode'] == barcode) {
         final caloriesPer100g = (product['calories_per_100g'] as num).toDouble();
         final servingSizeGrams = (product['serving_size_grams'] as num).toDouble();
-        
-        // Calculate total calories for the entire product
-        final totalCalories = (caloriesPer100g * servingSizeGrams) / 100;
-        
-        print('📦 Local product: ${product['name']}');
-        print('📏 Serving size: ${servingSizeGrams}g');
-        print('🔥 Calories per 100g: ${caloriesPer100g}');
-        print('🔥 Total calories: ${totalCalories.toStringAsFixed(0)} kcal');
+        final servingCalories = (caloriesPer100g * servingSizeGrams) / 100;
         
         return NutritionInfo(
           foodName: product['name'] as String,
           weightGrams: servingSizeGrams,
-          calories: totalCalories,
+          calories: servingCalories,
           protein: (product['protein_per_100g'] as num).toDouble() * servingSizeGrams / 100,
           carbs: (product['carbs_per_100g'] as num).toDouble() * servingSizeGrams / 100,
           fat: (product['fat_per_100g'] as num).toDouble() * servingSizeGrams / 100,
@@ -267,7 +260,7 @@ class BarcodeScanningService {
           source: 'Local Indian Dataset',
           category: product['category'] as String,
           brand: product['brand'] as String,
-          notes: 'Indian product - ${servingSizeGrams}g serving (${totalCalories.toStringAsFixed(0)} kcal total)',
+          notes: 'Indian product from local database',
         );
       }
     }
@@ -311,7 +304,7 @@ class BarcodeScanningService {
     return null;
   }
 
-  /// Parse Open Food Facts product data with accurate calorie calculation
+  /// Parse Open Food Facts product data
   static NutritionInfo _parseOpenFoodFactsProduct(Map<String, dynamic> product) {
     final productName = product['product_name'] as String? ?? 
                        product['product_name_en'] as String? ?? 
@@ -324,82 +317,45 @@ class BarcodeScanningService {
     // Extract nutrition data
     final nutriments = product['nutriments'] as Map<String, dynamic>? ?? {};
     
-    // Try to get total calories first (for the whole product)
-    double totalCalories = _parseNutrient(nutriments, 'energy-kcal') ?? 
-                          _parseNutrient(nutriments, 'energy') ?? 0.0;
+    final caloriesPer100g = _parseNutrient(nutriments, 'energy-kcal_100g') ?? 
+                           _parseNutrient(nutriments, 'energy_100g') ?? 0.0;
     
-    // If no total calories, try per 100g and calculate
-    double caloriesPer100g = _parseNutrient(nutriments, 'energy-kcal_100g') ?? 
-                            _parseNutrient(nutriments, 'energy_100g') ?? 0.0;
-    
-    // Get other nutrients per 100g
     final proteinPer100g = _parseNutrient(nutriments, 'proteins_100g') ?? 0.0;
     final carbsPer100g = _parseNutrient(nutriments, 'carbohydrates_100g') ?? 0.0;
     final fatPer100g = _parseNutrient(nutriments, 'fat_100g') ?? 0.0;
     final fiberPer100g = _parseNutrient(nutriments, 'fiber_100g') ?? 0.0;
     final sugarPer100g = _parseNutrient(nutriments, 'sugars_100g') ?? 0.0;
     
-    // Determine actual product size with enhanced detection
-    final productSize = _determineProductSize(product, quantity);
-    final actualWeight = productSize['weight'];
-    final actualVolume = productSize['volume'];
-    final isLiquid = productSize['isLiquid'];
-    final sizeInfo = productSize['display'];
-    
-    print('📏 Product size detected: $sizeInfo (Weight: ${actualWeight}g, Volume: ${actualVolume}ml)');
-    
-    // Calculate total calories for the entire product
-    double finalCalories;
-    if (totalCalories > 0) {
-      // Use total calories if available
-      finalCalories = totalCalories;
-      print('✅ Using total calories: $finalCalories kcal');
-    } else if (caloriesPer100g > 0) {
-      // Calculate from per 100g data
-      if (isLiquid) {
-        // For liquids, use volume if available, otherwise weight
-        final baseAmount = actualVolume > 0 ? actualVolume : actualWeight;
-        finalCalories = (caloriesPer100g * baseAmount) / 100;
-        print('🥤 Liquid calculation: ${caloriesPer100g} kcal/100ml × ${baseAmount}ml = $finalCalories kcal');
-      } else {
-        // For solids, use weight
-        finalCalories = (caloriesPer100g * actualWeight) / 100;
-        print('🍎 Solid calculation: ${caloriesPer100g} kcal/100g × ${actualWeight}g = $finalCalories kcal');
+    // Try to determine serving size
+    double servingSize = 100.0; // Default to 100g
+    if (quantity != null && quantity.isNotEmpty) {
+      final weightAndUnits = _extractWeightAndUnits(quantity);
+      if (weightAndUnits['weight'] > 0) {
+        servingSize = weightAndUnits['weight'];
       }
-    } else {
-      finalCalories = 0.0;
-      print('❌ No calorie data available');
     }
     
-    // Calculate other nutrients for the entire product
-    final baseAmount = isLiquid && actualVolume > 0 ? actualVolume : actualWeight;
-    final servingProtein = (proteinPer100g * baseAmount) / 100;
-    final servingCarbs = (carbsPer100g * baseAmount) / 100;
-    final servingFat = (fatPer100g * baseAmount) / 100;
-    final servingFiber = (fiberPer100g * baseAmount) / 100;
-    final servingSugar = (sugarPer100g * baseAmount) / 100;
+    // Calculate nutrition for the serving size
+    final servingCalories = (caloriesPer100g * servingSize) / 100;
+    final servingProtein = (proteinPer100g * servingSize) / 100;
+    final servingCarbs = (carbsPer100g * servingSize) / 100;
+    final servingFat = (fatPer100g * servingSize) / 100;
+    final servingFiber = (fiberPer100g * servingSize) / 100;
+    final servingSugar = (sugarPer100g * servingSize) / 100;
     
-    // Create display name with size information
+    // Create display name
     String displayName = productName;
     if (brand != null && brand.isNotEmpty && !displayName.toLowerCase().contains(brand.toLowerCase())) {
       displayName = '$brand $displayName';
     }
-    if (sizeInfo.isNotEmpty) {
-      displayName = '$displayName ($sizeInfo)';
-    }
-    
-    // Create detailed notes
-    String notes = 'Size: $sizeInfo';
-    if (totalCalories > 0) {
-      notes += ' | Total calories: ${finalCalories.toStringAsFixed(0)} kcal';
-    } else {
-      notes += ' | Calculated from ${caloriesPer100g.toStringAsFixed(0)} kcal/100${isLiquid ? 'ml' : 'g'}';
+    if (quantity != null && quantity.isNotEmpty) {
+      displayName = '$displayName ($quantity)';
     }
     
     return NutritionInfo(
       foodName: displayName,
-      weightGrams: actualWeight,
-      calories: finalCalories,
+      weightGrams: servingSize,
+      calories: servingCalories,
       protein: servingProtein,
       carbs: servingCarbs,
       fat: servingFat,
@@ -408,7 +364,7 @@ class BarcodeScanningService {
       source: 'Open Food Facts',
       category: categories?.split(',').first.trim() ?? 'Unknown',
       brand: brand,
-      notes: notes,
+      notes: quantity != null ? 'Size: $quantity' : null,
     );
   }
 
@@ -616,279 +572,8 @@ Be accurate and realistic while focusing on fitness nutrition.''',
     return 0.0;
   }
 
-  /// Determine product size with enhanced detection for accurate calorie calculation
-  static Map<String, dynamic> _determineProductSize(Map<String, dynamic> product, String? quantity) {
-    // Check multiple sources for size information
-    final quantityInfo = quantity ?? '';
-    final productName = (product['product_name'] as String? ?? '').toLowerCase();
-    final categories = (product['categories'] as String? ?? '').toLowerCase();
-    final nutriments = product['nutriments'] as Map<String, dynamic>? ?? {};
-    
-    // Check for liquid indicators
-    final isLiquid = _isLiquidProduct(productName, categories, quantityInfo);
-    
-    // Try to get size from various sources
-    double weight = 0.0;
-    double volume = 0.0;
-    String display = '';
-    
-    // 1. Check quantity field first
-    if (quantityInfo.isNotEmpty) {
-      final extracted = _extractWeightAndUnits(quantityInfo);
-      weight = extracted['weight'];
-      volume = extracted['volume'];
-      display = extracted['display'];
-      
-      if (isLiquid && volume > 0) {
-        print('📏 Size from quantity: $display (Volume: ${volume}ml)');
-        return {
-          'weight': weight,
-          'volume': volume,
-          'isLiquid': isLiquid,
-          'display': display,
-        };
-      } else if (!isLiquid && weight > 0) {
-        print('📏 Size from quantity: $display (Weight: ${weight}g)');
-        return {
-          'weight': weight,
-          'volume': volume,
-          'isLiquid': isLiquid,
-          'display': display,
-        };
-      }
-    }
-    
-    // 2. Check product name for size information
-    final nameSize = _extractSizeFromText(productName);
-    if (nameSize['weight'] > 0 || nameSize['volume'] > 0) {
-      weight = nameSize['weight'];
-      volume = nameSize['volume'];
-      display = nameSize['display'];
-      
-      if (isLiquid && volume > 0) {
-        print('📏 Size from product name: $display (Volume: ${volume}ml)');
-        return {
-          'weight': weight,
-          'volume': volume,
-          'isLiquid': isLiquid,
-          'display': display,
-        };
-      } else if (!isLiquid && weight > 0) {
-        print('📏 Size from product name: $display (Weight: ${weight}g)');
-        return {
-          'weight': weight,
-          'volume': volume,
-          'isLiquid': isLiquid,
-          'display': display,
-        };
-      }
-    }
-    
-    // 3. Check nutriments for serving size information
-    final servingSize = _parseNutrient(nutriments, 'serving_size') ?? 0.0;
-    if (servingSize > 0) {
-      if (isLiquid) {
-        volume = servingSize;
-        display = '${servingSize.toStringAsFixed(0)}ml';
-        print('📏 Size from nutriments: $display (Volume: ${volume}ml)');
-      } else {
-        weight = servingSize;
-        display = '${servingSize.toStringAsFixed(0)}g';
-        print('📏 Size from nutriments: $display (Weight: ${weight}g)');
-      }
-      
-      return {
-        'weight': weight,
-        'volume': volume,
-        'isLiquid': isLiquid,
-        'display': display,
-      };
-    }
-    
-    // 4. Default fallback based on product type
-    if (isLiquid) {
-      volume = 500.0; // Default 500ml for liquids
-      weight = 500.0; // Assume 1ml = 1g for liquids
-      display = '500ml';
-      print('📏 Default liquid size: $display');
-    } else {
-      weight = 100.0; // Default 100g for solids
-      volume = 0.0;
-      display = '100g';
-      print('📏 Default solid size: $display');
-    }
-    
-    return {
-      'weight': weight,
-      'volume': volume,
-      'isLiquid': isLiquid,
-      'display': display,
-    };
-  }
-
-  /// Check if product is liquid based on name, categories, and quantity
-  static bool _isLiquidProduct(String productName, String categories, String quantity) {
-    final liquidKeywords = [
-      'drink', 'beverage', 'juice', 'soda', 'water', 'milk', 'tea', 'coffee',
-      'beer', 'wine', 'spirit', 'liquor', 'syrup', 'sauce', 'oil', 'vinegar',
-      'ml', 'liter', 'litre', 'pint', 'quart', 'gallon', 'fluid'
-    ];
-    
-    final liquidCategories = [
-      'beverages', 'drinks', 'juices', 'alcoholic-beverages', 'waters',
-      'oils', 'vinegars', 'sauces', 'syrups'
-    ];
-    
-    final textToCheck = '$productName $categories $quantity'.toLowerCase();
-    
-    // Check for liquid keywords
-    for (final keyword in liquidKeywords) {
-      if (textToCheck.contains(keyword)) {
-        return true;
-      }
-    }
-    
-    // Check for liquid categories
-    for (final category in liquidCategories) {
-      if (textToCheck.contains(category)) {
-        return true;
-      }
-    }
-    
-    // Check for volume units in quantity
-    if (quantity.isNotEmpty) {
-      final volumeUnits = ['ml', 'l', 'liter', 'litre', 'pint', 'quart', 'gallon', 'fl oz'];
-      for (final unit in volumeUnits) {
-        if (quantity.toLowerCase().contains(unit)) {
-          return true;
-        }
-      }
-    }
-    
-    return false;
-  }
-
-  /// Extract size information from text with enhanced patterns
-  static Map<String, dynamic> _extractSizeFromText(String text) {
-    // Enhanced patterns for better size detection
-    final patterns = [
-      // Weight patterns
-      RegExp(r'(\d+(?:\.\d+)?)\s*(g|gram|grams)'),
-      RegExp(r'(\d+(?:\.\d+)?)\s*(kg|kilogram|kilograms)'),
-      RegExp(r'(\d+(?:\.\d+)?)\s*(oz|ounce|ounces)'),
-      RegExp(r'(\d+(?:\.\d+)?)\s*(lb|pound|pounds)'),
-      
-      // Volume patterns
-      RegExp(r'(\d+(?:\.\d+)?)\s*(ml|milliliter|milliliters)'),
-      RegExp(r'(\d+(?:\.\d+)?)\s*(l|liter|litre|liters|litres)'),
-      RegExp(r'(\d+(?:\.\d+)?)\s*(fl\s*oz|fluid\s*ounce|fluid\s*ounces)'),
-      RegExp(r'(\d+(?:\.\d+)?)\s*(pint|pints)'),
-      RegExp(r'(\d+(?:\.\d+)?)\s*(quart|quarts)'),
-      RegExp(r'(\d+(?:\.\d+)?)\s*(gallon|gallons)'),
-    ];
-    
-    for (final pattern in patterns) {
-      final match = pattern.firstMatch(text.toLowerCase());
-      if (match != null) {
-        final amount = double.tryParse(match.group(1)!) ?? 0.0;
-        final unit = match.group(2)!.toLowerCase();
-        
-        double weight = 0.0;
-        double volume = 0.0;
-        String display = '';
-        
-        // Convert to standard units
-        switch (unit) {
-          case 'g':
-          case 'gram':
-          case 'grams':
-            weight = amount;
-            display = '${amount.toStringAsFixed(0)}g';
-            break;
-          case 'kg':
-          case 'kilogram':
-          case 'kilograms':
-            weight = amount * 1000;
-            display = '${amount.toStringAsFixed(1)}kg';
-            break;
-          case 'oz':
-          case 'ounce':
-          case 'ounces':
-            weight = amount * 28.35;
-            display = '${amount.toStringAsFixed(0)}oz';
-            break;
-          case 'lb':
-          case 'pound':
-          case 'pounds':
-            weight = amount * 453.59;
-            display = '${amount.toStringAsFixed(1)}lb';
-            break;
-          case 'ml':
-          case 'milliliter':
-          case 'milliliters':
-            volume = amount;
-            weight = amount; // Assume 1ml = 1g for liquids
-            display = '${amount.toStringAsFixed(0)}ml';
-            break;
-          case 'l':
-          case 'liter':
-          case 'litre':
-          case 'liters':
-          case 'litres':
-            volume = amount * 1000;
-            weight = amount * 1000;
-            display = '${amount.toStringAsFixed(1)}L';
-            break;
-          case 'fl oz':
-          case 'fluid ounce':
-          case 'fluid ounces':
-            volume = amount * 29.57;
-            weight = amount * 29.57;
-            display = '${amount.toStringAsFixed(0)}fl oz';
-            break;
-          case 'pint':
-          case 'pints':
-            volume = amount * 473.18;
-            weight = amount * 473.18;
-            display = '${amount.toStringAsFixed(0)}pt';
-            break;
-          case 'quart':
-          case 'quarts':
-            volume = amount * 946.35;
-            weight = amount * 946.35;
-            display = '${amount.toStringAsFixed(0)}qt';
-            break;
-          case 'gallon':
-          case 'gallons':
-            volume = amount * 3785.41;
-            weight = amount * 3785.41;
-            display = '${amount.toStringAsFixed(1)}gal';
-            break;
-        }
-        
-        return {
-          'weight': weight,
-          'volume': volume,
-          'display': display,
-        };
-      }
-    }
-    
-    return {
-      'weight': 0.0,
-      'volume': 0.0,
-      'display': '',
-    };
-  }
-
-  /// Extract weight and units from string (enhanced version)
+  /// Extract weight and units from string
   static Map<String, dynamic> _extractWeightAndUnits(String text) {
-    final extracted = _extractSizeFromText(text);
-    if (extracted['weight'] > 0 || extracted['volume'] > 0) {
-      return extracted;
-    }
-    
-    // Fallback to simple pattern
     final weightPattern = RegExp(r'(\d+(?:\.\d+)?)\s*(g|kg|ml|l|oz|lb)');
     final match = weightPattern.firstMatch(text.toLowerCase());
     
@@ -897,25 +582,14 @@ Be accurate and realistic while focusing on fitness nutrition.''',
       final unit = match.group(2)!;
       
       double weightInGrams = weight;
-      double volumeInMl = 0.0;
-      
-      if (unit == 'kg') {
-        weightInGrams = weight * 1000;
-      } else if (unit == 'ml') {
-        weightInGrams = weight;
-        volumeInMl = weight;
-      } else if (unit == 'l') {
-        weightInGrams = weight * 1000;
-        volumeInMl = weight * 1000;
-      } else if (unit == 'oz') {
-        weightInGrams = weight * 28.35;
-      } else if (unit == 'lb') {
-        weightInGrams = weight * 453.59;
-      }
+      if (unit == 'kg') weightInGrams = weight * 1000;
+      else if (unit == 'ml') weightInGrams = weight; // Assume 1ml = 1g for liquids
+      else if (unit == 'l') weightInGrams = weight * 1000;
+      else if (unit == 'oz') weightInGrams = weight * 28.35;
+      else if (unit == 'lb') weightInGrams = weight * 453.59;
       
       return {
         'weight': weightInGrams,
-        'volume': volumeInMl,
         'unit': unit,
         'display': '$weight $unit',
       };
@@ -923,7 +597,6 @@ Be accurate and realistic while focusing on fitness nutrition.''',
     
     return {
       'weight': 100.0,
-      'volume': 0.0,
       'unit': 'g',
       'display': '100g',
     };

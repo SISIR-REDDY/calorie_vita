@@ -79,30 +79,44 @@ class AISuggestionsService {
   static Future<List<HealthSuggestion>> _generateHealthSuggestions(Map<String, dynamic> context) async {
     try {
       final prompt = '''
-You are a nutrition and health expert. Analyze the scanned food and provide health-focused suggestions.
+You are a certified fitness nutritionist and sports dietitian. Analyze the scanned food and provide fitness-focused suggestions.
 
 FOOD ANALYSIS:
 Total Calories: ${context['total_calories']} kcal
 Ingredients: ${context['ingredients']}
-User Goals: ${context['user_goals'] ?? 'General health'}
+User Goals: ${context['user_goals'] ?? 'General fitness'}
 Dietary Restrictions: ${context['dietary_restrictions'] ?? 'None'}
 
-Provide 3-5 health suggestions focusing on:
-1. Health benefits of the food
-2. Potential health concerns
-3. Nutrient balance
-4. Portion control advice
-5. Meal timing recommendations
+Provide 3-5 fitness/nutrition suggestions focusing on:
+1. Fitness benefits for muscle building/performance
+2. Macronutrient balance for fitness goals
+3. Pre/post workout suitability
+4. Portion control for fitness objectives
+5. Recovery and performance optimization
+
+ALLOWED TOPICS ONLY:
+• Fitness and exercise performance
+• Nutrition for muscle building/fat loss
+• Pre/post workout nutrition timing
+• Macronutrient optimization
+• Recovery and hydration
+• Supplement recommendations
+
+PROFESSIONAL BOUNDARIES:
+- Focus ONLY on fitness, nutrition, and wellness
+- Do NOT provide medical advice or diagnosis
+- Redirect health concerns to healthcare providers
 
 Return JSON format:
 {
   "suggestions": [
     {
-      "type": "benefit|concern|advice|warning",
-      "title": "Short title",
-      "description": "Detailed explanation",
+      "type": "fitness_benefit|nutrition_concern|workout_advice|performance_tip",
+      "title": "Short fitness-focused title",
+      "description": "Detailed fitness/nutrition explanation",
       "priority": "high|medium|low",
-      "icon": "emoji_or_description"
+      "icon": "emoji_or_description",
+      "fitness_category": "muscle_building|fat_loss|performance|recovery"
     }
   ]
 }
@@ -128,29 +142,43 @@ Return JSON format:
   static Future<List<NutritionAdvice>> _generateNutritionAdvice(Map<String, dynamic> context) async {
     try {
       final prompt = '''
-You are a nutrition expert. Analyze the scanned food ingredients and provide detailed nutrition advice.
+You are a certified sports nutritionist and fitness expert. Analyze the scanned food ingredients and provide detailed fitness-focused nutrition advice.
 
 FOOD ANALYSIS:
 Ingredients: ${context['ingredients']}
 Total Calories: ${context['total_calories']} kcal
-User Profile: ${context['user_profile'] ?? 'General'}
+User Profile: ${context['user_profile'] ?? 'General fitness'}
 
-Provide nutrition advice focusing on:
-1. Macronutrient balance (protein, carbs, fats)
-2. Micronutrient content
-3. Fiber and vitamin content
-4. Nutritional gaps
-5. Supplement recommendations if needed
+Provide fitness/nutrition advice focusing on:
+1. Macronutrient balance for fitness goals (protein, carbs, fats)
+2. Pre/post workout nutrition suitability
+3. Muscle building and recovery nutrients
+4. Performance optimization nutrients
+5. Fitness supplement timing and recommendations
+
+ALLOWED TOPICS ONLY:
+• Fitness and athletic performance nutrition
+• Macronutrient ratios for muscle building/fat loss
+• Pre/post workout meal timing
+• Recovery and muscle repair nutrients
+• Hydration for performance
+• Supplement optimization for fitness
+
+PROFESSIONAL BOUNDARIES:
+- Focus ONLY on fitness, nutrition, and wellness
+- Do NOT provide medical advice or diagnosis
+- Redirect health concerns to healthcare providers
 
 Return JSON format:
 {
   "advice": [
     {
-      "category": "macronutrients|micronutrients|fiber|vitamins|minerals",
-      "title": "Advice title",
-      "description": "Detailed nutrition information",
+      "category": "fitness_macronutrients|performance_nutrients|recovery_nutrients|pre_workout|post_workout",
+      "title": "Fitness-focused advice title",
+      "description": "Detailed fitness nutrition information",
       "importance": "high|medium|low",
-      "suggestion": "Specific recommendation"
+      "suggestion": "Specific fitness/nutrition recommendation",
+      "fitness_benefit": "muscle_building|fat_loss|performance|recovery"
     }
   ]
 }

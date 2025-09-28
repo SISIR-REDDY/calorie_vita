@@ -148,14 +148,16 @@ class SnapToCalorieService {
       final base64Image = base64Encode(imageBytes);
 
       final prompt = '''
-You are a food recognition expert. Analyze this image and identify EVERY SINGLE VISIBLE INGREDIENT AND FOOD COMPONENT separately.
+You are a food recognition expert. Quickly identify ALL visible food items and ingredients in this image.
 
-Return ONLY valid JSON in this exact format:
+Focus on Indian cuisine and common foods. Be precise and fast.
+
+Return ONLY valid JSON:
 {
   "items": [
     {
       "id": "unique_id",
-      "name": "specific_ingredient_name",
+      "name": "specific_food_name",
       "alternatives": [{"name": "alternative_name", "confidence": 0.8}],
       "segmentation_mask_provided": false,
       "ingredient_type": "main|sauce|garnish|accompaniment",
@@ -172,7 +174,7 @@ Return ONLY valid JSON in this exact format:
         final result = jsonDecode(response);
         return (result['items'] as List<dynamic>).cast<Map<String, dynamic>>();
       } catch (e) {
-        print('❌ Failed to parse AI response: $e');
+        print('❌ Failed to parse OpenRouter response: $e');
         return null;
       }
 
@@ -216,7 +218,7 @@ Return ONLY valid JSON in this exact format:
         Uri.parse(_baseUrl),
         headers: headers,
         body: jsonEncode(body),
-      ).timeout(AIConfig.requestTimeout);
+      ).timeout(const Duration(seconds: 15)); // Faster timeout for vision calls
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
