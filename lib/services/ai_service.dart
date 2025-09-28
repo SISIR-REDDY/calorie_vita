@@ -721,6 +721,19 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
     bool isChatRequest = false,
     bool isAnalyticsRequest = false,
   }) async {
+    // Validate API key
+    if (_apiKey.isEmpty) {
+      throw Exception('OpenRouter API key not configured');
+    }
+
+    // Validate inputs
+    if (model.isEmpty) {
+      throw Exception('Model name cannot be empty');
+    }
+    if (messages.isEmpty) {
+      throw Exception('Messages cannot be empty');
+    }
+
     // Determine appropriate token limit and temperature
     int maxTokens;
     double temperature;

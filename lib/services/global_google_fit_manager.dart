@@ -136,19 +136,21 @@ class GlobalGoogleFitManager {
         '🔍 GlobalGoogleFitManager: Connection check started (${_connectionCheckInterval.inMinutes}m intervals)');
   }
 
-  /// Check Google Fit connection status
+  /// Check Google Fit connection status with enhanced validation
   Future<void> _checkConnection() async {
     try {
       final wasConnected = _isConnected;
       
-      // Check connection using the Google Fit service
+      // Use enhanced validation with retry mechanism
       _isConnected = await _googleFitService
-          .validateAuthentication()
-          .timeout(const Duration(seconds: 5));
+          .validateAuthenticationWithRetry(maxRetries: 2)
+          .timeout(const Duration(seconds: 10));
 
       // If connection state changed
       if (wasConnected != _isConnected) {
-        _connectionStateController.add(_isConnected);
+        if (!_connectionStateController.isClosed) {
+          _connectionStateController.add(_isConnected);
+        }
 
         if (_isConnected) {
           print('✅ GlobalGoogleFitManager: Connection restored');
@@ -157,14 +159,28 @@ class GlobalGoogleFitManager {
         } else {
           print('⚠️ GlobalGoogleFitManager: Connection lost');
           _autoSyncTimer?.cancel();
+          _currentFitnessData = null;
+          if (!_syncDataController.isClosed) {
+            _syncDataController.add({
+              'timestamp': DateTime.now().toIso8601String(),
+              'steps': 0,
+              'caloriesBurned': 0.0,
+              'workoutSessions': 0,
+              'workoutDuration': 0.0,
+              'isDisconnected': true,
+            });
+          }
         }
       }
     } catch (e) {
+      print('⚠️ GlobalGoogleFitManager: Connection check failed: $e');
       if (_isConnected) {
-        print('⚠️ GlobalGoogleFitManager: Connection check failed: $e');
         _isConnected = false;
-        _connectionStateController.add(false);
+        if (!_connectionStateController.isClosed) {
+          _connectionStateController.add(false);
+        }
         _autoSyncTimer?.cancel();
+        _currentFitnessData = null;
       }
     }
   }
@@ -301,21 +317,48 @@ class GlobalGoogleFitManager {
     }
   }
 
-  /// Disconnect from Google Fit
+  /// Disconnect from Google Fit with complete cleanup
   Future<void> disconnect() async {
     try {
+      print('🔌 GlobalGoogleFitManager: Starting disconnect process...');
+      
+      // Stop all timers first
+      _autoSyncTimer?.cancel();
+      _connectionCheckTimer?.cancel();
+      
       // Disconnect from Google Fit service
       await _googleFitService.signOut();
 
+      // Reset connection state
       _isConnected = false;
-      _connectionStateController.add(false);
+      _currentFitnessData = null;
+      
+      // Notify listeners of disconnection
+      if (!_connectionStateController.isClosed) {
+        _connectionStateController.add(false);
+      }
+      
+      // Send disconnect notification to data stream
+      if (!_syncDataController.isClosed) {
+        _syncDataController.add({
+          'timestamp': DateTime.now().toIso8601String(),
+          'steps': 0,
+          'caloriesBurned': 0.0,
+          'workoutSessions': 0,
+          'workoutDuration': 0.0,
+          'isDisconnected': true,
+        });
+      }
 
-      _autoSyncTimer?.cancel();
-      _connectionCheckTimer?.cancel();
-
-      print('🔌 GlobalGoogleFitManager: Disconnected');
+      print('✅ GlobalGoogleFitManager: Disconnected successfully');
     } catch (e) {
       print('❌ GlobalGoogleFitManager: Disconnect error: $e');
+      
+      // Force reset state even if disconnect fails
+      _isConnected = false;
+      _currentFitnessData = null;
+      _autoSyncTimer?.cancel();
+      _connectionCheckTimer?.cancel();
     }
   }
 

@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'google_fit_service.dart';
+import 'global_google_fit_manager.dart';
+import 'unified_google_fit_manager.dart';
 
 /// Firebase authentication service
 class AuthService {
@@ -163,16 +166,44 @@ class AuthService {
     return null;
   }
 
-  /// Sign out
+  /// Sign out with complete cleanup including Google Fit
   Future<void> signOut() async {
     try {
+      print('🔌 AuthService: Starting complete sign out process...');
+      
+      // Import Google Fit services for cleanup
+      final googleFitService = GoogleFitService();
+      final globalGoogleFitManager = GlobalGoogleFitManager();
+      final unifiedGoogleFitManager = UnifiedGoogleFitManager();
+      
+      // Disconnect Google Fit first
+      print('🔌 AuthService: Disconnecting Google Fit...');
+      await Future.wait([
+        googleFitService.signOut(),
+        globalGoogleFitManager.disconnect(),
+        unifiedGoogleFitManager.disconnect(),
+      ]);
+      
+      // Sign out from Firebase
+      print('🔌 AuthService: Signing out from Firebase...');
       await _firebaseAuth.signOut();
+      
+      // Sign out from Google Sign-In
+      print('🔌 AuthService: Signing out from Google Sign-In...');
       await _googleSignIn.signOut();
+      
+      // Clear user data
       _currentUser = null;
       _userController.add(null);
-      print('Sign out successful');
+      
+      print('✅ AuthService: Complete sign out successful');
     } catch (e) {
-      print('Sign out error: $e');
+      print('❌ AuthService: Sign out error: $e');
+      
+      // Force clear user data even if sign out fails
+      _currentUser = null;
+      _userController.add(null);
+      
       rethrow;
     }
   }

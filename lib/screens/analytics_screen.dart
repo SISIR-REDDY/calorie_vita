@@ -52,6 +52,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
   // UI update debouncing
   Timer? _uiUpdateTimer;
+  Timer? _profileUpdateTimer;
   bool _hasPendingUIUpdate = false;
   static const Duration _minUIUpdateInterval = Duration(milliseconds: 300);
 
@@ -101,6 +102,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     // Initialize services asynchronously
     _setupTodaysFoodDataService();
     _initializeGoogleFitData();
+    
+    // Ensure profile data is loaded for weight progress and BMI
+    _loadUserProfileData();
   }
 
   @override
@@ -111,6 +115,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     _todaysFoodMacroSubscription?.cancel();
     _todaysFoodCaloriesSubscription?.cancel();
     _uiUpdateTimer?.cancel();
+    _profileUpdateTimer?.cancel();
     _analyticsService.dispose();
     _todaysFoodDataService.dispose();
     
@@ -398,15 +403,28 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           _appStateService.profileDataStream.listen((profileData) {
         print('Profile data stream received in analytics: $profileData');
         if (mounted && profileData != null) {
-          setState(() {
-            // Update height from profile data
-            final heightCm = profileData['height']?.toDouble();
-            _userHeight = heightCm != null ? heightCm / 100.0 : null;
-            _userGender = profileData['gender']?.toString();
-            _userAge = profileData['age']?.toInt();
-          });
-          print('Profile data updated in analytics: Height=${_userHeight}m');
-          print('BMI will be recalculated with new values');
+          // Only update if there are actual changes to avoid unnecessary rebuilds
+          final heightCm = profileData['height']?.toDouble();
+          final newHeight = heightCm != null ? heightCm / 100.0 : null;
+          final newGender = profileData['gender']?.toString();
+          final newAge = profileData['age']?.toInt();
+          
+          // Check if values actually changed before calling setState
+          if (_userHeight != newHeight || _userGender != newGender || _userAge != newAge) {
+            // Debounce the update to prevent excessive rebuilds
+            _profileUpdateTimer?.cancel();
+            _profileUpdateTimer = Timer(Duration(milliseconds: 100), () {
+              if (mounted) {
+                setState(() {
+                  _userHeight = newHeight;
+                  _userGender = newGender;
+                  _userAge = newAge;
+                });
+                print('Profile data updated in analytics: Height=${_userHeight}m');
+                print('BMI will be recalculated with new values');
+              }
+            });
+          }
         } else {
           print('Profile data is null or widget not mounted');
         }
@@ -851,29 +869,46 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         if (doc.exists) {
           final data = doc.data()!;
           print('Profile Data Loaded: $data');
-          setState(() {
-            // Height is stored in cm, convert to meters for BMI calculation
-            final heightCm = data['height']?.toDouble();
-            _userHeight = heightCm != null ? heightCm / 100.0 : null;
-            _userWeight = data['weight']?.toDouble();
-            _userGender = data['gender']?.toString();
-            _userAge = data['age']?.toInt();
-          });
-          print(
-              'Parsed Profile Data - Height: $_userHeight, Weight: $_userWeight, Gender: $_userGender, Age: $_userAge');
+          
+          // Height is stored in cm, convert to meters for BMI calculation
+          final heightCm = data['height']?.toDouble();
+          final weight = data['weight']?.toDouble();
+          final gender = data['gender']?.toString();
+          final age = data['age']?.toInt();
+          
+          if (mounted) {
+            setState(() {
+              _userHeight = heightCm != null ? heightCm / 100.0 : null;
+              _userWeight = weight;
+              _userGender = gender;
+              _userAge = age;
+            });
+          }
+          
+          print('Parsed Profile Data - Height: $_userHeight, Weight: $_userWeight, Gender: $_userGender, Age: $_userAge');
         } else {
           print('Profile document does not exist');
+          if (mounted) {
+            setState(() {
+              _userHeight = null;
+              _userWeight = null;
+              _userGender = null;
+              _userAge = null;
+            });
+          }
         }
       }
     } catch (e) {
       print('Error loading user profile data: $e');
       // Don't set default values - let user input their data
-      setState(() {
-        _userHeight = null;
-        _userWeight = null;
-        _userGender = null;
-        _userAge = null;
-      });
+      if (mounted) {
+        setState(() {
+          _userHeight = null;
+          _userWeight = null;
+          _userGender = null;
+          _userAge = null;
+        });
+      }
     }
   }
 
@@ -1156,6 +1191,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       _buildPeriodSelector(),
                       const SizedBox(height: 20),
                       _buildSummaryCards(),
+                      const SizedBox(height: 24),
+                      _buildWeightProgressSection(),
                       const SizedBox(height: 24),
                       _buildMacroBreakdown(),
                       const SizedBox(height: 24),
@@ -1569,6 +1606,567 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         ),
       ],
     );
+  }
+
+  /// Build weight progress section
+  Widget _buildWeightProgressSection() {
+    final userGoals = _appStateService.userGoals;
+    final weightGoal = userGoals?.weightGoal;
+    final currentWeight = _userWeight;
+    
+    // Debug logging
+    print('=== WEIGHT PROGRESS SECTION DEBUG ===');
+    print('Weight Progress Debug - AppStateService initialized: ${_appStateService.isInitialized}');
+    print('Weight Progress Debug - userGoals from AppStateService: $userGoals');
+    print('Weight Progress Debug - userGoals?.fitnessGoal: ${userGoals?.fitnessGoal}');
+    print('Weight Progress Debug - userGoals?.fitnessGoal == null: ${userGoals?.fitnessGoal == null}');
+    print('Weight Progress Debug - userGoals?.fitnessGoal == "": ${userGoals?.fitnessGoal == ""}');
+    print('Weight Progress Debug - userGoals?.fitnessGoal?.isEmpty: ${userGoals?.fitnessGoal?.isEmpty}');
+    print('Weight Progress Debug - Current Weight: $currentWeight, Weight Goal: $weightGoal');
+    print('=== END WEIGHT PROGRESS SECTION DEBUG ===');
+    
+    // Check if we have both current weight and weight goal
+    if (currentWeight == null || weightGoal == null) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: kSurfaceColor,
+          borderRadius: BorderRadius.all(Radius.circular(20)),
+          boxShadow: kCardShadow,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: kPrimaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.monitor_weight_outlined,
+                    color: kPrimaryColor,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Weight Progress',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: kTextPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: kWarningColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: kWarningColor.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: kWarningColor,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      currentWeight == null 
+                          ? 'Weight data unavailable. Please update your profile in settings.'
+                          : 'Set your weight goal in settings to track progress.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: kWarningColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Calculate weight progress
+    final weightDifference = currentWeight - weightGoal;
+    final progressPercentage = _calculateWeightProgress(currentWeight, weightGoal);
+    
+    // Get user's fitness goal to determine success criteria
+    String fitnessGoal = 'maintenance';
+    
+    if (userGoals != null) {
+      fitnessGoal = userGoals!.fitnessGoal ?? 'maintenance';
+      print('Weight Progress Debug - Using fitnessGoal from AppStateService: "$fitnessGoal"');
+    } else {
+      // Fallback: userGoals is null, use default
+      print('Weight Progress Debug - userGoals is null from AppStateService, using default maintenance');
+      fitnessGoal = 'maintenance';
+    }
+    
+    // If fitnessGoal is still null or empty, try to get it from the profile data
+    if (fitnessGoal == 'maintenance' && (userGoals?.fitnessGoal == null || userGoals?.fitnessGoal == '')) {
+      print('Weight Progress Debug - fitnessGoal is null/empty, checking profile data...');
+      // Try to get fitness goal from the profile data that's already loaded
+      // The fitness goal might be in the profile data stream
+      final profileData = _appStateService.profileData;
+      if (profileData != null && profileData['fitnessGoal'] != null) {
+        fitnessGoal = profileData['fitnessGoal'].toString();
+        print('Weight Progress Debug - Loaded fitnessGoal from profile data: "$fitnessGoal"');
+      } else {
+        print('Weight Progress Debug - fitnessGoal not found in profile data, using maintenance');
+      }
+    }
+    
+    // Debug logging for fitness goal
+    print('=== WEIGHT PROGRESS DEBUG START ===');
+    print('Weight Progress Debug - userGoals object: $userGoals');
+    if (userGoals != null) {
+      print('Weight Progress Debug - userGoals.fitnessGoal: "${userGoals.fitnessGoal}"');
+      print('Weight Progress Debug - userGoals.weightGoal: ${userGoals.weightGoal}');
+      print('Weight Progress Debug - userGoals.calorieGoal: ${userGoals.calorieGoal}');
+      print('Weight Progress Debug - userGoals.macroGoals: ${userGoals.macroGoals}');
+      if (userGoals.macroGoals != null) {
+        print('Weight Progress Debug - userGoals.macroGoals.proteinCalories: ${userGoals.macroGoals!.proteinCalories}');
+        print('Weight Progress Debug - userGoals.macroGoals.carbsCalories: ${userGoals.macroGoals!.carbsCalories}');
+        print('Weight Progress Debug - userGoals.macroGoals.fatCalories: ${userGoals.macroGoals!.fatCalories}');
+      }
+    } else {
+      print('Weight Progress Debug - userGoals is NULL!');
+    }
+    print('Weight Progress Debug - Raw fitnessGoal: "$fitnessGoal"');
+    print('Weight Progress Debug - fitnessGoal.toLowerCase(): "${fitnessGoal.toLowerCase()}"');
+    print('Weight Progress Debug - fitnessGoal.length: ${fitnessGoal.length}');
+    print('Weight Progress Debug - fitnessGoal.codeUnits: ${fitnessGoal.codeUnits}');
+    
+    // Test the fitness goal matching logic
+    final testFitnessGoal = fitnessGoal.toLowerCase();
+    print('Weight Progress Debug - Testing fitness goal matching:');
+    print('  - "weight loss" match: ${testFitnessGoal == "weight loss"}');
+    print('  - "weight_loss" match: ${testFitnessGoal == "weight_loss"}');
+    print('  - "weight gain" match: ${testFitnessGoal == "weight gain"}');
+    print('  - "weight_gain" match: ${testFitnessGoal == "weight_gain"}');
+    print('  - "maintenance" match: ${testFitnessGoal == "maintenance"}');
+    print('  - "general fitness" match: ${testFitnessGoal == "general fitness"}');
+    print('  - "general_fitness" match: ${testFitnessGoal == "general_fitness"}');
+    print('=== WEIGHT PROGRESS DEBUG END ===');
+    
+    // Determine if goal is achieved based on fitness goal
+    bool isGoalAchieved = false;
+    final fitnessGoalLower = fitnessGoal.toLowerCase();
+    
+    // Handle all possible fitness goal formats (underscore, space, title case, etc.)
+    print('Weight Progress Debug - About to check fitness goal: "$fitnessGoalLower"');
+    print('Weight Progress Debug - weightDifference: $weightDifference');
+    
+    // Normalize the fitness goal to handle all possible formats
+    final normalizedGoal = fitnessGoalLower
+        .replaceAll('_', ' ')
+        .replaceAll('-', ' ')
+        .trim();
+    
+    print('Weight Progress Debug - Normalized fitness goal: "$normalizedGoal"');
+    
+    if (normalizedGoal == 'weight loss' || normalizedGoal == 'general fitness') {
+      // Weight Loss + General Fitness: Success when current weight ≤ goal weight (losing weight)
+      isGoalAchieved = weightDifference <= 0;
+      print('Weight Progress Debug - Weight Loss/General Fitness: isGoalAchieved = $isGoalAchieved (weightDifference <= 0: ${weightDifference <= 0})');
+    } else if (normalizedGoal == 'weight gain' || normalizedGoal == 'muscle building' || normalizedGoal == 'athletic performance') {
+      // Weight Gain + Muscle Building + Athletic Performance: Success when current weight ≥ goal weight (gaining weight)
+      isGoalAchieved = weightDifference >= 0;
+      print('Weight Progress Debug - Weight Gain/Muscle Building/Athletic Performance: isGoalAchieved = $isGoalAchieved (weightDifference >= 0: ${weightDifference >= 0})');
+    } else if (normalizedGoal == 'maintenance') {
+      // Maintenance: Success when current weight is within 2kg of goal weight
+      isGoalAchieved = weightDifference.abs() <= 2.0;
+      print('Weight Progress Debug - Maintenance: isGoalAchieved = $isGoalAchieved (weightDifference.abs() <= 2.0: ${weightDifference.abs() <= 2.0})');
+    } else {
+      // Default to maintenance logic for unknown goals
+      isGoalAchieved = weightDifference.abs() <= 2.0;
+      print('Weight Progress Debug - Unknown goal "$normalizedGoal", using maintenance logic: isGoalAchieved = $isGoalAchieved');
+    }
+    
+    // Debug logging for weight progress
+    print('Weight Progress Calculation - Current: $currentWeight, Goal: $weightGoal, Difference: $weightDifference, Progress: $progressPercentage%, Fitness Goal: $fitnessGoal, Achieved: $isGoalAchieved');
+    print('Weight Progress Debug - isGoalAchieved: $isGoalAchieved, weightDifference: $weightDifference, fitnessGoal: $fitnessGoal');
+    print('Weight Progress Debug - weightDifference <= 0: ${weightDifference <= 0}, weightDifference >= 0: ${weightDifference >= 0}');
+    
+    // Determine progress color and status based on fitness goal
+    Color progressColor;
+    String progressStatus;
+    IconData progressIcon;
+    
+    if (isGoalAchieved) {
+      progressColor = kSuccessColor; // Green color for success
+      progressStatus = 'Goal Achieved!';
+      progressIcon = Icons.check_circle;
+      print('Weight Progress Debug - Using GREEN color for achieved goal');
+    } else {
+      // Handle color determination based on fitness goal rules
+      if (normalizedGoal == 'weight loss' || normalizedGoal == 'general fitness') {
+        // Weight Loss + General Fitness: Orange when above goal, Blue when on track
+        if (weightDifference > 0) {
+          progressColor = kWarningColor; // Orange for above goal
+          progressStatus = 'Above Goal';
+          progressIcon = Icons.trending_up;
+          print('Weight Progress Debug - Using ORANGE color for weight loss above goal');
+        } else {
+          progressColor = kInfoColor; // Blue for on track
+          progressStatus = 'On Track';
+          progressIcon = Icons.trending_down;
+          print('Weight Progress Debug - Using BLUE color for weight loss on track');
+        }
+      } else if (normalizedGoal == 'weight gain' || normalizedGoal == 'muscle building' || normalizedGoal == 'athletic performance') {
+        // Weight Gain + Muscle Building + Athletic Performance: Orange when below goal, Blue when on track
+        if (weightDifference < 0) {
+          progressColor = kWarningColor; // Orange for below goal
+          progressStatus = 'Below Goal';
+          progressIcon = Icons.trending_down;
+          print('Weight Progress Debug - Using ORANGE color for weight gain below goal');
+        } else {
+          progressColor = kInfoColor; // Blue for on track
+          progressStatus = 'On Track';
+          progressIcon = Icons.trending_up;
+          print('Weight Progress Debug - Using BLUE color for weight gain on track');
+        }
+      } else {
+        // Maintenance or default case: Orange when off target, Green when within 2kg
+        if (weightDifference.abs() > 2.0) {
+          progressColor = kWarningColor; // Orange for off target
+          progressStatus = 'Off Target';
+          progressIcon = weightDifference > 0 ? Icons.trending_up : Icons.trending_down;
+          print('Weight Progress Debug - Using ORANGE color for maintenance off target');
+        } else {
+          progressColor = kSuccessColor; // Green for maintenance success
+          progressStatus = 'Goal Achieved!';
+          progressIcon = Icons.check_circle;
+          print('Weight Progress Debug - Using GREEN color for maintenance success');
+        }
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: const BoxDecoration(
+        color: kSurfaceColor,
+        borderRadius: BorderRadius.all(Radius.circular(20)),
+        boxShadow: kCardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: progressColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  progressIcon,
+                  color: progressColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Weight Progress',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: kTextPrimary,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: progressColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  progressStatus,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: progressColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          
+          // Weight display with progress
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  progressColor.withValues(alpha: 0.1),
+                  progressColor.withValues(alpha: 0.05),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: progressColor.withValues(alpha: 0.2),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              children: [
+                // Current weight vs goal weight
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Expanded(
+                      child: _buildWeightDisplay(
+                        'Current',
+                        '${currentWeight.toStringAsFixed(1)} kg',
+                        kTextPrimary,
+                        Icons.person,
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 40,
+                      color: progressColor.withValues(alpha: 0.3),
+                    ),
+                    Expanded(
+                      child: _buildWeightDisplay(
+                        'Goal',
+                        '${weightGoal.toStringAsFixed(1)} kg',
+                        progressColor,
+                        Icons.flag,
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Progress bar
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Progress',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: progressColor,
+                          ),
+                        ),
+                        Text(
+                          '${progressPercentage.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: progressColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(
+                      value: progressPercentage / 100,
+                      backgroundColor: progressColor.withValues(alpha: 0.2),
+                      valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                      minHeight: 8,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _getWeightProgressMessage(weightDifference, isGoalAchieved),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: progressColor.withValues(alpha: 0.8),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build individual weight display
+  Widget _buildWeightDisplay(String label, String value, Color color, IconData icon) {
+    return Flexible(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: color,
+            size: 24,
+          ),
+          const SizedBox(height: 8),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: color.withValues(alpha: 0.7),
+            ),
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Calculate weight progress percentage based on fitness goal
+  double _calculateWeightProgress(double currentWeight, double goalWeight) {
+    if (goalWeight == 0) return 0.0;
+    
+    // Get user's fitness goal to determine success criteria
+    final userGoals = _appStateService.userGoals;
+    final fitnessGoal = userGoals?.fitnessGoal ?? 'maintenance';
+    
+    // Calculate how close we are to the goal (0-100%)
+    final difference = currentWeight - goalWeight;
+    
+    // Determine success based on fitness goal
+    bool isGoalAchieved = false;
+    
+    final fitnessGoalLower = fitnessGoal.toLowerCase();
+    
+    // Normalize the fitness goal to handle all possible formats
+    final normalizedGoal = fitnessGoalLower
+        .replaceAll('_', ' ')
+        .replaceAll('-', ' ')
+        .trim();
+    
+    if (normalizedGoal == 'weight loss' || normalizedGoal == 'general fitness') {
+      // Weight Loss + General Fitness: Success when current weight <= goal weight (losing weight)
+      isGoalAchieved = difference <= 0;
+    } else if (normalizedGoal == 'weight gain' || normalizedGoal == 'muscle building' || normalizedGoal == 'athletic performance') {
+      // Weight Gain + Muscle Building + Athletic Performance: Success when current weight >= goal weight (gaining weight)
+      isGoalAchieved = difference >= 0;
+    } else if (normalizedGoal == 'maintenance') {
+      // Maintenance: Success when current weight is within 2kg of goal weight
+      isGoalAchieved = difference.abs() <= 2.0;
+    } else {
+      // Default to maintenance logic for unknown goals
+      isGoalAchieved = difference.abs() <= 2.0;
+    }
+    
+    if (isGoalAchieved) {
+      return 100.0;
+    } else {
+      // Calculate progress based on fitness goal
+      // Calculate progress based on fitness goal rules
+      if (normalizedGoal == 'weight loss' || normalizedGoal == 'general fitness') {
+        // Weight Loss + General Fitness: Progress towards losing weight
+        if (difference > 0) {
+          // Above goal, calculate how much to lose
+          final maxWeightAboveGoal = goalWeight * 0.3; // 30% above goal as max
+          return ((maxWeightAboveGoal - difference) / maxWeightAboveGoal * 100).clamp(0.0, 100.0);
+        } else {
+          // Below goal, already achieved
+          return 100.0;
+        }
+      } else if (normalizedGoal == 'weight gain' || normalizedGoal == 'muscle building' || normalizedGoal == 'athletic performance') {
+        // Weight Gain + Muscle Building + Athletic Performance: Progress towards gaining weight
+        if (difference < 0) {
+          // Below goal, calculate how much to gain
+          final maxWeightBelowGoal = goalWeight * 0.2; // 20% below goal as max
+          return ((maxWeightBelowGoal + difference.abs()) / maxWeightBelowGoal * 100).clamp(0.0, 100.0);
+        } else {
+          // Above goal, already achieved
+          return 100.0;
+        }
+      } else {
+        // Maintenance or default case: Progress towards maintaining weight
+        final maxDeviation = goalWeight * 0.1; // 10% deviation as max
+        return ((maxDeviation - difference.abs()) / maxDeviation * 100).clamp(0.0, 100.0);
+      }
+    }
+  }
+
+  /// Get weight progress message based on fitness goal
+  String _getWeightProgressMessage(double weightDifference, bool isGoalAchieved) {
+    // Get user's fitness goal for appropriate messaging
+    final userGoals = _appStateService.userGoals;
+    final fitnessGoal = userGoals?.fitnessGoal ?? 'maintenance';
+    
+    if (isGoalAchieved) {
+      return '🎉 Congratulations! You\'ve reached your weight goal!';
+    } else {
+      final fitnessGoalLower = fitnessGoal.toLowerCase();
+      
+      // Normalize the fitness goal to handle all possible formats
+      final normalizedGoal = fitnessGoalLower
+          .replaceAll('_', ' ')
+          .replaceAll('-', ' ')
+          .trim();
+      
+      // Handle messages based on fitness goal rules
+      if (normalizedGoal == 'weight loss' || normalizedGoal == 'general fitness') {
+        // Weight Loss + General Fitness messages
+        if (weightDifference > 0) {
+          return '${weightDifference.toStringAsFixed(1)} kg above goal. Keep working towards your target!';
+        } else {
+          return '${(-weightDifference).toStringAsFixed(1)} kg to go. You\'re making great progress!';
+        }
+      } else if (normalizedGoal == 'weight gain' || normalizedGoal == 'muscle building' || normalizedGoal == 'athletic performance') {
+        // Weight Gain + Muscle Building + Athletic Performance messages
+        if (weightDifference < 0) {
+          return '${(-weightDifference).toStringAsFixed(1)} kg below goal. Keep working towards your target!';
+        } else {
+          return '${weightDifference.toStringAsFixed(1)} kg above goal. You\'re making great progress!';
+        }
+      } else {
+        // Maintenance or default case messages
+        if (weightDifference.abs() <= 2.0) {
+          return 'Great job! You\'re maintaining your target weight!';
+        } else if (weightDifference > 0) {
+          return '${weightDifference.toStringAsFixed(1)} kg above goal. Work towards your target!';
+        } else {
+          return '${(-weightDifference).toStringAsFixed(1)} kg below goal. Work towards your target!';
+        }
+      }
+    }
   }
 
   /// Format numbers with commas
@@ -2137,9 +2735,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
   /// Build BMI Analytics section
   Widget _buildBMIAnalytics() {
-    // Check if we have real user data (no hardcoded defaults)
+    // Check if we have real user data from profile (not Google Fit)
     final hasHeight = _userHeight != null && _userHeight! > 0;
     final hasWeight = _userWeight != null && _userWeight! > 0;
+    
+    // Debug logging
+    print('BMI Analytics Debug - Height: $_userHeight, Weight: $_userWeight');
+    
     if (!hasHeight || !hasWeight) {
       // Show message if either height or weight is missing
       return Container(
@@ -2178,9 +2780,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               ],
             ),
             const SizedBox(height: 16),
-            const Text(
-              'BMI data unavailable. Please check your profile and Google Fit connection.',
-              style: TextStyle(
+            Text(
+              hasHeight 
+                  ? 'Weight data unavailable. Please update your profile in settings.'
+                  : 'Height data unavailable. Please update your profile in settings.',
+              style: const TextStyle(
                 fontSize: 14,
                 color: kTextSecondary,
               ),

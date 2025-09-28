@@ -25,6 +25,20 @@ class FoodHistoryService {
         return false;
       }
 
+      // Validate entry data
+      if (entry.id.isEmpty) {
+        print('❌ Entry ID cannot be empty');
+        return false;
+      }
+      if (entry.foodName.isEmpty) {
+        print('❌ Food name cannot be empty');
+        return false;
+      }
+      if (entry.calories < 0) {
+        print('❌ Calories cannot be negative');
+        return false;
+      }
+
       // Add to Firestore
       await _firestore
           .collection(_collectionName)
@@ -382,7 +396,7 @@ class FoodHistoryService {
         .limit(limit)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => FoodHistoryEntry.fromMap(doc.data()))
+            .map((doc) => FoodHistoryEntry.fromMap(doc.data() as Map<String, dynamic>))
             .toList());
   }
 
@@ -408,7 +422,7 @@ class FoodHistoryService {
         .limit(limit)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => FoodHistoryEntry.fromMap(doc.data()))
+            .map((doc) => FoodHistoryEntry.fromMap(doc.data() as Map<String, dynamic>))
             .toList());
   }
 }

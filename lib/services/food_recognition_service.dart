@@ -38,20 +38,34 @@ class FoodRecognitionService {
   /// Recognize food from image using LogMeal API with Indian foods fallback
   static Future<FoodRecognitionResult> recognizeFoodFromImage(File imageFile) async {
     try {
+      // Validate input
+      if (!await imageFile.exists()) {
+        return FoodRecognitionResult(
+          foodName: 'Invalid Image',
+          confidence: 0.0,
+          category: 'Error',
+          cuisine: 'Unknown',
+          boundingBox: null,
+          error: 'Image file does not exist',
+        );
+      }
+
       // Ensure datasets are loaded
       if (_indianFoods == null || _indianPackaged == null) {
         await initialize();
       }
 
-      // Try LogMeal API first
-      try {
-        final logMealResult = await _recognizeWithLogMeal(imageFile);
-        if (logMealResult.confidence > 0.7) {
-          return logMealResult;
+      // Try LogMeal API first (only if API key is available)
+      if (_logMealApiKey != 'YOUR_LOGMEAL_API_KEY') {
+        try {
+          final logMealResult = await _recognizeWithLogMeal(imageFile);
+          if (logMealResult.confidence > 0.7) {
+            return logMealResult;
+          }
+          print('LogMeal confidence too low (${logMealResult.confidence}), trying local dataset');
+        } catch (e) {
+          print('LogMeal API failed: $e, trying local dataset');
         }
-        print('LogMeal confidence too low (${logMealResult.confidence}), trying local dataset');
-      } catch (e) {
-        print('LogMeal API failed: $e, trying local dataset');
       }
 
       // Fallback to local Indian foods dataset

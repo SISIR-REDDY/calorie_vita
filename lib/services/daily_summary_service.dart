@@ -88,11 +88,17 @@ class DailySummaryService {
   }) async {
     try {
       // Validate input
+      if (userId.isEmpty) {
+        throw Exception('User ID cannot be empty');
+      }
       if (caloriesBurned < 0 || caloriesBurned > 5000) {
         throw Exception('Invalid calories burned: $caloriesBurned');
       }
       if (durationMinutes < 0 || durationMinutes > 480) {
         throw Exception('Invalid duration: $durationMinutes minutes');
+      }
+      if (exerciseType.isEmpty) {
+        throw Exception('Exercise type cannot be empty');
       }
 
       final today = DateTime.now();

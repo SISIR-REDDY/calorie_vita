@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import '../models/food_entry.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
@@ -11,7 +10,6 @@ import '../models/user_preferences.dart';
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final Connectivity _connectivity = Connectivity();
 
   /// Check if Firebase is available and properly configured
   bool get isAvailable {
@@ -30,6 +28,11 @@ class FirebaseService {
   // Get food entries for a specific user
   Stream<List<FoodEntry>> getUserFoodEntries(String userId) {
     if (!isAvailable) {
+      return Stream.value([]);
+    }
+
+    if (userId.isEmpty) {
+      print('Error: User ID cannot be empty');
       return Stream.value([]);
     }
 

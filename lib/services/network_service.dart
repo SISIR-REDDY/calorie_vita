@@ -92,8 +92,17 @@ class NetworkService {
   /// Check if we can reach a specific URL
   Future<bool> canReachUrl(String url) async {
     try {
+      if (url.isEmpty) {
+        return false;
+      }
+
+      final uri = Uri.tryParse(url);
+      if (uri == null) {
+        return false;
+      }
+
       final response = await http.get(
-        Uri.parse(url),
+        uri,
         headers: {'Cache-Control': 'no-cache'},
       ).timeout(const Duration(seconds: 10));
 

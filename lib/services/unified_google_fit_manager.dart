@@ -134,13 +134,15 @@ class UnifiedGoogleFitManager {
     }
   }
 
-  /// Check connection status
+  /// Check connection status with enhanced validation
   Future<void> _checkConnectionStatus() async {
     try {
       final wasConnected = _isConnected;
       
-      // Check services for connection status
-      final googleFitConnected = _googleFitService.isConnected;
+      // Use enhanced validation with retry mechanism
+      final googleFitConnected = await _googleFitService
+          .validateAuthenticationWithRetry(maxRetries: 2)
+          .timeout(const Duration(seconds: 8));
       final globalConnected = _globalGoogleFitManager.isConnected;
       
       print('🔍 UnifiedGoogleFitManager: Service connection status - GoogleFit: $googleFitConnected, Global: $globalConnected');
@@ -167,6 +169,18 @@ class UnifiedGoogleFitManager {
       }
     } catch (e) {
       print('❌ UnifiedGoogleFitManager: Connection check failed: $e');
+      
+      // If we were connected and now we're not, update the state
+      if (_isConnected) {
+        _isConnected = false;
+        _currentData = null;
+        if (!_connectionController.isClosed) {
+          _connectionController.add(false);
+        }
+        if (!_dataController.isClosed) {
+          _dataController.add(null);
+        }
+      }
     }
   }
 
@@ -267,21 +281,39 @@ class UnifiedGoogleFitManager {
     }
   }
 
-  /// Disconnect from Google Fit
+  /// Disconnect from Google Fit with complete cleanup
   Future<void> disconnect() async {
     try {
+      print('🔌 UnifiedGoogleFitManager: Starting disconnect process...');
+      
+      // Stop all timers first
+      _refreshTimer?.cancel();
+      _connectionCheckTimer?.cancel();
+      
+      // Disconnect from Google Fit service
       await _googleFitService.signOut();
+      
+      // Reset connection state
       _isConnected = false;
       _currentData = null;
+      
+      // Notify listeners of disconnection
       if (!_connectionController.isClosed) {
         _connectionController.add(false);
       }
       if (!_dataController.isClosed) {
         _dataController.add(null);
       }
-      print('🔌 UnifiedGoogleFitManager: Disconnected');
+      
+      print('✅ UnifiedGoogleFitManager: Disconnected successfully');
     } catch (e) {
       print('❌ UnifiedGoogleFitManager: Disconnect failed: $e');
+      
+      // Force reset state even if disconnect fails
+      _isConnected = false;
+      _currentData = null;
+      _refreshTimer?.cancel();
+      _connectionCheckTimer?.cancel();
     }
   }
 

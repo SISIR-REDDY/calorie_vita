@@ -87,7 +87,7 @@ class _EnhancedLoadingWidgetState extends State<EnhancedLoadingWidget>
                     gradient: LinearGradient(
                       colors: [
                         widget.color ?? kPrimaryColor,
-                        (widget.color ?? kPrimaryColor).withOpacity(0.6),
+                        (widget.color ?? kPrimaryColor).withValues(alpha: 0.6),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -351,7 +351,7 @@ class LoadingOverlay extends StatelessWidget {
         child,
         if (isLoading)
           Container(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             child: Center(
               child: Container(
                 padding: const EdgeInsets.all(24),
@@ -360,7 +360,7 @@ class LoadingOverlay extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),

@@ -7,6 +7,7 @@ import '../ui/app_colors.dart';
 import '../services/app_state_service.dart';
 import '../services/real_time_input_service.dart';
 import '../services/google_fit_service.dart';
+import '../services/auth_service.dart';
 import '../widgets/setup_warning_popup.dart';
 import '../services/setup_check_service.dart';
 
@@ -464,19 +465,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (shouldLogout == true) {
       try {
-        // Try Firebase logout first
-        if (_user != null) {
-          await FirebaseAuth.instance.signOut();
+        // Show loading indicator
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => const Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
         }
 
+        // Use AuthService for complete logout including Google Fit
+        final authService = AuthService();
+        await authService.signOut();
 
         if (mounted) {
+          // Close loading dialog
+          Navigator.pop(context);
+          
           // Navigate to welcome screen
           Navigator.pushNamedAndRemoveUntil(
               context, '/welcome', (route) => false);
         }
       } catch (e) {
+        print('Logout error: $e');
         if (mounted) {
+          // Close loading dialog if still open
+          Navigator.pop(context);
+          
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error logging out: $e'),

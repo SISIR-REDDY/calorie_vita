@@ -25,7 +25,7 @@ class AnalyticsService {
 
   // Getter methods that ensure controllers exist and are not closed
   StreamController<List<DailySummary>> get _ensureDailySummariesController {
-    if (_dailySummariesController?.isClosed != false) {
+    if (_dailySummariesController == null || _dailySummariesController!.isClosed) {
       _dailySummariesController =
           StreamController<List<DailySummary>>.broadcast();
     }
@@ -33,14 +33,14 @@ class AnalyticsService {
   }
 
   StreamController<MacroBreakdown> get _ensureMacroBreakdownController {
-    if (_macroBreakdownController?.isClosed != false) {
+    if (_macroBreakdownController == null || _macroBreakdownController!.isClosed) {
       _macroBreakdownController = StreamController<MacroBreakdown>.broadcast();
     }
     return _macroBreakdownController!;
   }
 
   StreamController<List<UserAchievement>> get _ensureAchievementsController {
-    if (_achievementsController?.isClosed != false) {
+    if (_achievementsController == null || _achievementsController!.isClosed) {
       _achievementsController =
           StreamController<List<UserAchievement>>.broadcast();
     }
@@ -48,7 +48,7 @@ class AnalyticsService {
   }
 
   StreamController<List<Map<String, dynamic>>> get _ensureInsightsController {
-    if (_insightsController?.isClosed != false) {
+    if (_insightsController == null || _insightsController!.isClosed) {
       _insightsController =
           StreamController<List<Map<String, dynamic>>>.broadcast();
     }
@@ -57,7 +57,7 @@ class AnalyticsService {
 
   StreamController<List<Map<String, dynamic>>>
       get _ensureRecommendationsController {
-    if (_recommendationsController?.isClosed != false) {
+    if (_recommendationsController == null || _recommendationsController!.isClosed) {
       _recommendationsController =
           StreamController<List<Map<String, dynamic>>>.broadcast();
     }

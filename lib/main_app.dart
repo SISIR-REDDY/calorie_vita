@@ -144,6 +144,26 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     print('App lifecycle state changed: $state');
+    
+    switch (state) {
+      case AppLifecycleState.resumed:
+        print('🔄 App resumed - Ensuring Google Fit sync...');
+        _googleFitManager.ensureSync();
+        break;
+      case AppLifecycleState.paused:
+        print('⏸️ App paused - Google Fit will continue in background');
+        break;
+      case AppLifecycleState.detached:
+        print('🔌 App detached - Cleaning up Google Fit resources...');
+        _googleFitManager.dispose();
+        break;
+      case AppLifecycleState.inactive:
+        print('⏸️ App inactive - Google Fit sync paused');
+        break;
+      case AppLifecycleState.hidden:
+        print('👁️ App hidden - Google Fit sync continues');
+        break;
+    }
   }
 
   @override

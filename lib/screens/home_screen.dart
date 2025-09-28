@@ -193,6 +193,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       
       // Refresh Google Fit data when screen becomes visible
       _loadGoogleFitDataImmediate();
+      
+      // Load tasks immediately when screen becomes visible to prevent buffering
+      _loadTasksDataImmediate();
     }
   }
 
@@ -290,6 +293,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   void _loadInstantDataFromCache() {
     try {
       print('⚡ Home: Loading instant data from global cache...');
+      
+      // Load tasks instantly to prevent buffering
+      _loadTasksDataImmediate();
       
       // Load Google Fit data instantly
       // Note: Caching removed for simplification
@@ -503,25 +509,21 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           debugPrint('Enhanced streak stream error: $error');
         });
 
-        // Listen to task updates with optimized state management
+        // Listen to task updates with instant state management (no delays)
         _taskService.tasksStream.listen((tasks) {
           debugPrint('📋 Task stream received ${tasks.length} tasks');
           debugPrint('📋 Task titles: ${tasks.map((t) => t.title).toList()}');
           if (mounted) {
-            // Only update state if tasks actually changed and we're not in the middle of a manual update
+            // Only update state if tasks actually changed
             if (_tasks.length != tasks.length || 
                 !_listsEqual(_tasks, tasks)) {
-              // Add a delay to prevent conflicts with manual updates
-              Future.delayed(const Duration(milliseconds: 200), () {
-                if (mounted) {
-                  setState(() {
-                    _tasks = tasks;
-                    _isTasksLoading = false;
-                    _hasUserTasks = _taskService.hasUserTasks();
-                  });
-                  debugPrint('📋 UI updated with ${_tasks.length} tasks, hasUserTasks: $_hasUserTasks');
-                }
+              // Update immediately without delay to prevent buffering
+              setState(() {
+                _tasks = tasks;
+                _isTasksLoading = false;
+                _hasUserTasks = _taskService.hasUserTasks();
               });
+              debugPrint('📋 UI updated instantly with ${_tasks.length} tasks, hasUserTasks: $_hasUserTasks');
             }
             
             // Add example tasks if user has no tasks and we haven't loaded any yet
@@ -539,8 +541,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           }
         });
 
-        // Fallback: Load tasks directly after a delay if stream doesn't work
-        Timer(const Duration(seconds: 5), () {
+        // Fallback: Load tasks directly after a short delay if stream doesn't work
+        Timer(const Duration(seconds: 1), () {
           if (_isTasksLoading && mounted) {
             debugPrint('📋 Task stream timeout, loading tasks directly...');
             _loadTasksData();
@@ -671,8 +673,15 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       // Initialize AppStateService with timeout (non-blocking)
       _initializeAppStateAsync();
 
-      // Load fresh data in background (non-blocking)
-      _loadFreshDataAsync();
+      // Load essential data in parallel with timeouts
+      await Future.wait([
+        _loadStreakData().timeout(const Duration(seconds: 2)),
+        _loadRewardsData().timeout(const Duration(seconds: 2)),
+        _loadTasksData().timeout(const Duration(seconds: 1)),
+      ]).catchError((e) {
+        debugPrint('Essential data loading error: $e');
+        return <void>[];
+      });
       
       // Force refresh goals to ensure UI is up to date
       _forceRefreshGoals();
@@ -688,7 +697,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     } catch (e) {
       // Handle error silently in production
       debugPrint('Error loading home data: $e');
-      
+
       // Hide loading state even on error
       if (mounted) {
         setState(() => _isLoading = false);
@@ -701,19 +710,25 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     // Load non-essential data in background
     Future.microtask(() async {
       try {
-        // Only refresh Google Fit data if connected (avoid unnecessary API calls)
-        if (_isGoogleFitConnected) {
-          await _refreshGoogleFitData();
-        }
+        // Load data in parallel with timeouts to prevent blocking
+        await Future.wait([
+          if (_isGoogleFitConnected) 
+            _refreshGoogleFitData().timeout(const Duration(seconds: 3)),
+          _refreshFoodData().timeout(const Duration(seconds: 2)),
+        ]).catchError((e) {
+          debugPrint('Background data loading error: $e');
+          return <void>[];
+        });
         
-        // Refresh food data (lightweight)
-        await _refreshFoodData();
-        
-        // Refresh streak data (lightweight)
-        await _loadStreakData();
-        
-        // Refresh rewards data (lightweight)
-        await _loadRewardsData();
+        // Refresh streak, rewards, and tasks data with shorter timeouts
+        await Future.wait([
+          _loadStreakData().timeout(const Duration(seconds: 1)),
+          _loadRewardsData().timeout(const Duration(seconds: 1)),
+          _refreshTasksData().timeout(const Duration(seconds: 1)),
+        ]).catchError((e) {
+          debugPrint('Streak/rewards/tasks refresh error: $e');
+          return <void>[];
+        });
       } catch (e) {
         debugPrint('Background data loading error: $e');
       }
@@ -2105,16 +2120,25 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   Future<void> _loadStreakData() async {
     try {
-      // Initialize enhanced streak service with timeout
-      await _enhancedStreakService.initialize().timeout(
-        const Duration(seconds: 2),
+      // Get current streak data immediately (non-blocking)
+      _streakSummary = _enhancedStreakService.currentStreaks;
+      
+      // Initialize enhanced streak service in background with timeout
+      _enhancedStreakService.initialize().timeout(
+        const Duration(seconds: 1),
         onTimeout: () {
           debugPrint('⚠️ Streak service initialization timeout');
         },
-      );
-      
-      // Get current streak data
-      _streakSummary = _enhancedStreakService.currentStreaks;
+      ).then((_) {
+        // Update with fresh data if initialization succeeds
+        if (mounted) {
+          setState(() {
+            _streakSummary = _enhancedStreakService.currentStreaks;
+          });
+        }
+      }).catchError((e) {
+        debugPrint('❌ Streak service initialization error: $e');
+      });
       
       if (mounted) {
         setState(() => _isStreakLoading = false);
@@ -2245,6 +2269,30 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     };
   }
 
+  /// Load tasks data immediately without loading state (for instant display)
+  void _loadTasksDataImmediate() {
+    try {
+      debugPrint('📋 Loading tasks data immediately...');
+      final tasks = _taskService.getCurrentTasks();
+      debugPrint('📋 Loaded ${tasks.length} tasks immediately from service');
+      
+      if (mounted) {
+        setState(() {
+          _tasks = tasks;
+          _isTasksLoading = false;
+          _hasUserTasks = _taskService.hasUserTasks();
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading tasks immediately: $e');
+      if (mounted) {
+        setState(() {
+          _isTasksLoading = false;
+        });
+      }
+    }
+  }
+
   /// Load tasks data with fallback
   Future<void> _loadTasksData() async {
     try {
@@ -2269,6 +2317,24 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           _isTasksLoading = false;
         });
       }
+    }
+  }
+
+  /// Refresh tasks data without full screen refresh (for pull-to-refresh)
+  Future<void> _refreshTasksData() async {
+    try {
+      debugPrint('📋 Refreshing tasks data...');
+      final tasks = await _taskService.getTasks();
+      debugPrint('📋 Refreshed ${tasks.length} tasks from service');
+      
+      if (mounted) {
+        setState(() {
+          _tasks = tasks;
+          _hasUserTasks = _taskService.hasUserTasks();
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error refreshing tasks: $e');
     }
   }
 

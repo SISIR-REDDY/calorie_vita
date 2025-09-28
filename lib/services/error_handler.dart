@@ -59,6 +59,11 @@ class ErrorHandler {
     String? context,
     Map<String, dynamic>? additionalData,
   }) {
+    if (!_isInitialized) {
+      print('ErrorHandler not initialized, cannot handle error: $message');
+      return;
+    }
+
     final error = ErrorEvent(
       timestamp: DateTime.now(),
       type: type,

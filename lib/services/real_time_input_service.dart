@@ -127,20 +127,24 @@ class RealTimeInputService {
       );
 
       // Show warnings if any
-      if (caloriesValidation.warningMessage != null) {
+      if (caloriesValidation.warningMessage != null && context.mounted) {
         InputValidationService.showValidationResult(
             context, caloriesValidation);
       }
-      if (durationValidation.warningMessage != null) {
+      if (durationValidation.warningMessage != null && context.mounted) {
         InputValidationService.showValidationResult(
             context, durationValidation);
       }
 
-      _showSuccess(context, 'Exercise logged: $exerciseType');
+      if (context.mounted) {
+        _showSuccess(context, 'Exercise logged: $exerciseType');
+      }
       return true;
     } catch (e) {
       _errorHandler.handleFirebaseError('handleExercise', e);
-      _showError(context, 'Failed to log exercise: $e');
+      if (context.mounted) {
+        _showError(context, 'Failed to log exercise: $e');
+      }
       return false;
     }
   }
@@ -166,15 +170,19 @@ class RealTimeInputService {
       await _dailySummaryService.updateSteps(userId, steps);
 
       // Show warning if any
-      if (validation.warningMessage != null) {
+      if (validation.warningMessage != null && context.mounted) {
         InputValidationService.showValidationResult(context, validation);
       }
 
-      _showSuccess(context, 'Steps updated: $steps steps');
+      if (context.mounted) {
+        _showSuccess(context, 'Steps updated: $steps steps');
+      }
       return true;
     } catch (e) {
       _errorHandler.handleFirebaseError('handleSteps', e);
-      _showError(context, 'Failed to update steps: $e');
+      if (context.mounted) {
+        _showError(context, 'Failed to update steps: $e');
+      }
       return false;
     }
   }
@@ -208,18 +216,22 @@ class RealTimeInputService {
       await _dailySummaryService.updateWeight(userId, weight, bmi);
 
       // Show warnings if any
-      if (weightValidation.warningMessage != null) {
+      if (weightValidation.warningMessage != null && context.mounted) {
         InputValidationService.showValidationResult(context, weightValidation);
       }
-      if (bmiValidation.warningMessage != null) {
+      if (bmiValidation.warningMessage != null && context.mounted) {
         InputValidationService.showValidationResult(context, bmiValidation);
       }
 
-      _showSuccess(context, 'Weight updated: ${weight.toStringAsFixed(1)} kg');
+      if (context.mounted) {
+        _showSuccess(context, 'Weight updated: ${weight.toStringAsFixed(1)} kg');
+      }
       return true;
     } catch (e) {
       _errorHandler.handleFirebaseError('handleWeight', e);
-      _showError(context, 'Failed to update weight: $e');
+      if (context.mounted) {
+        _showError(context, 'Failed to update weight: $e');
+      }
       return false;
     }
   }
@@ -264,22 +276,26 @@ class RealTimeInputService {
       await _dailySummaryService.onMealLogged(userId, foodEntry);
 
       // Show warnings if any
-      if (nameValidation.warningMessage != null) {
+      if (nameValidation.warningMessage != null && context.mounted) {
         InputValidationService.showValidationResult(context, nameValidation);
       }
-      if (caloriesValidation.warningMessage != null) {
+      if (caloriesValidation.warningMessage != null && context.mounted) {
         InputValidationService.showValidationResult(
             context, caloriesValidation);
       }
-      if (portionValidation.warningMessage != null) {
+      if (portionValidation.warningMessage != null && context.mounted) {
         InputValidationService.showValidationResult(context, portionValidation);
       }
 
-      _showSuccess(context, 'Meal logged: ${foodEntry.name}');
+      if (context.mounted) {
+        _showSuccess(context, 'Meal logged: ${foodEntry.name}');
+      }
       return true;
     } catch (e) {
       _errorHandler.handleFirebaseError('handleMealLogging', e);
-      _showError(context, 'Failed to log meal: $e');
+      if (context.mounted) {
+        _showError(context, 'Failed to log meal: $e');
+      }
       return false;
     }
   }
@@ -334,11 +350,15 @@ class RealTimeInputService {
       // Force update to ensure immediate UI refresh
       appStateService.forceGoalsUpdate(goals);
 
-      _showSuccess(context, 'Goals updated successfully');
+      if (context.mounted) {
+        _showSuccess(context, 'Goals updated successfully');
+      }
       return true;
     } catch (e) {
       _errorHandler.handleFirebaseError('handleUserGoalsUpdate', e);
-      _showError(context, 'Failed to update goals: $e');
+      if (context.mounted) {
+        _showError(context, 'Failed to update goals: $e');
+      }
       return false;
     }
   }
@@ -356,11 +376,15 @@ class RealTimeInputService {
       // Save preferences to Firestore
       await _firebaseService.saveUserPreferences(userId, preferences);
 
-      _showSuccess(context, 'Preferences updated successfully');
+      if (context.mounted) {
+        _showSuccess(context, 'Preferences updated successfully');
+      }
       return true;
     } catch (e) {
       _errorHandler.handleFirebaseError('handleUserPreferencesUpdate', e);
-      _showError(context, 'Failed to update preferences: $e');
+      if (context.mounted) {
+        _showError(context, 'Failed to update preferences: $e');
+      }
       return false;
     }
   }
@@ -405,11 +429,15 @@ class RealTimeInputService {
       // Save profile to Firestore
       await _firebaseService.saveUserProfile(userId, profileData);
 
-      _showSuccess(context, 'Profile updated successfully');
+      if (context.mounted) {
+        _showSuccess(context, 'Profile updated successfully');
+      }
       return true;
     } catch (e) {
       _errorHandler.handleFirebaseError('handleProfileUpdate', e);
-      _showError(context, 'Failed to update profile: $e');
+      if (context.mounted) {
+        _showError(context, 'Failed to update profile: $e');
+      }
       return false;
     }
   }

@@ -119,11 +119,16 @@ class NutritionLookupService {
 
   /// Look up nutrition using USDA FoodData Central API
   static Future<Map<String, dynamic>?> _lookupWithUSDA(String foodName) async {
+    // Skip USDA API if no API key is provided
+    if (_usdaApiKey == 'YOUR_USDA_API_KEY') {
+      return null;
+    }
+
     try {
       final response = await http.get(
         Uri.parse('$_usdaBaseUrl?api_key=$_usdaApiKey&query=$foodName&pageSize=1'),
         headers: {'Content-Type': 'application/json'},
-      );
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -131,6 +136,8 @@ class NutritionLookupService {
         if (foods != null && foods.isNotEmpty) {
           return foods.first as Map<String, dynamic>;
         }
+      } else {
+        print('USDA API error: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       print('USDA API error: $e');

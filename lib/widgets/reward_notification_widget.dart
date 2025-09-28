@@ -190,7 +190,7 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
         gradient: LinearGradient(
           colors: [
             reward.color,
-            reward.color.withOpacity(0.8),
+            reward.color.withValues(alpha: 0.8),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -198,7 +198,7 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: reward.color.withOpacity(0.3),
+            color: reward.color.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -211,7 +211,7 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(25),
             ),
             child: Center(
@@ -259,7 +259,7 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Text(
@@ -295,7 +295,7 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.amber.withOpacity(0.5),
+            color: Colors.amber.withValues(alpha: 0.5),
             blurRadius: 30,
             offset: const Offset(0, 15),
           ),
@@ -361,7 +361,7 @@ class _RewardNotificationWidgetState extends State<RewardNotificationWidget>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -411,7 +411,7 @@ class StreakNotificationWidget extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.orange.withOpacity(0.3),
+              color: Colors.orange.withValues(alpha: 0.3),
               blurRadius: 10,
               offset: const Offset(0, 5),
             ),
@@ -450,7 +450,7 @@ class StreakNotificationWidget extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(

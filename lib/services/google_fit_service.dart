@@ -163,6 +163,75 @@ class GoogleFitService {
     }
   }
 
+  /// Enhanced authentication validation with retry mechanism
+  Future<bool> validateAuthenticationWithRetry({int maxRetries = 3}) async {
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        print('🔍 GoogleFitService: Authentication validation attempt $attempt/$maxRetries');
+        
+        if (_googleSignIn == null) {
+          print('❌ GoogleFitService: GoogleSignIn is null');
+          return false;
+        }
+
+        // Check if we're already authenticated with valid client
+        if (_isAuthenticated && _authClient != null && _googleSignIn!.currentUser != null) {
+          // Test the connection with a simple API call
+          try {
+            await getDailySteps(DateTime.now()).timeout(const Duration(seconds: 5));
+            print('✅ GoogleFitService: Authentication validated with API test');
+            return true;
+          } catch (e) {
+            print('⚠️ GoogleFitService: API test failed, re-authenticating...');
+            _isAuthenticated = false;
+            _authClient = null;
+          }
+        }
+
+        // Try to restore authentication
+        final isSignedIn = await _googleSignIn!.isSignedIn();
+        if (!isSignedIn) {
+          print('❌ GoogleFitService: Not signed in');
+          _isAuthenticated = false;
+          _authClient = null;
+          return false;
+        }
+
+        // Get current user and reinitialize client
+        final currentUser = _googleSignIn!.currentUser;
+        if (currentUser != null) {
+          _isAuthenticated = true;
+          await _initializeAuthClient();
+          
+          // Test the connection
+          try {
+            await getDailySteps(DateTime.now()).timeout(const Duration(seconds: 5));
+            print('✅ GoogleFitService: Authentication restored and validated');
+            return true;
+          } catch (e) {
+            print('⚠️ GoogleFitService: API test failed after re-initialization');
+            if (attempt < maxRetries) {
+              await Future.delayed(Duration(seconds: attempt * 2)); // Exponential backoff
+              continue;
+            }
+          }
+        }
+
+        return false;
+      } catch (e) {
+        print('❌ GoogleFitService: Authentication validation error (attempt $attempt): $e');
+        if (attempt < maxRetries) {
+          await Future.delayed(Duration(seconds: attempt * 2));
+        }
+      }
+    }
+    
+    print('❌ GoogleFitService: All authentication validation attempts failed');
+    _isAuthenticated = false;
+    _authClient = null;
+    return false;
+  }
+
   /// Authenticate user with Google Fit
   Future<bool> authenticate() async {
     try {
@@ -219,16 +288,45 @@ class GoogleFitService {
       _authClient != null &&
       _googleSignIn?.currentUser != null;
 
-  /// Sign out from Google Fit
+  /// Sign out from Google Fit with complete cleanup
   Future<void> signOut() async {
     try {
-      await _googleSignIn?.signOut();
-      _authClient?.close();
-      _authClient = null;
+      print('🔌 GoogleFitService: Starting sign out process...');
+      
+      // Stop live sync first
+      stopLiveSync();
+      
+      // Close HTTP client
+      if (_authClient != null) {
+        _authClient!.close();
+        _authClient = null;
+        print('🔌 GoogleFitService: HTTP client closed');
+      }
+      
+      // Sign out from Google Sign-In
+      if (_googleSignIn != null) {
+        await _googleSignIn!.signOut();
+        print('🔌 GoogleFitService: Google Sign-In signed out');
+      }
+      
+      // Reset authentication state
       _isAuthenticated = false;
+      
+      // Clear any cached data
+      _liveDataController?.close();
+      _liveDataController = null;
+      
       _logger.i('Signed out from Google Fit');
+      print('✅ GoogleFitService: Sign out completed successfully');
     } catch (e) {
       _logger.e('Sign out failed: $e');
+      print('❌ GoogleFitService: Sign out error: $e');
+      
+      // Force reset state even if sign out fails
+      _isAuthenticated = false;
+      _authClient = null;
+      _liveDataController?.close();
+      _liveDataController = null;
     }
   }
 
@@ -244,6 +342,12 @@ class GoogleFitService {
     // Check network connectivity first
     if (!await _hasNetworkConnection()) {
       _logger.w('No network connection available for Google Fit API');
+      return null;
+    }
+
+    // Validate date
+    if (date.isAfter(DateTime.now())) {
+      _logger.w('Cannot get steps for future date');
       return null;
     }
 

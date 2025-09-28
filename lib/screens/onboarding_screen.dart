@@ -26,6 +26,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   final _ageController = TextEditingController();
   final _heightController = TextEditingController();
   final _weightController = TextEditingController();
+  
+  // Goals controllers
+  final _weightGoalController = TextEditingController();
+  final _calorieGoalController = TextEditingController();
+  final _stepsGoalController = TextEditingController();
+  final _waterGoalController = TextEditingController();
 
   // Form state
   String? _selectedGender;
@@ -167,6 +173,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _weightController.addListener(() {
       setState(() {});
     });
+    _weightGoalController.addListener(() {
+      setState(() {});
+    });
+    _calorieGoalController.addListener(() {
+      setState(() {});
+    });
+    _stepsGoalController.addListener(() {
+      setState(() {});
+    });
+    _waterGoalController.addListener(() {
+      setState(() {});
+    });
   }
 
   @override
@@ -175,6 +193,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _ageController.dispose();
     _heightController.dispose();
     _weightController.dispose();
+    _weightGoalController.dispose();
+    _calorieGoalController.dispose();
+    _stepsGoalController.dispose();
+    _waterGoalController.dispose();
     super.dispose();
   }
 
@@ -289,11 +311,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   Widget _buildProgressIndicator() {
     return Row(
-      children: List.generate(4, (index) {
+      children: List.generate(5, (index) {
         return Expanded(
           child: Container(
             height: 4,
-            margin: EdgeInsets.only(right: index < 3 ? 8 : 0),
+            margin: EdgeInsets.only(right: index < 4 ? 8 : 0),
             decoration: BoxDecoration(
               color: index <= _currentStep
                   ? kPrimaryColor
@@ -316,6 +338,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         return _buildFitnessGoalStep();
       case 3:
         return _buildDietPreferenceStep();
+      case 4:
+        return _buildGoalsStep();
       default:
         return _buildPersonalInfoStep();
     }
@@ -498,6 +522,71 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               });
             },
           )).toList(),
+          const SizedBox(height: 24), // Extra spacing at bottom
+        ],
+    );
+  }
+
+  Widget _buildGoalsStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+          Text(
+            'Set Your Goals',
+            style: GoogleFonts.poppins(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: kTextPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Define your daily targets for a healthier lifestyle',
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              color: kTextSecondary,
+            ),
+          ),
+          const SizedBox(height: 32),
+          
+          // Weight Goal
+          _buildInputField(
+            controller: _weightGoalController,
+            label: 'Weight Goal',
+            hint: 'Enter your target weight',
+            suffix: 'kg',
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 24),
+          
+          // Daily Calorie Goal
+          _buildInputField(
+            controller: _calorieGoalController,
+            label: 'Daily Calorie Goal',
+            hint: 'Enter your daily calorie target',
+            suffix: 'cal',
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 24),
+          
+          // Daily Steps Goal
+          _buildInputField(
+            controller: _stepsGoalController,
+            label: 'Daily Steps Goal',
+            hint: 'Enter your daily steps target',
+            suffix: 'steps',
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 24),
+          
+          // Daily Water Goal
+          _buildInputField(
+            controller: _waterGoalController,
+            label: 'Daily Water Goal',
+            hint: 'Enter your daily water target',
+            suffix: 'glasses',
+            keyboardType: TextInputType.number,
+          ),
           const SizedBox(height: 24), // Extra spacing at bottom
         ],
     );
@@ -751,6 +840,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         canProceed = _selectedDietPreference != null;
         print('Step 3 - Diet Preference: $_selectedDietPreference, Can proceed: $canProceed');
         break;
+      case 4:
+        canProceed = _weightGoalController.text.isNotEmpty &&
+            _calorieGoalController.text.isNotEmpty &&
+            _stepsGoalController.text.isNotEmpty &&
+            _waterGoalController.text.isNotEmpty;
+        print('Step 4 - Weight Goal: ${_weightGoalController.text}, Calorie Goal: ${_calorieGoalController.text}, Steps Goal: ${_stepsGoalController.text}, Water Goal: ${_waterGoalController.text}, Can proceed: $canProceed');
+        break;
       default:
         canProceed = false;
     }
@@ -776,7 +872,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   void _nextStep() {
     print('Next step pressed - Current step: $_currentStep, Can proceed: ${_canProceed()}');
-    if (_currentStep < 3) {
+    if (_currentStep < 4) {
       setState(() {
         _currentStep++;
       });
@@ -859,66 +955,83 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   // Create initial goals based on onboarding data
   Future<void> _createInitialGoals(String userId, Map<String, dynamic> profileData) async {
     try {
-      final age = profileData['age'] as int;
-      final gender = profileData['gender'] as String;
-      final height = profileData['height'] as double;
-      final weight = profileData['weight'] as double;
-      final activityLevel = profileData['activityLevel'] as String;
-      final fitnessGoal = profileData['fitnessGoal'] as String;
-
-      // Calculate BMR (Basal Metabolic Rate) using Mifflin-St Jeor Equation
-      double bmr;
-      if (gender.toLowerCase() == 'male') {
-        bmr = 10 * weight + 6.25 * height - 5 * age + 5;
+      // Use goals from onboarding if provided, otherwise calculate defaults
+      final weightGoal = double.tryParse(_weightGoalController.text);
+      final calorieGoal = int.tryParse(_calorieGoalController.text);
+      final stepsGoal = int.tryParse(_stepsGoalController.text);
+      final waterGoal = int.tryParse(_waterGoalController.text);
+      
+      // If goals not provided, calculate defaults based on profile data
+      double finalCalorieGoal;
+      int finalStepsGoal;
+      int finalWaterGoal;
+      
+      if (calorieGoal != null) {
+        finalCalorieGoal = calorieGoal.toDouble();
       } else {
-        bmr = 10 * weight + 6.25 * height - 5 * age - 161;
-      }
+        // Calculate BMR (Basal Metabolic Rate) using Mifflin-St Jeor Equation
+        final age = profileData['age'] as int;
+        final gender = profileData['gender'] as String;
+        final height = profileData['height'] as double;
+        final weight = profileData['weight'] as double;
+        final activityLevel = profileData['activityLevel'] as String;
+        final fitnessGoal = profileData['fitnessGoal'] as String;
 
-      // Calculate TDEE (Total Daily Energy Expenditure) based on activity level
-      double tdee = bmr;
-      switch (activityLevel.toLowerCase()) {
-        case 'sedentary':
-          tdee = bmr * 1.2;
-          break;
-        case 'lightly active':
-          tdee = bmr * 1.375;
-          break;
-        case 'moderately active':
-          tdee = bmr * 1.55;
-          break;
-        case 'very active':
-          tdee = bmr * 1.725;
-          break;
-        case 'extremely active':
-          tdee = bmr * 1.9;
-          break;
-      }
+        double bmr;
+        if (gender.toLowerCase() == 'male') {
+          bmr = 10 * weight + 6.25 * height - 5 * age + 5;
+        } else {
+          bmr = 10 * weight + 6.25 * height - 5 * age - 161;
+        }
 
-      // Adjust calorie goal based on fitness goal
-      double calorieGoal = tdee;
-      switch (fitnessGoal.toLowerCase()) {
-        case 'weight loss':
-          calorieGoal = tdee - 500; // 500 calorie deficit
-          break;
-        case 'weight gain':
-          calorieGoal = tdee + 500; // 500 calorie surplus
-          break;
-        case 'muscle building':
-          calorieGoal = tdee + 300; // 300 calorie surplus
-          break;
-        case 'maintenance':
-        default:
-          calorieGoal = tdee;
-          break;
+        // Calculate TDEE (Total Daily Energy Expenditure) based on activity level
+        double tdee = bmr;
+        switch (activityLevel.toLowerCase()) {
+          case 'sedentary':
+            tdee = bmr * 1.2;
+            break;
+          case 'lightly active':
+            tdee = bmr * 1.375;
+            break;
+          case 'moderately active':
+            tdee = bmr * 1.55;
+            break;
+          case 'very active':
+            tdee = bmr * 1.725;
+            break;
+          case 'extremely active':
+            tdee = bmr * 1.9;
+            break;
+        }
+
+        // Adjust calorie goal based on fitness goal
+        switch (fitnessGoal.toLowerCase()) {
+          case 'weight loss':
+            finalCalorieGoal = tdee - 500; // 500 calorie deficit
+            break;
+          case 'weight gain':
+            finalCalorieGoal = tdee + 500; // 500 calorie surplus
+            break;
+          case 'muscle building':
+            finalCalorieGoal = tdee + 300; // 300 calorie surplus
+            break;
+          case 'maintenance':
+          default:
+            finalCalorieGoal = tdee;
+            break;
+        }
       }
+      
+      finalStepsGoal = stepsGoal ?? 10000;
+      finalWaterGoal = waterGoal ?? 8;
 
       // Create initial goals
       final initialGoals = {
-        'calorieGoal': calorieGoal.round(),
-        'waterGlassesGoal': 8,
-        'stepsPerDayGoal': 10000,
-        'sleepGoal': 8.0,
-        'fitnessGoal': fitnessGoal,
+        'weightGoal': weightGoal,
+        'calorieGoal': finalCalorieGoal.round(),
+        'waterGlassesGoal': finalWaterGoal,
+        'stepsPerDayGoal': finalStepsGoal,
+        'fitnessGoal': profileData['fitnessGoal'] as String,
         'createdAt': DateTime.now().toIso8601String(),
         'lastUpdated': DateTime.now().toIso8601String(),
       };

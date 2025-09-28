@@ -192,6 +192,16 @@ class OptimizedFirebaseService {
       return;
     }
 
+    if (userId.isEmpty) {
+      print('Error: User ID cannot be empty');
+      return;
+    }
+
+    if (entry.id.isEmpty) {
+      print('Error: Entry ID cannot be empty');
+      return;
+    }
+
     try {
       if (_isOffline) {
         // Store for later when online
