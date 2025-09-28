@@ -185,11 +185,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     // This prevents excessive refresh when switching between screens
     if (!_hasInitialized) {
       _hasInitialized = true;
-      // Refresh goals when screen becomes visible
-      _forceRefreshGoals();
-      
-      // Refresh consumed calories and macro nutrients when screen becomes visible
-      _refreshFoodData();
+    // Refresh goals when screen becomes visible
+    _forceRefreshGoals();
+    
+    // Refresh consumed calories and macro nutrients when screen becomes visible
+    _refreshFoodData();
       
       // Refresh Google Fit data when screen becomes visible
       _loadGoogleFitDataImmediate();
@@ -518,11 +518,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             if (_tasks.length != tasks.length || 
                 !_listsEqual(_tasks, tasks)) {
               // Update immediately without delay to prevent buffering
-              setState(() {
-                _tasks = tasks;
-                _isTasksLoading = false;
-                _hasUserTasks = _taskService.hasUserTasks();
-              });
+                  setState(() {
+                    _tasks = tasks;
+                    _isTasksLoading = false;
+                    _hasUserTasks = _taskService.hasUserTasks();
+                  });
               debugPrint('📋 UI updated instantly with ${_tasks.length} tasks, hasUserTasks: $_hasUserTasks');
             }
             
@@ -1355,7 +1355,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       }
       
       // Force refresh from unified manager with timeout
-      if (_isGoogleFitConnected) {
+    if (_isGoogleFitConnected) {
         final data = await _unifiedGoogleFitManager.forceRefresh().timeout(
           const Duration(seconds: 5),
           onTimeout: () {
@@ -2133,7 +2133,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         // Update with fresh data if initialization succeeds
         if (mounted) {
           setState(() {
-            _streakSummary = _enhancedStreakService.currentStreaks;
+      _streakSummary = _enhancedStreakService.currentStreaks;
           });
         }
       }).catchError((e) {
@@ -3596,82 +3596,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-  /// Show rewards details dialog
-  void _showRewardsDetails() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _buildRewardsBottomSheet(),
-    );
-  }
-
-  /// Build rewards bottom sheet
-  Widget _buildRewardsBottomSheet() {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.8,
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        children: [
-          // Handle bar
-          Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Rewards & Achievements',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-          ),
-
-          // Content
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Weekly Streak Calendar - Widget removed for simplification
-                  // WeeklyStreakCalendar(
-                  //   goalStreaks: _streakSummary.goalStreaks,
-                  //   weekStart: DateTime.now()
-                  //       .subtract(Duration(days: DateTime.now().weekday - 1)),
-                  // ),
-                  const SizedBox(height: 24),
-
-                  // Goal Streaks
-                  _buildGoalStreaksSection(),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   /// Build goal streaks section
   Widget _buildGoalStreaksSection() {
@@ -3852,10 +3776,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   // Current Streaks Section
                   _buildGoalStreaksSection(),
                   const SizedBox(height: 32),
-
-                  // Rewards & Achievements Section
-                  ProfileWidgets.buildRewardsSection(context, _userProgress),
-                  const SizedBox(height: 40),
                 ],
               ),
             ),

@@ -282,12 +282,13 @@ class EnhancedStreakService {
       final endDate = DateTime.now();
       final startDate = endDate.subtract(Duration(days: days));
 
+      // Query using milliseconds since epoch (int) format
       final querySnapshot = await _firestore
           .collection('users')
           .doc(userId)
-          .collection('dailySummary')
-          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
-          .where('date', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+          .collection('daily_summaries')
+          .where('date', isGreaterThanOrEqualTo: startDate.millisecondsSinceEpoch)
+          .where('date', isLessThanOrEqualTo: endDate.millisecondsSinceEpoch)
           .orderBy('date', descending: true)
           .get();
 

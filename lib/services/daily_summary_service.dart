@@ -54,7 +54,7 @@ class DailySummaryService {
     return _firestore
         .collection('users')
         .doc(userId)
-        .collection('dailySummary')
+        .collection('daily_summaries')
         .doc(dateKey)
         .snapshots()
         .map((doc) {
@@ -106,7 +106,7 @@ class DailySummaryService {
       final docRef = _firestore
           .collection('users')
           .doc(userId)
-          .collection('dailySummary')
+          .collection('daily_summaries')
           .doc(dateKey);
 
       await docRef.set({
@@ -160,7 +160,7 @@ class DailySummaryService {
       final docRef = _firestore
           .collection('users')
           .doc(userId)
-          .collection('dailySummary')
+          .collection('daily_summaries')
           .doc(dateKey);
 
       await docRef.set({
@@ -200,7 +200,7 @@ class DailySummaryService {
       final docRef = _firestore
           .collection('users')
           .doc(userId)
-          .collection('dailySummary')
+          .collection('daily_summaries')
           .doc(dateKey);
 
       // Get current summary
@@ -262,7 +262,7 @@ class DailySummaryService {
       final docRef = _firestore
           .collection('users')
           .doc(userId)
-          .collection('dailySummary')
+          .collection('daily_summaries')
           .doc(dateKey);
 
       await docRef.set({
@@ -296,7 +296,7 @@ class DailySummaryService {
       final docRef = _firestore
           .collection('users')
           .doc(userId)
-          .collection('dailySummary')
+          .collection('daily_summaries')
           .doc(dateKey);
 
       await docRef.set({
@@ -331,7 +331,7 @@ class DailySummaryService {
     return _firestore
         .collection('users')
         .doc(userId)
-        .collection('dailySummary')
+        .collection('daily_summaries')
         .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
         .where('date', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
         .orderBy('date', descending: true)
@@ -353,7 +353,7 @@ class DailySummaryService {
       final doc = await _firestore
           .collection('users')
           .doc(userId)
-          .collection('dailySummary')
+          .collection('daily_summaries')
           .doc(dateKey)
           .get();
 
@@ -375,7 +375,7 @@ class DailySummaryService {
       final docRef = _firestore
           .collection('users')
           .doc(userId)
-          .collection('dailySummary')
+          .collection('daily_summaries')
           .doc(dateKey);
 
       await docRef.set({
