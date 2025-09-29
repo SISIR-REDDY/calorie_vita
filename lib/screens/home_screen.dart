@@ -4,6 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../ui/app_colors.dart';
+import '../ui/responsive_utils.dart';
+import '../ui/responsive_widgets.dart';
+import '../ui/dynamic_columns.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
 import '../models/simple_streak_system.dart';
@@ -56,7 +59,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     with
         TickerProviderStateMixin,
         GoogleFitSyncMixin,
-        GoogleFitDataDisplayMixin {
+        GoogleFitDataDisplayMixin,
+        ResponsiveWidgetMixin,
+        DynamicColumnMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -3597,55 +3602,59 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
 
-  /// Build goal streaks section
+  /// Build goal streaks section with responsive design
   Widget _buildGoalStreaksSection() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
+    return ResponsiveCard(
+      padding: responsivePadding,
+      margin: responsiveMargin,
+      borderRadius: ResponsiveUtils.getResponsiveBorderRadius(context, 24.0),
+      elevation: ResponsiveUtils.getResponsiveElevation(context, 2.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(ResponsiveUtils.getResponsiveSpacing(context, 12.0)),
                 decoration: BoxDecoration(
                   color: kAccentColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(
+                    ResponsiveUtils.getResponsiveBorderRadius(context, 12.0),
+                  ),
                 ),
-                child: const Icon(Icons.trending_up,
-                    color: kAccentColor, size: 24),
+                child: ResponsiveIcon(
+                  Icons.trending_up,
+                  color: kAccentColor,
+                  size: ResponsiveUtils.getResponsiveIconSize(context, 24.0),
+                ),
               ),
-              const SizedBox(width: 12),
-              Text(
+              SizedBox(width: ResponsiveUtils.getResponsiveSpacing(context, 12.0)),
+              ResponsiveText(
                 'Daily Goal Streaks',
-                style: GoogleFonts.poppins(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context, 20.0)),
           
-          // Display actual goal streaks
+          // Display actual goal streaks with responsive layout
           if (_isStreakLoading)
-            ...List.generate(4, (index) => ProfileWidgets.buildLoadingStreakCard(context))
+            ...List.generate(4, (index) => 
+              Padding(
+                padding: EdgeInsets.only(
+                  bottom: ResponsiveUtils.getResponsiveSpacing(context, 12.0),
+                ),
+                child: ProfileWidgets.buildLoadingStreakCard(context),
+              ),
+            )
           else
             ..._streakSummary.goalStreaks.values.map(
               (streak) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: EdgeInsets.only(
+                  bottom: ResponsiveUtils.getResponsiveSpacing(context, 12.0),
+                ),
                 child: ProfileWidgets.buildGoalStreakCard(context, streak),
               ),
             ),

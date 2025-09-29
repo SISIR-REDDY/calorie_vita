@@ -9,6 +9,7 @@ import 'screens/onboarding_screen.dart';
 import 'widgets/reward_notification_widget.dart';
 import 'widgets/setup_warning_popup.dart';
 import 'ui/app_theme.dart';
+import 'ui/responsive_utils.dart';
 import 'services/app_state_manager.dart';
 import 'services/global_google_fit_manager.dart';
 import 'services/setup_check_service.dart';

@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../ui/app_colors.dart';
+import '../ui/responsive_utils.dart';
+import '../ui/responsive_widgets.dart';
+import '../ui/dynamic_columns.dart';
 import '../services/analytics_service.dart';
 import '../services/firebase_service.dart';
 import '../services/ai_service.dart';
@@ -29,7 +32,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     with
         TickerProviderStateMixin,
         GoogleFitSyncMixin,
-        GoogleFitDataDisplayMixin {
+        GoogleFitDataDisplayMixin,
+        ResponsiveWidgetMixin,
+        DynamicColumnMixin {
   String _selectedPeriod = 'Daily';
   final List<String> _periods = ['Daily', 'Weekly'];
 

@@ -3,55 +3,64 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/simple_streak_system.dart';
 import '../models/reward_system.dart';
 import '../ui/app_colors.dart';
+import '../ui/responsive_utils.dart';
+import '../ui/responsive_widgets.dart';
 
 /// Profile widgets for streaks and rewards
 class ProfileWidgets {
-  /// Build loading streak card
+  /// Build loading streak card with responsive design
   static Widget buildLoadingStreakCard(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
-      ),
+    return ResponsiveCard(
+      padding: ResponsiveUtils.getResponsivePadding(context),
+      borderRadius: ResponsiveUtils.getResponsiveBorderRadius(context, 16.0),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: ResponsiveUtils.getResponsiveIconSize(context, 40.0),
+            height: ResponsiveUtils.getResponsiveIconSize(context, 40.0),
             decoration: BoxDecoration(
               color: Colors.grey.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(
+                ResponsiveUtils.getResponsiveBorderRadius(context, 8.0),
+              ),
             ),
-            child: const Center(
+            child: Center(
               child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                width: ResponsiveUtils.getResponsiveIconSize(context, 20.0),
+                height: ResponsiveUtils.getResponsiveIconSize(context, 20.0),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context).primaryColor,
+                  ),
+                ),
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: ResponsiveUtils.getResponsiveSpacing(context, 12.0)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  height: 16,
-                  width: 120,
+                  height: ResponsiveUtils.getResponsiveFontSize(context, 16.0),
+                  width: ResponsiveUtils.getResponsiveSpacing(context, 120.0),
                   decoration: BoxDecoration(
                     color: Colors.grey.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(
+                      ResponsiveUtils.getResponsiveBorderRadius(context, 4.0),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context, 8.0)),
                 Container(
-                  height: 12,
-                  width: 80,
+                  height: ResponsiveUtils.getResponsiveFontSize(context, 12.0),
+                  width: ResponsiveUtils.getResponsiveSpacing(context, 80.0),
                   decoration: BoxDecoration(
                     color: Colors.grey.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(
+                      ResponsiveUtils.getResponsiveBorderRadius(context, 4.0),
+                    ),
                   ),
                 ),
               ],
