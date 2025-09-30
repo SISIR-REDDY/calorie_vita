@@ -21,35 +21,52 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   bool _isGoogleSigningIn = false;
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
+    _initializeAnimations();
+    _setupAuthListener();
+  }
+
+  void _initializeAnimations() {
     _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 800), // Reduced duration
       vsync: this,
     );
     _slideController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 600), // Reduced duration
       vsync: this,
     );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
     );
 
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.2),
+      begin: const Offset(0, 0.1), // Reduced offset
       end: Offset.zero,
     ).animate(
-        CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
+        CurvedAnimation(parent: _slideController, curve: Curves.easeOut));
 
-    // Start animations
-    _fadeController.forward();
-    Future.delayed(const Duration(milliseconds: 200), () {
-      _slideController.forward();
+    // Start animations with a small delay to ensure UI is ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _fadeController.forward();
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            _slideController.forward();
+          }
+        });
+        setState(() {
+          _isInitialized = true;
+        });
+      }
     });
+  }
 
+  void _setupAuthListener() {
     // Listen to auth state changes for immediate navigation
     _authService.userStream.listen((user) {
       if (user != null && mounted) {
@@ -152,22 +169,54 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     return Scaffold(
       backgroundColor: kAppBackground,
       body: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: CustomScrollView(
-              slivers: [
-                _buildHeaderSection(),
-                _buildAuthenticationSection(),
-                _buildFeaturesSection(),
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 40),
+        child: _isInitialized
+            ? FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: CustomScrollView(
+                    slivers: [
+                      _buildHeaderSection(),
+                      _buildAuthenticationSection(),
+                      _buildFeaturesSection(),
+                      const SliverToBoxAdapter(
+                        child: SizedBox(height: 40),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              )
+            : _buildLoadingState(),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Image.asset(
+            'calorie_logo.png',
+            width: 80,
+            height: 80,
+            fit: BoxFit.contain,
           ),
-        ),
+          const SizedBox(height: 24),
+          Text(
+            'Welcome to Calorie Vita',
+            style: GoogleFonts.inter(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: kTextPrimary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          const CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(kAccentBlue),
+          ),
+        ],
       ),
     );
   }

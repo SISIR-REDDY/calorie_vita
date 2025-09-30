@@ -1382,22 +1382,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
               child: Row(
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.asset(
-                        'calorie_logo.png',
-                        width: 40,
-                        height: 40,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
+                  Image.asset(
+                    'calorie_logo.png',
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.contain,
                   ),
                   const SizedBox(width: 16),
                   const Expanded(

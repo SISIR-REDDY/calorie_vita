@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'screens/home_screen.dart';
 import 'screens/analytics_screen.dart';
 import 'screens/camera_screen.dart';
@@ -9,6 +10,7 @@ import 'screens/onboarding_screen.dart';
 import 'widgets/reward_notification_widget.dart';
 import 'widgets/setup_warning_popup.dart';
 import 'ui/app_theme.dart';
+import 'ui/app_colors.dart';
 import 'ui/responsive_utils.dart';
 import 'services/app_state_manager.dart';
 import 'services/global_google_fit_manager.dart';
@@ -187,7 +189,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
 
         if (snapshot.connectionState == ConnectionState.waiting) {
           print('App state waiting...');
-          return const Center(child: CircularProgressIndicator());
+          return _buildLoadingScreen();
         }
 
         final appState = snapshot.data;
@@ -202,6 +204,37 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
         print('User authenticated, showing main navigation');
         return const MainNavigation();
       },
+    );
+  }
+
+  Widget _buildLoadingScreen() {
+    return Scaffold(
+      backgroundColor: kAppBackground,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              'calorie_logo.png',
+              width: 80,
+              height: 80,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 24),
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(kAccentBlue),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Loading...',
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                color: kTextSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -484,6 +484,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Close loading dialog
           Navigator.pop(context);
           
+          // Add a small delay to ensure auth state is properly updated
+          await Future.delayed(const Duration(milliseconds: 100));
+          
           // Navigate to welcome screen
           Navigator.pushNamedAndRemoveUntil(
               context, '/welcome', (route) => false);

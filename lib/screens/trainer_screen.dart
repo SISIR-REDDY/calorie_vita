@@ -1242,22 +1242,11 @@ class _AITrainerScreenState extends State<AITrainerScreen>
           elevation: 0,
           title: Row(
             children: [
-              Container(
+              Image.asset(
+                'calorie_logo.png',
                 width: 48,
                 height: 48,
-                decoration: BoxDecoration(
-                  color: kAccentBlue,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: Image.asset(
-                    'calorie_logo.png',
-                    width: 48,
-                    height: 48,
-                    fit: BoxFit.cover,
-                  ),
-                ),
+                fit: BoxFit.contain,
               ),
               const SizedBox(width: 12),
               Text('Trainer Sisir',
