@@ -95,6 +95,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   // Debouncing for UI updates
   Timer? _uiUpdateTimer;
   bool _hasPendingUIUpdate = false;
+
+  // Manual overrides for today's edits (UI-first, persisted via _dailySummary)
+  int? _manualCaloriesConsumedOverride;
+  int? _manualCaloriesBurnedOverride;
   
   // UI update throttling - Optimized for sub-second updates
   DateTime? _lastUIUpdate;
@@ -245,7 +249,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       // Listen to consumed calories stream (same data as TodaysFoodScreen)
       _todaysFoodCaloriesSubscription = _todaysFoodDataService.consumedCaloriesStream.listen((calories) {
         _debounceUIUpdate(() {
-          if (mounted && _dailySummary != null) {
+          if (!mounted) return;
+          // Respect manual override for the current session
+          if (_manualCaloriesConsumedOverride != null) return;
+          if (_dailySummary != null) {
             _dailySummary = _dailySummary!.copyWith(caloriesConsumed: calories);
           }
         });
@@ -1840,14 +1847,17 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
     setState(() {
       if (type == 'consumed') {
-        _dailySummary = _dailySummary!.copyWith(caloriesConsumed: value);
+        // Manual consumed editing disabled; ignore
       } else {
+        _manualCaloriesBurnedOverride = value;
         _dailySummary = _dailySummary!.copyWith(caloriesBurned: value);
       }
     });
 
     // Save to Firestore or local storage
-    await _saveDailySummaryToFirestore();
+    if (type != 'consumed') {
+      await _saveDailySummaryToFirestore();
+    }
     
     // Refresh streaks after calorie update
     try {
@@ -2833,32 +2843,27 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             Row(
               children: [
                 Expanded(
-                  child: GestureDetector(
-                    onTap: () => _showCalorieInputDialog('consumed'),
-                    child: _buildEnhancedSummaryCard(
-                      'Consumed',
-                      _calorieUnitsService.formatCaloriesShort(
-                          summary.caloriesConsumed.toDouble()),
-                      _calorieUnitsService.unitSuffix,
-                      Icons.restaurant,
-                      Colors.green[600]!,
-                      'Tap to edit calories consumed',
-                    ),
+                  child: _buildEnhancedSummaryCard(
+                    'Consumed',
+                    _calorieUnitsService.formatCaloriesShort(
+                        summary.caloriesConsumed.toDouble()),
+                    _calorieUnitsService.unitSuffix,
+                    Icons.restaurant,
+                    Colors.green[600]!,
+                    'Auto-tracked from Food Log',
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: GestureDetector(
-                    onTap: () => _showCalorieInputDialog('burned'),
-                    child: _buildEnhancedSummaryCard(
-                      'Burned',
-                      _calorieUnitsService.formatCaloriesShort(
-                          (_googleFitCaloriesBurned?.round() ?? 0).toDouble()),
-                      _calorieUnitsService.unitSuffix,
-                      Icons.directions_run,
-                      Colors.red[600]!,
-                      'Tap to edit calories burned',
-                    ),
+                  child: _buildEnhancedSummaryCard(
+                    'Burned',
+                    _calorieUnitsService.formatCaloriesShort(
+                        (_googleFitCaloriesBurned?.round() ?? summary.caloriesBurned)
+                          .toDouble()),
+                    _calorieUnitsService.unitSuffix,
+                    Icons.directions_run,
+                    Colors.red[600]!,
+                    'Synced from Google Fit',
                   ),
                 ),
               ],
@@ -2973,11 +2978,17 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     final fitnessGoal = (userGoals?.fitnessGoal ??
         profileData?['fitnessGoal']?.toString() ?? 'maintenance');
     
+    // Use manual overrides if available for immediate UI accuracy
+    // Consumed should be sourced from data, not manual input
+    final uiCaloriesConsumed = _dailySummary!.caloriesConsumed;
+    // Burned should always reflect synced Google Fit data, not manual edits
+    final uiCaloriesBurned = (_googleFitCaloriesBurned?.round() ?? _dailySummary!.caloriesBurned);
+
     // Calculate remaining calories based on fitness goal
     final caloriesToTarget = FitnessGoalCalculator.calculateRemainingCalories(
       fitnessGoal: fitnessGoal,
-      caloriesConsumed: _dailySummary!.caloriesConsumed,
-      caloriesBurned: _dailySummary!.caloriesBurned,
+      caloriesConsumed: uiCaloriesConsumed,
+      caloriesBurned: uiCaloriesBurned,
       baseCalorieGoal: _dailySummary!.caloriesGoal,
     );
     
