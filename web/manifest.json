@@ -1,11 +1,11 @@
 {
-    "name": "calorie_vita",
-    "short_name": "calorie_vita",
+    "name": "Calorie Vita",
+    "short_name": "Calorie Vita",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#FFFFFF",
     "theme_color": "#FFFFFF",
-    "description": "A new Flutter project.",
+    "description": "Track your nutrition, achieve your goals with AI-powered insights",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
