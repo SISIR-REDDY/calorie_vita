@@ -2969,7 +2969,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   Widget _buildCaloriesToTargetCard() {
     // Get user goals to determine fitness goal
     final userGoals = _appStateService.userGoals;
-    final fitnessGoal = userGoals?.fitnessGoal ?? 'maintenance';
+    final profileData = _appStateService.profileData;
+    final fitnessGoal = (userGoals?.fitnessGoal ??
+        profileData?['fitnessGoal']?.toString() ?? 'maintenance');
     
     // Calculate remaining calories based on fitness goal
     final caloriesToTarget = FitnessGoalCalculator.calculateRemainingCalories(

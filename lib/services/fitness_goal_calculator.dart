@@ -2,6 +2,10 @@
 
 /// Service for calculating calorie targets based on fitness goals
 class FitnessGoalCalculator {
+  /// Normalize goal labels to a canonical snake_case key
+  static String _normalizeGoal(String fitnessGoal) {
+    return fitnessGoal.trim().toLowerCase().replaceAll(' ', '_');
+  }
   /// Calculate daily calorie target based on fitness goal
   static int calculateDailyCalorieTarget({
     required String fitnessGoal,
@@ -9,24 +13,8 @@ class FitnessGoalCalculator {
     required int caloriesConsumed,
     required int caloriesBurned,
   }) {
-    switch (fitnessGoal.toLowerCase()) {
-      case 'weight_loss':
-        // For weight loss: base goal - consumed (focus on eating less)
-        return baseCalorieGoal - caloriesConsumed;
-      
-      case 'weight_gain':
-        // For weight gain: base goal - consumed (focus on eating more)
-        return baseCalorieGoal - caloriesConsumed;
-      
-      case 'muscle_building':
-        // For muscle building: base goal - consumed (focus on eating more)
-        return baseCalorieGoal - caloriesConsumed;
-      
-      case 'maintenance':
-      default:
-        // For maintenance: base goal - consumed (focus on balance)
-        return baseCalorieGoal - caloriesConsumed;
-    }
+    // Return the configured target; upstream logic already adjusts base goal per goal
+    return baseCalorieGoal;
   }
 
   /// Calculate remaining calories to reach goal based on fitness goal
@@ -36,8 +24,23 @@ class FitnessGoalCalculator {
     required int caloriesBurned,
     required int baseCalorieGoal,
   }) {
-    // Simple calculation: base goal - consumed calories
-    return baseCalorieGoal - caloriesConsumed;
+    // Groups/formulas:
+    // Weight Loss Group (Target - Burned): Weight Loss, General Fitness
+    // Weight Gain Group (Target - Consumed): Weight Gain, Muscle Building, Athletic Performance
+    // Maintenance Group (Target + Consumed - Burned): Maintenance
+    final goal = _normalizeGoal(fitnessGoal);
+    switch (goal) {
+      case 'weight_loss':
+      case 'general_fitness':
+        return baseCalorieGoal - caloriesBurned;
+      case 'weight_gain':
+      case 'muscle_building':
+      case 'athletic_performance':
+        return baseCalorieGoal - caloriesConsumed;
+      case 'maintenance':
+      default:
+        return baseCalorieGoal + caloriesConsumed - caloriesBurned;
+    }
   }
 
   /// Get motivational message based on fitness goal and progress
@@ -46,12 +49,15 @@ class FitnessGoalCalculator {
     required int remainingCalories,
     required bool isGoalReached,
   }) {
+    final goal = _normalizeGoal(fitnessGoal);
     if (isGoalReached) {
-      switch (fitnessGoal.toLowerCase()) {
+      switch (goal) {
         case 'weight_loss':
-          return 'Great job! You\'ve reached your weight loss target! 🎯';
+        case 'general_fitness':
+          return 'Great job! You\'ve reached your burn target! 🎯';
         case 'weight_gain':
-          return 'Excellent! You\'ve hit your weight gain goal! 💪';
+        case 'athletic_performance':
+          return 'Excellent! You\'ve hit your intake target! 💪';
         case 'muscle_building':
           return 'Amazing! You\'ve achieved your muscle building target! 🏋️‍♂️';
         case 'maintenance':
@@ -59,11 +65,13 @@ class FitnessGoalCalculator {
           return 'Perfect! You\'ve maintained your calorie balance! ⚖️';
       }
     } else {
-      switch (fitnessGoal.toLowerCase()) {
+      switch (goal) {
         case 'weight_loss':
-          return 'Keep going! You\'re on track to reach your weight loss goal! 🔥';
+        case 'general_fitness':
+          return 'Keep going! You\'re on track to reach your burn goal! 🔥';
         case 'weight_gain':
-          return 'Stay consistent! You\'re building towards your weight gain target! 📈';
+        case 'athletic_performance':
+          return 'Stay consistent! You\'re building towards your intake target! 📈';
         case 'muscle_building':
           return 'Keep pushing! You\'re building muscle and strength! 💪';
         case 'maintenance':
@@ -79,36 +87,30 @@ class FitnessGoalCalculator {
     required int remainingCalories,
   }) {
     final absRemaining = remainingCalories.abs();
-    
-    switch (fitnessGoal.toLowerCase()) {
+
+    switch (_normalizeGoal(fitnessGoal)) {
       case 'weight_loss':
-        if (remainingCalories > 0) {
-          return 'Eat $absRemaining more calories to reach your goal';
-        } else {
-          return 'Great! You\'ve reached your weight loss target!';
-        }
+      case 'general_fitness':
+        return remainingCalories > 0
+            ? 'Burn $absRemaining more calories to reach your goal'
+            : 'Great! You\'ve reached your burn target!';
       
       case 'weight_gain':
-        if (remainingCalories > 0) {
-          return 'Eat $absRemaining more calories to reach your goal';
-        } else {
-          return 'Excellent! You\'ve reached your weight gain target!';
-        }
+      case 'athletic_performance':
+        return remainingCalories > 0
+            ? 'Eat $absRemaining more calories to reach your goal'
+            : 'Excellent! You\'ve reached your intake target!';
       
       case 'muscle_building':
-        if (remainingCalories > 0) {
-          return 'Eat $absRemaining more calories to fuel muscle growth';
-        } else {
-          return 'Amazing! You\'ve reached your muscle building target!';
-        }
+        return remainingCalories > 0
+            ? 'Eat $absRemaining more calories to fuel muscle growth'
+            : 'Amazing! You\'ve reached your muscle building target!';
       
       case 'maintenance':
       default:
-        if (remainingCalories > 0) {
-          return 'Eat $absRemaining more calories to maintain balance';
-        } else {
-          return 'Perfect! You\'ve reached your maintenance target!';
-        }
+        return remainingCalories > 0
+            ? 'Eat $absRemaining more calories to maintain balance'
+            : 'Perfect! You\'ve reached your maintenance target!';
     }
   }
 
@@ -132,10 +134,12 @@ class FitnessGoalCalculator {
     }
     
     // Use goal-specific colors for motivation
-    switch (fitnessGoal.toLowerCase()) {
+    switch (_normalizeGoal(fitnessGoal)) {
       case 'weight_loss':
+      case 'general_fitness':
         return 0xFFFF9800; // Orange for weight loss
       case 'weight_gain':
+      case 'athletic_performance':
         return 0xFF2196F3; // Blue for weight gain
       case 'muscle_building':
         return 0xFF9C27B0; // Purple for muscle building
