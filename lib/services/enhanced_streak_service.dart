@@ -239,7 +239,10 @@ class EnhancedStreakService {
         break;
     }
     
-    debugPrint('Goal ${goalType.displayName}: ${achieved ? "ACHIEVED" : "NOT ACHIEVED"} (Calories: ${summary.caloriesConsumed}, Steps: ${summary.steps}, Burned: ${summary.caloriesBurned}, Water: ${summary.waterGlasses})');
+    // Reduced logging - only log achievements, not every check
+    if (achieved) {
+      debugPrint('✅ Goal ${goalType.displayName}: ACHIEVED (Calories: ${summary.caloriesConsumed}, Steps: ${summary.steps}, Burned: ${summary.caloriesBurned}, Water: ${summary.waterGlasses})');
+    }
     return achieved;
   }
 
@@ -327,7 +330,10 @@ class EnhancedStreakService {
       // Notify listeners of updated streak data
       _streakController.add(_currentStreaks);
       
-      debugPrint('✅ Streaks refreshed successfully');
+      // Reduced logging frequency - only log on significant changes
+      if (_currentStreaks.totalActiveStreaks > 0) {
+        debugPrint('✅ Streaks refreshed successfully - Active streaks: ${_currentStreaks.totalActiveStreaks}');
+      }
     } catch (e) {
       debugPrint('❌ Error refreshing streaks: $e');
       _errorHandler.handleDataError('streak_refresh', e);

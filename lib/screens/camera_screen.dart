@@ -6,8 +6,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../services/food_scanner_pipeline.dart';
 import '../services/optimized_food_scanner_pipeline.dart';
 import '../services/barcode_scanning_service.dart';
-import '../services/app_state_service.dart';
-import '../models/food_entry.dart';
+// Unused imports removed
 import '../models/food_history_entry.dart';
 import '../models/nutrition_info.dart';
 import '../models/portion_estimation_result.dart';
@@ -16,7 +15,7 @@ import '../widgets/food_result_card.dart';
 import '../widgets/manual_food_entry_dialog.dart';
 import '../ui/app_colors.dart';
 import '../services/food_history_service.dart';
-import '../services/manual_food_entry_service.dart';
+// Unused import removed
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -27,7 +26,7 @@ class CameraScreen extends StatefulWidget {
 
 class _CameraScreenState extends State<CameraScreen> {
   File? _imageFile;
-  String? _barcode;
+  // _barcode removed - never used
   bool _loading = false;
   FoodScannerResult? _scannerResult;
   String? _error;
@@ -132,7 +131,7 @@ class _CameraScreenState extends State<CameraScreen> {
       setState(() {
         _showBarcodeScanner = false;
         _loading = true;
-        _barcode = barcode;
+        // _barcode removed
       });
       try {
         // Process barcode through the optimized food scanner pipeline
@@ -201,7 +200,7 @@ class _CameraScreenState extends State<CameraScreen> {
   void _reset() {
     setState(() {
       _imageFile = null;
-      _barcode = null;
+      // _barcode removed
       _scannerResult = null;
       _error = null;
       _loading = false;

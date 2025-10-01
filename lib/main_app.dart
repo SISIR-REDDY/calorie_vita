@@ -12,9 +12,9 @@ import 'widgets/reward_notification_widget.dart';
 import 'widgets/setup_warning_popup.dart';
 import 'ui/app_theme.dart';
 import 'ui/app_colors.dart';
-import 'ui/responsive_utils.dart';
+// Unused import removed
 import 'services/app_state_manager.dart';
-import 'services/global_google_fit_manager.dart';
+import 'services/optimized_google_fit_manager.dart';
 import 'services/setup_check_service.dart';
 import 'services/firebase_service.dart';
 import 'services/daily_reset_service.dart';
@@ -31,7 +31,7 @@ class MainApp extends StatefulWidget {
 
 class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   final AppStateManager _appStateManager = AppStateManager();
-  final GlobalGoogleFitManager _googleFitManager = GlobalGoogleFitManager();
+  final OptimizedGoogleFitManager _googleFitManager = OptimizedGoogleFitManager();
   static final LoggerService _logger = LoggerService();
   bool _hasShownSetupWarning = false;
 
@@ -154,7 +154,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
     switch (state) {
       case AppLifecycleState.resumed:
         print('🔄 App resumed - Ensuring Google Fit sync...');
-        _googleFitManager.ensureSync();
+        _googleFitManager.forceRefresh();
         break;
       case AppLifecycleState.paused:
         print('⏸️ App paused - Google Fit will continue in background');
@@ -286,7 +286,7 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObserver {
   int _currentIndex = 0;
-  final GlobalGoogleFitManager _googleFitManager = GlobalGoogleFitManager();
+  final OptimizedGoogleFitManager _googleFitManager = OptimizedGoogleFitManager();
   final FirebaseService _firebaseService = FirebaseService();
   bool _isCheckingOnboarding = true;
   bool _onboardingCompleted = false;
@@ -360,8 +360,9 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
     print('Tab selected: $index'); // Debug log
 
     // Trigger Google Fit sync whenever a screen is opened
-    _googleFitManager.ensureSync().catchError((e) {
+    _googleFitManager.forceRefresh().catchError((e) {
       print('Failed to ensure Google Fit sync on screen change: $e');
+      return null;
     });
 
     if (index == 2) {

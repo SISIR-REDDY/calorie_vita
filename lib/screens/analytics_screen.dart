@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../ui/app_colors.dart';
 import '../ui/responsive_utils.dart';
-import '../ui/responsive_widgets.dart';
+// Unused import removed
 import '../ui/dynamic_columns.dart';
 import '../services/analytics_service.dart';
 import '../services/firebase_service.dart';
@@ -14,7 +14,7 @@ import '../services/optimized_google_fit_manager.dart';
 import '../services/todays_food_data_service.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
-import '../models/user_achievement.dart';
+// Unused import removed
 import '../models/user_goals.dart';
 import '../models/google_fit_data.dart';
 
@@ -35,7 +35,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
   // Services
   final AnalyticsService _analyticsService = AnalyticsService();
-  final FirebaseService _firebaseService = FirebaseService();
   final AppStateService _appStateService = AppStateService();
   final OptimizedGoogleFitManager _googleFitManager = OptimizedGoogleFitManager();
   final TodaysFoodDataService _todaysFoodDataService = TodaysFoodDataService();
@@ -48,11 +47,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   String _aiInsights = '';
   
 
-  // UI update debouncing
-  Timer? _uiUpdateTimer;
+  // UI update debouncing removed - OptimizedGoogleFitManager handles throttling
   Timer? _profileUpdateTimer;
-  bool _hasPendingUIUpdate = false;
-  static const Duration _minUIUpdateInterval = Duration(milliseconds: 300);
 
   // Stream subscriptions
   StreamSubscription<Map<String, dynamic>?>? _profileDataSubscription;
@@ -68,8 +64,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   List<DailySummary> _dailySummaries = [];
   MacroBreakdown _macroBreakdown =
       MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
-  List<UserAchievement> _achievements = [];
-  List<Map<String, dynamic>> _insights = [];
   List<Map<String, dynamic>> _recommendations = [];
 
   // Google Fit data - Optimized for steps, calories, and workouts only
@@ -82,7 +76,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   );
   List<GoogleFitData> _weeklyGoogleFitData = [];
   bool _isGoogleFitConnected = false;
-  bool _isGoogleFitLoading = false; // Track loading state for Google Fit
 
   // User profile data for BMI calculation
   double? _userHeight; // in meters
@@ -115,7 +108,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     _googleFitDataSubscription?.cancel();
     _googleFitConnectionSubscription?.cancel();
     _googleFitLoadingSubscription?.cancel();
-    _uiUpdateTimer?.cancel();
+    // UI timer removed
     _profileUpdateTimer?.cancel();
     _analyticsService.dispose();
     _todaysFoodDataService.dispose();
@@ -123,65 +116,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     super.dispose();
   }
 
-  /// Debounce UI updates to prevent flickering
-  void _debounceUIUpdate(VoidCallback updateCallback) {
-    _uiUpdateTimer?.cancel();
-    _uiUpdateTimer = Timer(_minUIUpdateInterval, () {
-      if (mounted && !_hasPendingUIUpdate) {
-        _hasPendingUIUpdate = true;
-        updateCallback();
-        _hasPendingUIUpdate = false;
-      }
-    });
-  }
+  // Debouncing removed - OptimizedGoogleFitManager handles throttling internally
 
 
 
 
 
-  /// Initialize unified Google Fit manager for analytics
-  Future<void> _initializeUnifiedGoogleFit() async {
-    try {
-      await _googleFitManager.initialize();
-      
-      // Load current data immediately (instant from cache)
-      final currentData = _googleFitManager.getCurrentData();
-      if (currentData != null && mounted) {
-        setState(() {
-          _todayGoogleFitData = currentData;
-        });
-        print('⚡ Analytics: Instant Google Fit data loaded');
-      }
-      
-      // Listen to optimized Google Fit data stream
-      _googleFitDataSubscription = _googleFitManager.dataStream.listen((data) {
-        if (mounted && data != null) {
-          setState(() {
-            _todayGoogleFitData = data;
-          });
-          print('⚡ Analytics: Real-time Google Fit update');
-        }
-      });
-      
-      _googleFitConnectionSubscription = _googleFitManager.connectionStream.listen((isConnected) {
-        if (mounted) {
-          setState(() {
-            _isGoogleFitConnected = isConnected;
-          });
-        }
-      });
-      
-      _googleFitLoadingSubscription = _googleFitManager.loadingStream.listen((isLoading) {
-        if (mounted) {
-          setState(() {
-            _isGoogleFitLoading = isLoading;
-          });
-        }
-      });
-    } catch (e) {
-      print('❌ Analytics: Google Fit init failed: $e');
-    }
-  }
+  // Google Fit initialization moved to _initializeGoogleFitData()
 
   // Mixin override methods removed - using OptimizedGoogleFitManager directly
 
@@ -331,18 +272,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     }
   }
 
-  /// Load additional data in background
-  Future<void> _loadBackgroundData() async {
-    try {
-      // Load Google Fit data asynchronously (non-blocking)
-      _loadGoogleFitDataAsync();
-
-      // Calculate achievements in background (non-blocking)
-      _analyticsService.calculateStreaksAndAchievements();
-    } catch (e) {
-      // Don't show error to user as this is background loading
-    }
-  }
+  // _loadBackgroundData removed - handled by OptimizedGoogleFitManager automatically
 
   /// Set up real-time listeners
   void _setupRealTimeListeners() {
@@ -359,13 +289,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       // Note: Macro breakdown is handled by TodaysFoodDataService for real-time updates
 
       // Listen to achievements with error handling
-      _analyticsService.achievementsStream.listen((achievements) {
-        if (mounted) {
-          setState(() {
-            _achievements = achievements;
-          });
-        }
-      }).onError((error) => print('Achievements stream error: $error'));
+      // Achievements stream removed - not used in UI
 
       // Listen to profile data changes (for BMI updates)
       _profileDataSubscription?.cancel();
@@ -418,13 +342,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       // _googleFitManager data stream already set up in init
 
       // Listen to insights
-      _analyticsService.insightsStream.listen((insights) {
-        if (mounted) {
-          setState(() {
-            _insights = insights;
-          });
-        }
-      });
+      // Insights stream removed - not used in UI
 
       // Listen to recommendations
       _analyticsService.recommendationsStream.listen((recommendations) {
@@ -444,8 +362,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     try {
       // Set default values to prevent null errors
       _dailySummaries = [];
-      _achievements = [];
-      _insights = [];
       _recommendations = [];
       
       // Set loading states
@@ -462,18 +378,31 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   /// Initialize Google Fit data with better error handling
   Future<void> _initializeGoogleFitData() async {
     try {
-      // Data is already initialized with default values
-      // Trigger UI update
-      if (mounted) {
-        setState(() {});
+      await _googleFitManager.initialize();
+      
+      // Get instant cached data
+      final currentData = _googleFitManager.getCurrentData();
+      if (currentData != null && mounted) {
+        setState(() {
+          _todayGoogleFitData = currentData;
+          _isGoogleFitConnected = true;
+        });
       }
       
-      // Try to load real data in background
-      _loadGoogleFitData().catchError((error) {
-        // Keep default data if loading fails
+      // Set up real-time listeners
+      _googleFitDataSubscription = _googleFitManager.dataStream.listen((data) {
+        if (mounted && data != null) {
+          setState(() => _todayGoogleFitData = data);
+        }
+      });
+      
+      _googleFitConnectionSubscription = _googleFitManager.connectionStream.listen((isConnected) {
+        if (mounted) {
+          setState(() => _isGoogleFitConnected = isConnected);
+        }
       });
     } catch (e) {
-      // Keep default data if initialization fails
+      debugPrint('Analytics: Google Fit init failed: $e');
     }
   }
 
@@ -542,9 +471,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   /// Load Google Fit data using optimized workout service - Fastest method
   Future<void> _loadGoogleFitData() async {
     try {
-      setState(() {
-        _isGoogleFitLoading = true;
-      });
+      // Loading state handled by OptimizedGoogleFitManager
       
       // Check authentication - using optimized manager
       final isAuthenticated = _googleFitManager.isConnected;
@@ -561,7 +488,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           if (todayData != null) {
             setState(() {
               _todayGoogleFitData = todayData;
-              _isGoogleFitLoading = false;
             });
             
             print('✅ Analytics: Google Fit live data loaded: ${_todayGoogleFitData?.steps} steps, ${_todayGoogleFitData?.caloriesBurned} calories, ${_todayGoogleFitData?.workoutSessions} workouts');
@@ -606,7 +532,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       
       setState(() {
         _todayGoogleFitData = cachedData;
-        _isGoogleFitLoading = false;
         _isGoogleFitConnected = false; // Mark as offline
       });
       
@@ -637,7 +562,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       
       setState(() {
         _todayGoogleFitData = todayData;
-        _isGoogleFitLoading = false;
+        // Loading state handled by OptimizedGoogleFitManager
       });
       
       print('Google Fit today data loaded (fallback): ${_todayGoogleFitData?.steps} steps');
@@ -651,7 +576,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           workoutSessions: 0,
           workoutDuration: 0.0,
         );
-        _isGoogleFitLoading = false;
+        // Loading state handled by OptimizedGoogleFitManager
       });
     }
   }
@@ -715,7 +640,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       ));
       
       if (forceRefresh) {
-        print('🔄 Analytics: Refreshed data for ${date.toIso8601String().split('T')[0]} - Steps: $steps, Calories: $calories, Workouts: $workoutSessions');
+        // Reduced logging - only log summary, not every day
       }
     } catch (e) {
       // Add empty data if loading fails
@@ -761,11 +686,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     }
   }
 
-  /// Live stream handled by OptimizedGoogleFitManager init method
-  void _setupGoogleFitLiveStream() {
-    // Live stream already set up in _initializeUnifiedGoogleFit()
-    // Real-time updates come automatically via the data stream
-  }
+  // _setupGoogleFitLiveStream removed - streams set up in _initializeGoogleFitData()
 
   /// Load user profile data for BMI calculation
   Future<void> _loadUserProfileData() async {
@@ -1154,24 +1075,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     );
   }
 
-  /// Build loading summary cards to prevent showing wrong data
-  Widget _buildLoadingSummaryCards() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildLoadingSummaryCard('Calories', 'kcal'),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _buildLoadingSummaryCard('Steps', 'steps'),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _buildLoadingSummaryCard('Workouts', 'times'),
-        ),
-      ],
-    );
-  }
+  // _buildLoadingSummaryCards removed - unused
 
   /// Build individual loading summary card
   Widget _buildLoadingSummaryCard(String title, String unit) {
@@ -1521,16 +1425,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     final weightGoal = userGoals?.weightGoal;
     final currentWeight = _userWeight;
     
-    // Debug logging
-    print('=== WEIGHT PROGRESS SECTION DEBUG ===');
-    print('Weight Progress Debug - AppStateService initialized: ${_appStateService.isInitialized}');
-    print('Weight Progress Debug - userGoals from AppStateService: $userGoals');
-    print('Weight Progress Debug - userGoals?.fitnessGoal: ${userGoals?.fitnessGoal}');
-    print('Weight Progress Debug - userGoals?.fitnessGoal == null: ${userGoals?.fitnessGoal == null}');
-    print('Weight Progress Debug - userGoals?.fitnessGoal == "": ${userGoals?.fitnessGoal == ""}');
-    print('Weight Progress Debug - userGoals?.fitnessGoal?.isEmpty: ${userGoals?.fitnessGoal?.isEmpty}');
-    print('Weight Progress Debug - Current Weight: $currentWeight, Weight Goal: $weightGoal');
-    print('=== END WEIGHT PROGRESS SECTION DEBUG ===');
+    // Debug logging reduced - only log when there are issues
     
     // Check if we have both current weight and weight goal
     if (currentWeight == null || weightGoal == null) {
@@ -1617,59 +1512,33 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     
     if (userGoals != null) {
       fitnessGoal = userGoals!.fitnessGoal ?? 'maintenance';
-      print('Weight Progress Debug - Using fitnessGoal from AppStateService: "$fitnessGoal"');
+      // Debug logging removed
     } else {
       // Fallback: userGoals is null, use default
-      print('Weight Progress Debug - userGoals is null from AppStateService, using default maintenance');
+      // Debug logging removed
       fitnessGoal = 'maintenance';
     }
     
     // If fitnessGoal is still null or empty, try to get it from the profile data
     if (fitnessGoal == 'maintenance' && (userGoals?.fitnessGoal == null || userGoals?.fitnessGoal == '')) {
-      print('Weight Progress Debug - fitnessGoal is null/empty, checking profile data...');
+      // Debug logging removed
       // Try to get fitness goal from the profile data that's already loaded
       // The fitness goal might be in the profile data stream
       final profileData = _appStateService.profileData;
       if (profileData != null && profileData['fitnessGoal'] != null) {
         fitnessGoal = profileData['fitnessGoal'].toString();
-        print('Weight Progress Debug - Loaded fitnessGoal from profile data: "$fitnessGoal"');
+        // Debug logging removed
       } else {
-        print('Weight Progress Debug - fitnessGoal not found in profile data, using maintenance');
+        // Debug logging removed
       }
     }
     
-    // Debug logging for fitness goal
-    print('=== WEIGHT PROGRESS DEBUG START ===');
-    print('Weight Progress Debug - userGoals object: $userGoals');
-    if (userGoals != null) {
-      print('Weight Progress Debug - userGoals.fitnessGoal: "${userGoals.fitnessGoal}"');
-      print('Weight Progress Debug - userGoals.weightGoal: ${userGoals.weightGoal}');
-      print('Weight Progress Debug - userGoals.calorieGoal: ${userGoals.calorieGoal}');
-      print('Weight Progress Debug - userGoals.macroGoals: ${userGoals.macroGoals}');
-      if (userGoals.macroGoals != null) {
-        print('Weight Progress Debug - userGoals.macroGoals.proteinCalories: ${userGoals.macroGoals!.proteinCalories}');
-        print('Weight Progress Debug - userGoals.macroGoals.carbsCalories: ${userGoals.macroGoals!.carbsCalories}');
-        print('Weight Progress Debug - userGoals.macroGoals.fatCalories: ${userGoals.macroGoals!.fatCalories}');
-      }
-    } else {
-      print('Weight Progress Debug - userGoals is NULL!');
-    }
-    print('Weight Progress Debug - Raw fitnessGoal: "$fitnessGoal"');
-    print('Weight Progress Debug - fitnessGoal.toLowerCase(): "${fitnessGoal.toLowerCase()}"');
-    print('Weight Progress Debug - fitnessGoal.length: ${fitnessGoal.length}');
-    print('Weight Progress Debug - fitnessGoal.codeUnits: ${fitnessGoal.codeUnits}');
+    // Debug logging removed for cleaner output
+    // Debug logging removed
+    // Debug logging removed
     
-    // Test the fitness goal matching logic
-    final testFitnessGoal = fitnessGoal.toLowerCase();
-    print('Weight Progress Debug - Testing fitness goal matching:');
-    print('  - "weight loss" match: ${testFitnessGoal == "weight loss"}');
-    print('  - "weight_loss" match: ${testFitnessGoal == "weight_loss"}');
-    print('  - "weight gain" match: ${testFitnessGoal == "weight gain"}');
-    print('  - "weight_gain" match: ${testFitnessGoal == "weight_gain"}');
-    print('  - "maintenance" match: ${testFitnessGoal == "maintenance"}');
-    print('  - "general fitness" match: ${testFitnessGoal == "general fitness"}');
-    print('  - "general_fitness" match: ${testFitnessGoal == "general_fitness"}');
-    print('=== WEIGHT PROGRESS DEBUG END ===');
+    // Debug logging removed
+    // Debug logging removed
     
     // Determine if goal is achieved based on fitness goal
     bool isGoalAchieved = false;
@@ -2084,28 +1953,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         );
   }
 
-  /// Calculate macro percentage
-  int _calculateMacroPercentage(double value) {
-    final total =
-        _macroBreakdown.carbs + _macroBreakdown.protein + _macroBreakdown.fat;
-    if (total == 0) return 0;
-    return ((value / total) * 100).round();
-  }
-
-  /// Get color for insight type
-  Color _getInsightColor(String type) {
-    switch (type.toLowerCase()) {
-      case 'success':
-        return kSuccessColor;
-      case 'warning':
-        return kWarningColor;
-      case 'error':
-        return Colors.red;
-      case 'info':
-      default:
-        return kInfoColor;
-    }
-  }
+  // _calculateMacroPercentage and _getInsightColor removed - unused
 
   /// Build empty insights state
   Widget _buildEmptyInsights() {

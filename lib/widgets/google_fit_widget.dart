@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/google_fit_service.dart';
+import '../services/optimized_google_fit_manager.dart';
 import '../models/google_fit_data.dart';
 import '../ui/app_colors.dart';
 import 'enhanced_loading_widgets.dart';
@@ -13,7 +13,7 @@ class GoogleFitWidget extends StatefulWidget {
 }
 
 class _GoogleFitWidgetState extends State<GoogleFitWidget> {
-  final GoogleFitService _googleFitService = GoogleFitService();
+  final OptimizedGoogleFitManager _googleFitManager = OptimizedGoogleFitManager();
   // GoogleFitCacheService removed for simplification
 
   bool _isLoading = false;
@@ -30,7 +30,7 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
 
   Future<void> _checkAuthenticationStatus() async {
     setState(() {
-      _isAuthenticated = _googleFitService.isAuthenticated;
+      _isAuthenticated = _googleFitManager.isConnected;
     });
 
     if (_isAuthenticated) {
@@ -45,7 +45,7 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
     });
 
     try {
-      final success = await _googleFitService.authenticate();
+      final success = await _googleFitManager.authenticate();
       if (success) {
         setState(() {
           _isAuthenticated = true;
@@ -76,9 +76,8 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
     });
 
     try {
-      // Use Google Fit service directly
-      final dataMap = await _googleFitService.getTodayFitnessDataBatch();
-      final data = dataMap != null ? GoogleFitData.fromJson(dataMap) : null;
+      // Use optimized manager
+      final data = await _googleFitManager.forceRefresh();
 
       setState(() {
         _todayData = data;
@@ -93,7 +92,7 @@ class _GoogleFitWidgetState extends State<GoogleFitWidget> {
   }
 
   Future<void> _signOut() async {
-    await _googleFitService.signOut();
+    await _googleFitManager.signOut();
     setState(() {
       _isAuthenticated = false;
       _todayData = null;

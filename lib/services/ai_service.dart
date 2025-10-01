@@ -19,8 +19,9 @@ class AIService {
   
   // Performance and caching
   static final LoggerService _logger = LoggerService();
-  static final Map<String, Map<String, dynamic>> _responseCache = {};
+  static final Map<String, String> _responseCache = {};
   static final Map<String, DateTime> _cacheTimestamps = {};
+  static const Duration _cacheExpiry = Duration(minutes: 45); // From ProductionConfig
 
   /// Ask Trainer Sisir for fitness and nutrition advice with conversation context
   static Future<String> askTrainerSisir(
@@ -31,6 +32,21 @@ class AIService {
   }) async {
     return await _logger.timeOperation('askTrainerSisir', () async {
       try {
+        // Generate cache key
+        final cacheKey = _generateCacheKey(query, userProfile, currentFitnessData);
+        
+        // Check cache first
+        if (_responseCache.containsKey(cacheKey) && _cacheTimestamps.containsKey(cacheKey)) {
+          final cacheTime = _cacheTimestamps[cacheKey]!;
+          if (DateTime.now().difference(cacheTime) < _cacheExpiry) {
+            print('⚡ AI Service: Using cached response');
+            return _responseCache[cacheKey]!;
+          } else {
+            // Remove expired cache
+            _responseCache.remove(cacheKey);
+            _cacheTimestamps.remove(cacheKey);
+          }
+        }
       // Build user context from profile and fitness data
       String userContext = '';
       if (userProfile != null && userProfile.isNotEmpty) {
@@ -133,7 +149,8 @@ CRITICAL RULES:
         // Clean up any markdown formatting that slipped through
         final result = _cleanMarkdownFormatting(rawResult);
         
-        // Don't cache personalized responses to ensure fresh, relevant answers
+        // Cache the response for future use
+        _cacheResponse(cacheKey, result);
         
         _logger.userAction('chat_query_completed', {
           'query_length': query.length,
@@ -1052,40 +1069,16 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
   }
   
   /// Generate cache key for requests
-  static String _generateCacheKey(String type, String query, Map<String, dynamic>? context) {
-    final contextHash = context != null ? context.hashCode.toString() : 'no_context';
-    return '${type}_${query.hashCode}_$contextHash';
-  }
-  
-  /// Get cached response if available and not expired
-  static Map<String, dynamic>? _getCachedResponse(String cacheKey) {
-    if (!ProductionConfig.isFeatureEnabled('enable_smart_caching')) return null;
-    
-    final cached = _responseCache[cacheKey];
-    final timestamp = _cacheTimestamps[cacheKey];
-    
-    if (cached != null && timestamp != null) {
-      final age = DateTime.now().difference(timestamp);
-      final cacheDuration = Duration(minutes: ProductionConfig.aiConfig['cache_duration_minutes'] as int);
-      
-      if (age < cacheDuration) {
-        return cached;
-      } else {
-        // Remove expired cache
-        _responseCache.remove(cacheKey);
-        _cacheTimestamps.remove(cacheKey);
-      }
-    }
-    
-    return null;
+  static String _generateCacheKey(String query, Map<String, dynamic>? userProfile, Map<String, dynamic>? fitnessData) {
+    final profileHash = userProfile?.hashCode.toString() ?? 'no_profile';
+    final fitnessHash = fitnessData?.hashCode.toString() ?? 'no_fitness';
+    return '${query.hashCode}_${profileHash}_${fitnessHash}';
   }
   
   /// Cache response for future use
-  static void _cacheResponse(String cacheKey, Map<String, dynamic> response) {
-    if (!ProductionConfig.isFeatureEnabled('enable_smart_caching')) return;
-    
+  static void _cacheResponse(String cacheKey, String response) {
     // Limit cache size for memory efficiency
-    if (_responseCache.length > 100) {
+    if (_responseCache.length > 50) {
       final oldestKey = _cacheTimestamps.entries
           .reduce((a, b) => a.value.isBefore(b.value) ? a : b)
           .key;

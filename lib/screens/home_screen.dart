@@ -1256,10 +1256,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Start periodic refresh timer for Google Fit data (backup)
   void _startGoogleFitRefreshTimer() {
     _googleFitRefreshTimer?.cancel();
-    _googleFitRefreshTimer =
-        Timer.periodic(const Duration(minutes: 5), (timer) {
-      _refreshGoogleFitData();
-    });
+    // Google Fit refresh handled by OptimizedGoogleFitManager (every 2 minutes)
+    // No need for separate timer here
   }
 
   /// Stop Google Fit refresh timer
@@ -1452,11 +1450,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     });
     debugPrint('Global goals callback registered');
 
-    // Set up periodic goals check
-    _goalsCheckTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+    // Set up periodic goals check (optimized - every 30 seconds instead of 2 seconds)
+    _goalsCheckTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       _checkForGoalsUpdate();
     });
-    debugPrint('Periodic goals check timer set up');
+    debugPrint('Periodic goals check timer set up (optimized: 30s interval)');
 
     // Listen to achievements updates
     _analyticsService.achievementsStream.listen((achievements) {
@@ -1577,7 +1575,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     final simpleGoals = SimpleGoalsNotifier().currentGoals;
     final appStateGoals = _appStateService.userGoals;
 
-    debugPrint('Periodic goals check - Simple: ${simpleGoals?.toMap()}, AppState: ${appStateGoals?.toMap()}');
+    // Reduced logging frequency - only log when goals actually change
+    if (simpleGoals?.toMap() != appStateGoals?.toMap()) {
+      debugPrint('Periodic goals check - Goals changed: Simple: ${simpleGoals?.toMap()}, AppState: ${appStateGoals?.toMap()}');
+    }
 
     // Check if goals have changed
     if (simpleGoals != null && appStateGoals != null) {

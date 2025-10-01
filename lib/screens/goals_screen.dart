@@ -124,20 +124,7 @@ class _GoalsScreenState extends State<GoalsScreen>
     }
   }
 
-  /// Check if the current macro value is close to the default calculated value
-  /// This helps determine if the user has manually edited the macro goals
-  bool _isDefaultMacroValue(String currentValue, int calculatedValue) {
-    if (currentValue.isEmpty) return true;
-    
-    final current = double.tryParse(currentValue);
-    if (current == null) return true;
-    
-    final currentInKcal = _calorieUnitsService.convertToKcal(current);
-    final difference = (currentInKcal - calculatedValue).abs();
-    
-    // Consider it default if within 50 calories of calculated value
-    return difference <= 50;
-  }
+  // _isDefaultMacroValue removed - unused method
 
   void _setupAnimations() {
     _animationController = AnimationController(

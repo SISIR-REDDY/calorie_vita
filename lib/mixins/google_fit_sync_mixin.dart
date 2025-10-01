@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../services/global_google_fit_manager.dart';
+import '../services/optimized_google_fit_manager.dart';
 import '../models/google_fit_data.dart';
 
 /// Mixin to add automatic Google Fit sync to any screen
 mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
-  final GlobalGoogleFitManager _googleFitManager = GlobalGoogleFitManager();
+  final OptimizedGoogleFitManager _googleFitManager = OptimizedGoogleFitManager();
 
   // Override these in your widget to handle Google Fit data
   void onGoogleFitDataUpdate(Map<String, dynamic> syncData) {
@@ -22,19 +22,20 @@ mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
     try {
       print('GoogleFitSyncMixin: Initializing sync for ${widget.runtimeType}');
 
-      // Ensure sync is active with timeout
-      await _googleFitManager.ensureSync().timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          print('GoogleFitSyncMixin: Sync initialization timed out');
-        },
-      );
+      // Initialize optimized manager
+      await _googleFitManager.initialize();
 
-      // Listen to sync data updates with error handling
-      _googleFitManager.syncDataStream.listen(
-        (syncData) {
-          if (mounted) {
+      // Listen to data stream
+      _googleFitManager.dataStream.listen(
+        (data) {
+          if (mounted && data != null) {
             try {
+              final syncData = {
+                'steps': data.steps,
+                'caloriesBurned': data.caloriesBurned,
+                'workoutSessions': data.workoutSessions,
+                'workoutDuration': data.workoutDuration,
+              };
               onGoogleFitDataUpdate(syncData);
             } catch (e) {
               print('GoogleFitSyncMixin: Error in data update callback: $e');
@@ -42,12 +43,12 @@ mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
           }
         },
         onError: (error) {
-          print('GoogleFitSyncMixin: Sync data stream error: $error');
+          print('GoogleFitSyncMixin: Data stream error: $error');
         },
       );
 
-      // Listen to connection state changes with error handling
-      _googleFitManager.connectionStateStream.listen(
+      // Listen to connection state
+      _googleFitManager.connectionStream.listen(
         (isConnected) {
           if (mounted) {
             try {
@@ -62,20 +63,16 @@ mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
         },
       );
 
-      // Get current data immediately with timeout
-      try {
-        final currentData = await _googleFitManager.getCurrentData().timeout(
-          const Duration(seconds: 5),
-          onTimeout: () {
-            print('GoogleFitSyncMixin: Current data fetch timed out');
-            return null;
-          },
-        );
-        if (currentData != null && mounted) {
-          onGoogleFitDataUpdate(currentData);
-        }
-      } catch (e) {
-        print('GoogleFitSyncMixin: Error fetching current data: $e');
+      // Get current data immediately
+      final currentData = _googleFitManager.getCurrentData();
+      if (currentData != null && mounted) {
+        final syncData = {
+          'steps': currentData.steps,
+          'caloriesBurned': currentData.caloriesBurned,
+          'workoutSessions': currentData.workoutSessions,
+          'workoutDuration': currentData.workoutDuration,
+        };
+        onGoogleFitDataUpdate(syncData);
       }
 
       print('GoogleFitSyncMixin: Sync initialized for ${widget.runtimeType}');
@@ -88,7 +85,16 @@ mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
   /// Force immediate Google Fit sync
   Future<Map<String, dynamic>?> forceGoogleFitSync() async {
     try {
-      return await _googleFitManager.forceSync();
+      final data = await _googleFitManager.forceRefresh();
+      if (data != null) {
+        return {
+          'steps': data.steps,
+          'caloriesBurned': data.caloriesBurned,
+          'workoutSessions': data.workoutSessions,
+          'workoutDuration': data.workoutDuration,
+        };
+      }
+      return null;
     } catch (e) {
       print('GoogleFitSyncMixin: Force sync failed: $e');
       return null;
@@ -100,7 +106,7 @@ mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
 
   /// Connect to Google Fit
   Future<bool> connectToGoogleFit() async {
-    return await _googleFitManager.connect();
+    return await _googleFitManager.authenticate();
   }
 
   /// Helper to convert sync data to GoogleFitData model

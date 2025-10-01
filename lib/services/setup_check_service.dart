@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'google_fit_service.dart';
+import 'optimized_google_fit_manager.dart';
 
 class SetupCheckService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -94,8 +94,8 @@ class SetupCheckService {
   /// Check if Google Fit is connected
   static Future<bool> _hasGoogleFitConnected() async {
     try {
-      final googleFitService = GoogleFitService();
-      return googleFitService.isAuthenticated;
+      final googleFitManager = OptimizedGoogleFitManager();
+      return googleFitManager.isConnected;
     } catch (e) {
       print('Error checking Google Fit connection: $e');
       return false;

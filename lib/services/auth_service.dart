@@ -1,9 +1,7 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'google_fit_service.dart';
-import 'global_google_fit_manager.dart';
-import 'unified_google_fit_manager.dart';
+import 'optimized_google_fit_manager.dart';
 import 'logger_service.dart';
 
 /// Firebase authentication service
@@ -173,18 +171,10 @@ class AuthService {
     try {
       _logger.info('Starting complete sign out process');
       
-      // Import Google Fit services for cleanup
-      final googleFitService = GoogleFitService();
-      final globalGoogleFitManager = GlobalGoogleFitManager();
-      final unifiedGoogleFitManager = UnifiedGoogleFitManager();
-      
-      // Disconnect Google Fit first (with timeout to prevent hanging)
+      // Disconnect Google Fit (with timeout to prevent hanging)
       _logger.info('Disconnecting Google Fit services');
-      await Future.wait([
-        googleFitService.signOut(),
-        globalGoogleFitManager.disconnect(),
-        unifiedGoogleFitManager.disconnect(),
-      ]).timeout(const Duration(seconds: 10));
+      final googleFitManager = OptimizedGoogleFitManager();
+      await googleFitManager.signOut().timeout(const Duration(seconds: 10));
       
       // Sign out from Firebase
       _logger.info('Signing out from Firebase');

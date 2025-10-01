@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+// Unused imports removed
 import '../services/ai_service.dart';
 import '../services/firebase_service.dart';
 import '../services/chat_history_manager.dart';
@@ -103,7 +102,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
 
   List<ChatSession> chatSessions = [];
   String? currentSessionId;
-  DateTime? _lastHistoryLoad;
+  // _lastHistoryLoad removed - unused field
   String? _lastLoadedUserId; // Track the last loaded user ID
   Map<String, dynamic>? _currentFitnessData;
   StateSetter? _currentModalState; // Store current modal state for updates
@@ -244,7 +243,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       if (mounted) {
         setState(() {
           chatSessions = sessions;
-          _lastHistoryLoad = DateTime.now();
+          // _lastHistoryLoad removed - unused field
         });
       }
 
@@ -263,7 +262,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
   /// Force reload chat history (useful after login/logout)
   Future<void> _forceReloadChatHistory() async {
     print('Force reloading chat history...');
-    _lastHistoryLoad = null; // Clear cache
+    // Cache clearing removed - unused field
     await _loadChatHistory(forceRefresh: true);
   }
 
@@ -282,16 +281,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
 
   // Removed duplicate caching - using ChatHistoryManager exclusively
 
-  /// Force refresh the chat history UI
-  void _refreshChatHistoryUI() {
-    if (mounted) {
-      // Immediate UI refresh without delay
-      setState(() {
-        // Force rebuild by updating a dummy variable
-        // This ensures the chat history bottom sheet refreshes
-      });
-    }
-  }
+  // _refreshChatHistoryUI removed - unused method
 
   Future<void> _saveCurrentSession() async {
     if (!isPremium) return;
