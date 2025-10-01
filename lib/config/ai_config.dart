@@ -7,11 +7,11 @@ class AIConfig {
   static const String visionModel = 'google/gemini-pro-1.5-exp'; // Vision model for food recognition
   static const String backupVisionModel = 'google/gemini-pro-1.5'; // Fast backup option
 
-  static const int maxTokens = 130;
-  static const int chatMaxTokens = 130; // Balanced responses (80-100 words)
-  static const int analyticsMaxTokens = 150;
-  static const int visionMaxTokens = 350; // Increased for more detailed food analysis
-  static const double temperature = 0.8; // Higher for more friendly and natural responses
+  static const int maxTokens = 100;
+  static const int chatMaxTokens = 100; // Optimized for speed (60-80 words)
+  static const int analyticsMaxTokens = 120;
+  static const int visionMaxTokens = 300; // Optimized for faster vision analysis
+  static const double temperature = 0.7; // Balanced for speed and quality
   static const double visionTemperature = 0.1; // Lower for more consistent food recognition
 
   /// App identification for OpenRouter

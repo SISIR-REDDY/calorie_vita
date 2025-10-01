@@ -18,11 +18,11 @@ class ProductionConfig {
     'chat_model': 'openai/gpt-3.5-turbo',
     'vision_model': 'google/gemini-pro-1.5-exp',
     'backup_vision_model': 'google/gemini-pro-1.5',
-    'max_tokens_chat': 130, // Balanced responses (80-100 words)
-    'max_tokens_vision': 350, // Increased for more detailed analysis
-    'temperature_chat': 0.8, // Higher for friendly responses
+    'max_tokens_chat': 100, // Optimized for speed (60-80 words)
+    'max_tokens_vision': 300, // Optimized for faster analysis
+    'temperature_chat': 0.7, // Balanced for speed and quality
     'temperature_vision': 0.05, // Very low for consistent food recognition
-    'timeout_seconds': 20, // Optimized for speed
+    'timeout_seconds': 15, // Faster timeout for instant feel
     'retry_attempts': 3, // Add retry logic for better accuracy
     'cache_duration_minutes': 45, // Longer cache for better performance
     'confidence_threshold': 0.75, // Higher threshold for better accuracy

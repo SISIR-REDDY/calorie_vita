@@ -280,77 +280,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     }
   }
 
-  /// Cache chat sessions to local storage
-  Future<void> _cacheChatSessions() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final user = _auth.currentUser;
-      if (user == null) return;
-
-      final cacheKey = 'chat_sessions_${user.uid}';
-      final sessionsJson = chatSessions.map((session) => session.toMap()).toList();
-      final sessionsString = jsonEncode(sessionsJson);
-      
-      await prefs.setString(cacheKey, sessionsString);
-      await prefs.setInt('${cacheKey}_timestamp', DateTime.now().millisecondsSinceEpoch);
-      print('Chat sessions cached locally');
-    } catch (e) {
-      print('Error caching chat sessions: $e');
-    }
-  }
-
-  /// Load chat sessions from local cache
-  Future<bool> _loadChatSessionsFromCache() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final user = _auth.currentUser;
-      if (user == null) return false;
-
-      final cacheKey = 'chat_sessions_${user.uid}';
-      final sessionsString = prefs.getString(cacheKey);
-      final cacheTimestamp = prefs.getInt('${cacheKey}_timestamp') ?? 0;
-      
-      if (sessionsString != null) {
-        // Check if cache is recent (less than 1 hour old)
-        final cacheAge = DateTime.now().millisecondsSinceEpoch - cacheTimestamp;
-        if (cacheAge < 3600000) { // 1 hour in milliseconds
-          final sessionsJson = jsonDecode(sessionsString) as List;
-          final sessions = sessionsJson
-              .map((json) => ChatSession.fromMap(json))
-              .toList();
-          
-          if (mounted) {
-            setState(() {
-              chatSessions = sessions;
-              _lastHistoryLoad = DateTime.fromMillisecondsSinceEpoch(cacheTimestamp);
-            });
-          }
-          print('Chat sessions loaded from cache: ${sessions.length} sessions');
-          return true; // Cache was used
-        }
-      }
-      return false; // Cache was not used
-    } catch (e) {
-      print('Error loading chat sessions from cache: $e');
-      return false;
-    }
-  }
-
-  /// Clear chat sessions cache
-  Future<void> _clearChatSessionsCache() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final user = _auth.currentUser;
-      if (user == null) return;
-
-      final cacheKey = 'chat_sessions_${user.uid}';
-      await prefs.remove(cacheKey);
-      await prefs.remove('${cacheKey}_timestamp');
-      print('Chat sessions cache cleared');
-    } catch (e) {
-      print('Error clearing chat sessions cache: $e');
-    }
-  }
+  // Removed duplicate caching - using ChatHistoryManager exclusively
 
   /// Force refresh the chat history UI
   void _refreshChatHistoryUI() {
@@ -1189,8 +1119,11 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       ),
     );
 
-    // Delete using ChatHistoryManager for consistent cache/Firebase update (fire and forget)
-    _chatHistoryManager.deleteChatSession(session.id).catchError((e) {
+    // Delete using ChatHistoryManager and force refresh to prevent deleted chats from reappearing
+    _chatHistoryManager.deleteChatSession(session.id).then((_) {
+      // Force refresh chat history after deletion to clear all caches
+      _loadChatHistory(forceRefresh: true);
+    }).catchError((e) {
       print('Error deleting session: $e');
     });
   }
@@ -1223,8 +1156,11 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       ),
     );
 
-    // Delete using ChatHistoryManager for consistent cache/Firebase update (fire and forget)
-    _chatHistoryManager.clearChatHistory().catchError((e) {
+    // Delete using ChatHistoryManager and force refresh to prevent cleared chats from reappearing
+    _chatHistoryManager.clearChatHistory().then((_) {
+      // Force refresh chat history after clearing to clear all caches
+      _loadChatHistory(forceRefresh: true);
+    }).catchError((e) {
       print('Error clearing all sessions: $e');
       // Don't show error to user since UI already updated optimistically
     });

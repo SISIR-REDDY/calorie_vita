@@ -15,7 +15,7 @@ class ChatHistoryManager {
   // Cache management
   static const String _chatHistoryKey = 'chat_history_cache';
   static const String _lastSyncKey = 'chat_last_sync';
-  static const Duration _cacheExpiry = Duration(hours: 24);
+  static const Duration _cacheExpiry = Duration(minutes: 5); // Reduced from 24 hours to 5 minutes
   static const int _maxCachedSessions = 20;
   
   // State management
@@ -31,25 +31,20 @@ class ChatHistoryManager {
     final user = _auth.currentUser;
     if (user == null) return [];
 
-    // Check if we have recent cached data
+    // Always force refresh to avoid stale cache issues
+    if (forceRefresh) {
+      _lastSyncTime = null;
+      _cachedSessions.clear();
+    }
+
+    // Check if we have recent cached data (within 5 minutes)
     if (!forceRefresh && _isCacheValid()) {
+      print('Using valid in-memory cache: ${_cachedSessions.length} sessions');
       return _cachedSessions;
     }
 
-    // Try to load from local cache first
-    if (!forceRefresh) {
-      final cachedData = await _loadFromCache();
-      if (cachedData.isNotEmpty) {
-        _cachedSessions = cachedData;
-        _lastSyncTime = DateTime.now();
-        
-        // Load fresh data in background
-        _loadFromFirebase(user.uid, limit);
-        return cachedData;
-      }
-    }
-
-    // Load from Firebase
+    // Load fresh data from Firebase
+    print('Loading fresh chat history from Firebase');
     return await _loadFromFirebase(user.uid, limit);
   }
 
@@ -74,13 +69,16 @@ class ChatHistoryManager {
         final messages = data['messages'] as List<dynamic>? ?? [];
         final firstMessage = messages.isNotEmpty ? messages.first : {};
         
+        // Convert DateTime to timestamp for serialization
+        final timestamp = data['timestamp'] is int 
+            ? data['timestamp']
+            : DateTime.now().millisecondsSinceEpoch;
+        
         return {
           'id': doc.id,
           'sender': firstMessage['sender'] ?? 'user',
           'text': firstMessage['text'] ?? data['title'] ?? '',
-          'timestamp': data['timestamp'] is int 
-              ? DateTime.fromMillisecondsSinceEpoch(data['timestamp'])
-              : DateTime.now(),
+          'timestamp': timestamp, // Store as int for cache serialization
           'sessionId': doc.id,
           'isFromCache': false,
           'title': data['title'] ?? '',
@@ -90,8 +88,8 @@ class ChatHistoryManager {
 
       // Sort sessions by timestamp in descending order (newest first)
       sessions.sort((a, b) {
-        final aTime = a['timestamp'] as DateTime;
-        final bTime = b['timestamp'] as DateTime;
+        final aTime = a['timestamp'] as int;
+        final bTime = b['timestamp'] as int;
         return bTime.compareTo(aTime);
       });
 
@@ -241,12 +239,17 @@ class ChatHistoryManager {
         await batch.commit().timeout(const Duration(seconds: 5));
       }
 
-      // Clear local cache
+      // Clear local cache and invalidate
       _cachedSessions.clear();
+      _lastSyncTime = null;
       await _clearCache();
       
+      print('All chat history cleared and cache invalidated');
     } catch (e) {
       print('Error clearing chat history: $e');
+      // Still clear in-memory cache
+      _cachedSessions.clear();
+      _lastSyncTime = null;
     }
   }
 
@@ -263,16 +266,20 @@ class ChatHistoryManager {
           .delete()
           .timeout(const Duration(seconds: 3));
 
-      // Remove from local cache
+      // Remove from local cache immediately
       _cachedSessions.removeWhere((s) => s['id'] == sessionId);
-      await _saveToCache(_cachedSessions);
       
+      // Invalidate cache to force fresh load next time
+      _lastSyncTime = null;
+      await _clearCache();
+      
+      print('Chat session deleted and cache invalidated: $sessionId');
     } catch (e) {
       print('Error deleting chat session: $e');
       
-      // Still remove from cache for offline support
+      // Still remove from in-memory cache
       _cachedSessions.removeWhere((s) => s['id'] == sessionId);
-      await _saveToCache(_cachedSessions);
+      _lastSyncTime = null;
     }
   }
 
