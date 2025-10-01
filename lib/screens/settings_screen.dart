@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../ui/app_colors.dart';
 import '../services/app_state_service.dart';
 import '../services/real_time_input_service.dart';
 import '../services/google_fit_service.dart';
 import '../services/auth_service.dart';
+import '../services/logger_service.dart';
 import '../widgets/setup_warning_popup.dart';
 import '../services/setup_check_service.dart';
 
@@ -31,6 +34,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final AppStateService _appStateService = AppStateService();
   final RealTimeInputService _realTimeInputService = RealTimeInputService();
   final GoogleFitService _googleFitService = GoogleFitService();
+  static final LoggerService _logger = LoggerService();
 
   // User data
   User? _user;
@@ -236,7 +240,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   /// Navigate to Contact Us
   void _navigateToContact() {
-    // For now, show a simple dialog. You can replace this with a proper contact screen
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -244,9 +247,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Contact Us',
           style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
         ),
-        content: Text(
-          'For support and feedback, please contact us at:\n\nEmail: support@calorievita.com\nPhone: +1 (555) 123-4567',
-          style: GoogleFonts.poppins(),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'For support and feedback, please contact us at:',
+              style: GoogleFonts.poppins(),
+            ),
+            const SizedBox(height: 16),
+            InkWell(
+              onTap: () => _launchEmail(),
+              onLongPress: () => _copyEmailToClipboard(),
+              child: Row(
+                children: [
+                  const Icon(Icons.email, color: kPrimaryColor, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'calorievita@gmail.com',
+                      style: GoogleFonts.poppins(
+                        color: kPrimaryColor,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.content_copy,
+                    size: 16,
+                    color: kPrimaryColor.withOpacity(0.6),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tap to email • Long press to copy',
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                color: kTextSecondary,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -259,6 +303,86 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  /// Launch email app
+  Future<void> _launchEmail() async {
+    final Uri emailUri = Uri(
+      scheme: 'mailto',
+      path: 'calorievita@gmail.com',
+      query: 'subject=Calorie Vita Support',
+    );
+    
+    try {
+      if (await canLaunchUrl(emailUri)) {
+        await launchUrl(emailUri);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Could not open email app. Please email us at: calorievita@gmail.com',
+                style: GoogleFonts.poppins(),
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Error: ${e.toString()}\nPlease email: calorievita@gmail.com',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Copy email to clipboard
+  Future<void> _copyEmailToClipboard() async {
+    const email = 'calorievita@gmail.com';
+    
+    try {
+      await Clipboard.setData(const ClipboardData(text: email));
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Email copied to clipboard!',
+                  style: GoogleFonts.poppins(),
+                ),
+              ],
+            ),
+            backgroundColor: kSuccessColor,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to copy email',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   /// Navigate to Weight Log
@@ -484,15 +608,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Close loading dialog
           Navigator.pop(context);
           
-          // Add a small delay to ensure auth state is properly updated
-          await Future.delayed(const Duration(milliseconds: 100));
+          // Wait for auth state to be properly updated
+          await Future.delayed(const Duration(milliseconds: 500));
           
-          // Navigate to welcome screen
-          Navigator.pushNamedAndRemoveUntil(
-              context, '/welcome', (route) => false);
+          // Force navigation to welcome screen with proper cleanup
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+                context, '/welcome', (route) => false);
+          }
         }
       } catch (e) {
-        print('Logout error: $e');
+        _logger.error('Logout error', {'error': e.toString()});
         if (mounted) {
           // Close loading dialog if still open
           Navigator.pop(context);
@@ -930,20 +1056,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
           padding: const EdgeInsets.all(20),
           child: Row(
             children: [
-              // Health Icon
+              // Google Fit Logo
               Container(
-                width: 52,
-                height: 52,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: _isGoogleFitConnected
-                      ? kSuccessColor.withValues(alpha: 0.1)
-                      : Colors.grey[100],
-                  border: Border.all(
+                      ? Colors.white
+                      : Colors.grey[50],
+                  boxShadow: [
+                    BoxShadow(
                       color: _isGoogleFitConnected
-                          ? kSuccessColor
-                          : Colors.grey[300]!,
-                      width: 1),
+                          ? kSuccessColor.withValues(alpha: 0.2)
+                          : Colors.grey.withValues(alpha: 0.1),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Center(
                   child: _isConnectingToGoogleFit
@@ -956,11 +1086,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 AlwaysStoppedAnimation<Color>(kPrimaryColor),
                           ),
                         )
-                      : Image.asset(
-                          'google-fit-png-logo.png',
-                          width: 48,
-                          height: 48,
-                          fit: BoxFit.contain,
+                      : Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: Image.asset(
+                            'google-fit-png-logo.png',
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              // Fallback icon if image fails to load
+                              return Icon(
+                                Icons.favorite,
+                                size: 36,
+                                color: _isGoogleFitConnected 
+                                    ? kSuccessColor 
+                                    : Colors.grey[400],
+                              );
+                            },
+                          ),
                         ),
                 ),
               ),

@@ -7,6 +7,7 @@ import 'screens/trainer_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'screens/admin_notification_screen.dart';
 import 'widgets/reward_notification_widget.dart';
 import 'widgets/setup_warning_popup.dart';
 import 'ui/app_theme.dart';
@@ -17,6 +18,7 @@ import 'services/global_google_fit_manager.dart';
 import 'services/setup_check_service.dart';
 import 'services/firebase_service.dart';
 import 'services/daily_reset_service.dart';
+import 'services/logger_service.dart';
 
 class MainApp extends StatefulWidget {
   final bool firebaseInitialized;
@@ -30,6 +32,7 @@ class MainApp extends StatefulWidget {
 class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   final AppStateManager _appStateManager = AppStateManager();
   final GlobalGoogleFitManager _googleFitManager = GlobalGoogleFitManager();
+  static final LoggerService _logger = LoggerService();
   bool _hasShownSetupWarning = false;
 
   @override
@@ -179,29 +182,33 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
     return StreamBuilder<AppState>(
       stream: _appStateManager.stateStream,
       builder: (context, snapshot) {
-        print(
-            'App state snapshot: ${snapshot.connectionState}, data: ${snapshot.data}');
+        _logger.debug('App state snapshot', {
+          'connection_state': snapshot.connectionState.toString(),
+          'has_data': snapshot.hasData,
+          'has_error': snapshot.hasError,
+          'user_id': snapshot.data?.currentUserId ?? 'null'
+        });
 
         if (snapshot.hasError) {
-          print('App state error: ${snapshot.error}');
+          _logger.error('App state error', {'error': snapshot.error.toString()});
           return const WelcomeScreen();
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
-          print('App state waiting...');
+          _logger.debug('App state waiting, showing loading screen');
           return _buildLoadingScreen();
         }
 
         final appState = snapshot.data;
-        print(
-            'App state data: isInitialized=${appState?.isInitialized}, userId=${appState?.currentUserId}');
-
+        
         if (appState == null || appState.currentUserId.isEmpty) {
-          print('No user authenticated, showing welcome screen');
+          _logger.info('No user authenticated, showing welcome screen');
           return const WelcomeScreen();
         }
 
-        print('User authenticated, showing main navigation');
+        _logger.info('User authenticated, showing main navigation', {
+          'user_id': appState.currentUserId
+        });
         return const MainNavigation();
       },
     );
@@ -251,6 +258,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
       routes: {
         '/welcome': (context) => const WelcomeScreen(),
         '/home': (context) => const MainNavigation(),
+        '/admin-notifications': (context) => const AdminNotificationScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/welcome') {

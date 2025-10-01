@@ -747,9 +747,9 @@ class _AITrainerScreenState extends State<AITrainerScreen>
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       'PREMIUM',
@@ -890,9 +890,9 @@ class _AITrainerScreenState extends State<AITrainerScreen>
           children: [
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.1),
-                shape: BoxShape.circle,
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.lock,
@@ -953,13 +953,13 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       decoration: BoxDecoration(
         color: isDark ? Colors.grey[800] : Colors.grey[50],
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isCurrentSession ? kAccentBlue : Colors.grey.withOpacity(0.3),
-          width: isCurrentSession ? 2 : 1,
+          border: Border.all(
+            color: isCurrentSession ? kAccentBlue : Colors.grey.withValues(alpha: 0.3),
+            width: isCurrentSession ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -969,7 +969,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: kAccentBlue.withOpacity(0.1),
+            color: kAccentBlue.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: const Icon(
@@ -1294,7 +1294,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
                 color: isDark ? Colors.grey[850] : Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, -2),
                   ),
@@ -1317,7 +1317,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
                         filled: true,
                         fillColor: isDark
                             ? Colors.grey[800]
-                            : kAccentBlue.withOpacity(0.08),
+                            : kAccentBlue.withValues(alpha: 0.08),
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 10),
                       ),
@@ -1361,7 +1361,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
               decoration: BoxDecoration(
                 gradient: isUser
                     ? LinearGradient(
-                        colors: [kAccentBlue, kAccentBlue.withOpacity(0.8)],
+                        colors: [kAccentBlue, kAccentBlue.withValues(alpha: 0.8)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       )
@@ -1381,15 +1381,15 @@ class _AITrainerScreenState extends State<AITrainerScreen>
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
                 ],
                 border: Border.all(
                   color: isUser
-                      ? kAccentBlue.withOpacity(0.3)
-                      : Colors.grey.withOpacity(0.2),
+                      ? kAccentBlue.withValues(alpha: 0.3)
+                      : Colors.grey.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
@@ -1411,7 +1411,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
                     _formatTime(msg.timestamp),
                     style: TextStyle(
                       color: isUser
-                          ? Colors.white.withOpacity(0.7)
+                          ? Colors.white.withValues(alpha: 0.7)
                           : Colors.grey[500],
                       fontSize: 11,
                     ),

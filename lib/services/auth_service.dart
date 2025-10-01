@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'google_fit_service.dart';
 import 'global_google_fit_manager.dart';
 import 'unified_google_fit_manager.dart';
+import 'logger_service.dart';
 
 /// Firebase authentication service
 class AuthService {
@@ -24,6 +25,7 @@ class AuthService {
     ],
     // Let Google Sign-In use the default configuration from google-services.json
   );
+  static final LoggerService _logger = LoggerService();
 
   final StreamController<AuthUser?> _userController =
       StreamController<AuthUser?>.broadcast();
@@ -169,42 +171,46 @@ class AuthService {
   /// Sign out with complete cleanup including Google Fit
   Future<void> signOut() async {
     try {
-      print('🔌 AuthService: Starting complete sign out process...');
+      _logger.info('Starting complete sign out process');
       
       // Import Google Fit services for cleanup
       final googleFitService = GoogleFitService();
       final globalGoogleFitManager = GlobalGoogleFitManager();
       final unifiedGoogleFitManager = UnifiedGoogleFitManager();
       
-      // Disconnect Google Fit first
-      print('🔌 AuthService: Disconnecting Google Fit...');
+      // Disconnect Google Fit first (with timeout to prevent hanging)
+      _logger.info('Disconnecting Google Fit services');
       await Future.wait([
         googleFitService.signOut(),
         globalGoogleFitManager.disconnect(),
         unifiedGoogleFitManager.disconnect(),
-      ]);
+      ]).timeout(const Duration(seconds: 10));
       
       // Sign out from Firebase
-      print('🔌 AuthService: Signing out from Firebase...');
+      _logger.info('Signing out from Firebase');
       await _firebaseAuth.signOut();
       
       // Sign out from Google Sign-In
-      print('🔌 AuthService: Signing out from Google Sign-In...');
+      _logger.info('Signing out from Google Sign-In');
       await _googleSignIn.signOut();
       
       // Clear user data
       _currentUser = null;
       _userController.add(null);
       
-      print('✅ AuthService: Complete sign out successful');
+      // Add a small delay to ensure all services are properly cleaned up
+      await Future.delayed(const Duration(milliseconds: 200));
+      
+      _logger.info('Complete sign out successful');
     } catch (e) {
-      print('❌ AuthService: Sign out error: $e');
+      _logger.error('Sign out error', {'error': e.toString()});
       
       // Force clear user data even if sign out fails
       _currentUser = null;
       _userController.add(null);
       
-      rethrow;
+      // Don't rethrow to prevent UI blocking
+      _logger.warning('Sign out completed with errors, but user data cleared');
     }
   }
 

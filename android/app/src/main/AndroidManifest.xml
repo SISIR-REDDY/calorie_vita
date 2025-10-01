@@ -40,7 +40,8 @@
         android:name="${applicationName}"
         android:label="Calorie Vita"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="false"
+        android:requestLegacyExternalStorage="true">
 
         <!-- Main Activity -->
         <activity

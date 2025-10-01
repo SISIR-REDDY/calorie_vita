@@ -1,17 +1,26 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:image/image.dart' as img;
 import '../config/ai_config.dart';
+import '../config/production_config.dart';
+import 'logger_service.dart';
+import 'image_processing_service.dart';
 
 /// AI Service for OpenRouter API integration
 /// Handles all AI functionality including chat, analytics, recommendations, and image analysis
 class AIService {
-  // Use configuration from AIConfig
+  // Enhanced configuration with production settings
   static String get _baseUrl => AIConfig.baseUrl;
-  static String get _apiKey => AIConfig.apiKey;
-  static String get _chatModel => AIConfig.chatModel;
-  static String get _visionModel => AIConfig.visionModel;
+  static String get _apiKey => ProductionConfig.openRouterApiKey.isNotEmpty 
+      ? ProductionConfig.openRouterApiKey 
+      : AIConfig.apiKey;
+  static String get _chatModel => ProductionConfig.aiConfig['chat_model'] as String;
+  static String get _visionModel => ProductionConfig.aiConfig['vision_model'] as String;
+  
+  // Performance and caching
+  static final LoggerService _logger = LoggerService();
+  static final Map<String, Map<String, dynamic>> _responseCache = {};
+  static final Map<String, DateTime> _cacheTimestamps = {};
 
   /// Ask Trainer Sisir for fitness and nutrition advice with conversation context
   static Future<String> askTrainerSisir(
@@ -20,17 +29,23 @@ class AIService {
     List<Map<String, String>>? conversationHistory,
     Map<String, dynamic>? currentFitnessData,
   }) async {
-    try {
+    return await _logger.timeOperation('askTrainerSisir', () async {
+      try {
+        // Check cache first for better performance
+        final cacheKey = _generateCacheKey('chat', query, userProfile);
+        final cachedResponse = _getCachedResponse(cacheKey);
+        if (cachedResponse != null) {
+          _logger.info('Using cached response for chat query', {'cache_key': cacheKey});
+          return cachedResponse['response'] as String;
+        }
       // Prepare personalized context if profile data is available
-      String personalizedContext = '';
       if (userProfile != null && userProfile.isNotEmpty) {
-        personalizedContext = _formatProfileForAI(userProfile);
+        // Context will be added to messages below
       }
 
       // Add current fitness data to context
-      String fitnessContext = '';
       if (currentFitnessData != null && currentFitnessData.isNotEmpty) {
-        fitnessContext = _formatFitnessDataForAI(currentFitnessData);
+        // Context will be added to messages below
       }
 
       // Build conversation messages with context
@@ -107,23 +122,35 @@ Stay focused, professional, and supportive while maintaining strict fitness/well
         'content': query,
       });
 
-      final response = await _makeRequest(
-        model: _chatModel,
-        messages: messages,
-        isChatRequest: true,
-      );
+        final response = await _makeRequest(
+          model: _chatModel,
+          messages: messages,
+          isChatRequest: true,
+        );
 
-      return response['choices'][0]['message']['content'] ??
-          'Sorry, I couldn\'t process your request.';
-    } catch (e) {
-      print('Error in askTrainerSisir: $e');
-      if (e.toString().contains('AI_CREDITS_EXCEEDED')) {
-        return '💡 AI credits exhausted. Please upgrade your plan or try again later.';
-      } else if (e.toString().contains('AI_RATE_LIMIT')) {
-        return '⏱️ AI service is busy. Please wait a moment and try again.';
+        final result = response['choices'][0]['message']['content'] ??
+            'Sorry, I couldn\'t process your request.';
+        
+        // Cache the response for better performance
+        _cacheResponse(cacheKey, {'response': result, 'timestamp': DateTime.now()});
+        
+        _logger.userAction('chat_query_completed', {
+          'query_length': query.length,
+          'has_profile': userProfile != null,
+          'has_fitness_data': currentFitnessData != null,
+        });
+        
+        return result;
+      } catch (e) {
+        _logger.error('Error in askTrainerSisir', {'query': query, 'error': e.toString()});
+        if (e.toString().contains('AI_CREDITS_EXCEEDED')) {
+          return '💡 AI credits exhausted. Please upgrade your plan or try again later.';
+        } else if (e.toString().contains('AI_RATE_LIMIT')) {
+          return '⏱️ AI service is busy. Please wait a moment and try again.';
+        }
+        return '⚠️ AI service temporarily unavailable. Please try again later.';
       }
-      return '⚠️ AI service temporarily unavailable. Please try again later.';
-    }
+    });
   }
 
   /// Get AI-powered analytics insights based on user data
@@ -201,7 +228,7 @@ Be professional, encouraging, and strictly fitness-focused. Use specific numbers
       return response['choices'][0]['message']['content'] ??
           'Unable to generate insights at this time.';
     } catch (e) {
-      print('Error in getAnalyticsInsights: $e');
+      _logger.error('Error in getAnalyticsInsights', {'error': e.toString()});
       if (e.toString().contains('AI_CREDITS_EXCEEDED')) {
         return '📊 Analytics insights temporarily unavailable due to service limits.';
       } else if (e.toString().contains('AI_RATE_LIMIT')) {
@@ -291,7 +318,7 @@ Be professional, specific, and motivating while maintaining strict fitness/nutri
       return response['choices'][0]['message']['content'] ??
           'Unable to generate recommendations at this time.';
     } catch (e) {
-      print('Error in getPersonalizedRecommendations: $e');
+      _logger.error('Error in getPersonalizedRecommendations', {'error': e.toString()});
       if (e.toString().contains('AI_CREDITS_EXCEEDED')) {
         return '💡 Personalized recommendations temporarily unavailable due to service limits.';
       } else if (e.toString().contains('AI_RATE_LIMIT')) {
@@ -304,10 +331,16 @@ Be professional, specific, and motivating while maintaining strict fitness/nutri
   /// Detect calories and nutrition info from food image with high accuracy
   static Future<Map<String, dynamic>> detectCaloriesFromImage(
       File imageFile) async {
-    try {
-      // Optimize image before sending
-      final optimizedImageBytes = await _optimizeImageForAnalysis(imageFile);
-      final base64Image = base64Encode(optimizedImageBytes);
+    return await _logger.timeOperation('detectCaloriesFromImage', () async {
+      try {
+        // Use enhanced image processing service for better accuracy and speed
+        final optimizedImageBytes = await ImageProcessingService.optimizeImageForAnalysis(imageFile);
+        final base64Image = base64Encode(optimizedImageBytes);
+        
+        _logger.info('Image processed for AI analysis', {
+          'original_size_kb': (await imageFile.readAsBytes()).length / 1024,
+          'optimized_size_kb': optimizedImageBytes.length / 1024,
+        });
 
       // Try primary model first
       try {
@@ -315,10 +348,9 @@ Be professional, specific, and motivating while maintaining strict fitness/nutri
         if (result['confidence'] >= 0.7) {
           return result;
         }
-        print(
-            'Primary model confidence too low (${result['confidence']}), trying backup model');
+        _logger.warning('Primary model confidence too low', {'confidence': result['confidence']});
       } catch (e) {
-        print('Primary model failed: $e, trying backup model');
+        _logger.warning('Primary model failed, trying backup', {'error': e.toString()});
       }
 
       // Try backup model if primary fails or confidence is low
@@ -326,11 +358,11 @@ Be professional, specific, and motivating while maintaining strict fitness/nutri
         return await _analyzeFoodWithModel(
             base64Image, AIConfig.backupVisionModel);
       } catch (e) {
-        print('Backup model also failed: $e');
+        _logger.error('Backup model also failed', {'error': e.toString()});
         throw Exception('All vision models failed');
       }
     } catch (e) {
-      print('Error in detectCaloriesFromImage: $e');
+      _logger.error('Error in detectCaloriesFromImage', {'error': e.toString()});
       String errorMessage = '⚠️ AI service unavailable, please try again later.';
       if (e.toString().contains('AI_CREDITS_EXCEEDED')) {
         errorMessage = '💡 Image analysis temporarily unavailable due to service limits.';
@@ -338,17 +370,18 @@ Be professional, specific, and motivating while maintaining strict fitness/nutri
         errorMessage = '⏱️ Image analysis service is busy. Please try again in a moment.';
       }
       
-      return {
-        'food': 'Unable to analyze',
-        'calories': 0,
-        'protein': '0g',
-        'carbs': '0g',
-        'fat': '0g',
-        'serving_size': '1 serving',
-        'confidence': 0.0,
-        'error': errorMessage,
-      };
-    }
+        return {
+          'food': 'Unable to analyze',
+          'calories': 0,
+          'protein': '0g',
+          'carbs': '0g',
+          'fat': '0g',
+          'serving_size': '1 serving',
+          'confidence': 0.0,
+          'error': errorMessage,
+        };
+      }
+    });
   }
 
   /// Analyze food with specific model - Enhanced for accuracy
@@ -413,7 +446,7 @@ Be accurate and realistic while focusing on fitness nutrition.''',
     );
 
     final content = response['choices'][0]['message']['content'] ?? '';
-    print('AI Vision Response ($model): $content');
+    _logger.debug('AI Vision Response', {'model': model, 'content': content});
 
     return _parseFoodAnalysisResponse(content);
   }
@@ -466,47 +499,13 @@ Be accurate and realistic while focusing on fitness nutrition.''',
         };
       }
     } catch (e) {
-      print('Error parsing food analysis JSON: $e');
-      print('Raw response: $content');
+      _logger.error('Error parsing food analysis JSON', {'error': e.toString(), 'content': content});
     }
 
     // Enhanced fallback with better text extraction
     return _extractFoodInfoFromText(content);
   }
 
-  /// Optimize image for better AI analysis
-  static Future<List<int>> _optimizeImageForAnalysis(File imageFile) async {
-    try {
-      // Read and decode image
-      final imageBytes = await imageFile.readAsBytes();
-      final image = img.decodeImage(imageBytes);
-
-      if (image == null) {
-        print('Could not decode image, using original bytes');
-        return imageBytes;
-      }
-
-      // Resize if too large (max 1024x1024 for better processing)
-      img.Image optimizedImage = image;
-      if (image.width > 1024 || image.height > 1024) {
-        optimizedImage = img.copyResize(
-          image,
-          width: image.width > image.height ? 1024 : null,
-          height: image.height > image.width ? 1024 : null,
-          interpolation: img.Interpolation.linear,
-        );
-      }
-
-      // Enhance contrast slightly for better recognition
-      optimizedImage = img.contrast(optimizedImage, contrast: 1.1);
-
-      // Convert back to bytes
-      return img.encodeJpg(optimizedImage, quality: 90);
-    } catch (e) {
-      print('Error optimizing image: $e, using original');
-      return await imageFile.readAsBytes();
-    }
-  }
 
   /// Parse number from dynamic value
   static double? _parseNumber(dynamic value) {
@@ -644,7 +643,7 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
       );
 
       final content = response['choices'][0]['message']['content'] ?? '';
-      print('AI Barcode Response: $content');
+      _logger.debug('AI Barcode Response', {'content': content});
 
       // Try to parse JSON from the response
       try {
@@ -674,7 +673,7 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
           };
         }
       } catch (e) {
-        print('Error parsing barcode JSON: $e');
+        _logger.error('Error parsing barcode JSON', {'error': e.toString()});
       }
 
       // Fallback for barcode
@@ -691,7 +690,7 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
         'barcode': barcode,
       };
     } catch (e) {
-      print('Error in getNutritionFromBarcode: $e');
+      _logger.error('Error in getNutritionFromBarcode', {'error': e.toString()});
       String errorMessage = '⚠️ AI service unavailable, please try again later.';
       if (e.toString().contains('AI_CREDITS_EXCEEDED')) {
         errorMessage = '💡 Barcode analysis temporarily unavailable due to service limits.';
@@ -941,5 +940,72 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
     }
 
     return buffer.toString();
+  }
+  
+  /// Generate cache key for requests
+  static String _generateCacheKey(String type, String query, Map<String, dynamic>? context) {
+    final contextHash = context != null ? context.hashCode.toString() : 'no_context';
+    return '${type}_${query.hashCode}_$contextHash';
+  }
+  
+  /// Get cached response if available and not expired
+  static Map<String, dynamic>? _getCachedResponse(String cacheKey) {
+    if (!ProductionConfig.isFeatureEnabled('enable_smart_caching')) return null;
+    
+    final cached = _responseCache[cacheKey];
+    final timestamp = _cacheTimestamps[cacheKey];
+    
+    if (cached != null && timestamp != null) {
+      final age = DateTime.now().difference(timestamp);
+      final cacheDuration = Duration(minutes: ProductionConfig.aiConfig['cache_duration_minutes'] as int);
+      
+      if (age < cacheDuration) {
+        return cached;
+      } else {
+        // Remove expired cache
+        _responseCache.remove(cacheKey);
+        _cacheTimestamps.remove(cacheKey);
+      }
+    }
+    
+    return null;
+  }
+  
+  /// Cache response for future use
+  static void _cacheResponse(String cacheKey, Map<String, dynamic> response) {
+    if (!ProductionConfig.isFeatureEnabled('enable_smart_caching')) return;
+    
+    // Limit cache size for memory efficiency
+    if (_responseCache.length > 100) {
+      final oldestKey = _cacheTimestamps.entries
+          .reduce((a, b) => a.value.isBefore(b.value) ? a : b)
+          .key;
+      _responseCache.remove(oldestKey);
+      _cacheTimestamps.remove(oldestKey);
+    }
+    
+    _responseCache[cacheKey] = response;
+    _cacheTimestamps[cacheKey] = DateTime.now();
+  }
+  
+  /// Clear all cached responses
+  static void clearCache() {
+    _responseCache.clear();
+    _cacheTimestamps.clear();
+    _logger.info('AI service cache cleared');
+  }
+  
+  /// Get cache statistics
+  static Map<String, dynamic> getCacheStats() {
+    return {
+      'cache_size': _responseCache.length,
+      'cache_keys': _responseCache.keys.toList(),
+      'oldest_cache': _cacheTimestamps.values.isNotEmpty 
+          ? _cacheTimestamps.values.reduce((a, b) => a.isBefore(b) ? a : b).toIso8601String()
+          : null,
+      'newest_cache': _cacheTimestamps.values.isNotEmpty 
+          ? _cacheTimestamps.values.reduce((a, b) => a.isAfter(b) ? a : b).toIso8601String()
+          : null,
+    };
   }
 }

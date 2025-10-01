@@ -8,6 +8,9 @@ import 'main_app.dart';
 import 'services/network_service.dart';
 import 'services/performance_monitor.dart';
 import 'services/error_handler.dart';
+import 'services/logger_service.dart';
+import 'services/push_notification_service.dart';
+import 'config/production_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,7 +21,12 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Initialize performance monitoring first
+  // Initialize logger service first for better debugging
+  final logger = LoggerService();
+  await logger.initialize();
+  logger.info('App starting', {'version': ProductionConfig.appVersion});
+
+  // Initialize performance monitoring
   final performanceMonitor = PerformanceMonitor();
   await performanceMonitor.initialize();
   performanceMonitor.startTimer('app_startup');
@@ -30,6 +38,12 @@ void main() async {
   // Initialize error handler
   final errorHandler = ErrorHandler();
   await errorHandler.initialize();
+  
+  logger.info('Core services initialized', {
+    'performance_monitor': true,
+    'network_service': true,
+    'error_handler': true,
+  });
 
   // Initialize Firebase with basic configuration
   bool firebaseInitialized = false;
@@ -38,15 +52,20 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    // Initialize Firebase services
-    await _initializeFirebaseServices();
+  // Initialize Firebase services
+  await _initializeFirebaseServices();
 
-    firebaseInitialized = true;
-    print('✅ Firebase initialized successfully');
+  // Initialize push notification service
+  final pushNotificationService = PushNotificationService();
+  await pushNotificationService.initialize();
+
+  firebaseInitialized = true;
+  logger.info('Firebase initialized successfully');
     performanceMonitor.logEvent('firebase_initialized', {'success': true});
 
-    // Update error handler with Firebase availability
+    // Update error handler and logger with Firebase availability
     await errorHandler.initialize(firebaseAvailable: true);
+    await logger.initialize(firebaseAvailable: true);
   } catch (e) {
     // If Firebase is already initialized, that's fine
     if (e.toString().contains('duplicate-app')) {
@@ -54,8 +73,8 @@ void main() async {
       firebaseInitialized = true;
       await errorHandler.initialize(firebaseAvailable: true);
     } else {
-      print('❌ Firebase initialization error: $e');
-      print('Continuing without Firebase - app will work in demo mode');
+      logger.error('Firebase initialization error', {'error': e.toString()});
+      logger.warning('Continuing without Firebase - app will work in demo mode');
       performanceMonitor.logEvent('firebase_init_error', {
         'error': e.toString(),
         'success': false,
@@ -68,7 +87,10 @@ void main() async {
 
   // Log startup performance
   final startupDuration = performanceMonitor.getOperationStats('app_startup');
-  print('App startup completed in ${startupDuration['average_ms']}ms');
+  logger.info('App startup completed', {
+    'duration_ms': startupDuration['average_ms'],
+    'firebase_initialized': firebaseInitialized,
+  });
 
   runApp(MainApp(firebaseInitialized: firebaseInitialized));
 }

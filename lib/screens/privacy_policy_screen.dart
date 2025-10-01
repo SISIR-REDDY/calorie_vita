@@ -76,93 +76,164 @@ class PrivacyPolicyScreen extends StatelessWidget {
             _buildSection(
               title: '1. Information We Collect',
               content: '''
-We collect information you provide directly to us, such as when you create an account, use our services, or contact us for support.
+We collect various types of information in connection with your use of the Calorie Vita application to provide, improve, and personalize our services.
 
-Personal Information:
-• Name, email address, and profile information
-• Age, gender, height, weight, and fitness goals
-• Dietary preferences and health information
-• Profile photos and user-generated content
+Personal Information You Provide:
+• Account Information: Name, email address, password (encrypted), date of birth, and gender
+• Health Profile Data: Height, weight, body measurements, fitness goals, target weight, and BMI
+• Dietary Information: Food preferences, allergies, dietary restrictions, and nutritional goals
+• User-Generated Content: Profile photos, food photos, notes, and journal entries
+• Communication Data: Customer support inquiries, feedback, and survey responses
 
-Usage Information:
-• App usage patterns and feature interactions
-• Device information and operating system
-• Log data and analytics information
-• Camera and photo library access (for food logging)
+Automatically Collected Information:
+• Device Information: Device model, operating system version, unique device identifiers, mobile network information
+• Usage Data: App features accessed, interaction patterns, session duration, screen views, and navigation paths
+• Location Data: Approximate location based on IP address (precise location only with explicit permission)
+• Camera and Media Access: Photos captured or selected for food logging (processed locally and via AI services)
+• Performance Data: Crash reports, error logs, diagnostic information, and app performance metrics
+
+Health and Fitness Data:
+• Activity Data: Steps, distance, calories burned, exercise duration (when integrated with Google Fit or Health Connect)
+• Nutritional Intake: Food consumption, calorie intake, macronutrient breakdown, meal timing
+• Progress Metrics: Weight changes, goal achievements, streak data, and behavioral patterns
+• Biometric Data: Body measurements, BMI calculations, and other health metrics you choose to provide
+
+Third-Party Integration Data:
+• Google Fit and Health Connect data (steps, activity, calories burned)
+• Wearable device synchronization data
+• Social media profile information (if you choose to connect social accounts)
               ''',
             ),
 
             _buildSection(
               title: '2. How We Use Your Information',
               content: '''
-We use the information we collect to provide, maintain, and improve our services:
+We process your personal information for the following legitimate purposes, in accordance with applicable data protection laws:
 
-Service Provision:
-• Provide personalized nutrition and fitness recommendations
-• Track your health and fitness progress
-• Enable AI-powered coaching and suggestions
-• Sync data across your devices
+Service Delivery and Functionality:
+• Provide core app functionality including food tracking, calorie counting, and progress monitoring
+• Generate personalized nutrition and fitness recommendations using AI-powered analysis
+• Process and analyze food photographs for nutritional content identification
+• Synchronize your data across multiple devices and platforms
+• Maintain your account and authenticate your identity
+• Enable social features and community interactions (if you opt-in)
 
-Communication:
-• Send important updates about our services
-• Provide customer support and respond to inquiries
-• Send notifications about your health goals
-• Share relevant tips and educational content
+AI-Powered Personalization:
+• Utilize OpenRouter AI services to provide intelligent nutrition analysis and recommendations
+• Generate personalized meal suggestions based on your dietary preferences and health goals
+• Provide AI-driven coaching insights and behavioral pattern analysis
+• Improve accuracy of food recognition and nutritional estimation algorithms
 
-Improvement:
-• Analyze usage patterns to improve our app
-• Develop new features and services
-• Conduct research and analytics
-• Ensure app security and prevent fraud
+Communication and Support:
+• Send transactional communications (account confirmations, password resets, critical updates)
+• Provide customer support and respond to your inquiries and requests
+• Send push notifications about goal progress, reminders, and achievements (with your consent)
+• Deliver educational content, health tips, and wellness information (with your consent)
+• Conduct user surveys and collect feedback to improve our services
+
+Analytics and Improvement:
+• Analyze usage patterns, trends, and user behavior to improve app functionality
+• Conduct statistical analysis and research to develop new features
+• Perform A/B testing to optimize user experience
+• Monitor app performance, identify bugs, and resolve technical issues
+• Generate anonymized and aggregated data for research and development
+
+Security and Compliance:
+• Detect, prevent, and respond to fraud, security threats, and unauthorized access
+• Comply with legal obligations and regulatory requirements
+• Enforce our Terms and Conditions and protect our legal rights
+• Prevent abuse, harmful activity, and violations of our policies
+• Maintain data integrity and system security
               ''',
             ),
 
             _buildSection(
-              title: '3. Information Sharing',
+              title: '3. Information Sharing and Disclosure',
               content: '''
-We do not sell, trade, or rent your personal information to third parties. We may share your information in the following limited circumstances:
+We do not sell, rent, or trade your personal information to third parties for their marketing purposes. We may share your information only in the following limited circumstances:
 
-Service Providers:
-• Cloud storage providers (Firebase, Google Cloud)
-• Analytics services (Google Analytics)
-• AI service providers (Google Gemini API)
-• Payment processors (if applicable)
+Essential Service Providers (Data Processors):
+• Cloud Infrastructure: Firebase (Google Cloud Platform) for secure data storage and synchronization
+• AI Services: OpenRouter API for intelligent food recognition and nutrition analysis
+• Analytics Platforms: Firebase Analytics and Google Analytics for app performance monitoring
+• Authentication Services: Firebase Authentication and Google Sign-In for secure account access
+• Crash Reporting: Firebase Crashlytics for error detection and app stability
+• Push Notifications: Firebase Cloud Messaging for delivering timely alerts and reminders
+• Payment Processors: [YOUR_PAYMENT_PROCESSOR - if applicable] for subscription billing
 
-Legal Requirements:
-• When required by law or legal process
-• To protect our rights and property
-• To prevent fraud or security issues
-• In case of business transfers or mergers
+All service providers are contractually obligated to:
+• Process data only on our instructions
+• Implement appropriate security measures
+• Delete or return data upon termination
+• Comply with applicable data protection laws
 
-With Your Consent:
-• When you explicitly authorize sharing
-• For research purposes (anonymized data)
-• For social features (if you choose to participate)
+Legal and Regulatory Compliance:
+• Compliance with legal obligations, court orders, subpoenas, or regulatory requests
+• Protection of our legal rights, property, and interests
+• Investigation and prevention of fraud, security threats, or illegal activities
+• Protection of user safety and prevention of harm
+• Enforcement of our Terms and Conditions
+
+Business Transfers:
+• In connection with mergers, acquisitions, corporate restructuring, or asset sales
+• Your data may be transferred as a business asset
+• We will notify you of any such transfer
+• Your privacy rights will continue to be protected
+
+With Your Explicit Consent:
+• Sharing with third-party health and fitness applications (when you authorize integration)
+• Participation in research studies (with anonymized data and your explicit opt-in)
+• Social features and community sharing (only information you choose to make public)
+• Export of your data to other platforms (at your request)
+
+Aggregated and Anonymized Data:
+• We may share non-identifiable, aggregated, or anonymized data for research, analytics, and business purposes
+• This data cannot be used to identify individual users
+• Used for industry research, statistical analysis, and service improvement
               ''',
             ),
 
             _buildSection(
-              title: '4. Data Security',
+              title: '4. Data Security and Protection',
               content: '''
-We implement appropriate security measures to protect your personal information:
+We implement comprehensive security measures designed to protect your personal information from unauthorized access, disclosure, alteration, and destruction.
 
-Technical Safeguards:
-• Encryption of data in transit and at rest
-• Secure authentication and access controls
-• Regular security audits and updates
-• Secure cloud infrastructure (Firebase)
+Technical Security Measures:
+• Encryption: All data transmitted between your device and our servers uses industry-standard TLS/SSL encryption
+• Data at Rest: Personal information stored in Firebase is encrypted using AES-256 encryption
+• Secure Authentication: Password-based authentication with bcrypt hashing and OAuth 2.0 for Google Sign-In
+• Access Controls: Role-based access control (RBAC) and principle of least privilege for system access
+• Network Security: Firewall protection, intrusion detection systems, and regular security monitoring
+• Secure APIs: API authentication, rate limiting, and request validation to prevent abuse
 
-Operational Safeguards:
-• Limited access to personal information
-• Employee training on data protection
-• Incident response procedures
-• Regular backup and recovery systems
+Infrastructure Security:
+• Cloud Security: Hosted on Google Cloud Platform (Firebase) with SOC 2, ISO 27001, and GDPR compliance
+• Regular Backups: Automated daily backups with encrypted storage and disaster recovery procedures
+• Security Updates: Continuous monitoring and timely application of security patches
+• Penetration Testing: Regular security audits and vulnerability assessments
+• Incident Response: 24/7 security monitoring with documented incident response procedures
 
-Your Responsibility:
-• Keep your login credentials secure
-• Use strong, unique passwords
-• Log out from shared devices
-• Report any suspicious activity
+Organizational Safeguards:
+• Access Limitation: Personal data access restricted to authorized personnel with legitimate business needs
+• Employee Training: Regular security and privacy training for all team members with data access
+• Confidentiality Agreements: All personnel bound by strict confidentiality obligations
+• Vendor Management: Security requirements for all third-party service providers
+• Data Minimization: Collection and retention of only necessary personal information
+
+User Security Responsibilities:
+• Account Security: Maintain strong, unique passwords and enable two-factor authentication when available
+• Device Security: Keep your device and operating system updated with latest security patches
+• Network Caution: Avoid accessing your account on public or unsecured Wi-Fi networks
+• Logout Practices: Always log out when using shared or public devices
+• Suspicious Activity: Immediately report any unauthorized access or suspicious activity to support@calorievita.com
+
+Data Breach Response:
+• Notification: We will notify affected users within 72 hours of discovering a data breach (as required by law)
+• Remediation: Immediate action to contain and remediate security incidents
+• Investigation: Thorough investigation to determine cause, scope, and impact
+• Prevention: Implementation of additional safeguards to prevent future incidents
+
+Important Notice: While we implement robust security measures, no method of electronic transmission or storage is 100% secure. You acknowledge and accept the inherent security risks of internet-based services.
               ''',
             ),
 
@@ -244,19 +315,40 @@ Your Rights:
             ),
 
             _buildSection(
-              title: '9. Contact Information',
+              title: '9. Contact Information and Data Protection',
               content: '''
-If you have any questions about this Privacy Policy or our privacy practices, please contact us:
+For questions, concerns, or requests regarding this Privacy Policy or our data processing practices, please contact us:
 
-Email: privacy@calorievita.com
-Address: Calorie Vita Privacy Team
-123 Health Street, Wellness City, WC 12345
+Email: calorievita@gmail.com
 
-Response Time:
-• We aim to respond within 48 hours
-• Complex requests may take up to 30 days
-• We will provide updates on request status
-• Multiple contact methods available
+Types of Inquiries We Handle:
+• General privacy inquiries and questions
+• Data subject rights requests (access, deletion, portability)
+• Privacy complaints and concerns
+• Data protection matters
+• GDPR/CCPA compliance questions
+
+For Data Subject Rights Requests, please include in your email:
+• Subject Line: "Data Rights Request - [Access/Deletion/Portability]"
+• Your registered email address
+• Specific details of your request
+• Proof of identity for verification
+
+Response Timeframes:
+• General privacy inquiries: Within 48-72 business hours
+• Data access requests: Within 30 days (as required by GDPR/CCPA)
+• Data deletion requests: Within 30 days of verification
+• Data portability requests: Within 30 days in machine-readable format
+• Privacy complaints: Acknowledged within 48 hours, resolved within 30 days
+
+Regulatory Authorities:
+If you are not satisfied with our response to your privacy concern, you have the right to lodge a complaint with your local data protection authority or supervisory authority.
+
+• EU Users: Contact your national Data Protection Authority
+• California Users: Contact California Attorney General's Office
+• Other Jurisdictions: Contact your applicable data protection regulator
+
+Important Note: To protect your privacy and security, we will verify your identity before processing data rights requests. Please provide your registered email address and be prepared to verify account ownership.
               ''',
             ),
 

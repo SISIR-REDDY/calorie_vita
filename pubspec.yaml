@@ -1,6 +1,6 @@
 name: calorie_vita
 description: A Flutter app for tracking calories by uploading food photos
-publish_to: 'none'
+# publish_to: 'none'  # Commented out for Play Store publishing
 version: 1.0.0+1
 
 environment:
@@ -35,22 +35,18 @@ dependencies:
   # HTTP (for food detection API later)
   http: ^1.1.0
 
-  # Extra dependencies
-  camera: ^0.10.5+9
+  # Essential dependencies only
   shared_preferences: ^2.5.3
+  url_launcher: ^6.3.1
+  flutter_local_notifications: ^17.2.3
 
-  # Production utils
+  # Production utils (minimal)
   connectivity_plus: ^6.0.5
-  device_info_plus: ^9.1.2
   package_info_plus: ^8.0.2
+  device_info_plus: ^9.1.2
   logger: ^2.4.0
   
-  # AR for portion estimation (commented out due to compatibility issues)
-  # arcore_flutter_plugin: ^0.0.9
-  # arkit_plugin: ^0.11.0
-  
-  # Health & Fitness Integration
-  # Using Google Fit REST API for real-time data
+  # Health & Fitness Integration (minimal)
   googleapis_auth: ^1.4.1
   googleapis: ^11.4.0
 
@@ -70,7 +66,6 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/
     - assets/indian_foods.json
     - assets/comprehensive_indian_foods.json
     - assets/indian_packaged.json

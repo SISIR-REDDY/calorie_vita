@@ -95,27 +95,32 @@ Updates to Terms:
             _buildSection(
               title: '2. Description of Service',
               content: '''
-Calorie Vita is a comprehensive health and fitness application that provides:
+Calorie Vita is a comprehensive health and wellness mobile application designed to assist users with nutritional tracking and fitness goal management.
 
 Core Features:
-• Food logging and calorie tracking
-• AI-powered nutrition recommendations
-• Fitness goal setting and progress tracking
-• Personalized coaching and insights
-• Photo-based food recognition
-• Health analytics and reporting
+• Food logging and calorie tracking with photo recognition
+• AI-powered nutrition analysis and recommendations
+• Fitness goal setting and progress monitoring
+• Personalized health coaching and insights
+• Macro and micronutrient tracking
+• Health analytics and comprehensive reporting
+• Weight management and BMI tracking
 
-AI Services:
-• Google Gemini API integration for personalized advice
-• Machine learning for nutrition recommendations
-• Automated meal planning and suggestions
-• Intelligent progress analysis
+AI-Powered Services:
+• Advanced AI integration via OpenRouter API for intelligent nutrition analysis
+• Machine learning algorithms for personalized meal recommendations
+• Automated nutritional content analysis from food photographs
+• Intelligent progress tracking and pattern recognition
+• AI-driven health insights and coaching suggestions
 
-Additional Services:
-• Social features and community support
-• Integration with health devices
-• Export and data portability
-• Premium features and subscriptions
+Integration Capabilities:
+• Google Fit and Health Connect integration
+• Wearable device synchronization
+• Cloud-based data storage and synchronization via Firebase
+• Data export and portability features
+• Third-party health platform compatibility
+
+The Service is provided on an "as-is" and "as-available" basis. We reserve the right to modify, suspend, or discontinue any aspect of the Service at any time with or without notice.
               ''',
             ),
 
@@ -170,25 +175,32 @@ Prohibited Uses:
             _buildSection(
               title: '5. Health and Medical Disclaimer',
               content: '''
-IMPORTANT: Calorie Vita is not a medical device or healthcare provider.
+IMPORTANT MEDICAL DISCLAIMER: Calorie Vita is a nutritional tracking and wellness tool and is NOT a medical device, healthcare provider, or substitute for professional medical advice, diagnosis, or treatment.
 
-Health Information:
-• The App provides general health and fitness information
-• Information is not intended as medical advice
-• Always consult healthcare professionals for medical decisions
-• We do not diagnose, treat, or cure any medical conditions
+Health Information Disclaimer:
+• The App provides general health, fitness, and nutritional information for educational and informational purposes only
+• All content, including AI-generated recommendations, is not intended as medical advice, diagnosis, or treatment
+• You must always consult qualified healthcare professionals before making any health-related decisions, including dietary changes, exercise programs, or weight management strategies
+• We do not diagnose, treat, cure, or prevent any disease, medical condition, or health problem
 
-Limitations:
-• AI recommendations are for informational purposes only
-• Individual results may vary
-• Not suitable for people with certain medical conditions
-• Emergency situations require immediate medical attention
+AI-Generated Content Limitations:
+• AI recommendations and nutrition analysis are automated and for informational purposes only
+• AI-generated content may contain errors, inaccuracies, or be incomplete
+• Individual nutritional needs vary significantly based on medical conditions, medications, allergies, and personal health factors
+• AI analysis should never replace professional nutritional counseling or medical advice
 
-Your Responsibility:
-• Consult healthcare providers before making health changes
-• Monitor your health and seek medical attention when needed
-• Use the App as a supplement, not replacement for medical care
-• Report any adverse effects to your healthcare provider
+Health and Safety Warnings:
+• Not suitable for individuals with eating disorders, diabetes, cardiovascular disease, or other serious medical conditions without physician oversight
+• Pregnant or nursing women must consult healthcare providers before using dietary tracking features
+• Individuals taking medications that interact with diet must seek medical guidance
+• Emergency medical situations require immediate professional medical attention - do not rely on the App for emergencies
+
+User Responsibility and Acknowledgment:
+• You acknowledge sole responsibility for all health and fitness decisions
+• You agree to consult licensed healthcare providers before implementing any dietary or fitness changes
+• You agree to monitor your health status and seek immediate medical attention for any adverse symptoms
+• You understand the App is a supplementary tool and not a replacement for professional medical care
+• You agree to inform your healthcare providers about your use of this App and any data collected
               ''',
             ),
 
@@ -337,51 +349,64 @@ Effect of Termination:
             ),
 
             _buildSection(
-              title: '12. Governing Law and Disputes',
+              title: '12. Governing Law and Dispute Resolution',
               content: '''
-These Terms are governed by applicable laws and dispute resolution procedures.
+These Terms shall be governed by and construed in accordance with applicable laws and regulations.
 
 Governing Law:
-• These Terms are governed by the laws of [Jurisdiction]
-• International users may be subject to local laws
-• We comply with applicable consumer protection laws
-• Some terms may vary by jurisdiction
+• These Terms are governed by the laws of [YOUR_JURISDICTION - e.g., "the State of California, United States" or "India"]
+• International users remain subject to their local consumer protection laws and regulations
+• We comply with applicable data protection regulations including GDPR (where applicable)
+• Certain provisions may vary by jurisdiction to comply with local legal requirements
 
-Dispute Resolution:
-• We encourage resolving disputes through direct communication
-• Mediation may be required before litigation
-• Arbitration may be required for certain disputes
-• Class action waivers may apply
+Informal Dispute Resolution:
+• Prior to initiating formal proceedings, parties agree to attempt good-faith negotiation
+• Notice of dispute must be sent in writing to: legal@calorievita.com
+• Parties shall have 30 days from notice to attempt informal resolution
+• This requirement does not apply to claims seeking injunctive relief
 
-Legal Proceedings:
-• Jurisdiction for legal proceedings is [Court Location]
-• You consent to the jurisdiction of these courts
-• We may seek injunctive relief in any court
-• Time limits for bringing claims may apply
+Arbitration Agreement:
+• Any dispute arising from these Terms shall be resolved through binding arbitration
+• Arbitration shall be conducted under the rules of [YOUR_ARBITRATION_BODY - e.g., "American Arbitration Association" or relevant local body]
+• Arbitration location: [YOUR_ARBITRATION_LOCATION - e.g., "San Francisco, California" or relevant city]
+• Each party bears their own costs unless otherwise awarded by arbitrator
+• Class action waiver: You agree to resolve disputes individually and waive rights to class action proceedings
+
+Legal Proceedings and Jurisdiction:
+• Exclusive jurisdiction for any court proceedings: [YOUR_COURT_JURISDICTION - e.g., "courts located in San Francisco County, California"]
+• You irrevocably consent to the personal jurisdiction of these courts
+• Either party may seek equitable relief (including injunctive relief) in any competent court
+• Claims must be brought within one (1) year of the cause of action arising, after which claims are time-barred
+
+Exceptions:
+• Small claims court proceedings (up to jurisdictional limit)
+• Claims for intellectual property infringement
+• Claims seeking emergency injunctive relief
               ''',
             ),
 
             _buildSection(
               title: '13. Contact Information',
               content: '''
-For questions about these Terms or our services, please contact us:
+For questions, concerns, or inquiries regarding these Terms and Conditions or our services, please contact us:
 
-General Inquiries:
-Email: support@calorievita.com
-Phone: +1 (555) 123-4567
-Address: Calorie Vita Support Team
-123 Health Street, Wellness City, WC 12345
+Email: calorievita@gmail.com
 
-Legal Matters:
-Email: legal@calorievita.com
-Address: Calorie Vita Legal Department
-123 Health Street, Wellness City, WC 12345
+You can reach us for:
+• General inquiries and customer support
+• Technical support and troubleshooting
+• Legal and compliance matters
+• Privacy and data protection concerns
+• Feedback and suggestions
 
-Response Times:
-• General inquiries: 24-48 hours
-• Technical support: 12-24 hours
-• Legal matters: 5-7 business days
-• Emergency issues: Immediate attention
+Expected Response Times:
+• General customer support: Within 24-48 business hours
+• Technical support issues: Within 12-24 business hours
+• Legal and compliance matters: Within 5-7 business days
+• Data protection requests (GDPR/Privacy): Within 30 days as required by law
+• Urgent security issues: Immediate priority response
+
+Note: Response times may vary during holidays or periods of high volume. We appreciate your patience and will respond to all inquiries as promptly as possible.
               ''',
             ),
 

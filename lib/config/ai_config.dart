@@ -1,5 +1,5 @@
 class AIConfig {
-  static const String apiKey = String.fromEnvironment('OPENROUTER_API_KEY', defaultValue: '');
+  static const String apiKey = String.fromEnvironment('OPENROUTER_API_KEY', defaultValue: 'YOUR_OPENROUTER_API_KEY_HERE');
 
   static const String baseUrl = 'https://openrouter.ai/api/v1/chat/completions';
 

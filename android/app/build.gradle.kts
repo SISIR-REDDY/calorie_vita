@@ -13,6 +13,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
     }
 
     tasks.withType<JavaCompile> {
@@ -33,12 +34,43 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
+    
+    // Split APKs disabled for now - will enable after testing
+    // splits {
+    //     abi {
+    //         isEnable = true
+    //         reset()
+    //         include("arm64-v8a", "armeabi-v7a")
+    //         isUniversalApk = false
+    //     }
+    // }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Production signing configuration
+            signingConfig = signingConfigs.getByName("debug") // TODO: Replace with production signing
+            
+            // Production optimizations - re-enabled for size reduction
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            
+            // Performance optimizations
+            ndk {
+                debugSymbolLevel = "NONE" // Remove debug symbols to save space
+            }
+            
+            // Additional size optimizations
+            // zipAlignEnabled = true  // Not available in this Gradle version
+            // crunchPngs = true       // Not available in this Gradle version
+        }
+        
+        debug {
+            // Debug optimizations
+            isDebuggable = true
+            // Removed applicationIdSuffix to match Firebase configuration
+            // applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
         }
     }
 }
@@ -48,6 +80,9 @@ flutter {
 }
 
 dependencies {
+    // Core library desugaring for flutter_local_notifications
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    
     implementation("com.google.android.gms:play-services-auth:20.7.0")
     implementation("com.google.android.gms:play-services-location:21.0.1")
     implementation("androidx.health.connect:connect-client:1.1.0-alpha07")
