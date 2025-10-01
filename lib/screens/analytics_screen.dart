@@ -10,11 +10,8 @@ import '../services/analytics_service.dart';
 import '../services/firebase_service.dart';
 import '../services/ai_service.dart';
 import '../services/app_state_service.dart';
-import '../services/google_fit_service.dart';
-import '../services/global_google_fit_manager.dart';
-import '../services/unified_google_fit_manager.dart';
+import '../services/optimized_google_fit_manager.dart';
 import '../services/todays_food_data_service.dart';
-import '../mixins/google_fit_sync_mixin.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
 import '../models/user_achievement.dart';
@@ -31,8 +28,6 @@ class AnalyticsScreen extends StatefulWidget {
 class _AnalyticsScreenState extends State<AnalyticsScreen>
     with
         TickerProviderStateMixin,
-        GoogleFitSyncMixin,
-        GoogleFitDataDisplayMixin,
         ResponsiveWidgetMixin,
         DynamicColumnMixin {
   String _selectedPeriod = 'Daily';
@@ -42,9 +37,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   final AnalyticsService _analyticsService = AnalyticsService();
   final FirebaseService _firebaseService = FirebaseService();
   final AppStateService _appStateService = AppStateService();
-  final GoogleFitService _googleFitService = GoogleFitService();
-  final GlobalGoogleFitManager _googleFitManager = GlobalGoogleFitManager();
-  final UnifiedGoogleFitManager _unifiedGoogleFitManager = UnifiedGoogleFitManager();
+  final OptimizedGoogleFitManager _googleFitManager = OptimizedGoogleFitManager();
   final TodaysFoodDataService _todaysFoodDataService = TodaysFoodDataService();
 
   // State management
@@ -67,9 +60,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   StreamSubscription<UserGoals?>? _goalsSubscription;
   StreamSubscription<Map<String, double>>? _todaysFoodMacroSubscription;
   StreamSubscription<int>? _todaysFoodCaloriesSubscription;
-  StreamSubscription<GoogleFitData?>? _unifiedGoogleFitSubscription;
-  StreamSubscription<bool>? _unifiedGoogleFitConnectionSubscription;
-  StreamSubscription<bool>? _unifiedGoogleFitLoadingSubscription;
+  StreamSubscription<GoogleFitData?>? _googleFitDataSubscription;
+  StreamSubscription<bool>? _googleFitConnectionSubscription;
+  StreamSubscription<bool>? _googleFitLoadingSubscription;
 
   // Real-time data
   List<DailySummary> _dailySummaries = [];
@@ -119,6 +112,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     _goalsSubscription?.cancel();
     _todaysFoodMacroSubscription?.cancel();
     _todaysFoodCaloriesSubscription?.cancel();
+    _googleFitDataSubscription?.cancel();
+    _googleFitConnectionSubscription?.cancel();
+    _googleFitLoadingSubscription?.cancel();
     _uiUpdateTimer?.cancel();
     _profileUpdateTimer?.cancel();
     _analyticsService.dispose();
@@ -146,30 +142,28 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   /// Initialize unified Google Fit manager for analytics
   Future<void> _initializeUnifiedGoogleFit() async {
     try {
-      await _unifiedGoogleFitManager.initialize();
+      await _googleFitManager.initialize();
       
-      // Load current data immediately to prevent zero display
-      final currentData = _unifiedGoogleFitManager.getCurrentData();
+      // Load current data immediately (instant from cache)
+      final currentData = _googleFitManager.getCurrentData();
       if (currentData != null && mounted) {
         setState(() {
           _todayGoogleFitData = currentData;
         });
+        print('⚡ Analytics: Instant Google Fit data loaded');
       }
       
-      // Listen to unified Google Fit data stream with debouncing
-      _unifiedGoogleFitSubscription = _unifiedGoogleFitManager.dataStream.listen((data) {
+      // Listen to optimized Google Fit data stream
+      _googleFitDataSubscription = _googleFitManager.dataStream.listen((data) {
         if (mounted && data != null) {
-          // Use debounced update to prevent UI flickering
-          _debounceUIUpdate(() {
-            setState(() {
-              _todayGoogleFitData = data;
-            });
+          setState(() {
+            _todayGoogleFitData = data;
           });
+          print('⚡ Analytics: Real-time Google Fit update');
         }
       });
       
-      // Listen to connection status
-      _unifiedGoogleFitConnectionSubscription = _unifiedGoogleFitManager.connectionStream.listen((isConnected) {
+      _googleFitConnectionSubscription = _googleFitManager.connectionStream.listen((isConnected) {
         if (mounted) {
           setState(() {
             _isGoogleFitConnected = isConnected;
@@ -177,47 +171,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         }
       });
       
-      // Listen to loading status
-      _unifiedGoogleFitLoadingSubscription = _unifiedGoogleFitManager.loadingStream.listen((isLoading) {
+      _googleFitLoadingSubscription = _googleFitManager.loadingStream.listen((isLoading) {
         if (mounted) {
           setState(() {
             _isGoogleFitLoading = isLoading;
           });
         }
       });
-      
     } catch (e) {
+      print('❌ Analytics: Google Fit init failed: $e');
     }
   }
 
-  /// Override mixin method to handle Google Fit data updates
-  @override
-  void onGoogleFitDataUpdate(Map<String, dynamic> syncData) {
-    super.onGoogleFitDataUpdate(syncData);
-
-    final todayData = syncDataToGoogleFitData(syncData);
-    if (todayData != null && mounted) {
-      setState(() {
-        _todayGoogleFitData = todayData;
-      });
-    }
-  }
-
-  /// Override mixin method to handle Google Fit connection changes
-  @override
-  void onGoogleFitConnectionChanged(bool isConnected) {
-    super.onGoogleFitConnectionChanged(isConnected);
-
-    if (mounted) {
-      setState(() {
-        _isGoogleFitConnected = isConnected;
-      });
-
-      if (isConnected) {
-        _loadGoogleFitData();
-      }
-    }
-  }
+  // Mixin override methods removed - using OptimizedGoogleFitManager directly
 
   /// Initialize real-time analytics (optimized for instant UI display)
   Future<void> _initializeAnalytics() async {
@@ -448,15 +414,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         onError: (error) => print('Goals stream error: $error'),
       );
 
-      // Listen to Google Fit weight changes for BMI
-      _googleFitService.liveDataStream?.listen((liveData) {
-        if (mounted && liveData['weight'] != null) {
-          setState(() {
-            _userWeight = liveData['weight']?.toDouble();
-          });
-          print('BMI updated from Google Fit weight: ${liveData['weight']}');
-        }
-      });
+      // Weight changes handled by OptimizedGoogleFitManager
+      // _googleFitManager data stream already set up in init
 
       // Listen to insights
       _analyticsService.insightsStream.listen((insights) {
@@ -587,13 +546,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         _isGoogleFitLoading = true;
       });
       
-      // Check authentication with network timeout
-      final isAuthenticated = await _googleFitService
-          .validateAuthentication()
-          .timeout(const Duration(seconds: 2), onTimeout: () {
-        print('Google Fit authentication check timed out');
-        return false;
-      });
+      // Check authentication - using optimized manager
+      final isAuthenticated = _googleFitManager.isConnected;
       
       setState(() {
         _isGoogleFitConnected = isAuthenticated;
@@ -601,8 +555,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       
       if (_isGoogleFitConnected) {
         try {
-          // Use live Google Fit data
-          final todayData = await _unifiedGoogleFitManager.getLiveData();
+          // Use optimized Google Fit data
+          final todayData = _googleFitManager.getCurrentData();
           
           if (todayData != null) {
             setState(() {
@@ -664,36 +618,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   Future<void> _loadGoogleFitDataFallback() async {
     try {
       final today = DateTime.now();
-      final batchData = await _googleFitService
-          .getTodayFitnessDataBatch()
-          .timeout(const Duration(seconds: 5), onTimeout: () => null);
+      // Use optimized manager with force refresh
+      final batchData = await _googleFitManager.forceRefresh();
       
       GoogleFitData todayData;
       if (batchData != null) {
-        todayData = GoogleFitData(
-          date: today,
-          steps: batchData['steps'] as int? ?? 0,
-          caloriesBurned: batchData['caloriesBurned'] as double? ?? 0.0,
-          workoutSessions: batchData['workoutSessions'] as int? ?? 0,
-          workoutDuration: (batchData['workoutDuration'] as num?)?.toDouble() ?? 0.0,
-        );
+        todayData = batchData;
       } else {
-        final futures = await Future.wait([
-          _googleFitService
-              .getDailySteps(today)
-              .timeout(const Duration(seconds: 3), onTimeout: () => 0),
-          _googleFitService
-              .getDailyCaloriesBurned(today)
-              .timeout(const Duration(seconds: 3), onTimeout: () => 0.0),
-          _googleFitService
-              .getWorkoutSessions(today)
-              .timeout(const Duration(seconds: 3), onTimeout: () => 0),
-        ]);
-        todayData = GoogleFitData(
+        // Fallback to cached data
+        todayData = _googleFitManager.getCurrentData() ?? GoogleFitData(
           date: today,
-          steps: futures[0] as int? ?? 0,
-          caloriesBurned: futures[1] as double? ?? 0.0,
-          workoutSessions: futures[2] as int? ?? 0,
+          steps: 0,
+          caloriesBurned: 0.0,
+          workoutSessions: 0,
           workoutDuration: 0.0,
         );
       }
@@ -759,11 +696,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   Future<void> _loadSingleDayGoogleFitData(
       DateTime date, List<GoogleFitData> weeklyData, {bool forceRefresh = false}) async {
     try {
-      final futures = await Future.wait([
-        _googleFitService.getDailySteps(date),
-        _googleFitService.getDailyCaloriesBurned(date),
-        _googleFitService.getWorkoutSessions(date),
-      ]);
+      // Get data from optimized manager
+      final data = _googleFitManager.getCurrentData();
+      if (data == null) return null;
+      
+      final futures = [data.steps ?? 0, data.caloriesBurned ?? 0.0, data.workoutSessions ?? 0];
 
       final steps = futures[0] as int? ?? 0;
       final calories = futures[1] as double? ?? 0.0;
@@ -824,38 +761,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     }
   }
 
-  /// Setup Google Fit live stream for real-time updates (optimized for speed)
+  /// Live stream handled by OptimizedGoogleFitManager init method
   void _setupGoogleFitLiveStream() {
-    _googleFitService.liveDataStream?.listen((liveData) {
-      if (mounted && liveData['isLive'] == true) {
-        // Immediate update for faster response
-        final newSteps = liveData['steps'];
-        final newCalories = liveData['caloriesBurned'];
-        final newDistance = liveData['distance'];
-
-        // Update today's data with live data immediately
-        if (_todayGoogleFitData != null) {
-          final updatedData = GoogleFitData(
-            date: _todayGoogleFitData!.date,
-            steps: newSteps ?? _todayGoogleFitData!.steps,
-            caloriesBurned: newCalories ?? _todayGoogleFitData!.caloriesBurned,
-            workoutSessions: _todayGoogleFitData!.workoutSessions,
-            workoutDuration: _todayGoogleFitData!.workoutDuration,
-          );
-
-          // Only update if data has actually changed
-          if (updatedData.steps != _todayGoogleFitData!.steps ||
-              updatedData.caloriesBurned !=
-                  _todayGoogleFitData!.caloriesBurned ||
-              updatedData.workoutSessions != _todayGoogleFitData!.workoutSessions ||
-              updatedData.workoutDuration != _todayGoogleFitData!.workoutDuration) {
-            setState(() {
-              _todayGoogleFitData = updatedData;
-            });
-          }
-        }
-      }
-    });
+    // Live stream already set up in _initializeUnifiedGoogleFit()
+    // Real-time updates come automatically via the data stream
   }
 
   /// Load user profile data for BMI calculation
@@ -1057,11 +966,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           
           if (forceRefresh) {
             // Force refresh from Google Fit API
-            todayData = await _unifiedGoogleFitManager.forceRefresh();
+            todayData = await _googleFitManager.forceRefresh();
             print('🔄 Analytics: Force refreshed today\'s data from Google Fit API');
           } else {
-            // Use live data
-            todayData = await _unifiedGoogleFitManager.getLiveData();
+            // Use cached data
+            todayData = _googleFitManager.getCurrentData();
           }
           
           if (todayData != null) {
@@ -1147,9 +1056,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       };
 
       print('Generating fresh AI insights for period: $_selectedPeriod');
+      
+      // Convert GoogleFitData to Map for AI service
+      final fitnessDataMap = _googleFitManager.currentData != null ? {
+        'steps': _googleFitManager.currentData!.steps,
+        'caloriesBurned': _googleFitManager.currentData!.caloriesBurned,
+        'workoutSessions': _googleFitManager.currentData!.workoutSessions,
+        'workoutDuration': _googleFitManager.currentData!.workoutDuration,
+      } : null;
+      
       final insights = await AIService.getAnalyticsInsights(
         userData,
-        currentFitnessData: _googleFitManager.currentFitnessData,
+        currentFitnessData: fitnessDataMap,
       );
 
       setState(() {
@@ -1411,9 +1329,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   ),
                   Row(
                     children: [
-                      // Live sync indicator
-                      if (_isGoogleFitConnected &&
-                          _googleFitService.isLiveSyncing)
+                      // Live sync always active with OptimizedGoogleFitManager
+                      if (_isGoogleFitConnected)
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
@@ -1445,8 +1362,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                             ],
                           ),
                         ),
-                      if (_isGoogleFitConnected &&
-                          _googleFitService.isLiveSyncing)
+                      if (_isGoogleFitConnected)
                         const SizedBox(width: 8),
                       IconButton(
                         onPressed: _isRefreshing ? null : _refreshData,

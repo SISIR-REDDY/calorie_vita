@@ -27,11 +27,8 @@ import '../widgets/profile_widgets.dart';
 import '../services/calorie_units_service.dart';
 import '../services/analytics_service.dart';
 import '../services/goals_event_bus.dart';
-import '../services/google_fit_service.dart';
+import '../services/optimized_google_fit_manager.dart';
 import '../services/global_goals_manager.dart';
-import '../services/global_google_fit_manager.dart';
-import '../services/unified_google_fit_manager.dart';
-import '../mixins/google_fit_sync_mixin.dart';
 import '../models/google_fit_data.dart';
 import '../services/simple_goals_notifier.dart';
 import '../services/rewards_service.dart';
@@ -58,8 +55,6 @@ class PremiumHomeScreen extends StatefulWidget {
 class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     with
         TickerProviderStateMixin,
-        GoogleFitSyncMixin,
-        GoogleFitDataDisplayMixin,
         ResponsiveWidgetMixin,
         DynamicColumnMixin {
   late AnimationController _animationController;
@@ -76,9 +71,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   final CalorieUnitsService _calorieUnitsService = CalorieUnitsService();
   final AnalyticsService _analyticsService = AnalyticsService();
   final RewardsService _rewardsService = RewardsService();
-  final GoogleFitService _googleFitService = GoogleFitService();
-  final GlobalGoogleFitManager _globalGoogleFitManager = GlobalGoogleFitManager();
-  final UnifiedGoogleFitManager _unifiedGoogleFitManager = UnifiedGoogleFitManager();
+  final OptimizedGoogleFitManager _googleFitManager = OptimizedGoogleFitManager();
   final TaskService _taskService = TaskService();
   final FastDataRefreshService _fastDataRefreshService = FastDataRefreshService();
   final TodaysFoodDataService _todaysFoodDataService = TodaysFoodDataService();
@@ -144,9 +137,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   StreamSubscription<UserGoals?>? _goalsSubscription;
   StreamSubscription<UserGoals>? _goalsEventBusSubscription;
   StreamSubscription<List<Task>>? _tasksSubscription;
-  StreamSubscription<GoogleFitData?>? _unifiedGoogleFitSubscription;
-  StreamSubscription<bool>? _unifiedGoogleFitConnectionSubscription;
-  StreamSubscription<bool>? _unifiedGoogleFitLoadingSubscription;
+  StreamSubscription<GoogleFitData?>? _googleFitDataSubscription;
+  StreamSubscription<bool>? _googleFitConnectionSubscription;
+  StreamSubscription<bool>? _googleFitLoadingSubscription;
   StreamSubscription<int>? _consumedCaloriesSubscription;
   StreamSubscription<List<FoodHistoryEntry>>? _todaysFoodSubscription;
   StreamSubscription<Map<String, dynamic>>? _fastMacroBreakdownSubscription;
@@ -294,7 +287,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Preload Google Fit data for instant display
   Future<void> _preloadGoogleFitData() async {
     try {
-      await _unifiedGoogleFitManager.preloadData();
+      await _googleFitManager.initialize();
       print('✅ Home screen: Google Fit data preloaded');
     } catch (e) {
       print('❌ Home screen: Google Fit data preload failed: $e');
@@ -337,8 +330,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       // Step 2: Preload data for instant display
       await _preloadGoogleFitData();
       
-      // Step 3: Initialize sync mixin
-      initializeGoogleFitSync();
+      // Sync mixin removed - using optimized manager
       
       print('✅ Home: Google Fit services initialized successfully');
     } catch (e) {
@@ -346,102 +338,31 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
-  /// Diagnostic method to test Google Fit connection
+  /// Diagnostic method removed - OptimizedGoogleFitManager handles everything  
   Future<void> _testGoogleFitConnection() async {
-    print('🔍 Home: Starting Google Fit diagnostic...');
-    
-    try {
-      // Test individual services
-      print('📡 Home: Testing GoogleFitService connection: ${_googleFitService.isConnected}');
-      // OptimizedGoogleFitService removed for simplification
-      print('📡 Home: Testing GlobalGoogleFitManager connection: ${_globalGoogleFitManager.isConnected}');
-      
-      // Test authentication
-      final authStatus = await _googleFitService.validateAuthentication();
-      print('🔐 Home: Google Fit authentication status: $authStatus');
-      
-      // If not authenticated, try to authenticate
-      if (!authStatus) {
-        print('🔧 Home: Attempting to authenticate with Google Fit...');
-        final authenticated = await _googleFitService.authenticate();
-        print('🔧 Home: Google Fit authentication result: $authenticated');
-        
-        // If authentication successful, try to get data again
-        if (authenticated) {
-          final today = DateTime.now();
-          final steps = await _googleFitService.getDailySteps(today);
-          final calories = await _googleFitService.getDailyCaloriesBurned(today);
-          print('🔧 Home: Post-auth data - Steps: $steps, Calories: $calories');
-          
-          if (steps != null || calories != null) {
-            if (mounted) {
-              setState(() {
-                _googleFitSteps = steps ?? _googleFitSteps ?? 0;
-                _googleFitCaloriesBurned = calories?.toDouble() ?? _googleFitCaloriesBurned ?? 0.0;
-                _isGoogleFitConnected = true;
-              });
-              _updateDailySummaryWithGoogleFitData();
-              print('✅ Home: Post-auth UI updated with Google Fit data');
-            }
-          }
-        }
-      }
-      
-      // Test data retrieval
-      if (authStatus) {
-        final today = DateTime.now();
-        final steps = await _googleFitService.getDailySteps(today);
-        print('👟 Home: Steps data: $steps');
-        
-        final calories = await _googleFitService.getDailyCaloriesBurned(today);
-        print('🔥 Home: Calories data: $calories');
-        
-        // If we got data, update the UI immediately
-        if (steps != null || calories != null) {
-          if (mounted) {
-            setState(() {
-              _googleFitSteps = steps ?? _googleFitSteps ?? 0;
-              _googleFitCaloriesBurned = calories?.toDouble() ?? _googleFitCaloriesBurned ?? 0.0;
-              _isGoogleFitConnected = true;
-            });
-            print('✅ Home: Updated UI with Google Fit data - Steps: $steps, Calories: $calories');
-            
-            // Also update daily summary immediately
-            _updateDailySummaryWithGoogleFitData();
-          }
-        } else {
-          print('⚠️ Home: No Google Fit data received');
-        }
-      }
-      
-      // Test unified manager
-      final unifiedData = _unifiedGoogleFitManager.getCurrentData();
-      print('📊 Home: Unified manager data: $unifiedData');
-      
-    } catch (e) {
-      print('❌ Home: Google Fit diagnostic failed: $e');
-    }
+    // Old diagnostic code removed - OptimizedGoogleFitManager provides:
+    // - Automatic authentication checking
+    // - Built-in logging
+    // - Real-time connection status via streams
+    debugPrint('🔍 Home: Using OptimizedGoogleFitManager - diagnostics built-in');
   }
 
-  /// Initialize unified Google Fit manager
+  /// Initialize optimized Google Fit manager
   Future<void> _initializeUnifiedGoogleFit() async {
     try {
-      print('🚀 Home: Starting Google Fit initialization...');
-      await _unifiedGoogleFitManager.initialize();
+      print('🚀 Home: Starting optimized Google Fit initialization...');
+      await _googleFitManager.initialize();
       
       // Check connection status
-      final isConnected = _unifiedGoogleFitManager.isConnected;
+      final isConnected = _googleFitManager.isConnected;
       print('🔍 Home: Google Fit connection status: $isConnected');
       
-      // INSTANT: Load current data immediately (0ms delay)
-      final currentData = _unifiedGoogleFitManager.getCurrentData();
+      // INSTANT: Load current data immediately (0ms delay) from cache
+      final currentData = _googleFitManager.getCurrentData();
       print('📊 Home: Current Google Fit data: $currentData');
       
       if (currentData != null && mounted) {
-        // Cache data globally for instant access across screens
-        // Note: Caching removed for simplification
-        
-        // Update UI immediately without debouncing for instant display
+        // Update UI immediately for instant display
         setState(() {
           _googleFitSteps = currentData.steps ?? 0;
           _googleFitCaloriesBurned = currentData.caloriesBurned ?? 0.0;
@@ -449,34 +370,19 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           _googleFitWorkoutDuration = currentData.workoutDuration ?? 0.0;
           _activityLevel = _calculateActivityLevel(currentData.steps);
           _lastSyncTime = DateTime.now();
+          _isGoogleFitConnected = true;
         });
         
-        // Update daily summary with Google Fit data immediately
         _updateDailySummaryWithGoogleFitData();
         print('⚡ Home: INSTANT Google Fit data loaded - Steps: ${currentData.steps}, Calories: ${currentData.caloriesBurned}');
-      } else {
-        print('⚠️ Home: No cached Google Fit data, will load fresh data...');
-        print('🔧 Home: Attempting to connect to Google Fit...');
-        // Try to connect if not connected (non-blocking)
-        if (!isConnected) {
-          _unifiedGoogleFitManager.connect().then((connected) {
-            if (connected) {
-              print('✅ Home: Google Fit connected successfully');
-            } else {
-              print('❌ Home: Google Fit connection failed');
-            }
-          });
-        }
       }
       
-      // Google Fit listeners are now set up in _setupGoogleFitListeners()
+      // Set up listeners for real-time updates
+      _setupGoogleFitListeners();
       
-      print('✅ Unified Google Fit manager initialized');
-      
-      // Run diagnostic after initialization
-      await _testGoogleFitConnection();
+      print('✅ Optimized Google Fit manager initialized');
     } catch (e) {
-      print('❌ Unified Google Fit initialization failed: $e');
+      print('❌ Optimized Google Fit initialization failed: $e');
     }
   }
 
@@ -623,9 +529,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _goalsCheckTimer?.cancel();
     _googleFitRefreshTimer?.cancel();
     _streakRefreshTimer?.cancel();
-    _unifiedGoogleFitSubscription?.cancel();
-    _unifiedGoogleFitConnectionSubscription?.cancel();
-    _unifiedGoogleFitLoadingSubscription?.cancel();
+    _googleFitDataSubscription?.cancel();
+    _googleFitConnectionSubscription?.cancel();
+    _googleFitLoadingSubscription?.cancel();
     _consumedCaloriesSubscription?.cancel();
     _todaysFoodSubscription?.cancel();
     _fastMacroBreakdownSubscription?.cancel();
@@ -638,7 +544,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     // _unifiedGoogleFitManager.dispose();
     
     _todaysFoodDataService.dispose();
-    _stopLiveSync();
+    // OptimizedGoogleFitManager handles its own lifecycle
     GlobalGoalsManager().clearCallback();
     super.dispose();
   }
@@ -750,8 +656,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Load Google Fit data immediately if available
   void _loadGoogleFitDataImmediate() {
     try {
-      // Get current data from unified manager if available
-      final currentData = _unifiedGoogleFitManager.getCurrentData();
+      // Get current data from optimized manager (instant from cache)
+      final currentData = _googleFitManager.getCurrentData();
       if (currentData != null) {
         setState(() {
           _googleFitSteps = currentData.steps ?? 0;
@@ -759,11 +665,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           _googleFitWorkoutSessions = currentData.workoutSessions ?? 0;
           _googleFitWorkoutDuration = currentData.workoutDuration ?? 0.0;
           _activityLevel = _calculateActivityLevel(currentData.steps);
-          _isGoogleFitConnected = _unifiedGoogleFitManager.isConnected;
+          _isGoogleFitConnected = _googleFitManager.isConnected;
         });
         print('✅ Home: Loaded Google Fit data immediately - Steps: ${currentData.steps}, Calories: ${currentData.caloriesBurned}');
       } else {
-        // Set default values if no data available
         setState(() {
           _googleFitSteps = 0;
           _googleFitCaloriesBurned = 0.0;
@@ -772,10 +677,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           _activityLevel = 'Unknown';
           _isGoogleFitConnected = false;
         });
-        print('⚠️ Home: No Google Fit data available for immediate loading');
+        print('⚠️ Home: No Google Fit data available');
       }
     } catch (e) {
-      print('❌ Home: Error loading Google Fit data immediately: $e');
+      print('❌ Home: Error loading Google Fit data: $e');
     }
   }
 
@@ -1018,15 +923,20 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
 
-  /// Initialize Google Fit service and load data (with persistence and RAM clearing support)
+  /// Initialize Google Fit - DEPRECATED  
+  @Deprecated('Use _initializeUnifiedGoogleFit instead')
   Future<void> _initializeGoogleFit() async {
+    print('⚠️ _initializeGoogleFit is deprecated - use OptimizedGoogleFitManager');
+    return;
+    
+    // Old code below - not executed
     try {
       // Initialize both services
-      await _googleFitService.initialize();
+      // await _googleFitService.initialize();
       // OptimizedGoogleFitService removed for simplification
 
       // Check authentication status immediately
-      final isAuthenticated = await _googleFitService.validateAuthentication();
+      final isAuthenticated = false; // await _googleFitService.validateAuthentication();
       setState(() {
         _isGoogleFitConnected = isAuthenticated;
       });
@@ -1035,8 +945,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         // Load Google Fit data immediately for instant UI update using optimized service
         await _loadGoogleFitDataOptimized();
 
-        // Start live sync for real-time updates
-        _startLiveSync();
+        // Live sync handled automatically by OptimizedGoogleFitManager
         _startGoogleFitRefreshTimer();
 
         print('Google Fit initialized and connected - UI updated instantly with optimized service');
@@ -1112,52 +1021,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
-  /// Override mixin method to handle Google Fit data updates
-  @override
-  void onGoogleFitDataUpdate(Map<String, dynamic> syncData) {
-    super.onGoogleFitDataUpdate(syncData);
-
-    if (mounted) {
-        setState(() {
-          _googleFitSteps = syncData['steps'] as int? ?? 0;
-          _googleFitCaloriesBurned =
-              (syncData['caloriesBurned'] as num?)?.toDouble() ?? 0.0;
-          _googleFitWorkoutSessions = syncData['workoutSessions'] as int? ?? 0;
-          _googleFitWorkoutDuration = (syncData['workoutDuration'] as num?)?.toDouble() ?? 0.0;
-          _activityLevel = _calculateActivityLevel(syncData['steps'] as int?);
-          _lastSyncTime = DateTime.now();
-        });
-
-      // Update daily summary if available
-      if (_dailySummary != null) {
-        _updateDailySummaryWithGoogleFitData();
-      }
-
-      print(
-          'Home screen: Updated with global Google Fit data - Steps: ${syncData['steps']}');
-    }
-  }
-
-  /// Override mixin method to handle Google Fit connection changes
-  @override
-  void onGoogleFitConnectionChanged(bool isConnected) {
-    super.onGoogleFitConnectionChanged(isConnected);
-
-    if (mounted) {
-      setState(() {
-        _isGoogleFitConnected = isConnected;
-      });
-
-      if (isConnected) {
-        print('Home screen: Google Fit connected via global manager');
-        _loadGoogleFitData();
-        _startLiveSync();
-      } else {
-        print('Home screen: Google Fit disconnected via global manager');
-        _stopLiveSync();
-      }
-    }
-  }
+  /// Old mixin methods removed - OptimizedGoogleFitManager handles data via streams automatically
+  /// Data updates come through _setupGoogleFitListeners() via the optimized manager's streams
 
   /// Load Google Fit data asynchronously - now handled by unified manager
   @Deprecated('Use unified manager instead')
@@ -1182,8 +1047,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         });
       }
 
-      // Force refresh data from unified manager
-      final workoutData = await _unifiedGoogleFitManager.forceRefresh();
+      // Force refresh data from optimized manager
+      final workoutData = await _googleFitManager.forceRefresh();
 
       if (workoutData != null && mounted) {
         setState(() {
@@ -1223,20 +1088,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     try {
       final today = DateTime.now();
 
-      // Individual API calls with error handling
-      final steps =
-          await _googleFitService.getDailySteps(today).catchError((e) {
-                print('Steps fetch failed: $e');
-                return 0;
-              }) ??
-              0;
-
-      final calories =
-          await _googleFitService.getDailyCaloriesBurned(today).catchError((e) {
-                print('Calories fetch failed: $e');
-                return 0.0;
-              }) ??
-              0.0;
+      // Use optimized manager for data
+      final data = _googleFitManager.getCurrentData();
+      final steps = data?.steps ?? 0;
+      final calories = data?.caloriesBurned ?? 0.0;
 
       if (mounted) {
         setState(() {
@@ -1317,7 +1172,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Connect to Google Fit using unified manager
   Future<void> _connectToGoogleFit() async {
     try {
-      final success = await _unifiedGoogleFitManager.connect();
+      final success = await _googleFitManager.authenticate();
       if (success) {
         // Show success message
         if (mounted) {
@@ -1366,9 +1221,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         );
       }
       
-      // Force refresh from unified manager with timeout
+      // Force refresh from optimized manager with timeout
     if (_isGoogleFitConnected) {
-        final data = await _unifiedGoogleFitManager.forceRefresh().timeout(
+        final data = await _googleFitManager.forceRefresh().timeout(
           const Duration(seconds: 5),
           onTimeout: () {
             print('⚠️ Google Fit data refresh timeout');
@@ -1395,21 +1250,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
-  /// Start live sync for Google Fit data (optimized for speed)
-  void _startLiveSync() {
-    if (!_isGoogleFitConnected) return;
-
-    _googleFitService.startLiveSync();
-
-    // Note: Live data stream is now handled by unified manager
-  }
-
-  /// Stop live sync
-  void _stopLiveSync() {
-    _googleFitService.stopLiveSync();
-    // Note: Live stream subscription is now handled by unified manager
-    _isLiveSyncing = false;
-  }
+  /// Live sync is now handled automatically by OptimizedGoogleFitManager
+  /// No manual start/stop needed - it uses background timer with caching
 
   /// Start periodic refresh timer for Google Fit data (backup)
   void _startGoogleFitRefreshTimer() {
@@ -1459,48 +1301,48 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
-  /// Set up Google Fit listeners
+  /// Set up Google Fit listeners for real-time updates
   void _setupGoogleFitListeners() {
-    // Listen to unified Google Fit data stream with debouncing
-    _unifiedGoogleFitSubscription?.cancel();
-    _unifiedGoogleFitSubscription = _unifiedGoogleFitManager.dataStream.listen((data) {
+    // Listen to optimized Google Fit data stream
+    _googleFitDataSubscription?.cancel();
+    _googleFitDataSubscription = _googleFitManager.dataStream.listen((data) {
       if (mounted && data != null) {
-        // Use debounced update to prevent UI flickering
-        _debounceUIUpdate(() {
-          setState(() {
-            _googleFitSteps = data.steps ?? 0;
-            _googleFitCaloriesBurned = data.caloriesBurned ?? 0.0;
-            _googleFitWorkoutSessions = data.workoutSessions ?? 0;
-            _googleFitWorkoutDuration = data.workoutDuration ?? 0.0;
-            _activityLevel = _calculateActivityLevel(data.steps);
-            _lastSyncTime = DateTime.now();
-          });
-          
-          // Update daily summary with Google Fit data
-          _updateDailySummaryWithGoogleFitData();
+        setState(() {
+          _googleFitSteps = data.steps ?? 0;
+          _googleFitCaloriesBurned = data.caloriesBurned ?? 0.0;
+          _googleFitWorkoutSessions = data.workoutSessions ?? 0;
+          _googleFitWorkoutDuration = data.workoutDuration ?? 0.0;
+          _activityLevel = _calculateActivityLevel(data.steps);
+          _lastSyncTime = DateTime.now();
         });
+        
+        _updateDailySummaryWithGoogleFitData();
+        print('⚡ Home: Real-time Google Fit update - Steps: ${data.steps}, Calories: ${data.caloriesBurned}');
       }
     });
     
     // Listen to connection status
-    _unifiedGoogleFitConnectionSubscription?.cancel();
-    _unifiedGoogleFitConnectionSubscription = _unifiedGoogleFitManager.connectionStream.listen((isConnected) {
+    _googleFitConnectionSubscription?.cancel();
+    _googleFitConnectionSubscription = _googleFitManager.connectionStream.listen((isConnected) {
       if (mounted) {
         setState(() {
           _isGoogleFitConnected = isConnected;
         });
+        print('🔗 Home: Google Fit connection changed: $isConnected');
       }
     });
     
     // Listen to loading status
-    _unifiedGoogleFitLoadingSubscription?.cancel();
-    _unifiedGoogleFitLoadingSubscription = _unifiedGoogleFitManager.loadingStream.listen((isLoading) {
+    _googleFitLoadingSubscription?.cancel();
+    _googleFitLoadingSubscription = _googleFitManager.loadingStream.listen((isLoading) {
       if (mounted) {
         setState(() {
           _isGoogleFitLoading = isLoading;
         });
       }
     });
+    
+    print('✅ Home: Google Fit listeners set up');
   }
 
   /// Set up real-time data listeners from AppStateService

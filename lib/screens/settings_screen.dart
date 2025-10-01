@@ -8,7 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../ui/app_colors.dart';
 import '../services/app_state_service.dart';
 import '../services/real_time_input_service.dart';
-import '../services/google_fit_service.dart';
+import '../services/optimized_google_fit_manager.dart';
 import '../services/auth_service.dart';
 import '../services/logger_service.dart';
 import '../widgets/setup_warning_popup.dart';
@@ -33,7 +33,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final AppStateService _appStateService = AppStateService();
   final RealTimeInputService _realTimeInputService = RealTimeInputService();
-  final GoogleFitService _googleFitService = GoogleFitService();
+  final OptimizedGoogleFitManager _googleFitManager = OptimizedGoogleFitManager();
   static final LoggerService _logger = LoggerService();
 
   // User data
@@ -897,7 +897,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _initializeGoogleFit() async {
     try {
       // Check if already connected without triggering re-authentication
-      if (_googleFitService.isConnected) {
+      if (_googleFitManager.isConnected) {
         setState(() {
           _isGoogleFitConnected = true;
           _lastGoogleFitSync = DateTime.now();
@@ -907,10 +907,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
 
       // Only initialize if not already connected
-      await _googleFitService.initialize();
-      final isAuthenticated = await _googleFitService.validateAuthentication();
+      await _googleFitManager.initialize();
       setState(() {
-        _isGoogleFitConnected = isAuthenticated;
+        _isGoogleFitConnected = _googleFitManager.isConnected;
         if (_isGoogleFitConnected) {
           _lastGoogleFitSync = DateTime.now();
         }
@@ -928,7 +927,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   /// Refresh Google Fit connection status without re-authentication
   void _refreshGoogleFitStatus() {
-    if (_googleFitService.isConnected) {
+    if (_googleFitManager.isConnected) {
       setState(() {
         _isGoogleFitConnected = true;
         _lastGoogleFitSync = DateTime.now();
@@ -949,7 +948,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
 
     try {
-      final success = await _googleFitService.authenticate();
+      final success = await _googleFitManager.authenticate();
       if (success) {
         setState(() {
           _isGoogleFitConnected = true;
@@ -991,7 +990,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// Disconnect from Google Fit
   Future<void> _disconnectFromGoogleFit() async {
     try {
-      await _googleFitService.signOut();
+      await _googleFitManager.signOut();
       setState(() {
         _isGoogleFitConnected = false;
         _lastGoogleFitSync = null;
