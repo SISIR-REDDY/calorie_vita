@@ -429,9 +429,7 @@ class RealTimeInputService {
       // Save profile to Firestore
       await _firebaseService.saveUserProfile(userId, profileData);
 
-      if (context.mounted) {
-        _showSuccess(context, 'Profile updated successfully');
-      }
+      // Success message is shown by the calling screen
       return true;
     } catch (e) {
       _errorHandler.handleFirebaseError('handleProfileUpdate', e);

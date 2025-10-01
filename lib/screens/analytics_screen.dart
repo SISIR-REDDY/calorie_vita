@@ -321,8 +321,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       // Load Google Fit data in background (lowest priority)
       _loadGoogleFitDataAsync();
 
-      // Generate AI insights after data is loaded
-      _generateAIInsights();
+      // AI Insights generation removed
     } catch (e) {
       // Don't show error to user, just log it
     } finally {
@@ -1013,8 +1012,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       // Wait for all refreshes to complete
       await Future.wait(futures);
 
-      // Generate fresh AI insights after data refresh
-      _generateAIInsights();
+      // AI Insights generation removed
 
       print('✅ Analytics: Data refreshed successfully');
     } catch (e) {
@@ -1203,8 +1201,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       const SizedBox(height: 24),
                       _buildBMIAnalytics(),
                       const SizedBox(height: 24),
-                      _buildAIInsights(),
-                      const SizedBox(height: 24),
+                      // AI Insights removed
                       _buildPersonalizedRecommendations(),
                       const SizedBox(height: 100), // Bottom spacing
                     ],

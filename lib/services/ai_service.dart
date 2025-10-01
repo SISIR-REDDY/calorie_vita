@@ -31,21 +31,15 @@ class AIService {
   }) async {
     return await _logger.timeOperation('askTrainerSisir', () async {
       try {
-        // Check cache first for better performance
-        final cacheKey = _generateCacheKey('chat', query, userProfile);
-        final cachedResponse = _getCachedResponse(cacheKey);
-        if (cachedResponse != null) {
-          _logger.info('Using cached response for chat query', {'cache_key': cacheKey});
-          return cachedResponse['response'] as String;
-        }
-      // Prepare personalized context if profile data is available
+      // Build user context from profile and fitness data
+      String userContext = '';
       if (userProfile != null && userProfile.isNotEmpty) {
-        // Context will be added to messages below
+        userContext = _buildUserContextString(userProfile);
       }
-
-      // Add current fitness data to context
+      
+      String fitnessContext = '';
       if (currentFitnessData != null && currentFitnessData.isNotEmpty) {
-        // Context will be added to messages below
+        fitnessContext = _buildFitnessContextString(currentFitnessData);
       }
 
       // Build conversation messages with context
@@ -53,56 +47,79 @@ class AIService {
         {
           'role': 'system',
           'content':
-              '''You are Trainer Sisir, a certified personal trainer and nutritionist with 15+ years of experience specializing in fitness, nutrition, and wellness. You ONLY discuss topics related to:
+              '''You are Trainer Sisir, a warm, friendly, and highly experienced certified personal trainer and nutritionist with 15+ years of experience. You're passionate about helping people achieve their fitness goals and improving their lives through better nutrition and exercise.
 
-ALLOWED TOPICS:
-• Fitness and exercise (strength training, cardio, flexibility, sports)
-• Nutrition and diet (macros, calories, meal planning, supplements)
-• Weight management (weight loss, weight gain, body composition)
-• Health metrics (BMI, body fat, muscle mass, fitness goals)
-• Lifestyle habits (sleep, hydration, stress management)
-• Recovery and injury prevention
-• Goal setting and progress tracking
+$userContext$fitnessContext
 
-PROFESSIONAL BOUNDARIES:
-- You are NOT a doctor, therapist, or medical professional
-- You do NOT provide medical advice, diagnosis, or treatment
-- You do NOT discuss mental health treatment, medications, or medical conditions
-- You do NOT provide relationship, career, or personal life advice outside fitness
-- Redirect medical questions to "Please consult your healthcare provider"
+You ONLY discuss topics related to:
+
+STRICT FITNESS-ONLY TOPICS:
+• Exercise and workouts (strength training, cardio, flexibility)
+• Nutrition and diet (calories, protein, carbs, fats, meal timing)
+• Weight management (weight loss, weight gain, muscle building)
+• Fitness goals and progress tracking
+• Recovery (rest days, sleep for fitness)
+• Hydration (only for fitness/exercise)
+
+WHAT YOU NEVER DISCUSS:
+- Medical advice, diagnosis, or treatment
+- Mental health, therapy, medications
+- Injuries or pain (say "consult a doctor")
+- Relationships, career, personal life
+- General lifestyle advice not directly related to fitness
+- Anything outside exercise and nutrition
 
 PERSONALITY:
-- Warm, encouraging, and professional
-- Use "we" and "us" to show partnership
-- Be specific with numbers and actionable advice
-- Celebrate progress and motivate continued effort
-- Address concerns with empathy while staying in scope
+- Be warm, friendly, and genuinely caring - like a supportive friend and mentor
+- Use the user's name and personal data to make responses feel personal
+- Use "we" and "us" to show partnership in their journey
+- Celebrate every win, no matter how small
+- Be conversational and natural - not stiff or robotic
+- Show enthusiasm with emojis (but don't overdo it)
+- Remember previous conversations and reference them
+- Be specific with numbers and actionable advice based on THEIR data
+- Address concerns with empathy while staying in your expertise
 
-RESPONSE STYLE:
-- Keep under 150 words
-- Use bullet points for multiple items
-- Give specific numbers (calories, reps, sets, days, weights)
-- Focus on what they can do TODAY
-- Use encouraging language: "Let's work on this together", "You're doing great", "I believe in you"
-- Always stay focused on fitness, nutrition, and wellness topics
+RESPONSE STYLE - BALANCED APPROACH:
+- Keep concise: 80-100 words (not too short, not too long)
+- Be friendly but don't over-explain
+- ABSOLUTELY NO MARKDOWN: Never use **, *, __, #, etc.
+- Write PLAIN TEXT like a real trainer texting
+- Brief friendly greeting, then get to the point
+- Give necessary info only - what they need to know and do
+- Include specific numbers and actionable steps
+- Use simple dashes (-) for lists when needed
+- End with natural encouragement
+- 1-2 emojis max
 
-EXAMPLE RESPONSE:
-"Hey! Great question about your fitness routine. Based on your current activity level, here's what I recommend:
+MEASUREMENT UNITS (USE INDIAN/METRIC ONLY):
+- Weight: grams (g), kilograms (kg) - NEVER ounces (oz) or pounds (lbs)
+- Liquids: milliliters (ml), liters (L) - NEVER cups or fluid ounces
+- Distance: meters (m), kilometers (km) - NEVER miles or feet
+- Height: centimeters (cm) - NEVER inches
+- Example: "Protein: 120g daily" NOT "4 oz protein"
+- Example: "Water: 2-3 liters" NOT "8 cups"
 
-• Strength Training: 3-4 sessions/week, focusing on compound movements
-• Cardio: 150 minutes moderate intensity or 75 minutes vigorous weekly
-• Protein: 1.6-2.2g per kg body weight for muscle building
-• Recovery: 7-9 hours sleep, active recovery days
+EXAMPLE RESPONSE (COPY THIS BALANCED STYLE):
+"Hey! Looking at your progress, you're doing well with calories.
 
-Start with bodyweight exercises if you're new to strength training. Track your workouts in the app so we can monitor your progress.
+To hit your goals:
+- Protein: 120g daily (you're at 85g today)
+- Water: 2-3 liters daily
+- Cardio: 30 mins, 3-4x per week
+- Keep logging meals like you did today
 
-Remember, consistency beats perfection. You've got this! 💪"
+You're on the right track. Stay consistent and results will come 💪"
 
-Stay focused, professional, and supportive while maintaining strict fitness/wellness boundaries.''',
+CRITICAL RULES:
+- Give helpful info without being too brief or too wordy
+- Be warm and supportive, not robotic
+- Focus on what they actually need to know
+- NO markdown formatting ever''',
         },
       ];
 
-      // Add conversation history if provided (last 10 messages to maintain context)
+      // Add conversation history if provided (last 10 messages for better speed)
       if (conversationHistory != null && conversationHistory.isNotEmpty) {
         final recentHistory = conversationHistory.length > 10
             ? conversationHistory.sublist(conversationHistory.length - 10)
@@ -128,11 +145,13 @@ Stay focused, professional, and supportive while maintaining strict fitness/well
           isChatRequest: true,
         );
 
-        final result = response['choices'][0]['message']['content'] ??
+        final rawResult = response['choices'][0]['message']['content'] ??
             'Sorry, I couldn\'t process your request.';
         
-        // Cache the response for better performance
-        _cacheResponse(cacheKey, {'response': result, 'timestamp': DateTime.now()});
+        // Clean up any markdown formatting that slipped through
+        final result = _cleanMarkdownFormatting(rawResult);
+        
+        // Don't cache personalized responses to ensure fresh, relevant answers
         
         _logger.userAction('chat_query_completed', {
           'query_length': query.length,
@@ -721,6 +740,7 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
     bool isAnalyticsRequest = false,
   }) async {
     // Validate API key
+    print('🔑 Using model: $model | API Key length: ${_apiKey.length}');
     if (_apiKey.isEmpty) {
       throw Exception('OpenRouter API key not configured');
     }
@@ -766,21 +786,25 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
           'max_tokens': maxTokens,
           'temperature': temperature,
         }),
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(const Duration(seconds: 20)); // Optimized timeout for faster responses
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       } else if (response.statusCode == 402) {
         // Credit limit exceeded
+        print('❌ API Error 402: Credits exceeded');
         throw Exception('AI_CREDITS_EXCEEDED');
       } else if (response.statusCode == 429) {
         // Rate limit exceeded
+        print('❌ API Error 429: Rate limit');
         throw Exception('AI_RATE_LIMIT');
       } else {
+        print('❌ API Error ${response.statusCode}: ${response.body}');
         throw Exception(
             'API request failed with status ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
+      print('❌ Request Exception: $e');
       if (e.toString().contains('AI_CREDITS_EXCEEDED') || 
           e.toString().contains('AI_RATE_LIMIT')) {
         rethrow;
@@ -940,6 +964,109 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
     }
 
     return buffer.toString();
+  }
+
+  /// Build user context string for chat
+  static String _buildUserContextString(Map<String, dynamic> profile) {
+    final buffer = StringBuffer();
+    buffer.writeln('\n==== USER PROFILE ====');
+    
+    if (profile['name'] != null) {
+      buffer.writeln('Name: ${profile['name']}');
+    }
+    if (profile['age'] != null) {
+      buffer.writeln('Age: ${profile['age']} years');
+    }
+    if (profile['gender'] != null) {
+      buffer.writeln('Gender: ${profile['gender']}');
+    }
+    if (profile['weight'] != null) {
+      buffer.writeln('Current Weight: ${profile['weight']} kg');
+    }
+    if (profile['height'] != null) {
+      buffer.writeln('Height: ${profile['height']} cm');
+    }
+    if (profile['fitnessGoal'] != null) {
+      buffer.writeln('Fitness Goal: ${profile['fitnessGoal']}');
+    }
+    if (profile['activityLevel'] != null) {
+      buffer.writeln('Activity Level: ${profile['activityLevel']}');
+    }
+    if (profile['dietPreference'] != null) {
+      buffer.writeln('Diet Preference: ${profile['dietPreference']}');
+    }
+    if (profile['calorieGoal'] != null) {
+      buffer.writeln('Daily Calorie Goal: ${profile['calorieGoal']} kcal');
+    }
+    if (profile['proteinGoal'] != null) {
+      buffer.writeln('Protein Goal: ${profile['proteinGoal']}g');
+    }
+    if (profile['carbsGoal'] != null) {
+      buffer.writeln('Carbs Goal: ${profile['carbsGoal']}g');
+    }
+    if (profile['fatGoal'] != null) {
+      buffer.writeln('Fat Goal: ${profile['fatGoal']}g');
+    }
+    
+    buffer.writeln('==================\n');
+    return buffer.toString();
+  }
+
+  /// Build fitness context string for chat
+  static String _buildFitnessContextString(Map<String, dynamic> fitnessData) {
+    final buffer = StringBuffer();
+    buffer.writeln('\n==== TODAY\'S DATA ====');
+    
+    if (fitnessData['caloriesConsumed'] != null) {
+      buffer.writeln('Calories Consumed: ${fitnessData['caloriesConsumed']} kcal');
+    }
+    if (fitnessData['proteinConsumed'] != null) {
+      buffer.writeln('Protein Consumed: ${fitnessData['proteinConsumed']}g');
+    }
+    if (fitnessData['carbsConsumed'] != null) {
+      buffer.writeln('Carbs Consumed: ${fitnessData['carbsConsumed']}g');
+    }
+    if (fitnessData['fatConsumed'] != null) {
+      buffer.writeln('Fat Consumed: ${fitnessData['fatConsumed']}g');
+    }
+    if (fitnessData['steps'] != null) {
+      buffer.writeln('Steps: ${fitnessData['steps']}');
+    }
+    if (fitnessData['caloriesBurned'] != null) {
+      buffer.writeln('Calories Burned: ${fitnessData['caloriesBurned']} kcal');
+    }
+    if (fitnessData['waterIntake'] != null) {
+      buffer.writeln('Water Intake: ${fitnessData['waterIntake']} ml');
+    }
+    if (fitnessData['recentMeals'] != null) {
+      buffer.writeln('Recent Meals: ${fitnessData['recentMeals']}');
+    }
+    
+    buffer.writeln('==================\n');
+    return buffer.toString();
+  }
+
+  /// Clean markdown formatting from AI response
+  static String _cleanMarkdownFormatting(String text) {
+    // Remove all markdown formatting characters
+    String cleaned = text;
+    
+    // Remove bold (**text** or __text__)
+    cleaned = cleaned.replaceAll(RegExp(r'\*\*([^\*]+)\*\*'), r'$1');
+    cleaned = cleaned.replaceAll(RegExp(r'__([^_]+)__'), r'$1');
+    
+    // Remove italic (*text* or _text_)
+    cleaned = cleaned.replaceAll(RegExp(r'\*([^\*]+)\*'), r'$1');
+    cleaned = cleaned.replaceAll(RegExp(r'_([^_]+)_'), r'$1');
+    
+    // Remove headers (# text)
+    cleaned = cleaned.replaceAll(RegExp(r'^#+\s+', multiLine: true), '');
+    
+    // Remove code blocks (```text```)
+    cleaned = cleaned.replaceAll(RegExp(r'```[^`]*```'), '');
+    cleaned = cleaned.replaceAll(RegExp(r'`([^`]+)`'), r'$1');
+    
+    return cleaned;
   }
   
   /// Generate cache key for requests
