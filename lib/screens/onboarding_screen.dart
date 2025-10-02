@@ -1025,12 +1025,20 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       finalStepsGoal = stepsGoal ?? 10000;
       finalWaterGoal = waterGoal ?? 8;
 
-      // Create initial goals
+      // Calculate macro goals based on calorie target (standard distribution)
+      final macroGoals = {
+        'carbsCalories': (finalCalorieGoal * 0.50).round(), // 50% carbs
+        'proteinCalories': (finalCalorieGoal * 0.20).round(), // 20% protein
+        'fatCalories': (finalCalorieGoal * 0.30).round(), // 30% fat
+      };
+
+      // Create initial goals with complete structure
       final initialGoals = {
         'weightGoal': weightGoal,
         'calorieGoal': finalCalorieGoal.round(),
         'waterGlassesGoal': finalWaterGoal,
         'stepsPerDayGoal': finalStepsGoal,
+        'macroGoals': macroGoals,
         'fitnessGoal': profileData['fitnessGoal'] as String,
         'createdAt': DateTime.now().toIso8601String(),
         'lastUpdated': DateTime.now().toIso8601String(),
@@ -1040,6 +1048,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       await _firebaseService.saveUserGoals(userId, UserGoals.fromMap(initialGoals));
       
       print('Initial goals created for user: $userId');
+      print('Goals data: $initialGoals');
     } catch (e) {
       print('Error creating initial goals: $e');
     }

@@ -186,13 +186,14 @@ class _GoalsScreenState extends State<GoalsScreen>
         _fatController.text = _calorieUnitsService.formatCaloriesShort(
             _currentGoals!.macroGoals!.fatCalories?.toDouble() ?? 600);
       } else {
-        // Set default values
+        // Calculate macro goals based on calorie goal if not set
+        final calorieGoal = _currentGoals!.calorieGoal?.toDouble() ?? 2000;
         _carbsController.text = _calorieUnitsService.formatCaloriesShort(
-            MacroGoals.defaultMacros.carbsCalories?.toDouble() ?? 900);
+            (calorieGoal * 0.50)); // 50% carbs
         _proteinController.text = _calorieUnitsService.formatCaloriesShort(
-            MacroGoals.defaultMacros.proteinCalories?.toDouble() ?? 500);
+            (calorieGoal * 0.20)); // 20% protein
         _fatController.text = _calorieUnitsService.formatCaloriesShort(
-            MacroGoals.defaultMacros.fatCalories?.toDouble() ?? 600);
+            (calorieGoal * 0.30)); // 30% fat
       }
     } else {
       // Set default values for new users

@@ -303,6 +303,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Only check onboarding for authenticated users
     _checkOnboardingStatus();
   }
 
@@ -403,17 +404,27 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
       );
     }
 
-    // Show onboarding if not completed
-    if (!_onboardingCompleted) {
+    // Check if user is authenticated before showing onboarding
+    final userId = _firebaseService.getCurrentUserId();
+    
+    // Show onboarding if not completed AND user is authenticated
+    if (!_onboardingCompleted && userId != null) {
       return OnboardingScreen(
-        onCompleted: () {
+        onCompleted: () async {
           // Refresh onboarding status when completed
-          _checkOnboardingStatus();
+          await _checkOnboardingStatus();
+          // Also refresh user data to ensure goals are synchronized
+          await _appStateService.refreshUserData();
         },
       );
     }
 
-    // Show main navigation if onboarding is completed
+    // If user is not authenticated, redirect to welcome screen
+    if (userId == null) {
+      return const WelcomeScreen();
+    }
+
+    // Show main navigation if onboarding is completed and user is authenticated
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: AnimatedSwitcher(

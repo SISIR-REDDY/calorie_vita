@@ -699,6 +699,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (currentGoals != null) {
         _appStateService.forceGoalsUpdate(currentGoals);
       }
+      
+      // Show success message to confirm goals were updated
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Goals updated successfully! 🎯'),
+            backgroundColor: kSuccessColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
