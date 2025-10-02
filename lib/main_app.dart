@@ -414,7 +414,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
           // Refresh onboarding status when completed
           await _checkOnboardingStatus();
           // Also refresh user data to ensure goals are synchronized
-          await _appStateService.refreshUserData();
+          // await _appStateService.refreshUserData(); // TODO: Fix this reference
         },
       );
     }

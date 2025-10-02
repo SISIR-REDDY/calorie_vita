@@ -149,14 +149,14 @@ class SimpleStreakService {
         newCurrentStreak = 1;
       } else if (currentStreak.lastAchievedDate
           .isAtSameMomentAs(today.subtract(const Duration(days: 1)))) {
-        // Continuing streak
+        // Continuing streak - increment current streak
         newCurrentStreak = currentStreak.currentStreak + 1;
       } else {
         // Same day, no change needed
         return;
       }
 
-      // Update longest streak if needed
+      // Update longest streak if current streak is better than previous best
       if (newCurrentStreak > newLongestStreak) {
         newLongestStreak = newCurrentStreak;
       }

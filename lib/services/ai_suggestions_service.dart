@@ -5,10 +5,10 @@ import 'snap_to_calorie_service.dart';
 
 /// AI-powered suggestions service for post-scan recommendations
 class AISuggestionsService {
-  static const String _baseUrl = AIConfig.baseUrl;
-  static const String _apiKey = AIConfig.apiKey;
-  static const String _chatModel = AIConfig.chatModel;
-  static const String _backupModel = AIConfig.backupVisionModel;
+  static String get _baseUrl => AIConfig.baseUrl;
+  static String get _apiKey => AIConfig.apiKey;
+  static String get _chatModel => AIConfig.chatModel;
+  static String get _backupModel => AIConfig.backupVisionModel;
 
   /// Generate comprehensive AI suggestions based on scanned food analysis
   static Future<AISuggestionsResult> generateSuggestions({

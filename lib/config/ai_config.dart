@@ -1,10 +1,10 @@
-import '../services/secure_config_service.dart';
+import '../services/firestore_config_service.dart';
 
-/// Secure AI Configuration using Firebase Remote Config
+/// Secure AI Configuration using Firestore
 /// This class provides secure access to API keys and configuration
 /// without exposing sensitive data in the client code
 class AIConfig {
-  static SecureConfigService get _config => SecureConfigService.instance;
+  static FirestoreConfigService get _config => FirestoreConfigService();
   
   /// Initialize the configuration service
   static Future<void> initialize() async {

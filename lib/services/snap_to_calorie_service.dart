@@ -9,10 +9,10 @@ import 'nutrition_lookup_service.dart';
 /// Enhanced snap-to-calorie service using OpenRouter AI vision
 /// Implements the complete pipeline: IDENTIFY -> MEASURE -> CALORIE -> OUTPUT
 class SnapToCalorieService {
-  static const String _baseUrl = AIConfig.baseUrl;
-  static const String _apiKey = AIConfig.apiKey;
-  static const String _visionModel = AIConfig.visionModel;
-  static const String _backupVisionModel = AIConfig.backupVisionModel;
+  static String get _baseUrl => AIConfig.baseUrl;
+  static String get _apiKey => AIConfig.apiKey;
+  static String get _visionModel => AIConfig.visionModel;
+  static String get _backupVisionModel => AIConfig.backupVisionModel;
 
   /// Process food image through complete snap-to-calorie pipeline with AI suggestions
   static Future<SnapToCalorieResult> processFoodImage(

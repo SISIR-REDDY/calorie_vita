@@ -148,42 +148,69 @@ class EnhancedStreakService {
     DateTime streakStartDate = DateTime.now().subtract(const Duration(days: 1));
     bool achievedToday = false;
 
-    // Calculate current streak
+    // Calculate current streak (consecutive days from today backwards)
     final today = DateTime.now();
     final todayDate = DateTime(today.year, today.month, today.day);
     
-    for (int i = 0; i < sortedSummaries.length; i++) {
-      final summary = sortedSummaries[i];
-      final summaryDate = DateTime(summary.date.year, summary.date.month, summary.date.day);
-      final daysDiff = todayDate.difference(summaryDate).inDays;
-
-      // Only count consecutive days
-      if (daysDiff != i) break;
-
-      final goalAchieved = _isGoalAchieved(goalType, summary, userGoals);
+    // Check if achieved today first
+    if (sortedSummaries.isNotEmpty) {
+      final todaySummary = sortedSummaries.first;
+      final todaySummaryDate = DateTime(todaySummary.date.year, todaySummary.date.month, todaySummary.date.day);
       
-      if (goalAchieved) {
-        if (i == 0) {
-          achievedToday = true;
-          lastAchievedDate = summaryDate;
+      if (todaySummaryDate.isAtSameMomentAs(todayDate)) {
+        achievedToday = _isGoalAchieved(goalType, todaySummary, userGoals);
+        if (achievedToday) {
+          currentStreak = 1;
+          lastAchievedDate = todayDate;
+          streakStartDate = todayDate;
         }
-        currentStreak++;
-        totalDaysAchieved++;
-      } else {
-        break;
       }
     }
 
-    // Calculate longest streak
+    // Continue counting consecutive days backwards from today
+    if (achievedToday && sortedSummaries.length > 1) {
+      for (int i = 1; i < sortedSummaries.length; i++) {
+        final summary = sortedSummaries[i];
+        final summaryDate = DateTime(summary.date.year, summary.date.month, summary.date.day);
+        final previousSummary = sortedSummaries[i - 1];
+        final previousDate = DateTime(previousSummary.date.year, previousSummary.date.month, previousSummary.date.day);
+        
+        // Check if this is the next consecutive day
+        final daysDiff = previousDate.difference(summaryDate).inDays;
+        if (daysDiff != 1) break; // Not consecutive, stop counting
+        
+        final goalAchieved = _isGoalAchieved(goalType, summary, userGoals);
+        
+        if (goalAchieved) {
+          currentStreak++;
+          streakStartDate = summaryDate;
+        } else {
+          break; // Streak broken, stop counting
+        }
+      }
+    }
+
+    // Calculate longest streak and total days achieved
     int tempStreak = 0;
+    DateTime? tempStreakStart = null;
+    
     for (final summary in sortedSummaries) {
       final goalAchieved = _isGoalAchieved(goalType, summary, userGoals);
       
       if (goalAchieved) {
+        if (tempStreak == 0) {
+          tempStreakStart = DateTime(summary.date.year, summary.date.month, summary.date.day);
+        }
         tempStreak++;
-        longestStreak = tempStreak > longestStreak ? tempStreak : longestStreak;
+        totalDaysAchieved++;
+        
+        // Update longest streak if this is better
+        if (tempStreak > longestStreak) {
+          longestStreak = tempStreak;
+        }
       } else {
         tempStreak = 0;
+        tempStreakStart = null;
       }
     }
 
@@ -191,7 +218,7 @@ class EnhancedStreakService {
       goalType: goalType,
       currentStreak: currentStreak,
       longestStreak: longestStreak,
-      lastAchievedDate: lastAchievedDate,
+      lastAchievedDate: achievedToday ? todayDate : lastAchievedDate,
       achievedToday: achievedToday,
       streakStartDate: streakStartDate,
       totalDaysAchieved: totalDaysAchieved,

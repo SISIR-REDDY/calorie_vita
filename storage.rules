@@ -12,45 +12,16 @@ service firebase.storage {
     
     function isValidImage() {
       return resource.contentType.matches('image/.*') &&
-             resource.size < 10 * 1024 * 1024; // 10MB limit
+             resource.size < 8 * 1024 * 1024; // 8MB limit
     }
     
-    function isValidFileType() {
-      return resource.contentType.matches('image/.*') ||
-             resource.contentType.matches('application/pdf') ||
-             resource.contentType.matches('text/.*');
-    }
-    
-    // User files - users can only access their own files
+    // User files - simplified structure
     match /users/{userId}/{allPaths=**} {
       allow read, write: if isOwner(userId);
       
-      // Validate file uploads
-      allow create: if isOwner(userId) && 
-        isValidFileType() &&
-        resource.size < 10 * 1024 * 1024; // 10MB limit
-      
-      allow update: if isOwner(userId) && 
-        isValidFileType() &&
-        resource.size < 10 * 1024 * 1024;
-    }
-    
-    // Profile images - specific validation
-    match /users/{userId}/profile/images/{imageId} {
-      allow read, write: if isOwner(userId);
-      
+      // Validate image uploads
       allow create, update: if isOwner(userId) &&
-        resource.contentType.matches('image/.*') &&
-        resource.size < 5 * 1024 * 1024; // 5MB limit for profile images
-    }
-    
-    // Food images - specific validation
-    match /users/{userId}/food/images/{imageId} {
-      allow read, write: if isOwner(userId);
-      
-      allow create, update: if isOwner(userId) &&
-        resource.contentType.matches('image/.*') &&
-        resource.size < 8 * 1024 * 1024; // 8MB limit for food images
+        isValidImage();
     }
     
     // Public assets - read-only for all users
@@ -61,11 +32,6 @@ service firebase.storage {
     
     // Admin files - server-side only
     match /admin/{allPaths=**} {
-      allow read, write: if false;
-    }
-    
-    // System files - server-side only
-    match /system/{allPaths=**} {
       allow read, write: if false;
     }
   }
