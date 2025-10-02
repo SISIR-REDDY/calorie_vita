@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import '../services/food_scanner_pipeline.dart';
 import '../services/optimized_food_scanner_pipeline.dart';
 import '../services/barcode_scanning_service.dart';
 // Unused imports removed
@@ -271,12 +270,12 @@ class _CameraScreenState extends State<CameraScreen> {
         Map<String, dynamic>? scanData;
         if (result.snapToCalorieResult != null) {
           scanData = {
-            'confidence': result.snapToCalorieResult!.overallConfidence,
-            'overall_confidence': result.snapToCalorieResult!.overallConfidence,
-            'recommended_action': result.snapToCalorieResult!.recommendedAction,
-            'notes': result.snapToCalorieResult!.notes,
-            'items_count': result.snapToCalorieResult!.items.length,
-            'ai_suggestions': result.snapToCalorieResult!.aiSuggestions?.toJson(),
+            'confidence': result.snapToCalorieResult!['overallConfidence'],
+            'overall_confidence': result.snapToCalorieResult!['overallConfidence'],
+            'recommended_action': result.snapToCalorieResult!['recommendedAction'],
+            'notes': result.snapToCalorieResult!['notes'],
+            'items_count': (result.snapToCalorieResult!['items'] as List?)?.length ?? 0,
+            'ai_suggestions': result.snapToCalorieResult!['aiSuggestions'],
           };
         }
         

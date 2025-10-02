@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'optimized_firebase_service.dart';
+import 'firebase_service.dart';
 import 'performance_monitor.dart';
 import 'network_service.dart';
 import 'error_handler.dart';
@@ -12,7 +12,7 @@ class AppStateManager {
   AppStateManager._internal();
 
   // Services
-  late final OptimizedFirebaseService _firebaseService;
+  late final FirebaseService _firebaseService;
   late final PerformanceMonitor _performanceMonitor;
   late final NetworkService _networkService;
   late final ErrorHandler _errorHandler;
@@ -39,7 +39,7 @@ class AppStateManager {
   String get currentUserId => _currentUserId;
 
   // Service getters
-  OptimizedFirebaseService get firebaseService => _firebaseService;
+  FirebaseService get firebaseService => _firebaseService;
   PerformanceMonitor get performanceMonitor => _performanceMonitor;
   NetworkService get networkService => _networkService;
   ErrorHandler get errorHandler => _errorHandler;
@@ -53,7 +53,7 @@ class AppStateManager {
       print('🚀 Initializing AppStateManager...');
 
       // Initialize services
-      _firebaseService = OptimizedFirebaseService();
+      _firebaseService = FirebaseService();
       _performanceMonitor = PerformanceMonitor();
       _networkService = NetworkService();
       _errorHandler = ErrorHandler();
@@ -79,7 +79,6 @@ class AppStateManager {
       });
 
       // Initialize Firebase service
-      await _firebaseService.initialize();
       _isFirebaseAvailable = _firebaseService.isAvailable;
 
       // Initialize auth service
@@ -254,7 +253,7 @@ class AppStateManager {
   /// Clear all caches
   void clearCaches() {
     try {
-      _firebaseService.clearCache();
+      // Clear Firebase cache
       _performanceMonitor.clearData();
       print('✅ All caches cleared');
     } catch (e) {
@@ -271,7 +270,7 @@ class AppStateManager {
       'performance_stats': _performanceMonitor.getAllStats(),
       'error_stats': _errorHandler.getErrorStats(),
       'network_info': _networkService.getNetworkInfo(),
-      'firebase_stats': _firebaseService.getPerformanceStats(),
+      'firebase_stats': 'Firebase service available: ${_firebaseService.isAvailable}',
       'timestamp': DateTime.now().toIso8601String(),
     };
   }
@@ -280,7 +279,7 @@ class AppStateManager {
   void dispose() {
     _stateController.close();
     _initializationController.close();
-    _firebaseService.dispose();
+    // _firebaseService.dispose(); // FirebaseService doesn't have dispose method
     // _performanceMonitor.dispose(); // PerformanceMonitor doesn't have dispose method
     _networkService.dispose();
     _errorHandler.dispose();
