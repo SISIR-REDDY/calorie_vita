@@ -961,6 +961,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       final stepsGoal = int.tryParse(_stepsGoalController.text);
       final waterGoal = int.tryParse(_waterGoalController.text);
       
+      print('Onboarding goals input:');
+      print('Weight goal text: "${_weightGoalController.text}" -> parsed: $weightGoal');
+      print('Calorie goal text: "${_calorieGoalController.text}" -> parsed: $calorieGoal');
+      print('Steps goal text: "${_stepsGoalController.text}" -> parsed: $stepsGoal');
+      print('Water goal text: "${_waterGoalController.text}" -> parsed: $waterGoal');
+      
       // If goals not provided, calculate defaults based on profile data
       double finalCalorieGoal;
       int finalStepsGoal;
@@ -1025,12 +1031,20 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       finalStepsGoal = stepsGoal ?? 10000;
       finalWaterGoal = waterGoal ?? 8;
 
+      print('Final calculated goals:');
+      print('Weight goal: $weightGoal');
+      print('Calorie goal: $finalCalorieGoal');
+      print('Steps goal: $finalStepsGoal');
+      print('Water goal: $finalWaterGoal');
+
       // Calculate macro goals based on calorie target (standard distribution)
       final macroGoals = {
         'carbsCalories': (finalCalorieGoal * 0.50).round(), // 50% carbs
         'proteinCalories': (finalCalorieGoal * 0.20).round(), // 20% protein
         'fatCalories': (finalCalorieGoal * 0.30).round(), // 30% fat
       };
+      
+      print('Macro goals: $macroGoals');
 
       // Create initial goals with complete structure
       final initialGoals = {
@@ -1040,8 +1054,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         'stepsPerDayGoal': finalStepsGoal,
         'macroGoals': macroGoals,
         'fitnessGoal': profileData['fitnessGoal'] as String,
-        'createdAt': DateTime.now().toIso8601String(),
-        'lastUpdated': DateTime.now().toIso8601String(),
+        'lastUpdated': DateTime.now(), // Use DateTime object instead of ISO string
       };
 
       // Save to Firebase
@@ -1049,6 +1062,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       
       print('Initial goals created for user: $userId');
       print('Goals data: $initialGoals');
+      
+      // Verify the goals were saved correctly by reading them back
+      final savedGoals = await _firebaseService.getUserGoals(userId);
+      print('Goals saved and retrieved: ${savedGoals?.toMap()}');
     } catch (e) {
       print('Error creating initial goals: $e');
     }

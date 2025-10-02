@@ -53,7 +53,8 @@ class _GoalsScreenState extends State<GoalsScreen>
 
   Future<void> _initializeServices() async {
     await _calorieUnitsService.initialize();
-    _loadGoals();
+    // Load goals after services are initialized
+    await _loadGoals();
   }
 
   @override
@@ -157,11 +158,14 @@ class _GoalsScreenState extends State<GoalsScreen>
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        debugPrint('Loading goals for user: ${user.uid}');
         final goals = await _firebaseService.getUserGoals(user.uid);
+        debugPrint('Goals loaded from Firebase: ${goals?.toMap()}');
         setState(() {
           _currentGoals = goals;
           _populateFields();
         });
+        debugPrint('Goals populated in UI fields');
       }
     } catch (e) {
       debugPrint('Error loading goals: $e');
@@ -171,12 +175,20 @@ class _GoalsScreenState extends State<GoalsScreen>
   }
 
   void _populateFields() {
+    debugPrint('Populating fields with goals: ${_currentGoals?.toMap()}');
+    
     if (_currentGoals != null) {
       _weightController.text = _currentGoals!.weightGoal?.toString() ?? '';
       _calorieController.text = _calorieUnitsService
           .formatCaloriesShort(_currentGoals!.calorieGoal?.toDouble() ?? 2000);
       _stepsController.text = _currentGoals!.stepsPerDayGoal?.toString() ?? '';
       _waterController.text = _currentGoals!.waterGlassesGoal?.toString() ?? '';
+
+      debugPrint('Weight goal: ${_currentGoals!.weightGoal}');
+      debugPrint('Calorie goal: ${_currentGoals!.calorieGoal}');
+      debugPrint('Steps goal: ${_currentGoals!.stepsPerDayGoal}');
+      debugPrint('Water goal: ${_currentGoals!.waterGlassesGoal}');
+      debugPrint('Macro goals: ${_currentGoals!.macroGoals?.toMap()}');
 
       if (_currentGoals!.macroGoals != null) {
         _carbsController.text = _calorieUnitsService.formatCaloriesShort(
@@ -196,6 +208,7 @@ class _GoalsScreenState extends State<GoalsScreen>
             (calorieGoal * 0.30)); // 30% fat
       }
     } else {
+      debugPrint('No goals found, setting default values');
       // Set default values for new users
       _calorieController.text = _calorieUnitsService.formatCaloriesShort(2000);
       _stepsController.text = '10000';

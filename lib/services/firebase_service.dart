@@ -664,9 +664,17 @@ class FirebaseService {
           .doc('goals')
           .get();
 
+      print('Getting goals for user: $userId');
+      print('Document exists: ${doc.exists}');
+      
       if (doc.exists) {
-        return UserGoals.fromMap(doc.data()!);
+        final data = doc.data()!;
+        print('Raw goals data from Firebase: $data');
+        final goals = UserGoals.fromMap(data);
+        print('Parsed goals object: ${goals.toMap()}');
+        return goals;
       }
+      print('No goals document found for user: $userId');
       return null;
     } catch (e) {
       print('Error getting user goals: $e');
@@ -676,12 +684,35 @@ class FirebaseService {
 
   Future<void> saveUserGoals(String userId, UserGoals goals) async {
     try {
+      final goalsMap = goals.toMap();
+      // Convert DateTime to Timestamp for Firebase
+      if (goalsMap['lastUpdated'] != null) {
+        goalsMap['lastUpdated'] = Timestamp.fromDate(goalsMap['lastUpdated']);
+      }
+      
       await _firestore
           .collection('users')
           .doc(userId)
           .collection('profile')
           .doc('goals')
-          .set(goals.toMap());
+          .set(goalsMap);
+          
+      print('Goals saved successfully for user: $userId');
+      print('Goals data saved: $goalsMap');
+      
+      // Verify the data was saved correctly by reading it back immediately
+      final verifyDoc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('profile')
+          .doc('goals')
+          .get();
+      
+      if (verifyDoc.exists) {
+        print('Verification - Goals data in Firebase: ${verifyDoc.data()}');
+      } else {
+        print('ERROR: Goals document not found after saving!');
+      }
     } catch (e) {
       print('Error saving user goals: $e');
       rethrow;

@@ -30,7 +30,11 @@ class UserGoals {
           ? MacroGoals.fromMap(map['macroGoals'])
           : null,
       fitnessGoal: map['fitnessGoal']?.toString(),
-      lastUpdated: map['lastUpdated']?.toDate(),
+      lastUpdated: map['lastUpdated'] != null 
+          ? (map['lastUpdated'] is DateTime 
+              ? map['lastUpdated'] 
+              : map['lastUpdated'].toDate())
+          : null,
     );
   }
 
