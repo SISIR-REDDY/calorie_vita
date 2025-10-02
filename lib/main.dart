@@ -11,6 +11,7 @@ import 'services/error_handler.dart';
 import 'services/logger_service.dart';
 import 'services/push_notification_service.dart';
 import 'config/production_config.dart';
+import 'config/ai_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,6 +55,14 @@ void main() async {
 
   // Initialize Firebase services
   await _initializeFirebaseServices();
+
+  // Initialize secure configuration service
+  try {
+    await AIConfig.initialize();
+    logger.info('Secure configuration initialized successfully');
+  } catch (e) {
+    logger.error('Secure configuration initialization error', {'error': e.toString()});
+  }
 
   // Initialize push notification service
   final pushNotificationService = PushNotificationService();

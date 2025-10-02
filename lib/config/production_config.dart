@@ -4,14 +4,8 @@ class ProductionConfig {
   static const bool isProduction = bool.fromEnvironment('PRODUCTION', defaultValue: false);
   static const bool isDebug = bool.fromEnvironment('DEBUG', defaultValue: true);
   
-  // API Configuration with environment-based keys
-  static String get openRouterApiKey {
-    if (isProduction) {
-      return const String.fromEnvironment('OPENROUTER_API_KEY_PROD', defaultValue: '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');
-    } else {
-      return const String.fromEnvironment('OPENROUTER_API_KEY_DEV', defaultValue: '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');
-    }
-  }
+  // Note: API keys are now managed securely through Firebase Remote Config
+  // Use AIConfig.apiKey to access the secure API key
   
   // Enhanced AI Configuration for better accuracy and speed
   static const Map<String, dynamic> aiConfig = {
@@ -79,9 +73,6 @@ class ProductionConfig {
   static const String appUrl = 'https://calorievita.com';
   
   // Validation methods
-  static bool isValidApiKey(String key) {
-    return key.isNotEmpty && key.length >= 20;
-  }
   
   static bool isFeatureEnabled(String feature) {
     return featureFlags[feature] ?? false;

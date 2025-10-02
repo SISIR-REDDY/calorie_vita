@@ -11,9 +11,7 @@ import 'image_processing_service.dart';
 class AIService {
   // Enhanced configuration with production settings
   static String get _baseUrl => AIConfig.baseUrl;
-  static String get _apiKey => ProductionConfig.openRouterApiKey.isNotEmpty 
-      ? ProductionConfig.openRouterApiKey 
-      : AIConfig.apiKey;
+  static String get _apiKey => AIConfig.apiKey;
   static String get _chatModel => ProductionConfig.aiConfig['chat_model'] as String;
   static String get _visionModel => ProductionConfig.aiConfig['vision_model'] as String;
   
