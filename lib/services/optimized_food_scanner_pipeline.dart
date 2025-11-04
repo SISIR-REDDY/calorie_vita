@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
 import '../config/ai_config.dart';
 import '../models/food_recognition_result.dart';
 import '../models/portion_estimation_result.dart';
@@ -551,12 +552,51 @@ class OptimizedFoodScannerPipeline {
       
       print('✅ Image file loaded: ${(imageBytes.length / 1024).toStringAsFixed(1)}KB');
       
-      // Optimize image size for faster processing (reduce if too large)
+      // Fast image optimization for faster upload and processing
       List<int> optimizedBytes = imageBytes;
-      if (imageBytes.length > 500 * 1024) { // If > 500KB, compress
-        print('⚠️ Image is large (${(imageBytes.length / 1024).toStringAsFixed(1)}KB), using as-is for speed');
-        // For now, use as-is - compression would add delay
-        // In production, could resize/compress here
+      if (imageBytes.length > 300 * 1024) { // If > 300KB, compress and resize
+        print('⚡ Optimizing large image for faster processing...');
+        try {
+          final decodedImage = img.decodeImage(imageBytes);
+          if (decodedImage != null) {
+            // Resize to max 1024px on longest side (fast and good enough for AI)
+            final maxSize = 1024;
+            img.Image resizedImage = decodedImage;
+            
+            if (decodedImage.width > maxSize || decodedImage.height > maxSize) {
+              final aspectRatio = decodedImage.width / decodedImage.height;
+              int newWidth, newHeight;
+              
+              if (aspectRatio > 1) {
+                newWidth = maxSize;
+                newHeight = (maxSize / aspectRatio).round();
+              } else {
+                newHeight = maxSize;
+                newWidth = (maxSize * aspectRatio).round();
+              }
+              
+              resizedImage = img.copyResize(
+                decodedImage,
+                width: newWidth,
+                height: newHeight,
+                interpolation: img.Interpolation.linear, // Fast interpolation
+              );
+              print('   📐 Resized: ${decodedImage.width}x${decodedImage.height} → $newWidth x $newHeight');
+            }
+            
+            // Compress with quality 85 (good quality, smaller size)
+            optimizedBytes = img.encodeJpg(resizedImage, quality: 85);
+            final originalSizeKB = (imageBytes.length / 1024);
+            final optimizedSizeKB = (optimizedBytes.length / 1024);
+            final reduction = ((1 - optimizedSizeKB / originalSizeKB) * 100);
+            print('   ✅ Optimized: ${originalSizeKB.toStringAsFixed(1)}KB → ${optimizedSizeKB.toStringAsFixed(1)}KB (${reduction.toStringAsFixed(1)}% reduction)');
+          }
+        } catch (e) {
+          print('   ⚠️ Image optimization failed, using original: $e');
+          optimizedBytes = imageBytes; // Fallback to original
+        }
+      } else {
+        print('   ✅ Image size is acceptable, using as-is');
       }
       
       // Validate image is not too small (might be corrupted)
@@ -650,9 +690,9 @@ Remember: Your ONLY job is to identify and analyze FOOD items. Everything else i
       print('   Base URL: ${AIConfig.baseUrl}');
       
       final response = await _callOpenRouterVisionFast(prompt, base64Image).timeout(
-        const Duration(seconds: 60), // Increased timeout to allow both models to complete (45s + 30s + overhead)
+        const Duration(seconds: 50), // Optimized timeout for faster models (30s + 45s + overhead)
         onTimeout: () {
-          print('⏱️ AI vision API call timed out after 60 seconds (all models exhausted)');
+          print('⏱️ AI vision API call timed out after 50 seconds (all models exhausted)');
           return null;
         },
       );
@@ -1215,7 +1255,7 @@ Remember: Your ONLY job is to identify and analyze FOOD items. Everything else i
                     'type': 'image_url',
                     'image_url': {
                       'url': 'data:image/jpeg;base64,$base64Image',
-                      'detail': 'high', // Use high detail for better food identification when other objects are present
+                      'detail': 'low', // Use low detail for faster processing (images are already optimized)
                     }
                   }
                 ],
@@ -1234,9 +1274,9 @@ Remember: Your ONLY job is to identify and analyze FOOD items. Everything else i
             print('   ⚠️ Model may not support response_format - will rely on prompt');
           }
 
-          // Increased timeout for vision API calls (needs more time for high-detail image analysis)
-          // Use longer timeout for first attempt, shorter for fallback
-          final timeout = Duration(seconds: attempt == 0 ? 45 : 30); // Longer timeout for primary model, shorter for fallback
+          // Optimized timeout for faster vision API calls (images are optimized, so faster processing)
+          // Use shorter timeout for faster model, longer for fallback
+          final timeout = Duration(seconds: attempt == 0 ? 30 : 45); // Faster timeout for primary model (mini), longer for fallback
           
           print('📤 Sending request to OpenRouter:');
           print('   Model: $model');

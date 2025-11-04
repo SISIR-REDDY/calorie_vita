@@ -47,15 +47,15 @@ class AIConfig {
   static String get chatModel => _config.getString('chat_model', 
       defaultValue: 'openai/gpt-3.5-turbo');
   static String get visionModel => _config.getString('vision_model', 
-      defaultValue: 'openai/gpt-4o'); // Primary vision model - GPT-4o (working model)
+      defaultValue: 'openai/gpt-4o-mini'); // Primary vision model - GPT-4o Mini (faster)
   static String get backupVisionModel => _config.getString('backup_vision_model', 
-      defaultValue: 'openai/gpt-4o-mini'); // Fallback vision model - GPT-4o Mini if GPT-4o fails
+      defaultValue: 'openai/gpt-4o'); // Fallback vision model - GPT-4o if Mini fails
 
   /// Token Limits
   static int get maxTokens => _config.getInt('max_tokens', defaultValue: 100);
   static int get chatMaxTokens => _config.getInt('chat_max_tokens', defaultValue: 100);
   static int get analyticsMaxTokens => _config.getInt('analytics_max_tokens', defaultValue: 120);
-  static int get visionMaxTokens => _config.getInt('vision_max_tokens', defaultValue: 150); // Optimized for speed
+  static int get visionMaxTokens => _config.getInt('vision_max_tokens', defaultValue: 120); // Reduced for faster responses
   
   /// Temperature Settings
   static double get temperature => _config.getDouble('temperature', defaultValue: 0.7);
