@@ -9,7 +9,7 @@ import 'logger_service.dart';
 /// 
 /// Required fields:
 /// - openrouter_api_key: String (your OpenRouter API key)
-/// - vision_model: String (default: 'openai/gpt-4o-mini')
+/// - vision_model: String (default: 'google/gemini-1.5-flash')
 /// - enable_image_analysis: Boolean (default: true)
 /// 
 /// To verify config is loaded, check console logs for:
@@ -120,9 +120,8 @@ class FirestoreConfigService {
       'openrouter_api_key': '', // EMPTY - must come from Firebase
       'openrouter_base_url': 'https://openrouter.ai/api/v1/chat/completions',
       'chat_model': 'openai/gpt-3.5-turbo',
-      'vision_model': 'openai/gpt-4o-mini', // Primary vision model - fastest for food recognition
-      'backup_vision_model': 'openai/gpt-4o', // Backup vision model - more accurate if needed
-      'fallback_vision_model': 'openai/gpt-4-turbo', // Fallback vision model (supports vision)
+      'vision_model': 'google/gemini-1.5-flash', // Primary vision model - Gemini 1.5 Flash
+      'backup_vision_model': 'openai/gpt-4o', // Fallback vision model - GPT-4o if Gemini fails
       'max_tokens': 100,
       'chat_max_tokens': 100,
       'analytics_max_tokens': 120,

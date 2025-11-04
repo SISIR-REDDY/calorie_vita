@@ -1035,9 +1035,8 @@ Requirements: JSON only. Estimate weight visually. Calories = (protein×4 + carb
       print('   - Base URL: ${AIConfig.baseUrl}');
       print('   - API Key: ${AIConfig.apiKey.isNotEmpty ? "${AIConfig.apiKey.substring(0, 12)}..." : "MISSING"}');
       print('   - API Key length: ${AIConfig.apiKey.length}');
-      print('   - Vision Model: ${AIConfig.visionModel}');
-      print('   - Backup Model: ${AIConfig.backupVisionModel}');
-      print('   - Fallback Model: ${AIConfig.fallbackVisionModel}');
+      print('   - Primary Model: ${AIConfig.visionModel}');
+      print('   - Fallback Model: ${AIConfig.backupVisionModel}');
       print('   - Image size: ${(base64Image.length / 1024).toStringAsFixed(1)}KB base64');
       
       // Validate configuration FIRST before making any API calls
@@ -1092,11 +1091,10 @@ Requirements: JSON only. Estimate weight visually. Calories = (protein×4 + carb
       print('   - HTTP-Referer: ${AIConfig.appUrl}');
       print('   - X-Title: ${AIConfig.appName}');
 
-      // Try multiple models with fallback
+      // Try primary model (Gemini 1.5 Flash), fallback to GPT-4o if it fails
       final models = [
         AIConfig.visionModel,
         AIConfig.backupVisionModel,
-        AIConfig.fallbackVisionModel,
       ];
 
       for (int attempt = 0; attempt < models.length; attempt++) {
@@ -1139,7 +1137,7 @@ Requirements: JSON only. Estimate weight visually. Calories = (protein×4 + carb
             print('   ⚠️ Model may not support response_format - will rely on prompt');
           }
 
-          // Optimized timeout for faster responses (gpt-4o-mini is faster)
+          // Optimized timeout for faster responses (Gemini 1.5 Flash is fast)
           const timeout = Duration(seconds: 15); // Faster timeout for speed
           
           print('📤 Sending request to OpenRouter:');

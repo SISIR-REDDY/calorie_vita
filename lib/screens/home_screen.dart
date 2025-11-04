@@ -191,6 +191,19 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     // Refresh goals when screen becomes visible
     _forceRefreshGoals();
     
+    // CRITICAL: Load cached calories IMMEDIATELY before any streams can emit 0
+    // This prevents the zero-value flash when switching screens
+    final cachedCalories = _todaysFoodDataService.getCachedConsumedCalories();
+    if (cachedCalories > 0 && _dailySummary != null) {
+      // Update immediately with cached value to prevent zero flash
+      if (_dailySummary!.caloriesConsumed == 0) {
+        setState(() {
+          _dailySummary = _dailySummary!.copyWith(caloriesConsumed: cachedCalories);
+        });
+        print('⚡ Home: Loaded cached calories on screen change: $cachedCalories');
+      }
+    }
+    
     // Refresh consumed calories and macro nutrients when screen becomes visible
     _refreshFoodData();
       
@@ -210,32 +223,59 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       final cachedMacros = _todaysFoodDataService.getCachedMacroNutrients();
       
       // Update UI immediately with cached data (0ms delay)
-      if (cachedCalories > 0 || cachedMacros.isNotEmpty) {
-        if (mounted) {
-          setState(() {
-            // Update consumed calories immediately
-            if (_dailySummary != null) {
+      // CRITICAL: Always update even if value is 0 to prevent stale data
+      if (mounted) {
+        setState(() {
+          // Update consumed calories immediately (even if 0, to ensure consistency)
+          if (_dailySummary != null) {
+            // Only update if cached value is greater than current, or current is 0
+            if (cachedCalories > _dailySummary!.caloriesConsumed || 
+                _dailySummary!.caloriesConsumed == 0) {
               _dailySummary = _dailySummary!.copyWith(caloriesConsumed: cachedCalories);
             }
-            
-            // Update macro breakdown immediately
-            if (cachedMacros.isNotEmpty) {
-              _macroBreakdown = MacroBreakdown(
-                protein: cachedMacros['protein'] ?? 0.0,
-                carbs: cachedMacros['carbs'] ?? 0.0,
-                fat: cachedMacros['fat'] ?? 0.0,
-                fiber: cachedMacros['fiber'] ?? 0.0,
-                sugar: cachedMacros['sugar'] ?? 0.0,
-              );
-            }
-          });
+          } else {
+            // Create daily summary if it doesn't exist
+            _dailySummary = DailySummary(
+              caloriesConsumed: cachedCalories,
+              caloriesBurned: 0,
+              caloriesGoal: 2000,
+              steps: 0,
+              stepsGoal: 10000,
+              waterGlasses: 0,
+              waterGlassesGoal: 8,
+              date: DateTime.now(),
+            );
+          }
+          
+          // Update macro breakdown immediately
+          if (cachedMacros.isNotEmpty) {
+            _macroBreakdown = MacroBreakdown(
+              protein: cachedMacros['protein'] ?? 0.0,
+              carbs: cachedMacros['carbs'] ?? 0.0,
+              fat: cachedMacros['fat'] ?? 0.0,
+              fiber: cachedMacros['fiber'] ?? 0.0,
+              sugar: cachedMacros['sugar'] ?? 0.0,
+            );
+          }
+        });
+        if (cachedCalories > 0) {
+          print('⚡ Home: INSTANT cached data loaded - Calories: $cachedCalories');
         }
-        print('⚡ Home: INSTANT cached data loaded - Calories: $cachedCalories');
       }
       
       // Initialize service in background (non-blocking)
+      // This will reload data from Firestore and update streams
       _todaysFoodDataService.initialize().then((_) {
         print('✅ Home: Food data service initialized');
+        // After initialization, ensure cached data is still displayed
+        final updatedCalories = _todaysFoodDataService.getCachedConsumedCalories();
+        if (updatedCalories > 0 && mounted && _dailySummary != null) {
+          setState(() {
+            if (_dailySummary!.caloriesConsumed == 0 || updatedCalories > _dailySummary!.caloriesConsumed) {
+              _dailySummary = _dailySummary!.copyWith(caloriesConsumed: updatedCalories);
+            }
+          });
+        }
       }).catchError((e) {
         print('❌ Home: Food data service init error: $e');
       });
@@ -1333,20 +1373,34 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           final currentConsumedCalories = _dailySummary?.caloriesConsumed ?? 0;
           final newConsumedCalories = summary?.caloriesConsumed ?? 0;
           
+          // CRITICAL: Check cached data from TodaysFoodDataService if current is 0
+          // This prevents zero-value flash when switching screens
+          final cachedCalories = _todaysFoodDataService.getCachedConsumedCalories();
+          final caloriesToUse = cachedCalories > 0 ? cachedCalories : currentConsumedCalories;
+          
           // Only use AppStateService calories if:
-          // 1. We don't have current calories (0 or null), OR
-          // 2. The new value is greater than 0 (real data)
+          // 1. We don't have current calories (0 or null), AND
+          // 2. We don't have cached calories, AND
+          // 3. The new value is greater than 0 (real data)
           // This prevents overwriting real data with 0
           if (summary != null) {
-            if (currentConsumedCalories == 0 && newConsumedCalories > 0) {
-              // Use AppStateService value if we have no current value but new value is valid
+            if (caloriesToUse > 0) {
+              // Always preserve calories from TodaysFoodDataService (cached or current)
+              _dailySummary = summary.copyWith(caloriesConsumed: caloriesToUse);
+            } else if (currentConsumedCalories == 0 && newConsumedCalories > 0) {
+              // Use AppStateService value only if we have no current/cached value but new value is valid
               _dailySummary = summary;
             } else if (currentConsumedCalories > 0) {
               // Preserve current calories from TodaysFoodDataService
               _dailySummary = summary.copyWith(caloriesConsumed: currentConsumedCalories);
             } else {
-              // Default case - use summary as is
-              _dailySummary = summary;
+              // Default case - use summary as is (but don't overwrite if we have cached data)
+              if (cachedCalories == 0) {
+                _dailySummary = summary;
+              } else {
+                // Keep current summary if we have cached data
+                _dailySummary = _dailySummary ?? summary;
+              }
             }
           } else {
             // If summary is null, keep current summary

@@ -142,17 +142,22 @@ class AnalyticsService {
 
       _logger.info('Analytics listeners set up successfully');
 
-      // Generate initial insights and recommendations with timeout (non-blocking)
+      // Generate initial insights and recommendations (ensure recommendations always generate)
       _generateInsights(userId)
-          .timeout(const Duration(seconds: 3),
+          .timeout(const Duration(seconds: 10),
               onTimeout: () => _logger.warning('Insights generation timed out'))
           .catchError((error) => _logger.error('Error generating insights', {'error': error.toString()}));
 
-      _generateRecommendations(userId)
-          .timeout(const Duration(seconds: 3),
-              onTimeout: () => _logger.warning('Recommendations generation timed out'))
-          .catchError(
-              (error) => _logger.error('Error generating recommendations', {'error': error.toString()}));
+      // CRITICAL: Generate recommendations immediately and ensure they always generate
+      // Remove timeout to ensure recommendations always complete
+      _generateRecommendations(userId).then((_) {
+        print('✅ Analytics: Recommendations generation completed successfully');
+      }).catchError((error) {
+        _logger.error('Error generating recommendations', {'error': error.toString()});
+        print('❌ Analytics: Error generating recommendations: $error');
+        // Even on error, generate fallback recommendations
+        _generateFallbackRecommendations(userId);
+      });
 
       _logger.info('Analytics initialization completed');
     } catch (e) {
@@ -496,15 +501,35 @@ class AnalyticsService {
     }
   }
 
+  // Today's macro breakdown from today's food entries (for accurate recommendations)
+  MacroBreakdown? _todayMacroBreakdown;
+
+  /// Update today's macro breakdown from today's food entries
+  /// This ensures recommendations use actual today's data, not historical averages
+  void updateTodayMacroBreakdown(MacroBreakdown todayMacros) {
+    _todayMacroBreakdown = todayMacros;
+    print('📊 Analytics: Today\'s macro breakdown updated for recommendations - Protein: ${todayMacros.protein}g, Carbs: ${todayMacros.carbs}g, Fat: ${todayMacros.fat}g');
+    
+    // Regenerate recommendations with updated today's data
+    final userId = _auth.currentUser?.uid;
+    if (userId != null) {
+      _generateRecommendations(userId).catchError((e) {
+        _logger.error('Error regenerating recommendations after macro update', {'error': e.toString()});
+      });
+    }
+  }
+
   /// Generate personalized recommendations
   Future<void> _generateRecommendations(String userId) async {
     try {
+      print('🔄 Analytics: Generating recommendations for user: $userId');
       final recommendations = <Map<String, dynamic>>[];
 
       // Get user profile for personalized recommendations
       Map<String, dynamic>? profile;
       try {
         profile = await _firebaseService.getUserProfile(userId);
+        print('📊 Analytics: User profile loaded: ${profile.isNotEmpty}');
       } catch (e) {
         print('⚠️ Could not load user profile for recommendations: $e');
       }
@@ -512,11 +537,25 @@ class AnalyticsService {
       // Get user goals for better recommendations
       final userGoals = await _getUserGoals(userId);
       final calorieGoal = userGoals['caloriesGoal'] ?? 2000;
+      print('📊 Analytics: User calorie goal: $calorieGoal');
 
-      // Calorie-based recommendations
+      // Calorie-based recommendations - use TODAY's data from today's food entries
+      int todayCalories = 0;
       if (_cachedDailySummaries.isNotEmpty) {
         final today = _cachedDailySummaries.last;
-        final todayCalories = today.caloriesConsumed;
+        todayCalories = today.caloriesConsumed;
+        print('📊 Analytics: Today\'s calories from daily summaries: $todayCalories');
+      } else if (_todayMacroBreakdown != null) {
+        // If no daily summaries, calculate calories from today's macros
+        todayCalories = (_todayMacroBreakdown!.protein * 4 + 
+                        _todayMacroBreakdown!.carbs * 4 + 
+                        _todayMacroBreakdown!.fat * 9).round();
+        print('📊 Analytics: Today\'s calories calculated from macros: $todayCalories');
+      } else {
+        print('⚠️ Analytics: No today\'s calorie data available');
+      }
+      
+      if (todayCalories > 0) {
         final calorieDeficit = calorieGoal - todayCalories;
 
         if (todayCalories < 1200) {
@@ -549,54 +588,68 @@ class AnalyticsService {
         }
       }
 
-      // Macro-based recommendations
-      final avgDailyProtein = _cachedDailySummaries.isNotEmpty
-          ? (_cachedMacroBreakdown.protein / _cachedDailySummaries.length)
-          : 0.0;
-      final avgDailyCarbs = _cachedDailySummaries.isNotEmpty
-          ? (_cachedMacroBreakdown.carbs / _cachedDailySummaries.length)
-          : 0.0;
-      final avgDailyFat = _cachedDailySummaries.isNotEmpty
-          ? (_cachedMacroBreakdown.fat / _cachedDailySummaries.length)
-          : 0.0;
+      // Macro-based recommendations - use TODAY's actual values from today's food entries
+      // Priority: Use today's macro breakdown if available, otherwise use averages
+      double todayProtein = 0.0;
+      double todayCarbs = 0.0;
+      double todayFat = 0.0;
+      
+      if (_todayMacroBreakdown != null) {
+        // Use today's actual values from today's food entries
+        todayProtein = _todayMacroBreakdown!.protein;
+        todayCarbs = _todayMacroBreakdown!.carbs;
+        todayFat = _todayMacroBreakdown!.fat;
+        print('📊 Using TODAY\'s macro values for recommendations: Protein: ${todayProtein}g, Carbs: ${todayCarbs}g, Fat: ${todayFat}g');
+      } else if (_cachedDailySummaries.isNotEmpty) {
+        // Fallback to averages if today's data not available
+        todayProtein = _cachedMacroBreakdown.protein / _cachedDailySummaries.length;
+        todayCarbs = _cachedMacroBreakdown.carbs / _cachedDailySummaries.length;
+        todayFat = _cachedMacroBreakdown.fat / _cachedDailySummaries.length;
+        print('📊 Using average macro values for recommendations (today\'s data not available)');
+      } else {
+        print('⚠️ Analytics: No macro data available for recommendations');
+      }
+      
+      print('📊 Analytics: Using macro values - Protein: ${todayProtein}g, Carbs: ${todayCarbs}g, Fat: ${todayFat}g');
 
-      // Protein recommendations
-      if (avgDailyProtein < 80) {
-        final proteinNeeded = (80 - avgDailyProtein).toStringAsFixed(0);
+      // Protein recommendations - based on TODAY's actual values
+      if (todayProtein < 80 && todayProtein > 0) {
+        final proteinNeeded = (80 - todayProtein).toStringAsFixed(0);
         recommendations.add({
           'title': 'Boost protein intake',
           'description':
-              'Your average protein is ${avgDailyProtein.toStringAsFixed(0)}g/day. Aim for ${proteinNeeded}g more for muscle recovery and satiety. Try lean meats, eggs, or legumes.',
+              'You\'ve consumed ${todayProtein.toStringAsFixed(0)}g of protein today. Aim for ${proteinNeeded}g more (total 80g) for muscle recovery and satiety. Try lean meats, eggs, or legumes.',
             'type': 'nutrition',
             'priority': 'high',
           'timestamp': DateTime.now(),
         });
       }
 
-      // Carb recommendations
-      if (avgDailyCarbs < 100) {
+      // Carb recommendations - based on TODAY's actual values
+      if (todayCarbs < 100 && todayCarbs > 0) {
+        final carbsNeeded = (100 - todayCarbs).toStringAsFixed(0);
         recommendations.add({
           'title': 'Add healthy carbs',
           'description':
-              'Include more whole grains, fruits, and vegetables to fuel your activities and support recovery.',
+              'You\'ve consumed ${todayCarbs.toStringAsFixed(0)}g of carbs today. Add ${carbsNeeded}g more whole grains, fruits, and vegetables to fuel your activities and support recovery.',
             'type': 'nutrition',
             'priority': 'medium',
           'timestamp': DateTime.now(),
         });
       }
 
-      // Balance recommendations
-      final totalMacros = _cachedMacroBreakdown.protein + _cachedMacroBreakdown.carbs + _cachedMacroBreakdown.fat;
-      if (totalMacros > 0) {
-        final proteinPercent = (_cachedMacroBreakdown.protein / totalMacros) * 100;
-        final carbsPercent = (_cachedMacroBreakdown.carbs / totalMacros) * 100;
-        final fatPercent = (_cachedMacroBreakdown.fat / totalMacros) * 100;
+      // Balance recommendations - based on TODAY's actual values
+      final totalTodayMacros = todayProtein + todayCarbs + todayFat;
+      if (totalTodayMacros > 0) {
+        final proteinPercent = (todayProtein / totalTodayMacros) * 100;
+        final carbsPercent = (todayCarbs / totalTodayMacros) * 100;
+        final fatPercent = (todayFat / totalTodayMacros) * 100;
 
         if (proteinPercent < 15 || proteinPercent > 40) {
           recommendations.add({
             'title': 'Balance your macros',
             'description':
-                'Your protein is ${proteinPercent.toStringAsFixed(0)}% of total macros. Aim for 20-30% protein, 40-50% carbs, and 20-30% fat for optimal nutrition.',
+                'Today your protein is ${proteinPercent.toStringAsFixed(0)}% of total macros. Aim for 20-30% protein, 40-50% carbs, and 20-30% fat for optimal nutrition.',
             'type': 'nutrition',
             'priority': 'medium',
             'timestamp': DateTime.now(),
@@ -663,6 +716,48 @@ class AnalyticsService {
         }
       }
 
+      // If no recommendations generated, add some general recommendations
+      if (recommendations.isEmpty) {
+        print('⚠️ No recommendations generated, adding general recommendations');
+        
+        // General health recommendations
+        recommendations.add({
+          'title': 'Start tracking your meals',
+          'description':
+              'Log your food intake to get personalized nutrition recommendations based on your goals and activity level.',
+          'type': 'general',
+          'priority': 'medium',
+          'timestamp': DateTime.now(),
+        });
+        
+        // Add recommendation based on profile if available
+        if (profile != null) {
+          final age = profile['age'] as int?;
+          final gender = profile['gender'] as String?;
+          
+          if (age != null && gender != null) {
+            recommendations.add({
+              'title': 'Set your nutrition goals',
+              'description':
+                  'Based on your profile ($gender, $age years old), set personalized calorie and macro goals in settings to track your progress better.',
+              'type': 'general',
+              'priority': 'medium',
+              'timestamp': DateTime.now(),
+            });
+          }
+        }
+        
+        // Add hydration reminder
+        recommendations.add({
+          'title': 'Stay hydrated',
+          'description':
+              'Drink at least 8 glasses of water daily to support metabolism, digestion, and overall health.',
+          'type': 'activity',
+          'priority': 'low',
+          'timestamp': DateTime.now(),
+        });
+      }
+
       // Sort by priority (high -> medium -> low)
       final priorityOrder = {'high': 1, 'medium': 2, 'low': 3};
       recommendations.sort((a, b) {
@@ -673,6 +768,11 @@ class AnalyticsService {
 
       // Limit to top 5 recommendations
       final finalRecommendations = recommendations.take(5).toList();
+
+      print('✅ Generated ${finalRecommendations.length} recommendations');
+      for (var i = 0; i < finalRecommendations.length; i++) {
+        print('   ${i + 1}. ${finalRecommendations[i]['title']}');
+      }
 
       _cachedRecommendations = finalRecommendations;
       try {
@@ -685,15 +785,66 @@ class AnalyticsService {
       }
     } catch (e) {
       _logger.error('Error generating recommendations', {'error': e.toString()});
-      // Return empty list on error
-      _cachedRecommendations = [];
+      print('❌ Analytics: Error in _generateRecommendations: $e');
+      // Generate fallback recommendations on error
+      _generateFallbackRecommendations(userId);
+    }
+  }
+
+  /// Generate fallback recommendations when main generation fails
+  Future<void> _generateFallbackRecommendations(String userId) async {
+    try {
+      print('🔄 Analytics: Generating fallback recommendations...');
+      final recommendations = <Map<String, dynamic>>[];
+
+      // Always add general recommendations
+      recommendations.add({
+        'title': 'Start tracking your meals',
+        'description':
+            'Log your food intake to get personalized nutrition recommendations based on your goals and activity level.',
+        'type': 'general',
+        'priority': 'medium',
+        'timestamp': DateTime.now(),
+      });
+
+      recommendations.add({
+        'title': 'Stay hydrated',
+        'description':
+            'Drink at least 8 glasses of water daily to support metabolism, digestion, and overall health.',
+        'type': 'activity',
+        'priority': 'low',
+        'timestamp': DateTime.now(),
+      });
+
+      recommendations.add({
+        'title': 'Set your nutrition goals',
+        'description':
+            'Set personalized calorie and macro goals in settings to track your progress better.',
+        'type': 'general',
+        'priority': 'medium',
+        'timestamp': DateTime.now(),
+      });
+
+      // Ensure maximum of 5 recommendations
+      final limitedRecommendations = recommendations.take(5).toList();
+      _cachedRecommendations = limitedRecommendations;
       try {
         if (!_ensureRecommendationsController.isClosed) {
-          _ensureRecommendationsController.add([]);
+          _ensureRecommendationsController.add(limitedRecommendations);
+          print('✅ Analytics: Fallback recommendations generated: ${limitedRecommendations.length} items');
+          _logger.info('Generated fallback recommendations', {'count': limitedRecommendations.length});
+        } else {
+          print('⚠️ Analytics: Recommendations controller is closed, recreating...');
+          // Controller is closed, recreate it
+          _ensureRecommendationsController.add(limitedRecommendations);
         }
-      } catch (e2) {
-        _logger.error('Error broadcasting empty recommendations', {'error': e2.toString()});
+      } catch (e) {
+        print('❌ Analytics: Error broadcasting fallback recommendations: $e');
+        _logger.error('Error broadcasting fallback recommendations', {'error': e.toString()});
       }
+    } catch (e) {
+      print('❌ Analytics: Error in _generateFallbackRecommendations: $e');
+      _logger.error('Error generating fallback recommendations', {'error': e.toString()});
     }
   }
 

@@ -97,6 +97,98 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     
     // Ensure profile data is loaded for weight progress and BMI
     _loadUserProfileData();
+    
+    // Force initialize analytics service to generate recommendations
+    _initializeAnalyticsForRecommendations();
+  }
+
+  /// Initialize analytics service to generate recommendations
+  Future<void> _initializeAnalyticsForRecommendations() async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId != null) {
+        print('🔄 Analytics: Initializing analytics service for recommendations...');
+        
+        // Initialize analytics service - don't timeout, let it complete
+        _analyticsService.initializeRealTimeAnalytics(days: 7).then((_) {
+          print('✅ Analytics: Real-time analytics initialized successfully');
+          
+          // Wait a bit for recommendations to generate, then check
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted) {
+              // Check if recommendations were generated
+              final cachedRecs = _analyticsService.cachedRecommendations;
+              if (cachedRecs.isEmpty) {
+                print('⚠️ Analytics: No recommendations after initialization, generating fallback...');
+                // Force generate recommendations directly
+                _forceGenerateRecommendations();
+              } else {
+                print('✅ Analytics: Recommendations found: ${cachedRecs.length} items');
+                setState(() {
+                  _recommendations = cachedRecs;
+                });
+              }
+              
+              // Update today's macro breakdown if available
+              if (_macroBreakdown.totalCalories > 0) {
+                _analyticsService.updateTodayMacroBreakdown(_macroBreakdown);
+                print('📊 Analytics: Updated today\'s macro breakdown for recommendations');
+              }
+            }
+          });
+        }).catchError((e) {
+          print('❌ Analytics: Error initializing real-time analytics: $e');
+          // Generate fallback recommendations on error
+          _forceGenerateRecommendations();
+        });
+      } else {
+        print('⚠️ Analytics: No user ID, generating fallback recommendations');
+        _forceGenerateRecommendations();
+      }
+    } catch (e) {
+      print('❌ Analytics: Error initializing for recommendations: $e');
+      // Generate fallback recommendations on error
+      _forceGenerateRecommendations();
+    }
+  }
+
+  /// Force generate recommendations directly
+  Future<void> _forceGenerateRecommendations() async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId != null) {
+        print('🔄 Analytics: Force generating recommendations...');
+        // Directly call the generation method via updateTodayMacroBreakdown
+        // This will trigger recommendation generation
+        _analyticsService.updateTodayMacroBreakdown(_macroBreakdown);
+        
+        // Also wait a bit and check cache
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            final cachedRecs = _analyticsService.cachedRecommendations;
+            if (cachedRecs.isNotEmpty) {
+              setState(() {
+                _recommendations = cachedRecs;
+              });
+              print('✅ Analytics: Force generated recommendations: ${cachedRecs.length} items');
+            }
+          }
+        });
+      }
+    } catch (e) {
+      print('❌ Analytics: Error force generating recommendations: $e');
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Refresh macro data when screen becomes visible (like home screen)
+    // This ensures the data is up-to-date when navigating to analytics screen
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshMacroDataFromTodaysFood();
+    });
   }
 
   @override
@@ -384,16 +476,53 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         print('📊 Loaded ${_recommendations.length} cached recommendations');
       });
       
-      // Generate recommendations if empty
+      // Generate recommendations if empty or refresh when data is available
       if (_recommendations.isEmpty) {
-        Future.delayed(const Duration(seconds: 2), () {
+        print('📊 Analytics: No recommendations found, generating...');
+        // Force generate recommendations immediately
+        Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted && _recommendations.isEmpty) {
             final userId = FirebaseAuth.instance.currentUser?.uid;
             if (userId != null) {
-              _analyticsService.initializeRealTimeAnalytics(days: 7);
+              print('🔄 Analytics: Initializing real-time analytics for recommendations...');
+              _analyticsService.initializeRealTimeAnalytics(days: 7).then((_) {
+                print('✅ Analytics: Real-time analytics initialized');
+                // Check cache after initialization
+                Future.delayed(const Duration(seconds: 2), () {
+                  if (mounted) {
+                    final cachedRecs = _analyticsService.cachedRecommendations;
+                    if (cachedRecs.isNotEmpty) {
+                      setState(() {
+                        _recommendations = cachedRecs;
+                      });
+                      print('✅ Analytics: Loaded recommendations from cache: ${cachedRecs.length} items');
+                    } else {
+                      print('⚠️ Analytics: Still no recommendations, forcing generation...');
+                      _forceGenerateRecommendations();
+                    }
+                  }
+                });
+              }).catchError((e) {
+                print('❌ Analytics: Error initializing real-time analytics: $e');
+                // Generate fallback on error
+                _forceGenerateRecommendations();
+              });
+            } else {
+              print('⚠️ Analytics: No user ID, generating fallback recommendations');
+              _forceGenerateRecommendations();
             }
           }
         });
+      } else {
+        print('📊 Analytics: Found ${_recommendations.length} cached recommendations');
+        // If we have cached recommendations but data has changed, regenerate
+        // This ensures recommendations stay up-to-date with today's food entries
+        final userId = FirebaseAuth.instance.currentUser?.uid;
+        if (userId != null && _macroBreakdown.totalCalories > 0) {
+          // Update today's macro breakdown to trigger recommendation regeneration
+          _analyticsService.updateTodayMacroBreakdown(_macroBreakdown);
+          print('📊 Analytics: Updated today\'s macro breakdown for recommendations');
+        }
       }
     } catch (e) {
       print('Error setting up real-time listeners: $e');
@@ -452,14 +581,52 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   /// Setup today's food data service for immediate updates
   Future<void> _setupTodaysFoodDataService() async {
     try {
+      // INSTANT: Load cached data BEFORE initialization for fastest UI (like home screen)
+      final cachedCalories = _todaysFoodDataService.getCachedConsumedCalories();
+      final cachedMacros = _todaysFoodDataService.getCachedMacroNutrients();
+      
+      // Update UI immediately with cached data (0ms delay)
+      if (cachedCalories > 0 || cachedMacros.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            // Update consumed calories immediately
+            if (_dailySummaries.isNotEmpty) {
+              final todaySummary = _dailySummaries.last;
+              _dailySummaries[_dailySummaries.length - 1] = todaySummary.copyWith(
+                caloriesConsumed: cachedCalories,
+              );
+            }
+            
+            // Update macro breakdown immediately from cached data
+            if (cachedMacros.isNotEmpty) {
+              _macroBreakdown = MacroBreakdown(
+                protein: cachedMacros['protein'] ?? 0.0,
+                carbs: cachedMacros['carbs'] ?? 0.0,
+                fat: cachedMacros['fat'] ?? 0.0,
+                fiber: cachedMacros['fiber'] ?? 0.0,
+                sugar: cachedMacros['sugar'] ?? 0.0,
+              );
+              
+              // Update analytics service with today's macro breakdown for recommendations
+              _analyticsService.updateTodayMacroBreakdown(_macroBreakdown);
+            }
+          });
+        }
+        print('⚡ Analytics: INSTANT cached data loaded - Calories: $cachedCalories, Protein: ${cachedMacros['protein'] ?? 0.0}g');
+      }
+      
       // Initialize service in background (non-blocking)
       _todaysFoodDataService.initialize().then((_) {
         print('✅ Analytics: Food data service initialized');
+        
+        // Initialize will automatically load today's food entries and update streams
+        // The streams will emit the latest data automatically
       }).catchError((e) {
         print('❌ Analytics: Food data service init error: $e');
       });
       
       // Listen to consumed calories stream (same data as TodaysFoodScreen)
+      _todaysFoodCaloriesSubscription?.cancel(); // Cancel existing subscription first
       _todaysFoodCaloriesSubscription = _todaysFoodDataService.consumedCaloriesStream.listen((calories) {
         if (mounted) {
           // Update the daily summaries with consumed calories from today's food
@@ -490,6 +657,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                 sugar: macros['sugar'] ?? 0.0,
               );
             });
+            
+            // Update analytics service with today's macro breakdown for recommendations
+            _analyticsService.updateTodayMacroBreakdown(_macroBreakdown);
+            
             print('✅ Analytics: Macro breakdown updated from TodaysFoodDataService');
             print('   Protein: ${macros['protein'] ?? 0.0}g, Carbs: ${macros['carbs'] ?? 0.0}g, Fat: ${macros['fat'] ?? 0.0}g');
           }
@@ -514,6 +685,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               setState(() {
                 _macroBreakdown = breakdown;
               });
+              
+              // Update analytics service with today's macro breakdown for recommendations
+              _analyticsService.updateTodayMacroBreakdown(breakdown);
+              
               print('✅ Analytics: Macro breakdown updated from AppStateService');
               print('   Protein: ${breakdown.protein}g, Carbs: ${breakdown.carbs}g, Fat: ${breakdown.fat}g');
             }
@@ -527,6 +702,58 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       print('✅ Today\'s food data service initialized for analytics');
     } catch (e) {
       print('❌ Error initializing today\'s food data service for analytics: $e');
+    }
+  }
+
+  /// Refresh macro data from today's food entries
+  /// This ensures the macro breakdown is always up-to-date with today's food column
+  Future<void> _refreshMacroDataFromTodaysFood() async {
+    try {
+      // Get cached data first for instant update
+      final cachedMacros = _todaysFoodDataService.getCachedMacroNutrients();
+      
+      if (cachedMacros.isNotEmpty && mounted) {
+        setState(() {
+          _macroBreakdown = MacroBreakdown(
+            protein: cachedMacros['protein'] ?? 0.0,
+            carbs: cachedMacros['carbs'] ?? 0.0,
+            fat: cachedMacros['fat'] ?? 0.0,
+            fiber: cachedMacros['fiber'] ?? 0.0,
+            sugar: cachedMacros['sugar'] ?? 0.0,
+          );
+        });
+        print('⚡ Analytics: Macro data refreshed from cached data - Protein: ${cachedMacros['protein'] ?? 0.0}g, Carbs: ${cachedMacros['carbs'] ?? 0.0}g, Fat: ${cachedMacros['fat'] ?? 0.0}g');
+      }
+      
+      // Re-initialize service to reload latest data from today's food entries
+      // This will trigger the stream to emit the latest values
+      await _todaysFoodDataService.initialize().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          print('⚠️ Analytics: Macro data refresh timeout');
+        },
+      );
+      
+      // Get the latest cached data after refresh
+      final latestMacros = _todaysFoodDataService.getCachedMacroNutrients();
+      if (latestMacros.isNotEmpty && mounted) {
+        setState(() {
+          _macroBreakdown = MacroBreakdown(
+            protein: latestMacros['protein'] ?? 0.0,
+            carbs: latestMacros['carbs'] ?? 0.0,
+            fat: latestMacros['fat'] ?? 0.0,
+            fiber: latestMacros['fiber'] ?? 0.0,
+            sugar: latestMacros['sugar'] ?? 0.0,
+          );
+        });
+        
+        // Update analytics service with today's macro breakdown for recommendations
+        _analyticsService.updateTodayMacroBreakdown(_macroBreakdown);
+        
+        print('✅ Analytics: Macro data refreshed from today\'s food - Protein: ${latestMacros['protein'] ?? 0.0}g, Carbs: ${latestMacros['carbs'] ?? 0.0}g, Fat: ${latestMacros['fat'] ?? 0.0}g');
+      }
+    } catch (e) {
+      print('❌ Error refreshing macro data from today\'s food: $e');
     }
   }
 
@@ -3256,7 +3483,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           if (_recommendations.isEmpty)
             _buildEmptyRecommendations()
           else
-            ..._recommendations.map((recommendation) => Column(
+            ..._recommendations.take(5).map((recommendation) => Column(
                   children: [
                     _buildRecommendationItem(
                       recommendation['title']?.toString() ?? 'Recommendation',

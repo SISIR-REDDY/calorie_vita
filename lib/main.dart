@@ -24,23 +24,25 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Initialize logger service first for better debugging
+  // Initialize logger service first for better debugging (minimal delay)
   final logger = LoggerService();
   await logger.initialize();
   logger.info('App starting', {'version': ProductionConfig.appVersion});
 
-  // Initialize performance monitoring
+  // Initialize performance monitoring (minimal delay)
   final performanceMonitor = PerformanceMonitor();
   await performanceMonitor.initialize();
   performanceMonitor.startTimer('app_startup');
 
-  // Initialize network service
+  // Initialize core services in parallel for faster startup
   final networkService = NetworkService();
-  await networkService.initialize();
-
-  // Initialize error handler
   final errorHandler = ErrorHandler();
-  await errorHandler.initialize();
+  
+  // Run network and error handler initialization in parallel (non-blocking)
+  await Future.wait([
+    networkService.initialize(),
+    errorHandler.initialize(),
+  ]);
   
   logger.info('Core services initialized', {
     'performance_monitor': true,
@@ -48,79 +50,94 @@ void main() async {
     'error_handler': true,
   });
 
-  // Initialize Firebase with basic configuration
+  // Initialize Firebase with basic configuration (required for app to work)
   bool firebaseInitialized = false;
   try {
+    // Initialize Firebase in parallel with other operations
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-  // Initialize Firebase services
-  await _initializeFirebaseServices();
-  
-  // Enable Firestore persistence for offline support
-  try {
-    await FirebaseFirestore.instance.enablePersistence();
-    logger.info('Firestore persistence enabled');
-  } catch (e) {
-    logger.warning('Firestore persistence already enabled or not available');
-  }
-
-  // Initialize secure configuration service
-  // Note: Config may fail to load if user is not authenticated (security rules require auth)
-  // The config will be loaded automatically after user authentication via AppStateManager
-  try {
-    await AIConfig.initialize();
-    logger.info('Secure configuration initialization attempted');
+    // Initialize Firebase services (minimal delay)
+    await _initializeFirebaseServices();
     
-    // Log API key source for debugging
-    final apiKey = AIConfig.apiKey;
-    if (apiKey.isNotEmpty) {
-      print('🔑 API Key Status: ${apiKey.length} characters (${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)})');
-      print('   📍 Check FirestoreConfigService logs above to see if it came from Firebase or code');
-    } else {
-      print('⚠️ API Key is EMPTY - will load after user authentication');
-      print('   📌 Security: Config requires authentication (see firestore.rules)');
-      print('   📌 Config will be loaded automatically when user logs in');
-    }
-    
-    // Print feature status report
-    try {
-      await Future.delayed(const Duration(milliseconds: 500)); // Wait for config to load
-      FeatureStatusChecker.printStatusReport();
-    } catch (e) {
-      // Feature status checker not critical, just log
-      logger.debug('Feature status check skipped', {'error': e.toString()});
-    }
-  } catch (e) {
-    // Config load failure is expected if user is not authenticated
-    // It will be loaded automatically after authentication
-    if (e.toString().contains('permission') || e.toString().contains('Permission')) {
-      logger.info('Config load requires authentication - will load after user login');
-      print('ℹ️ Config requires authentication - will load after user login');
-    } else {
-      logger.warning('Secure configuration initialization error', {'error': e.toString()});
-      print('⚠️ Config initialization error: $e (may be due to missing auth)');
-    }
-  }
+    // Enable Firestore persistence in background (non-blocking)
+    FirebaseFirestore.instance.enablePersistence().then((_) {
+      logger.info('Firestore persistence enabled');
+    }).catchError((e) {
+      logger.warning('Firestore persistence already enabled or not available');
+    });
 
-  // Initialize push notification service
-  final pushNotificationService = PushNotificationService();
-  await pushNotificationService.initialize();
-
-  firebaseInitialized = true;
-  logger.info('Firebase initialized successfully');
+    firebaseInitialized = true;
+    logger.info('Firebase initialized successfully');
     performanceMonitor.logEvent('firebase_initialized', {'success': true});
 
-    // Update error handler and logger with Firebase availability
-    await errorHandler.initialize(firebaseAvailable: true);
-    await logger.initialize(firebaseAvailable: true);
+    // Update error handler and logger with Firebase availability in background (non-blocking)
+    Future(() {
+      errorHandler.initialize(firebaseAvailable: true).catchError((e) {
+        logger.warning('Error handler re-initialization error', {'error': e.toString()});
+      });
+      logger.initialize(firebaseAvailable: true).catchError((e) {
+        logger.warning('Logger re-initialization error', {'error': e.toString()});
+      });
+    });
+
+    // Initialize secure configuration service in background (non-blocking)
+    // Note: Config may fail to load if user is not authenticated (security rules require auth)
+    // The config will be loaded automatically after user authentication via AppStateManager
+    AIConfig.initialize().then((_) {
+      logger.info('Secure configuration initialization attempted');
+      
+      // Log API key source for debugging (in background)
+      final apiKey = AIConfig.apiKey;
+      if (apiKey.isNotEmpty) {
+        print('🔑 API Key Status: ${apiKey.length} characters (${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)})');
+        print('   📍 Check FirestoreConfigService logs above to see if it came from Firebase or code');
+      } else {
+        print('⚠️ API Key is EMPTY - will load after user authentication');
+        print('   📌 Security: Config requires authentication (see firestore.rules)');
+        print('   📌 Config will be loaded automatically when user logs in');
+      }
+      
+      // Print feature status report in background (non-blocking, no delay)
+      Future(() {
+        try {
+          FeatureStatusChecker.printStatusReport();
+        } catch (e) {
+          logger.debug('Feature status check skipped', {'error': e.toString()});
+        }
+      });
+    }).catchError((e) {
+      // Config load failure is expected if user is not authenticated
+      // It will be loaded automatically after authentication
+      if (e.toString().contains('permission') || e.toString().contains('Permission')) {
+        logger.info('Config load requires authentication - will load after user login');
+        print('ℹ️ Config requires authentication - will load after user login');
+      } else {
+        logger.warning('Secure configuration initialization error', {'error': e.toString()});
+        print('⚠️ Config initialization error: $e (may be due to missing auth)');
+      }
+    });
+
+    // Initialize push notification service in background (non-blocking)
+    final pushNotificationService = PushNotificationService();
+    pushNotificationService.initialize().then((_) {
+      logger.info('Push notification service initialized');
+    }).catchError((e) {
+      logger.warning('Push notification service initialization error', {'error': e.toString()});
+    });
+
   } catch (e) {
     // If Firebase is already initialized, that's fine
     if (e.toString().contains('duplicate-app')) {
       print('Firebase already initialized, continuing...');
       firebaseInitialized = true;
-      await errorHandler.initialize(firebaseAvailable: true);
+      // Re-initialize error handler in background (non-blocking)
+      Future(() {
+        errorHandler.initialize(firebaseAvailable: true).catchError((err) {
+          logger.warning('Error handler re-initialization error', {'error': err.toString()});
+        });
+      });
     } else {
       logger.error('Firebase initialization error', {'error': e.toString()});
       logger.warning('Continuing without Firebase - app will work in demo mode');

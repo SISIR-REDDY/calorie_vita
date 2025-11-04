@@ -42,7 +42,6 @@ class FeatureStatusChecker {
       'base_url': AIConfig.baseUrl,
       'vision_model': AIConfig.visionModel,
       'backup_vision_model': AIConfig.backupVisionModel,
-      'fallback_vision_model': AIConfig.fallbackVisionModel,
       'chat_model': AIConfig.chatModel,
       'vision_fallback_enabled': AIConfig.visionFallbackEnabled,
       'last_fetch_time': AIConfig.lastFetchTime?.toString() ?? 'Never',
@@ -112,7 +111,6 @@ class FeatureStatusChecker {
       'api_key_configured': AIConfig.apiKey.isNotEmpty,
       'vision_model': AIConfig.visionModel,
       'backup_model': AIConfig.backupVisionModel,
-      'fallback_model': AIConfig.fallbackVisionModel,
       'vision_fallback_enabled': AIConfig.visionFallbackEnabled,
       'retry_attempts': AIConfig.visionRetryAttempts,
       'max_tokens': AIConfig.visionMaxTokens,
@@ -191,9 +189,8 @@ class FeatureStatusChecker {
     // AI Configuration
     print('\n🤖 AI CONFIGURATION:');
     final aiConfig = status['ai_config'] as Map<String, dynamic>;
-    print('   ✅ Vision Model: ${aiConfig['vision_model']}');
-    print('   ✅ Backup Model: ${aiConfig['backup_vision_model']}');
-    print('   ✅ Fallback Model: ${aiConfig['fallback_vision_model']}');
+    print('   ✅ Primary Model: ${aiConfig['vision_model']}');
+    print('   ✅ Fallback Model: ${aiConfig['backup_vision_model']}');
     print('   ✅ Chat Model: ${aiConfig['chat_model']}');
     print('   ${aiConfig['vision_fallback_enabled'] == true ? "✅" : "❌"} Vision Fallback: ${aiConfig['vision_fallback_enabled']}');
     

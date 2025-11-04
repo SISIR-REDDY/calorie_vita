@@ -10,8 +10,8 @@ class ProductionConfig {
   // Enhanced AI Configuration for better accuracy and speed
   static const Map<String, dynamic> aiConfig = {
     'chat_model': 'openai/gpt-3.5-turbo',
-    'vision_model': 'openai/gpt-4o-mini', // Use OpenAI vision model (more reliable)
-    'backup_vision_model': 'openai/gpt-4o-mini', // Reliable fallback
+    'vision_model': 'google/gemini-1.5-flash', // Primary vision model - Gemini 1.5 Flash
+    'backup_vision_model': 'openai/gpt-4o', // Fallback vision model - GPT-4o if Gemini fails
     'max_tokens_chat': 100, // Optimized for speed (60-80 words)
     'max_tokens_vision': 300, // Optimized for faster analysis
     'temperature_chat': 0.7, // Balanced for speed and quality

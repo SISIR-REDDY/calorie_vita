@@ -74,16 +74,16 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
         return;
       }
 
-      // Show warning after a short delay to ensure UI is ready
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      if (mounted && !_hasShownSetupWarning) {
-        setState(() {
-          _hasShownSetupWarning = true;
-        });
-        
-        _showSetupWarning();
-      }
+      // Show warning after a delay to ensure UI is ready (non-blocking)
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted && !_hasShownSetupWarning) {
+          setState(() {
+            _hasShownSetupWarning = true;
+          });
+          
+          _showSetupWarning();
+        }
+      });
     } catch (e) {
       print('Error checking setup warning: $e');
     }
