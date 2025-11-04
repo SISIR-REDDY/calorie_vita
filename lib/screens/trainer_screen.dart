@@ -245,6 +245,16 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     }
 
     try {
+      // Update modal if it's open to show loading state
+      if (_currentModalState != null && mounted) {
+        try {
+          _currentModalState!(() {});
+        } catch (e) {
+          print('Error updating modal state: $e');
+          _currentModalState = null;
+        }
+      }
+      
       // Use the enhanced chat history manager
       final history = await _chatHistoryManager.getChatHistory(
         forceRefresh: forceRefresh,
@@ -286,6 +296,18 @@ class _AITrainerScreenState extends State<AITrainerScreen>
           chatSessions = sessions;
           // _lastHistoryLoad removed - unused field
         });
+        // Update ValueNotifier to refresh modal if it's open
+        _chatSessionsNotifier.value = List.from(sessions);
+        
+        // Update modal state to trigger rebuild
+        if (_currentModalState != null) {
+          try {
+            _currentModalState!(() {});
+          } catch (e) {
+            print('Error updating modal state: $e');
+            _currentModalState = null;
+          }
+        }
       }
 
       print('Chat history loaded: ${sessions.length} sessions');
@@ -296,6 +318,15 @@ class _AITrainerScreenState extends State<AITrainerScreen>
         setState(() {
           isLoadingHistory = false;
         });
+        // Update modal state to hide loading indicator
+        if (_currentModalState != null) {
+          try {
+            _currentModalState!(() {});
+          } catch (e) {
+            print('Error updating modal state: $e');
+            _currentModalState = null;
+          }
+        }
       }
     }
   }
@@ -361,10 +392,34 @@ class _AITrainerScreenState extends State<AITrainerScreen>
             chatSessions = chatSessions.take(10).toList();
           }
         });
+        // Update ValueNotifier to refresh modal if it's open
+        _chatSessionsNotifier.value = List.from(chatSessions);
       }
       
       // Use ChatHistoryManager for consistent storage
-      await _chatHistoryManager.saveChatSession(session.toMap());
+      try {
+        await _chatHistoryManager.saveChatSession(session.toMap());
+        print('✅ Chat session saved successfully: $sessionId');
+      } catch (e, stackTrace) {
+        print('❌ Error saving chat session to Firebase: $e');
+        print('Stack trace: $stackTrace');
+        // Show error message to user
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error saving chat to Firebase: ${e.toString()}'),
+              backgroundColor: Colors.red[600],
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+        // Re-throw to indicate failure
+        rethrow;
+      }
       
       // Update modal if it's open and still mounted
       if (_currentModalState != null && mounted) {
@@ -381,19 +436,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
 
     } catch (e) {
       print('Error preparing chat session: $e');
-      // Show error message to user
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving chat: $e'),
-            backgroundColor: Colors.red[600],
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
-      }
+      // Error already shown above if it was a Firebase error
     }
   }
 
@@ -434,6 +477,8 @@ class _AITrainerScreenState extends State<AITrainerScreen>
             chatSessions = chatSessions.take(10).toList();
           }
         });
+        // Update ValueNotifier to refresh modal if it's open
+        _chatSessionsNotifier.value = List.from(chatSessions);
       }
       
       // Use ChatHistoryManager for consistent storage (silently)
@@ -623,6 +668,11 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     // Check if user has changed and reload if needed
     _checkUserAndReloadHistory();
     
+    // If chat sessions are empty and not currently loading, try to load history
+    if (chatSessions.isEmpty && !isLoadingHistory) {
+      _loadChatHistory(forceRefresh: true);
+    }
+    
     // Initialize ValueNotifier with current chatSessions
     _chatSessionsNotifier.value = List.from(chatSessions);
     
@@ -642,9 +692,6 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       // Clear the modal state reference when modal is dismissed
       _currentModalState = null;
     });
-
-    // Don't reload chat history when popup opens to preserve current state
-    // The chatSessions list already contains the most recent data
   }
 
   Widget _buildHistoryBottomSheet([StateSetter? setModalState]) {
@@ -737,19 +784,31 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       return _buildPremiumLockScreen();
     }
 
-    // Show empty state immediately if no data (no loading state for empty)
-    // Force loading state to false when showing empty state
+    // Show loading state while fetching history
+    if (isLoadingHistory && chatSessions.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text(
+                'Loading chat history...',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show empty state if no data and not loading
     if (chatSessions.isEmpty) {
-      // Ensure no loading state when showing empty
-      if (isLoadingHistory) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            setState(() {
-              isLoadingHistory = false;
-            });
-          }
-        });
-      }
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

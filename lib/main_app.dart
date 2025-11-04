@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'screens/home_screen.dart';
@@ -34,6 +35,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   final OptimizedGoogleFitManager _googleFitManager = OptimizedGoogleFitManager();
   static final LoggerService _logger = LoggerService();
   bool _hasShownSetupWarning = false;
+  StreamSubscription<AppState>? _appStateSubscription;
 
   @override
   void initState() {
@@ -81,7 +83,9 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
             _hasShownSetupWarning = true;
           });
           
-          _showSetupWarning();
+          if (mounted) {
+            _showSetupWarning();
+          }
         }
       });
     } catch (e) {
@@ -118,7 +122,8 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
       await _appStateManager.initialize();
 
       // Listen to app state changes
-      _appStateManager.stateStream.listen((state) {
+      _appStateSubscription?.cancel();
+      _appStateSubscription = _appStateManager.stateStream.listen((state) {
         print(
             'AppStateManager state change: userId=${state.currentUserId}, initialized=${state.isInitialized}');
         if (mounted) {
@@ -160,8 +165,8 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
         print('⏸️ App paused - Google Fit will continue in background');
         break;
       case AppLifecycleState.detached:
-        print('🔌 App detached - Cleaning up Google Fit resources...');
-        _googleFitManager.dispose();
+        print('🔌 App detached - Note: Google Fit manager is singleton, not disposing');
+        // Don't dispose singleton managers here - they may be used elsewhere
         break;
       case AppLifecycleState.inactive:
         print('⏸️ App inactive - Google Fit sync paused');
@@ -174,6 +179,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _appStateSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

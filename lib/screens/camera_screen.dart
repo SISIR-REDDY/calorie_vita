@@ -186,14 +186,18 @@ class _CameraScreenState extends State<CameraScreen> {
     } catch (e, stackTrace) {
       print('❌ Error in image picker: $e');
       print('Stack trace: $stackTrace');
-      setState(() {
-        _error = "Couldn't capture or analyze image: ${e.toString()}. Please try again or add food manually.";
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = "Couldn't capture or analyze image: ${e.toString()}. Please try again or add food manually.";
+          _loading = false;
+        });
+      }
     } finally {
-      setState(() {
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -318,14 +322,18 @@ class _CameraScreenState extends State<CameraScreen> {
         
       } catch (e) {
         print('❌ Barcode processing error: $e');
-        setState(() {
-          _error = "Couldn't fetch product info. Try again.";
-        });
+        if (mounted) {
+          setState(() {
+            _error = "Couldn't fetch product info. Try again.";
+          });
+        }
       } finally {
-        setState(() {
-          _loading = false;
-          _barcodeProcessing = false; // Reset processing flag
-        });
+        if (mounted) {
+          setState(() {
+            _loading = false;
+            _barcodeProcessing = false; // Reset processing flag
+          });
+        }
       }
     }
   }

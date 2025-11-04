@@ -51,6 +51,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   Timer? _profileUpdateTimer;
 
   // Stream subscriptions
+  StreamSubscription<List<DailySummary>>? _dailySummariesSubscription;
   StreamSubscription<Map<String, dynamic>?>? _profileDataSubscription;
   StreamSubscription<MacroBreakdown>? _fastMacroBreakdownSubscription; // Changed from Map to MacroBreakdown
   StreamSubscription<UserGoals?>? _goalsSubscription;
@@ -193,6 +194,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
   @override
   void dispose() {
+    _dailySummariesSubscription?.cancel();
     _profileDataSubscription?.cancel();
     _fastMacroBreakdownSubscription?.cancel();
     _goalsSubscription?.cancel();
@@ -387,13 +389,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   void _setupRealTimeListeners() {
     try {
       // Listen to daily summaries with error handling
-      _analyticsService.dailySummariesStream.listen((summaries) {
+      _dailySummariesSubscription?.cancel();
+      _dailySummariesSubscription = _analyticsService.dailySummariesStream.listen((summaries) {
         if (mounted) {
           setState(() {
             _dailySummaries = summaries;
           });
         }
-      }).onError((error) => print('Daily summaries stream error: $error'));
+      }, onError: (error) => print('Daily summaries stream error: $error'));
 
       // Note: Macro breakdown is handled by TodaysFoodDataService for real-time updates
 

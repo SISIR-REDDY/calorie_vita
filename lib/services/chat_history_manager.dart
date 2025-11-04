@@ -69,16 +69,21 @@ class ChatHistoryManager {
         final messages = data['messages'] as List<dynamic>? ?? [];
         final firstMessage = messages.isNotEmpty ? messages.first : {};
         
-        // Convert DateTime to timestamp for serialization
-        final timestamp = data['timestamp'] is int 
-            ? data['timestamp']
-            : DateTime.now().millisecondsSinceEpoch;
+        // Convert timestamp to int (milliseconds) for serialization
+        int timestamp;
+        if (data['timestamp'] is Timestamp) {
+          timestamp = (data['timestamp'] as Timestamp).millisecondsSinceEpoch;
+        } else if (data['timestamp'] is int) {
+          timestamp = data['timestamp'] as int;
+        } else {
+          timestamp = DateTime.now().millisecondsSinceEpoch;
+        }
         
         return {
           'id': doc.id,
           'sender': firstMessage['sender'] ?? 'user',
           'text': firstMessage['text'] ?? data['title'] ?? '',
-          'timestamp': timestamp, // Store as int for cache serialization
+          'timestamp': timestamp, // Store as int (milliseconds) for cache serialization
           'sessionId': doc.id,
           'isFromCache': false,
           'title': data['title'] ?? '',
@@ -175,15 +180,36 @@ class ChatHistoryManager {
   /// Save a new chat session with immediate cache update
   Future<void> saveChatSession(Map<String, dynamic> sessionData) async {
     final user = _auth.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      print('ERROR: Cannot save chat session - user is not authenticated');
+      return;
+    }
 
     try {
+      print('Saving chat session to Firebase: ${sessionData['id']}');
+      
+      // Prepare data for Firebase - convert timestamp int to Timestamp if needed
+      final firebaseData = Map<String, dynamic>.from(sessionData);
+      
+      // Convert timestamp from int (milliseconds) to DateTime, then to Firestore Timestamp
+      if (firebaseData['timestamp'] is int) {
+        final timestampMs = firebaseData['timestamp'] as int;
+        firebaseData['timestamp'] = Timestamp.fromMillisecondsSinceEpoch(timestampMs);
+      }
+      
+      // Ensure userId is set
+      if (firebaseData['userId'] == null || firebaseData['userId'] == '') {
+        firebaseData['userId'] = user.uid;
+      }
+      
       // Add to Firebase using the same collection as trainer_screen.dart
       await _firestore
           .collection('chat_sessions')
           .doc(sessionData['id'])
-          .set(sessionData)
+          .set(firebaseData, SetOptions(merge: false))
           .timeout(const Duration(seconds: 5));
+
+      print('✅ Chat session saved successfully to Firebase: ${sessionData['id']}');
 
       // Update local cache immediately
       final newSession = {
@@ -203,8 +229,10 @@ class ChatHistoryManager {
       // Save updated cache
       await _saveToCache(_cachedSessions);
       
-    } catch (e) {
-      print('Error saving chat session: $e');
+    } catch (e, stackTrace) {
+      print('❌ ERROR saving chat session to Firebase: $e');
+      print('Stack trace: $stackTrace');
+      print('Session data: ${sessionData.toString()}');
       
       // Still add to cache for offline support
       final newSession = {
@@ -215,6 +243,9 @@ class ChatHistoryManager {
       _cachedSessions.removeWhere((s) => s['id'] == sessionData['id']);
       _cachedSessions.insert(0, newSession);
       await _saveToCache(_cachedSessions);
+      
+      // Re-throw to let caller know it failed
+      rethrow;
     }
   }
 

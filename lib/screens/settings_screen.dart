@@ -43,8 +43,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _profileImageUrl;
   UserPreferences _userPreferences = const UserPreferences();
 
-  // Stream subscription for profile data
+  // Stream subscriptions
   StreamSubscription<DocumentSnapshot>? _profileSubscription;
+  StreamSubscription<User?>? _userSubscription;
+  StreamSubscription<User?>? _authStateSubscription;
+  StreamSubscription<UserPreferences>? _preferencesSubscription;
 
   // Settings state variables
 
@@ -1357,6 +1360,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void dispose() {
     _profileSubscription?.cancel();
+    _userSubscription?.cancel();
+    _authStateSubscription?.cancel();
+    _preferencesSubscription?.cancel();
     super.dispose();
   }
 }
