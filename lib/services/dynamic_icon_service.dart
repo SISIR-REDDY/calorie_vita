@@ -1037,7 +1037,7 @@ class DynamicIconService {
       'health': '❤️',
       'hospital': '🏥',
       'appointment': '📅',
-      'meeting': '👥',
+      'conference': '👥', // Changed from duplicate 'meeting'
       'party': '🎉',
       'celebration': '🎊',
       'birthday': '🎂',

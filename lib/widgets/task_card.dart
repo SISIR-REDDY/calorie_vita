@@ -11,12 +11,12 @@ class TaskCard extends StatefulWidget {
   final bool showActions;
 
   const TaskCard({
-    Key? key,
+    super.key,
     required this.task,
     required this.onToggleCompletion,
     required this.onDelete,
     this.showActions = true,
-  }) : super(key: key);
+  });
 
   @override
   State<TaskCard> createState() => _TaskCardState();
@@ -89,7 +89,7 @@ class _TaskCardState extends State<TaskCard> with SingleTickerProviderStateMixin
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 12 : 16),
             child: Row(
               children: [
                 _buildCompletionIndicator(),
@@ -287,9 +287,9 @@ class EmptyTasksWidget extends StatelessWidget {
   final VoidCallback onAddTask;
 
   const EmptyTasksWidget({
-    Key? key,
+    super.key,
     required this.onAddTask,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -359,9 +359,9 @@ class ExampleTasksWidget extends StatelessWidget {
   final VoidCallback onAddTask;
 
   const ExampleTasksWidget({
-    Key? key,
+    super.key,
     required this.onAddTask,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -380,7 +380,7 @@ class ExampleTasksWidget extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.lightbulb_outline,
                 color: kAccentColor,
                 size: 20,
@@ -425,7 +425,7 @@ class ExampleTasksWidget extends StatelessWidget {
                 ),
               ],
             ),
-          )).toList(),
+          )),
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: onAddTask,

@@ -38,9 +38,15 @@ class TodaysFoodDataService {
     }
     
     // Listen to today's food entries stream (same as TodaysFoodScreen)
-    _foodEntriesSubscription = FoodHistoryService.getTodaysFoodEntriesStream().listen((entries) {
-      calculateAndUpdateData(entries);
-    });
+    _foodEntriesSubscription?.cancel(); // Cancel existing subscription first
+    _foodEntriesSubscription = FoodHistoryService.getTodaysFoodEntriesStream().listen(
+      (entries) {
+        calculateAndUpdateData(entries);
+      },
+      onError: (error) {
+        print('❌ TodaysFoodDataService: Error in food entries stream: $error');
+      },
+    );
   }
 
   /// Calculate consumed calories and macro nutrients from food entries

@@ -33,7 +33,6 @@ class DailySummaryService {
 
   // Current daily summary cache
   DailySummary? _currentDailySummary;
-  DateTime? _lastUpdateDate;
 
   /// Initialize the service
   Future<void> initialize() async {
@@ -54,25 +53,31 @@ class DailySummaryService {
     return _firestore
         .collection('users')
         .doc(userId)
-        .collection('daily_summaries')
+        .collection('dailySummary')
         .doc(dateKey)
         .snapshots()
         .map((doc) {
       if (doc.exists) {
-        final data = doc.data()!;
-        final summary = DailySummary.fromMap(data);
-        _currentDailySummary = summary;
-        _lastUpdateDate = today;
-        _dailySummaryController.add(summary);
-        return summary;
-      } else {
-        // Create default summary for today
-        final defaultSummary = _createDefaultSummary(today);
-        _currentDailySummary = defaultSummary;
-        _lastUpdateDate = today;
-        _dailySummaryController.add(defaultSummary);
-        return defaultSummary;
+        try {
+          final data = doc.data()!;
+          final summary = DailySummary.fromMap(data);
+          _currentDailySummary = summary;
+          if (!_dailySummaryController.isClosed) {
+            _dailySummaryController.add(summary);
+          }
+          return summary;
+        } catch (e) {
+          _errorHandler.handleDataError('parse_daily_summary', e);
+          // Fall through to default
+        }
       }
+      // Create default summary for today
+      final defaultSummary = _createDefaultSummary(today);
+      _currentDailySummary = defaultSummary;
+      if (!_dailySummaryController.isClosed) {
+        _dailySummaryController.add(defaultSummary);
+      }
+      return defaultSummary;
     }).handleError((error) {
       _errorHandler.handleFirebaseError('getTodaySummary', error);
       return _createDefaultSummary(today);
@@ -106,10 +111,11 @@ class DailySummaryService {
       final docRef = _firestore
           .collection('users')
           .doc(userId)
-          .collection('daily_summaries')
+          .collection('dailySummary')
           .doc(dateKey);
 
       await docRef.set({
+        'date': today.millisecondsSinceEpoch,
         'caloriesBurned': FieldValue.increment(caloriesBurned),
         'exerciseMinutes': FieldValue.increment(durationMinutes),
         'exerciseType': exerciseType,
@@ -160,10 +166,11 @@ class DailySummaryService {
       final docRef = _firestore
           .collection('users')
           .doc(userId)
-          .collection('daily_summaries')
+          .collection('dailySummary')
           .doc(dateKey);
 
       await docRef.set({
+        'date': today.millisecondsSinceEpoch,
         'steps': steps,
         'lastUpdated': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -200,7 +207,7 @@ class DailySummaryService {
       final docRef = _firestore
           .collection('users')
           .doc(userId)
-          .collection('daily_summaries')
+          .collection('dailySummary')
           .doc(dateKey);
 
       // Get current summary
@@ -211,6 +218,7 @@ class DailySummaryService {
           (currentSummary['caloriesConsumed'] ?? 0) + foodEntry.calories;
 
       await docRef.set({
+        'date': today.millisecondsSinceEpoch,
         'caloriesConsumed': newCaloriesConsumed,
         'lastMealLogged': FieldValue.serverTimestamp(),
         'lastUpdated': FieldValue.serverTimestamp(),
@@ -262,10 +270,11 @@ class DailySummaryService {
       final docRef = _firestore
           .collection('users')
           .doc(userId)
-          .collection('daily_summaries')
+          .collection('dailySummary')
           .doc(dateKey);
 
       await docRef.set({
+        'date': today.millisecondsSinceEpoch,
         'weight': weight,
         'bmi': bmi,
         'lastWeightUpdate': FieldValue.serverTimestamp(),
@@ -296,10 +305,11 @@ class DailySummaryService {
       final docRef = _firestore
           .collection('users')
           .doc(userId)
-          .collection('daily_summaries')
+          .collection('dailySummary')
           .doc(dateKey);
 
       await docRef.set({
+        'date': today.millisecondsSinceEpoch,
         'caloriesGoal': goals.calorieGoal ?? 2000,
         'waterGoal': goals.waterGlassesGoal ?? 8,
         'stepsGoal': goals.stepsPerDayGoal ?? 10000,
@@ -322,7 +332,7 @@ class DailySummaryService {
     }
   }
 
-  /// Get historical daily summaries
+  /// Get historical daily summaries - ONLY real data (not empty summaries)
   Stream<List<DailySummary>> getHistoricalSummaries(String userId,
       {int days = 7}) {
     final endDate = DateTime.now();
@@ -331,19 +341,85 @@ class DailySummaryService {
     return _firestore
         .collection('users')
         .doc(userId)
-        .collection('daily_summaries')
+        .collection('dailySummary')
         .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
         .where('date', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
         .orderBy('date', descending: true)
         .snapshots()
         .map((snapshot) {
+      // Filter to only include summaries with actual data (calories consumed > 0)
       return snapshot.docs
           .map((doc) => DailySummary.fromMap(doc.data()))
+          .where((summary) => summary.caloriesConsumed > 0) // Only real data
           .toList();
     }).handleError((error) {
       _errorHandler.handleFirebaseError('getHistoricalSummaries', error);
       return <DailySummary>[];
     });
+  }
+  
+  /// Clean up old dailySummary data (older than 7 days) to save space
+  Future<void> cleanupOldDailySummaryData(String userId) async {
+    try {
+      final now = DateTime.now();
+      final cutoffDate = now.subtract(const Duration(days: 7));
+      
+      // Get all dailySummary documents
+      final allSummaries = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('dailySummary')
+          .get();
+
+      final batch = _firestore.batch();
+      int deletedCount = 0;
+
+      for (final doc in allSummaries.docs) {
+        try {
+          final data = doc.data();
+          final dateValue = data['date'];
+          
+          DateTime? summaryDate;
+          if (dateValue is Timestamp) {
+            summaryDate = dateValue.toDate();
+          } else if (dateValue is DateTime) {
+            summaryDate = dateValue;
+          } else {
+            // Try to parse from document ID (format: YYYY-MM-DD)
+            try {
+              final parts = doc.id.split('-');
+              if (parts.length == 3) {
+                summaryDate = DateTime(
+                  int.parse(parts[0]),
+                  int.parse(parts[1]),
+                  int.parse(parts[2]),
+                );
+              }
+            } catch (_) {
+              // Skip if can't parse
+              continue;
+            }
+          }
+
+          // Delete if older than 7 days
+          if (summaryDate != null && summaryDate.isBefore(cutoffDate)) {
+            batch.delete(doc.reference);
+            deletedCount++;
+          }
+        } catch (e) {
+          print('Error processing summary document ${doc.id}: $e');
+          // Continue with other documents
+        }
+      }
+
+      if (deletedCount > 0) {
+        await batch.commit();
+        print('✅ Cleaned up $deletedCount old dailySummary documents (older than 7 days)');
+      }
+    } catch (e) {
+      _errorHandler.handleDataError('cleanup_old_daily_summary', e);
+      // Don't throw - cleanup failure shouldn't break the app
+    }
   }
 
   /// Get current summary data
@@ -353,7 +429,7 @@ class DailySummaryService {
       final doc = await _firestore
           .collection('users')
           .doc(userId)
-          .collection('daily_summaries')
+          .collection('dailySummary')
           .doc(dateKey)
           .get();
 
@@ -375,10 +451,11 @@ class DailySummaryService {
       final docRef = _firestore
           .collection('users')
           .doc(userId)
-          .collection('daily_summaries')
+          .collection('dailySummary')
           .doc(dateKey);
 
       await docRef.set({
+        'date': today.millisecondsSinceEpoch,
         'caloriesConsumed': updatedSummary.caloriesConsumed,
         'caloriesBurned': updatedSummary.caloriesBurned,
         'steps': updatedSummary.steps,
@@ -400,7 +477,7 @@ class DailySummaryService {
     }
   }
 
-  /// Update local summary cache
+  /// Update local summary cache (optimized - non-blocking)
   Future<void> _updateLocalSummary(
       String userId, Map<String, dynamic> updates) async {
     if (_currentDailySummary == null) return;
@@ -417,14 +494,18 @@ class DailySummaryService {
     );
 
     _currentDailySummary = updatedSummary;
-    _dailySummaryController.add(updatedSummary);
+    if (!_dailySummaryController.isClosed) {
+      _dailySummaryController.add(updatedSummary);
+    }
 
     // Emit progress update
-    _progressController.add({
-      'calorieProgress': updatedSummary.calorieProgress,
-      'stepsProgress': updatedSummary.stepsProgress,
-      'overallProgress': updatedSummary.overallProgress,
-    });
+    if (!_progressController.isClosed) {
+      _progressController.add({
+        'calorieProgress': updatedSummary.calorieProgress,
+        'stepsProgress': updatedSummary.stepsProgress,
+        'overallProgress': updatedSummary.overallProgress,
+      });
+    }
   }
 
   /// Create default summary for a date
@@ -460,7 +541,6 @@ class DailySummaryService {
   void _performDailyReset() {
     // Reset daily summary cache
     _currentDailySummary = null;
-    _lastUpdateDate = null;
 
     // Emit reset event
     _progressController.add({

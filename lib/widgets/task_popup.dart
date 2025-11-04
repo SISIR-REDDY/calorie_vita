@@ -9,10 +9,10 @@ class TaskPopup extends StatefulWidget {
   final String? initialTitle;
 
   const TaskPopup({
-    Key? key,
+    super.key,
     required this.onAddTask,
     this.initialTitle,
-  }) : super(key: key);
+  });
 
   @override
   State<TaskPopup> createState() => _TaskPopupState();

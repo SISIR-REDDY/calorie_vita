@@ -6,6 +6,7 @@ import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
 import '../models/user_achievement.dart';
 import 'firebase_service.dart';
+import 'logger_service.dart';
 
 class AnalyticsService {
   static final AnalyticsService _instance = AnalyticsService._internal();
@@ -15,6 +16,7 @@ class AnalyticsService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseService _firebaseService = FirebaseService();
+  final LoggerService _logger = LoggerService();
 
   // Stream controllers for real-time updates (recreated if closed)
   StreamController<List<DailySummary>>? _dailySummariesController;
@@ -22,6 +24,7 @@ class AnalyticsService {
   StreamController<List<UserAchievement>>? _achievementsController;
   StreamController<List<Map<String, dynamic>>>? _insightsController;
   StreamController<List<Map<String, dynamic>>>? _recommendationsController;
+  StreamController<Map<String, dynamic>>? _weeklyStatsController;
 
   // Getter methods that ensure controllers exist and are not closed
   StreamController<List<DailySummary>> get _ensureDailySummariesController {
@@ -64,6 +67,13 @@ class AnalyticsService {
     return _recommendationsController!;
   }
 
+  StreamController<Map<String, dynamic>> get _ensureWeeklyStatsController {
+    if (_weeklyStatsController == null || _weeklyStatsController!.isClosed) {
+      _weeklyStatsController = StreamController<Map<String, dynamic>>.broadcast();
+    }
+    return _weeklyStatsController!;
+  }
+
   // Streams for real-time data
   Stream<List<DailySummary>> get dailySummariesStream =>
       _ensureDailySummariesController.stream;
@@ -75,6 +85,8 @@ class AnalyticsService {
       _ensureInsightsController.stream;
   Stream<List<Map<String, dynamic>>> get recommendationsStream =>
       _ensureRecommendationsController.stream;
+  Stream<Map<String, dynamic>> get weeklyStatsStream =>
+      _ensureWeeklyStatsController.stream;
 
   // Cache for offline support
   List<DailySummary> _cachedDailySummaries = [];
@@ -99,7 +111,7 @@ class AnalyticsService {
   Future<void> initializeRealTimeAnalytics({int days = 7}) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) {
-      print('No authenticated user for analytics initialization');
+      _logger.warning('No authenticated user for analytics initialization');
       return;
     }
 
@@ -107,7 +119,7 @@ class AnalyticsService {
     await _cancelExistingListeners();
 
     try {
-      print('Setting up analytics listeners for user: $userId');
+      _logger.info('Setting up analytics listeners', {'userId': userId});
 
       // Ensure stream controllers are available
       _ensureDailySummariesController;
@@ -115,35 +127,36 @@ class AnalyticsService {
       _ensureAchievementsController;
       _ensureInsightsController;
       _ensureRecommendationsController;
+      _ensureWeeklyStatsController;
 
       // Set up real-time listeners with timeouts
       await Future.wait([
         _setupFoodEntriesListener(userId, days).timeout(
             const Duration(seconds: 3),
-            onTimeout: () => print('Food entries listener setup timed out')),
+            onTimeout: () => _logger.warning('Food entries listener setup timed out')),
         _setupAchievementsListener(userId).timeout(const Duration(seconds: 2),
-            onTimeout: () => print('Achievements listener setup timed out')),
+            onTimeout: () => _logger.warning('Achievements listener setup timed out')),
         _setupWeightHistoryListener(userId).timeout(const Duration(seconds: 2),
-            onTimeout: () => print('Weight history listener setup timed out')),
+            onTimeout: () => _logger.warning('Weight history listener setup timed out')),
       ]);
 
-      print('Analytics listeners set up successfully');
+      _logger.info('Analytics listeners set up successfully');
 
       // Generate initial insights and recommendations with timeout (non-blocking)
       _generateInsights(userId)
           .timeout(const Duration(seconds: 3),
-              onTimeout: () => print('Insights generation timed out'))
-          .catchError((error) => print('Error generating insights: $error'));
+              onTimeout: () => _logger.warning('Insights generation timed out'))
+          .catchError((error) => _logger.error('Error generating insights', {'error': error.toString()}));
 
       _generateRecommendations(userId)
           .timeout(const Duration(seconds: 3),
-              onTimeout: () => print('Recommendations generation timed out'))
+              onTimeout: () => _logger.warning('Recommendations generation timed out'))
           .catchError(
-              (error) => print('Error generating recommendations: $error'));
+              (error) => _logger.error('Error generating recommendations', {'error': error.toString()}));
 
-      print('Analytics initialization completed');
+      _logger.info('Analytics initialization completed');
     } catch (e) {
-      print('Error during analytics initialization: $e');
+      _logger.error('Error during analytics initialization', {'error': e.toString()});
       // Don't throw - let the app continue with empty data
     }
   }
@@ -159,9 +172,9 @@ class AnalyticsService {
       _achievementsSubscription = null;
       _weightHistorySubscription = null;
 
-      print('Existing analytics listeners cancelled');
+      _logger.debug('Existing analytics listeners cancelled');
     } catch (e) {
-      print('Error cancelling existing listeners: $e');
+      _logger.error('Error cancelling existing listeners', {'error': e.toString()});
     }
   }
 
@@ -179,9 +192,18 @@ class AnalyticsService {
         .where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
         .orderBy('timestamp', descending: false)
         .snapshots()
-        .listen((snapshot) async {
-      await _processFoodEntriesUpdate(snapshot, days);
-    });
+        .listen(
+          (snapshot) async {
+            try {
+              await _processFoodEntriesUpdate(snapshot, days);
+            } catch (e) {
+              _logger.error('Error processing food entries update', {'error': e.toString()});
+            }
+          },
+          onError: (error) {
+            _logger.error('Food entries listener error', {'error': error.toString()});
+          },
+        );
   }
 
   /// Process food entries update
@@ -200,14 +222,18 @@ class AnalyticsService {
       entriesByDate.putIfAbsent(dateKey, () => []).add(doc);
     }
 
-    // Generate daily summaries
+    // Generate daily summaries for a continuous window (include zero days)
     final List<DailySummary> summaries = [];
     final endDate = DateTime.now();
     final startDate = endDate.subtract(Duration(days: days - 1));
 
+    // Track which dates have entries
+    final datesWithData = entriesByDate.keys.toSet();
+    
     for (int i = 0; i < days; i++) {
       final date = startDate.add(Duration(days: i));
-      final dateKey = '${date.year}-${date.month}-${date.day}';
+      final dateKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      
       final dayEntries = entriesByDate[dateKey] ?? [];
 
       final caloriesConsumed = dayEntries.fold(0, (sum, doc) {
@@ -241,18 +267,25 @@ class AnalyticsService {
         caloriesGoal: userGoals['caloriesGoal'] ?? 2000,
         steps: actualSteps,
         stepsGoal: userGoals['stepsGoal'] ?? 10000,
-        waterGlasses: 0, // This should be tracked from user input
+        waterGlasses: 0, // If tracked elsewhere, will be merged when available
         waterGlassesGoal: userGoals['waterGlassesGoal'] ?? 8,
         date: date,
         macroBreakdown: macros, // Pass the calculated macro data
       ));
     }
+    
+    // Clean up old dailySummary data (older than 7 days) - non-blocking
+    _cleanupOldDailySummaryData(userId).catchError((e) {
+      _logger.warning('Cleanup error (non-blocking)', {'error': e.toString()});
+    });
 
     _cachedDailySummaries = summaries;
     try {
-      _ensureDailySummariesController.add(summaries);
+      if (!_ensureDailySummariesController.isClosed) {
+        _ensureDailySummariesController.add(summaries);
+      }
     } catch (e) {
-      print('Error broadcasting daily summaries: $e');
+      _logger.error('Error broadcasting daily summaries', {'error': e.toString()});
     }
 
     // Update macro breakdown
@@ -262,14 +295,60 @@ class AnalyticsService {
     );
     _cachedMacroBreakdown = totalMacros;
     try {
-      _ensureMacroBreakdownController.add(totalMacros);
+      if (!_ensureMacroBreakdownController.isClosed) {
+        _ensureMacroBreakdownController.add(totalMacros);
+      }
     } catch (e) {
-      print('Error broadcasting macro breakdown: $e');
+      _logger.error('Error broadcasting macro breakdown', {'error': e.toString()});
     }
 
     // Regenerate insights and recommendations
     await _generateInsights(userId);
     await _generateRecommendations(userId);
+
+    // Broadcast weekly stats (calories, steps, workout sessions)
+    try {
+      final endDate = DateTime.now();
+      final startDate = endDate.subtract(Duration(days: days - 1));
+      final calories = <int>[];
+      final steps = <int>[];
+      final workouts = <int>[];
+
+      for (int i = 0; i < days; i++) {
+        final date = startDate.add(Duration(days: i));
+        final ds = summaries.firstWhere(
+          (s) => _sameDay(s.date, date),
+          orElse: () => DailySummary(
+            caloriesConsumed: 0,
+            caloriesBurned: 0,
+            caloriesGoal: 2000,
+            steps: 0,
+            stepsGoal: 10000,
+            waterGlasses: 0,
+            waterGlassesGoal: 8,
+            date: date,
+          ),
+        );
+
+        final exerciseMinutes = await _getActualExerciseMinutes(userId, date);
+        calories.add(ds.caloriesConsumed);
+        steps.add(ds.steps);
+        workouts.add((exerciseMinutes > 0 || ds.caloriesBurned > 0) ? 1 : 0);
+      }
+
+      final payload = {
+        'startDate': startDate,
+        'endDate': endDate,
+        'calories': calories,
+        'steps': steps,
+        'workoutSessions': workouts,
+      };
+      if (!_ensureWeeklyStatsController.isClosed) {
+        _ensureWeeklyStatsController.add(payload);
+      }
+    } catch (e) {
+      print('Error broadcasting weekly stats: $e');
+    }
   }
 
   /// Set up achievements listener
@@ -280,32 +359,37 @@ class AnalyticsService {
         .collection('profile')
         .doc('achievements')
         .snapshots()
-        .listen((snapshot) async {
-      if (snapshot.exists) {
-        final data = snapshot.data() ?? {};
-        final achievements = <UserAchievement>[];
+        .listen(
+          (snapshot) async {
+            try {
+              if (snapshot.exists) {
+                final data = snapshot.data() ?? {};
+                final achievements = <UserAchievement>[];
 
-        for (final achievementData in data['achievements'] ?? []) {
-          achievements.add(UserAchievement.fromJson(achievementData));
-        }
+                for (final achievementData in data['achievements'] ?? []) {
+                  achievements.add(UserAchievement.fromJson(achievementData));
+                }
 
-        _cachedAchievements = achievements;
-        try {
-          _ensureAchievementsController.add(achievements);
-        } catch (e) {
-          print('Error broadcasting achievements: $e');
-        }
-      } else {
-        // Return default achievements if none exist
-        final defaultAchievements = Achievements.defaultAchievements;
-        _cachedAchievements = defaultAchievements;
-        try {
-          _ensureAchievementsController.add(defaultAchievements);
-        } catch (e) {
-          print('Error broadcasting default achievements: $e');
-        }
-      }
-    });
+                _cachedAchievements = achievements;
+                if (!_ensureAchievementsController.isClosed) {
+                  _ensureAchievementsController.add(achievements);
+                }
+              } else {
+                // Return default achievements if none exist
+                final defaultAchievements = Achievements.defaultAchievements;
+                _cachedAchievements = defaultAchievements;
+                if (!_ensureAchievementsController.isClosed) {
+                  _ensureAchievementsController.add(defaultAchievements);
+                }
+              }
+            } catch (e) {
+              _logger.error('Error processing achievements snapshot', {'error': e.toString()});
+            }
+          },
+          onError: (error) {
+            _logger.error('Achievements listener error', {'error': error.toString()});
+          },
+        );
   }
 
   /// Set up weight history listener
@@ -317,10 +401,22 @@ class AnalyticsService {
         .orderBy('date', descending: true)
         .limit(30)
         .snapshots()
-        .listen((snapshot) {
-      // Weight history updates can trigger insights regeneration
-      _generateInsights(userId);
-    });
+        .listen(
+          (snapshot) {
+            try {
+              // Weight history updates can trigger insights regeneration (debounced)
+              _generateInsights(userId)
+                  .timeout(const Duration(seconds: 3),
+                      onTimeout: () => _logger.warning('Insights generation timed out'))
+                  .catchError((error) => _logger.error('Error generating insights', {'error': error.toString()}));
+            } catch (e) {
+              _logger.error('Error processing weight history snapshot', {'error': e.toString()});
+            }
+          },
+          onError: (error) {
+            _logger.error('Weight history listener error', {'error': error.toString()});
+          },
+        );
   }
 
   /// Generate AI insights based on current data
@@ -389,12 +485,14 @@ class AnalyticsService {
 
       _cachedInsights = insights;
       try {
-        _ensureInsightsController.add(insights);
+        if (!_ensureInsightsController.isClosed) {
+          _ensureInsightsController.add(insights);
+        }
       } catch (e) {
-        print('Error broadcasting insights: $e');
+        _logger.error('Error broadcasting insights', {'error': e.toString()});
       }
     } catch (e) {
-      print('Error generating insights: $e');
+      _logger.error('Error generating insights', {'error': e.toString()});
     }
   }
 
@@ -404,60 +502,198 @@ class AnalyticsService {
       final recommendations = <Map<String, dynamic>>[];
 
       // Get user profile for personalized recommendations
-      final profile = await _firebaseService.getUserProfile(userId);
+      Map<String, dynamic>? profile;
+      try {
+        profile = await _firebaseService.getUserProfile(userId);
+      } catch (e) {
+        print('⚠️ Could not load user profile for recommendations: $e');
+      }
+
+      // Get user goals for better recommendations
+      final userGoals = await _getUserGoals(userId);
+      final calorieGoal = userGoals['caloriesGoal'] ?? 2000;
 
       // Calorie-based recommendations
       if (_cachedDailySummaries.isNotEmpty) {
-        final todayCalories = _cachedDailySummaries.last.caloriesConsumed;
+        final today = _cachedDailySummaries.last;
+        final todayCalories = today.caloriesConsumed;
+        final calorieDeficit = calorieGoal - todayCalories;
 
-        if (todayCalories < 1500) {
+        if (todayCalories < 1200) {
           recommendations.add({
             'title': 'Increase calorie intake',
             'description':
-                'You\'re below your minimum daily calorie needs. Consider adding healthy snacks.',
-            'icon': '🍎',
-            'color': 'info',
-            'priority': 1,
+                'You\'re below your minimum daily calorie needs ($todayCalories/$calorieGoal kcal). Consider adding healthy snacks or a balanced meal.',
+            'type': 'nutrition',
+            'priority': 'high',
             'timestamp': DateTime.now(),
           });
-        } else if (todayCalories > 2500) {
+        } else if (todayCalories > calorieGoal * 1.2) {
           recommendations.add({
-            'title': 'Take a 20-minute walk',
+            'title': 'Balance your calories',
             'description':
-                'Balance today\'s calorie surplus with light activity.',
-            'icon': '🚶',
-            'color': 'info',
-            'priority': 2,
+                'You\'ve exceeded your daily goal by ${((todayCalories - calorieGoal) / calorieGoal * 100).toStringAsFixed(0)}%. Consider light activity or adjusting tomorrow\'s intake.',
+            'type': 'activity',
+            'priority': 'medium',
+            'timestamp': DateTime.now(),
+          });
+        } else if (calorieDeficit > 0 && calorieDeficit < 200) {
+          recommendations.add({
+            'title': 'Almost at your goal!',
+            'description':
+                'You\'re ${calorieDeficit.toStringAsFixed(0)} calories away from your daily goal. A small healthy snack can help you reach it!',
+            'type': 'general',
+            'priority': 'low',
             'timestamp': DateTime.now(),
           });
         }
       }
 
+      // Macro-based recommendations
+      final avgDailyProtein = _cachedDailySummaries.isNotEmpty
+          ? (_cachedMacroBreakdown.protein / _cachedDailySummaries.length)
+          : 0.0;
+      final avgDailyCarbs = _cachedDailySummaries.isNotEmpty
+          ? (_cachedMacroBreakdown.carbs / _cachedDailySummaries.length)
+          : 0.0;
+      final avgDailyFat = _cachedDailySummaries.isNotEmpty
+          ? (_cachedMacroBreakdown.fat / _cachedDailySummaries.length)
+          : 0.0;
+
       // Protein recommendations
-      if (_cachedMacroBreakdown.protein < 100) {
+      if (avgDailyProtein < 80) {
+        final proteinNeeded = (80 - avgDailyProtein).toStringAsFixed(0);
         recommendations.add({
-          'title': 'Increase protein intake',
+          'title': 'Boost protein intake',
           'description':
-              'Add ${(120 - _cachedMacroBreakdown.protein).toStringAsFixed(0)}g protein for better muscle recovery.',
-          'icon': '💪',
-          'color': 'success',
-          'priority': 4,
+              'Your average protein is ${avgDailyProtein.toStringAsFixed(0)}g/day. Aim for ${proteinNeeded}g more for muscle recovery and satiety. Try lean meats, eggs, or legumes.',
+            'type': 'nutrition',
+            'priority': 'high',
           'timestamp': DateTime.now(),
         });
       }
 
-      // Sort by priority
-      recommendations.sort(
-          (a, b) => (a['priority'] ?? 999).compareTo(b['priority'] ?? 999));
+      // Carb recommendations
+      if (avgDailyCarbs < 100) {
+        recommendations.add({
+          'title': 'Add healthy carbs',
+          'description':
+              'Include more whole grains, fruits, and vegetables to fuel your activities and support recovery.',
+            'type': 'nutrition',
+            'priority': 'medium',
+          'timestamp': DateTime.now(),
+        });
+      }
 
-      _cachedRecommendations = recommendations;
+      // Balance recommendations
+      final totalMacros = _cachedMacroBreakdown.protein + _cachedMacroBreakdown.carbs + _cachedMacroBreakdown.fat;
+      if (totalMacros > 0) {
+        final proteinPercent = (_cachedMacroBreakdown.protein / totalMacros) * 100;
+        final carbsPercent = (_cachedMacroBreakdown.carbs / totalMacros) * 100;
+        final fatPercent = (_cachedMacroBreakdown.fat / totalMacros) * 100;
+
+        if (proteinPercent < 15 || proteinPercent > 40) {
+          recommendations.add({
+            'title': 'Balance your macros',
+            'description':
+                'Your protein is ${proteinPercent.toStringAsFixed(0)}% of total macros. Aim for 20-30% protein, 40-50% carbs, and 20-30% fat for optimal nutrition.',
+            'type': 'nutrition',
+            'priority': 'medium',
+            'timestamp': DateTime.now(),
+          });
+        }
+      }
+
+      // Consistency recommendations
+      if (_cachedDailySummaries.length >= 7) {
+        final goalMetDays = _cachedDailySummaries
+            .where((day) => day.caloriesConsumed >= day.caloriesGoal * 0.9 && 
+                           day.caloriesConsumed <= day.caloriesGoal * 1.1)
+            .length;
+        
+        if (goalMetDays < 3) {
+          recommendations.add({
+            'title': 'Improve consistency',
+            'description':
+                'You met your calorie goal $goalMetDays/7 days this week. Consistency is key to achieving your goals!',
+            'type': 'activity',
+            'priority': 'medium',
+            'timestamp': DateTime.now(),
+          });
+        } else if (goalMetDays >= 5) {
+          recommendations.add({
+            'title': 'Great consistency!',
+            'description':
+                'Excellent work! You\'ve been consistent with your goals $goalMetDays/7 days this week. Keep it up!',
+            'type': 'general',
+            'priority': 'low',
+            'timestamp': DateTime.now(),
+          });
+        }
+      }
+
+      // Profile-based recommendations
+      if (profile != null) {
+        final age = profile['age'] as int?;
+        final gender = profile['gender'] as String?;
+        final height = profile['height'] as double?;
+        final weight = profile['weight'] as double?;
+
+        if (age != null && gender != null && height != null && weight != null) {
+          final bmi = weight / (height * height);
+          if (bmi < 18.5) {
+            recommendations.add({
+              'title': 'Focus on healthy weight gain',
+              'description':
+                  'Based on your profile (BMI: ${bmi.toStringAsFixed(1)}), consider increasing calorie intake with nutrient-dense foods and strength training.',
+              'type': 'nutrition',
+              'priority': 'high',
+              'timestamp': DateTime.now(),
+            });
+          } else if (bmi > 25) {
+            recommendations.add({
+              'title': 'Focus on sustainable weight management',
+              'description':
+                  'Based on your profile (BMI: ${bmi.toStringAsFixed(1)}), maintain a moderate calorie deficit through balanced nutrition and regular activity.',
+              'type': 'nutrition',
+              'priority': 'high',
+              'timestamp': DateTime.now(),
+            });
+          }
+        }
+      }
+
+      // Sort by priority (high -> medium -> low)
+      final priorityOrder = {'high': 1, 'medium': 2, 'low': 3};
+      recommendations.sort((a, b) {
+        final aPriority = priorityOrder[a['priority']] ?? 4;
+        final bPriority = priorityOrder[b['priority']] ?? 4;
+        return aPriority.compareTo(bPriority);
+      });
+
+      // Limit to top 5 recommendations
+      final finalRecommendations = recommendations.take(5).toList();
+
+      _cachedRecommendations = finalRecommendations;
       try {
-        _ensureRecommendationsController.add(recommendations);
+        if (!_ensureRecommendationsController.isClosed) {
+          _ensureRecommendationsController.add(finalRecommendations);
+          _logger.info('Generated personalized recommendations', {'count': finalRecommendations.length});
+        }
       } catch (e) {
-        print('Error broadcasting recommendations: $e');
+        _logger.error('Error broadcasting recommendations', {'error': e.toString()});
       }
     } catch (e) {
-      print('Error generating recommendations: $e');
+      _logger.error('Error generating recommendations', {'error': e.toString()});
+      // Return empty list on error
+      _cachedRecommendations = [];
+      try {
+        if (!_ensureRecommendationsController.isClosed) {
+          _ensureRecommendationsController.add([]);
+        }
+      } catch (e2) {
+        _logger.error('Error broadcasting empty recommendations', {'error': e2.toString()});
+      }
     }
   }
 
@@ -704,8 +940,8 @@ class AnalyticsService {
       final summaryDoc = await _firestore
           .collection('users')
           .doc(userId)
-          .collection('daily_summaries')
-          .doc('${date.year}-${date.month}-${date.day}')
+          .collection('dailySummary')
+          .doc('${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}')
           .get();
 
       if (summaryDoc.exists) {
@@ -728,8 +964,8 @@ class AnalyticsService {
       final summaryDoc = await _firestore
           .collection('users')
           .doc(userId)
-          .collection('daily_summaries')
-          .doc('${date.year}-${date.month}-${date.day}')
+          .collection('dailySummary')
+          .doc('${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}')
           .get();
 
       if (summaryDoc.exists) {
@@ -743,6 +979,31 @@ class AnalyticsService {
       print('Error getting actual steps: $e');
       return 0;
     }
+  }
+
+  /// Get actual exercise minutes for a specific date
+  Future<int> _getActualExerciseMinutes(String userId, DateTime date) async {
+    try {
+      final summaryDoc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('dailySummary')
+          .doc('${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}')
+          .get();
+
+      if (summaryDoc.exists) {
+        final data = summaryDoc.data()!;
+        return (data['exerciseMinutes'] as int?) ?? 0;
+      }
+      return 0;
+    } catch (e) {
+      print('Error getting actual exercise minutes: $e');
+      return 0;
+    }
+  }
+
+  bool _sameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
   /// Get user goals from profile
@@ -780,21 +1041,85 @@ class AnalyticsService {
     }
   }
 
+  /// Clean up old dailySummary data (older than 7 days) to save space
+  Future<void> _cleanupOldDailySummaryData(String userId) async {
+    try {
+      final now = DateTime.now();
+      final cutoffDate = now.subtract(const Duration(days: 7));
+      
+      // Get all dailySummary documents
+      final allSummaries = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('dailySummary')
+          .get();
+
+      final batch = _firestore.batch();
+      int deletedCount = 0;
+
+      for (final doc in allSummaries.docs) {
+        try {
+          final data = doc.data();
+          final dateValue = data['date'];
+          
+          DateTime? summaryDate;
+          if (dateValue is Timestamp) {
+            summaryDate = dateValue.toDate();
+          } else if (dateValue is DateTime) {
+            summaryDate = dateValue;
+          } else {
+            // Try to parse from document ID (format: YYYY-MM-DD)
+            try {
+              final parts = doc.id.split('-');
+              if (parts.length == 3) {
+                summaryDate = DateTime(
+                  int.parse(parts[0]),
+                  int.parse(parts[1]),
+                  int.parse(parts[2]),
+                );
+              }
+            } catch (_) {
+              // Skip if can't parse
+              continue;
+            }
+          }
+
+          // Delete if older than 7 days
+          if (summaryDate != null && summaryDate.isBefore(cutoffDate)) {
+            batch.delete(doc.reference);
+            deletedCount++;
+          }
+        } catch (e) {
+          print('Error processing summary document ${doc.id}: $e');
+          // Continue with other documents
+        }
+      }
+
+      if (deletedCount > 0) {
+        await batch.commit();
+      _logger.info('Cleaned up old dailySummary documents', {'deleted': deletedCount});
+      }
+    } catch (e) {
+      _logger.error('Error cleaning up old dailySummary data', {'error': e.toString()});
+      // Don't throw - cleanup failure shouldn't break analytics
+    }
+  }
+
   /// Dispose resources
   /// Clean up resources (but don't close controllers for singleton)
   Future<void> cleanup() async {
     try {
-      print('Cleaning up analytics service...');
+      _logger.debug('Cleaning up analytics service...');
       await _cancelExistingListeners();
-      print('Analytics service cleaned up');
+      _logger.debug('Analytics service cleaned up');
     } catch (e) {
-      print('Error during analytics cleanup: $e');
+      _logger.error('Error during analytics cleanup', {'error': e.toString()});
     }
   }
 
   /// Dispose method for singleton - only cancel listeners, don't close controllers
   void dispose() {
-    print('Analytics service dispose called - cleaning up listeners only');
+    _logger.debug('Analytics service dispose called - cleaning up listeners only');
     cleanup();
     // Don't close controllers since this is a singleton that may be reused
   }

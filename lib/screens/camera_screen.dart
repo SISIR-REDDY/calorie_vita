@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../services/optimized_food_scanner_pipeline.dart';
+import '../config/ai_config.dart';
+import '../services/network_service.dart';
 import '../services/barcode_scanning_service.dart';
 // Unused imports removed
 import '../models/food_history_entry.dart';
@@ -51,6 +53,7 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _pickImage() async {
+    print('📸 Image picker initiated');
     setState(() {
       _loading = true;
       _error = null;
@@ -59,22 +62,107 @@ class _CameraScreenState extends State<CameraScreen> {
     });
 
     try {
-      final picked = await _picker.pickImage(source: ImageSource.camera);
+      // Preflight: ensure AI vision is enabled, API key present, and network online
+      print('🔍 Preflight checks for image analysis...');
+      print('   - Image analysis enabled: ${AIConfig.enableImageAnalysis}');
+      print('   - API key configured: ${AIConfig.apiKey.isNotEmpty} (length: ${AIConfig.apiKey.length})');
+      print('   - Network online: ${NetworkService().isOnline}');
+      print('   - Vision model: ${AIConfig.visionModel}');
+      
+      if (!AIConfig.enableImageAnalysis) {
+        print('❌ Image analysis is disabled in configuration');
+        setState(() {
+          _loading = false;
+          _error = 'Image analysis is disabled in configuration. You can add food manually.';
+        });
+        return;
+      }
+
+      if (AIConfig.apiKey.isEmpty) {
+        print('❌ API key is empty - config may not have loaded from Firebase');
+        print('   - Check Firebase console for app_config/ai_settings document');
+        setState(() {
+          _loading = false;
+          _error = 'AI service is not configured (missing API key). Please sign in and try again later or add food manually.';
+        });
+        return;
+      }
+
+      if (!NetworkService().isOnline) {
+        print('❌ Network is offline');
+        setState(() {
+          _loading = false;
+          _error = 'No internet connection. Please connect to the internet or add food manually.';
+        });
+        return;
+      }
+      
+      print('✅ All preflight checks passed, proceeding with image capture...');
+
+      final picked = await _picker.pickImage(source: ImageSource.camera).catchError((error) {
+        print('❌ Image picker error: $error');
+        if (mounted) {
+          setState(() {
+            // Provide user-friendly error messages based on error type
+            if (error.toString().contains('permission') || error.toString().contains('Permission')) {
+              _error = 'Camera permission is required. Please enable camera access in your device settings to take food photos.';
+            } else if (error.toString().contains('not available') || error.toString().contains('unavailable')) {
+              _error = 'Camera is not available. Please check if another app is using the camera.';
+            } else {
+              _error = 'Could not access camera. Please try again or add food manually.';
+            }
+            _loading = false;
+          });
+        }
+        return null;
+      });
+      
       if (picked != null) {
+        print('✅ Image captured: ${picked.path}');
         setState(() {
           _imageFile = File(picked.path);
         });
         
         // Process image through the optimized food scanner pipeline
-        final result = await OptimizedFoodScannerPipeline.processFoodImage(_imageFile!);
-        
+        print('🚀 Starting image processing pipeline...');
+        var result = await OptimizedFoodScannerPipeline.processFoodImage(_imageFile!);
+        print('📊 Image processing result: success=${result.success}, error=${result.error}');
+
+        // If result is missing calories or macros, attempt to fix via product name lookup
+        if (result.success && result.nutritionInfo != null) {
+          final nutrition = result.nutritionInfo!;
+          final missingCalories = nutrition.calories <= 0;
+          final missingMacros = nutrition.protein == 0 && nutrition.carbs == 0 && nutrition.fat == 0;
+          if (missingCalories || missingMacros) {
+            try {
+              final fixedNutrition = await _tryFixMissingNutrition(nutrition);
+              if (fixedNutrition != null) {
+                final fixedResult = FoodScannerResult(
+                  success: true,
+                  recognitionResult: result.recognitionResult,
+                  portionResult: result.portionResult,
+                  nutritionInfo: fixedNutrition,
+                  aiAnalysis: result.aiAnalysis,
+                  processingTime: result.processingTime,
+                  isBarcodeScan: result.isBarcodeScan,
+                  confidencePercentage: (result.confidencePercentage * 0.9).clamp(0.0, 100.0),
+                );
+                result = fixedResult;
+              }
+            } catch (_) {}
+          }
+        }
+
         setState(() {
           _scannerResult = result;
-          if (result.success && result.portionResult != null) {
+          if (!result.success) {
+            _error = result.error ?? "Couldn't analyze image. Please try again or add food manually.";
+            print('❌ Image analysis failed: ${result.error}');
+          } else if (result.success && result.portionResult != null) {
             _selectedPortion = result.portionResult!.estimatedWeight;
           }
         });
-        
+
         // Auto-save successful scan results
         if (result.success && result.nutritionInfo != null) {
           _autoSaveFood(result, 'camera_scan');
@@ -87,10 +175,20 @@ class _CameraScreenState extends State<CameraScreen> {
             _showPortionSelector = true;
           });
         }
+      } else {
+        // User cancelled image picker
+        setState(() {
+          _loading = false;
+          _error = null;
+        });
+        return;
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('❌ Error in image picker: $e');
+      print('Stack trace: $stackTrace');
       setState(() {
-        _error = "Couldn't capture or analyze image. Try again.";
+        _error = "Couldn't capture or analyze image: ${e.toString()}. Please try again or add food manually.";
+        _loading = false;
       });
     } finally {
       setState(() {
@@ -100,6 +198,11 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _scanBarcode() async {
+    print('📱 Barcode scanner initiated');
+    
+    // Dispose existing controller if any
+    _scannerController?.dispose();
+    
     setState(() {
       _showBarcodeScanner = true;
       _error = null;
@@ -109,8 +212,33 @@ class _CameraScreenState extends State<CameraScreen> {
       _scannerDisabled = false; // Reset scanner disabled flag
     });
     
-    // Initialize scanner controller
-    _scannerController = MobileScannerController();
+    // Initialize scanner controller with proper configuration
+    _scannerController = MobileScannerController(
+      formats: [BarcodeFormat.all],
+      facing: CameraFacing.back,
+      autoStart: true,
+    );
+    
+    // Ensure scanner starts
+    try {
+      await _scannerController?.start();
+      print('✅ Barcode scanner started and ready - waiting for barcode detection...');
+    } catch (e) {
+      print('❌ Error starting scanner: $e');
+      if (mounted) {
+        setState(() {
+          // Provide user-friendly error message with actionable guidance
+          if (e.toString().contains('permission') || e.toString().contains('Permission')) {
+            _error = 'Camera permission is required to scan barcodes. Please enable camera access in your device settings.';
+          } else if (e.toString().contains('not available') || e.toString().contains('unavailable')) {
+            _error = 'Camera is not available. Please check if another app is using the camera.';
+          } else {
+            _error = 'Could not start camera. Please try again or add food manually.';
+          }
+          _showBarcodeScanner = false;
+        });
+      }
+    }
   }
 
   void _onBarcodeDetected(BarcodeCapture capture) async {
@@ -123,7 +251,11 @@ class _CameraScreenState extends State<CameraScreen> {
       _scannerDisabled = true; // Completely disable scanner
       
       // Stop and dispose the scanner immediately to prevent automatic switching
-      _scannerController?.stop();
+      try {
+        await _scannerController?.stop();
+      } catch (e) {
+        print('⚠️ Error stopping scanner: $e');
+      }
       _scannerController?.dispose();
       _scannerController = null;
       
@@ -134,10 +266,12 @@ class _CameraScreenState extends State<CameraScreen> {
       });
       try {
         // Process barcode through the optimized food scanner pipeline
+        print('🔍 Starting barcode processing pipeline for: $barcode');
         final result = await OptimizedFoodScannerPipeline.processBarcodeScan(barcode);
+        print('📊 Barcode processing result: success=${result.success}, error=${result.error}');
         
         // Check result and fix missing nutrition data if needed
-        if (result != null && result.success && result.nutritionInfo != null) {
+        if (result.success && result.nutritionInfo != null) {
           final nutrition = result.nutritionInfo!;
           print('✅ Barcode scan successful: ${nutrition.foodName}');
           
@@ -172,13 +306,13 @@ class _CameraScreenState extends State<CameraScreen> {
         
         setState(() {
           _scannerResult = result;
-          if (result != null && !result.success) {
-            _error = result.error ?? "Barcode not found in any database";
-          }
+          if (!result.success) {
+          _error = result.error ?? "Barcode not found in any database";
+        }
         });
         
         // Auto-save successful barcode scan results
-        if (result != null && result.success && result.nutritionInfo != null) {
+        if (result.success && result.nutritionInfo != null) {
           _autoSaveFood(result, 'barcode_scan');
         }
         
@@ -528,11 +662,38 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Widget _buildBarcodeScanner() {
+    if (_scannerController == null) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+    
     return Stack(
       children: [
         MobileScanner(
-          controller: _scannerController,
+          controller: _scannerController!,
           onDetect: _onBarcodeDetected,
+          errorBuilder: (context, error, child) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error, color: Colors.red, size: 48),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Camera Error: ${error.toString()}',
+                    style: GoogleFonts.poppins(color: Colors.white),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _reset,
+                    child: const Text('Close'),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
         Positioned(
           top: 20,
@@ -665,15 +826,15 @@ class _CameraScreenState extends State<CameraScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: kInfoColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                border: Border.all(color: kInfoColor.withOpacity(0.3)),
               ),
               child: Column(
                 children: [
                   Icon(
                     Icons.restaurant_menu,
-                    color: Colors.blue,
+                    color: kInfoColor,
                     size: 32,
                   ),
                   const SizedBox(height: 8),
@@ -682,7 +843,7 @@ class _CameraScreenState extends State<CameraScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blue[800],
+                      color: kTextDark,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -690,7 +851,7 @@ class _CameraScreenState extends State<CameraScreen> {
                     'You can still add food manually while we restore AI services.',
                     style: GoogleFonts.poppins(
                       fontSize: 14,
-                      color: Colors.blue[700],
+                      color: kTextSecondary,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -703,7 +864,7 @@ class _CameraScreenState extends State<CameraScreen> {
                       style: GoogleFonts.poppins(color: Colors.white),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: kPrimaryColor,
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     ),
                   ),
@@ -745,7 +906,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
                 child: Column(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.restaurant_menu,
                       color: Colors.blue,
                       size: 32,
@@ -791,8 +952,8 @@ class _CameraScreenState extends State<CameraScreen> {
     }
 
     final nutrition = _scannerResult!.nutritionInfo!;
-    final recognition = _scannerResult!.recognitionResult;
-    final portion = _scannerResult!.portionResult;
+    // final recognition = _scannerResult!.recognitionResult;
+    // final portion = _scannerResult!.portionResult;
     final aiAnalysis = _scannerResult!.aiAnalysis;
 
     // Check if nutrition data is valid for UI rendering
@@ -884,15 +1045,15 @@ class _CameraScreenState extends State<CameraScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: kWarningColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                border: Border.all(color: kWarningColor.withOpacity(0.3)),
               ),
               child: Column(
                 children: [
                   Icon(
                     Icons.warning_amber_rounded,
-                    color: Colors.orange,
+                    color: kWarningColor,
                     size: 48,
                   ),
                   const SizedBox(height: 12),
@@ -936,20 +1097,20 @@ class _CameraScreenState extends State<CameraScreen> {
                             }
                           });
                         },
-                        icon: Icon(Icons.refresh, color: Colors.white),
+                        icon: const Icon(Icons.refresh, color: Colors.white),
                         label: Text('Try Again', style: GoogleFonts.poppins(color: Colors.white)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.orange,
-                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                         ),
                       ),
                       ElevatedButton.icon(
                         onPressed: _reset,
-                        icon: Icon(Icons.camera_alt, color: Colors.white),
+                        icon: const Icon(Icons.camera_alt, color: Colors.white),
                         label: Text('Scan Again', style: GoogleFonts.poppins(color: Colors.white)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: kAccentBlue,
-                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                         ),
                       ),
                     ],
@@ -978,9 +1139,9 @@ class _CameraScreenState extends State<CameraScreen> {
                 // Header with confidence indicator
                 Container(
                   padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     gradient: kPrimaryGradient,
-                    borderRadius: const BorderRadius.only(
+                    borderRadius: BorderRadius.only(
                       topLeft: Radius.circular(20),
                       topRight: Radius.circular(20),
                     ),
@@ -1036,7 +1197,7 @@ class _CameraScreenState extends State<CameraScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.analytics,
                               color: Colors.white,
                               size: 16,
@@ -1150,10 +1311,16 @@ class _CameraScreenState extends State<CameraScreen> {
                         ),
                       ],
                       
-                      // AI Analysis
-                      if (aiAnalysis != null && aiAnalysis!['insights'] != null) ...[
+                      // Food Description
+                      if (_scannerResult!.snapToCalorieResult != null) ...[
                         const SizedBox(height: 20),
-                        _buildAIAnalysis(aiAnalysis!),
+                        _buildFoodDescription(_scannerResult!.snapToCalorieResult!, nutrition),
+                      ],
+                      
+                      // AI Analysis
+                      if (aiAnalysis != null && aiAnalysis['insights'] != null) ...[
+                        const SizedBox(height: 20),
+                        _buildAIAnalysis(aiAnalysis),
                       ],
                       
                       
@@ -1336,36 +1503,140 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Widget _buildMacroCard(String label, double value, Color color) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final padding = screenWidth < 360 ? 10.0 : 12.0;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(padding),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             label,
             style: GoogleFonts.poppins(
-              fontSize: 12,
+              fontSize: screenWidth < 360 ? 11 : 12,
               fontWeight: FontWeight.w600,
               color: color,
             ),
             overflow: TextOverflow.ellipsis,
             maxLines: 1,
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: screenWidth < 360 ? 3 : 4),
           Text(
             '${value.toStringAsFixed(1)}g',
             style: GoogleFonts.poppins(
-              fontSize: 16,
+              fontSize: screenWidth < 360 ? 14 : 16,
               fontWeight: FontWeight.bold,
               color: color,
             ),
             overflow: TextOverflow.ellipsis,
             maxLines: 1,
+            textAlign: TextAlign.center,
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFoodDescription(Map<String, dynamic> snapResult, NutritionInfo nutrition) {
+    final ingredients = snapResult['ingredients'] as List?;
+    final volumeEstimate = snapResult['volumeEstimate'] as String?;
+    final category = snapResult['category'] as String?;
+    final cuisine = snapResult['cuisine'] as String?;
+    
+    // Build description text
+    final descriptionParts = <String>[];
+    
+    if (ingredients != null && ingredients.isNotEmpty) {
+      final ingredientsList = ingredients.map((e) => e.toString()).toList();
+      if (ingredientsList.length <= 5) {
+        descriptionParts.add('Ingredients: ${ingredientsList.join(", ")}');
+      } else {
+        descriptionParts.add('Ingredients: ${ingredientsList.take(5).join(", ")} and more');
+      }
+    }
+    
+    if (volumeEstimate != null && volumeEstimate.isNotEmpty) {
+      descriptionParts.add('Portion: $volumeEstimate');
+    }
+    
+    if (category != null && category.isNotEmpty && category != 'Unknown') {
+      descriptionParts.add('Category: $category');
+    }
+    
+    if (cuisine != null && cuisine.isNotEmpty && cuisine != 'Unknown') {
+      descriptionParts.add('Cuisine: $cuisine');
+    }
+    
+    // If no description parts, return empty container
+    if (descriptionParts.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    return Container(
+      padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 12 : 16),
+      decoration: BoxDecoration(
+        color: kAccentBlue.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kAccentBlue.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                size: 18,
+                color: kAccentBlue,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'About This Food',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: kTextDark,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...descriptionParts.map((part) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '• ',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: kAccentBlue,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    part,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      color: kTextSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )),
         ],
       ),
     );

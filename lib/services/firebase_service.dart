@@ -52,6 +52,15 @@ class FirebaseService {
 
   // Get today's food entries for a user
   Stream<List<FoodEntry>> getTodayFoodEntries(String userId) {
+    if (!isAvailable) {
+      return Stream.value([]);
+    }
+
+    if (userId.isEmpty) {
+      print('Error: User ID cannot be empty');
+      return Stream.value([]);
+    }
+
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
@@ -66,12 +75,36 @@ class FirebaseService {
         .orderBy('timestamp', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => FoodEntry.fromFirestore(doc)).toList();
+      try {
+        return snapshot.docs.map((doc) {
+          try {
+            return FoodEntry.fromFirestore(doc);
+          } catch (e) {
+            print('Error parsing food entry ${doc.id}: $e');
+            return null;
+          }
+        }).whereType<FoodEntry>().toList();
+      } catch (e) {
+        print('Error processing food entries snapshot: $e');
+        return <FoodEntry>[];
+      }
+    }).handleError((error) {
+      print('Error getting today food entries: $error');
+      return <FoodEntry>[];
     });
   }
 
   // Get weekly food entries for a user
   Stream<List<FoodEntry>> getWeeklyFoodEntries(String userId) {
+    if (!isAvailable) {
+      return Stream.value([]);
+    }
+
+    if (userId.isEmpty) {
+      print('Error: User ID cannot be empty');
+      return Stream.value([]);
+    }
+
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
     final startOfWeekDay =
@@ -86,7 +119,22 @@ class FirebaseService {
         .orderBy('timestamp', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => FoodEntry.fromFirestore(doc)).toList();
+      try {
+        return snapshot.docs.map((doc) {
+          try {
+            return FoodEntry.fromFirestore(doc);
+          } catch (e) {
+            print('Error parsing food entry ${doc.id}: $e');
+            return null;
+          }
+        }).whereType<FoodEntry>().toList();
+      } catch (e) {
+        print('Error processing weekly food entries snapshot: $e');
+        return <FoodEntry>[];
+      }
+    }).handleError((error) {
+      print('Error getting weekly food entries: $error');
+      return <FoodEntry>[];
     });
   }
 
@@ -356,13 +404,30 @@ class FirebaseService {
 
   // ========== ANALYTICS METHODS ==========
 
-  // Get daily summaries for analytics
+  // Get daily summaries for analytics (optimized with error handling)
   Future<List<DailySummary>> getDailySummaries(String userId,
       {int days = 7}) async {
     try {
+      if (!isAvailable) {
+        print('Firebase not available');
+        return [];
+      }
+
+      if (userId.isEmpty) {
+        print('Error: User ID cannot be empty');
+        return [];
+      }
+
+      // Validate days parameter
+      if (days < 1 || days > 365) {
+        print('Invalid days parameter: $days, using default 7');
+        days = 7;
+      }
+
       final endDate = DateTime.now();
       final startDate = endDate.subtract(Duration(days: days - 1));
 
+      // Use timeout to prevent hanging
       final entries = await _firestore
           .collection('users')
           .doc(userId)
@@ -371,37 +436,115 @@ class FirebaseService {
               isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
           .where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
           .orderBy('timestamp', descending: false)
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 10));
 
       // Group entries by date and calculate daily summaries
       final Map<String, List<FoodEntry>> entriesByDate = {};
       for (final doc in entries.docs) {
-        final entry = FoodEntry.fromFirestore(doc);
-        final dateKey =
-            '${entry.timestamp.year}-${entry.timestamp.month}-${entry.timestamp.day}';
-        entriesByDate.putIfAbsent(dateKey, () => []).add(entry);
+        try {
+          final entry = FoodEntry.fromFirestore(doc);
+          // Validate entry before adding
+          if (entry.calories >= 0 && entry.timestamp.isBefore(DateTime.now().add(const Duration(days: 1)))) {
+            final dateKey =
+                '${entry.timestamp.year}-${entry.timestamp.month}-${entry.timestamp.day}';
+            entriesByDate.putIfAbsent(dateKey, () => []).add(entry);
+          }
+        } catch (e) {
+          print('Error processing entry ${doc.id}: $e');
+          // Skip invalid entries
+        }
       }
 
+      // Get user goals once for all summaries (more efficient)
+      final userGoals = await getUserGoals(userId);
+      final defaultCaloriesGoal = userGoals?.calorieGoal ?? 2000;
+      final defaultStepsGoal = userGoals?.stepsPerDayGoal ?? 10000;
+      final defaultWaterGoal = userGoals?.waterGlassesGoal ?? 8;
+
       final List<DailySummary> summaries = [];
+      
+      // Only process dates that have actual entries (real data)
+      final datesWithData = entriesByDate.keys.toSet();
+      
       for (int i = 0; i < days; i++) {
         final date = startDate.add(Duration(days: i));
         final dateKey = '${date.year}-${date.month}-${date.day}';
+        
+        // Only add summary if this date has actual entries
+        if (!datesWithData.contains(dateKey)) {
+          continue; // Skip days with no data
+        }
+        
         final dayEntries = entriesByDate[dateKey] ?? [];
+        
+        // Double check we have entries
+        if (dayEntries.isEmpty) {
+          continue; // Skip empty days
+        }
 
         final caloriesConsumed =
             dayEntries.fold(0, (sum, entry) => sum + entry.calories);
 
-        summaries.add(DailySummary(
-          caloriesConsumed: caloriesConsumed,
-          caloriesBurned: 300, // Default - should be tracked separately
-          caloriesGoal: 2000, // Should come from user profile
-          steps: 5000, // Default - should be tracked separately
-          stepsGoal: 10000,
-          waterGlasses: 0, // Default value
-          waterGlassesGoal: 8, // Default value
-          date: date,
-        ));
+        // Only add if there's actual calories consumed (real data)
+        if (caloriesConsumed <= 0) {
+          continue; // Skip days with zero calories
+        }
+
+        // Try to get actual data from daily summary if available
+        try {
+          final summaryDoc = await _firestore
+              .collection('users')
+              .doc(userId)
+              .collection('dailySummary')
+              .doc(dateKey)
+              .get()
+              .timeout(const Duration(seconds: 2));
+
+          if (summaryDoc.exists) {
+            final summaryData = summaryDoc.data()!;
+            summaries.add(DailySummary(
+              caloriesConsumed: caloriesConsumed,
+              caloriesBurned: (summaryData['caloriesBurned'] as int?) ?? 0,
+              caloriesGoal: (summaryData['caloriesGoal'] as int?) ?? defaultCaloriesGoal,
+              steps: (summaryData['steps'] as int?) ?? 0,
+              stepsGoal: (summaryData['stepsGoal'] as int?) ?? defaultStepsGoal,
+              waterGlasses: (summaryData['waterGlasses'] as int?) ?? 0,
+              waterGlassesGoal: (summaryData['waterGlassesGoal'] as int?) ?? defaultWaterGoal,
+              date: date,
+            ));
+          } else {
+            // No daily summary exists, but we have consumed calories, so create summary
+            summaries.add(DailySummary(
+              caloriesConsumed: caloriesConsumed,
+              caloriesBurned: 0,
+              caloriesGoal: defaultCaloriesGoal,
+              steps: 0,
+              stepsGoal: defaultStepsGoal,
+              waterGlasses: 0,
+              waterGlassesGoal: defaultWaterGoal,
+              date: date,
+            ));
+          }
+        } catch (e) {
+          // If fetching daily summary fails, still add if we have consumed calories
+          summaries.add(DailySummary(
+            caloriesConsumed: caloriesConsumed,
+            caloriesBurned: 0,
+            caloriesGoal: defaultCaloriesGoal,
+            steps: 0,
+            stepsGoal: defaultStepsGoal,
+            waterGlasses: 0,
+            waterGlassesGoal: defaultWaterGoal,
+            date: date,
+          ));
+        }
       }
+      
+      // Clean up old dailySummary data (older than 7 days) - non-blocking
+      cleanupOldDailySummaryData(userId).catchError((e) {
+        print('Cleanup error (non-blocking): $e');
+      });
 
       return summaries;
     } catch (e) {
@@ -609,7 +752,10 @@ class FirebaseService {
   Future<List<Map<String, dynamic>>> getPersonalizedRecommendations(
       String userId) async {
     try {
-      final todayCalories = await getTodayCalories(userId).first;
+      // Use timeout to prevent hanging
+      final todayCalories = await getTodayCalories(userId)
+          .timeout(const Duration(seconds: 5))
+          .first;
       final recommendations = <Map<String, dynamic>>[];
 
       // Calorie-based recommendations
@@ -1010,5 +1156,72 @@ class FirebaseService {
   /// Get date key for Firestore document
   String _getDateKey(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+  
+  /// Clean up old dailySummary data (older than 7 days) to save space
+  Future<void> cleanupOldDailySummaryData(String userId) async {
+    try {
+      if (!isAvailable || userId.isEmpty) return;
+      
+      final now = DateTime.now();
+      final cutoffDate = now.subtract(const Duration(days: 7));
+      
+      // Get all dailySummary documents
+      final allSummaries = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('dailySummary')
+          .get()
+          .timeout(const Duration(seconds: 10));
+
+      final batch = _firestore.batch();
+      int deletedCount = 0;
+
+      for (final doc in allSummaries.docs) {
+        try {
+          final data = doc.data();
+          final dateValue = data['date'];
+          
+          DateTime? summaryDate;
+          if (dateValue is Timestamp) {
+            summaryDate = dateValue.toDate();
+          } else if (dateValue is DateTime) {
+            summaryDate = dateValue;
+          } else {
+            // Try to parse from document ID (format: YYYY-MM-DD)
+            try {
+              final parts = doc.id.split('-');
+              if (parts.length == 3) {
+                summaryDate = DateTime(
+                  int.parse(parts[0]),
+                  int.parse(parts[1]),
+                  int.parse(parts[2]),
+                );
+              }
+            } catch (_) {
+              // Skip if can't parse
+              continue;
+            }
+          }
+
+          // Delete if older than 7 days
+          if (summaryDate != null && summaryDate.isBefore(cutoffDate)) {
+            batch.delete(doc.reference);
+            deletedCount++;
+          }
+        } catch (e) {
+          print('Error processing summary document ${doc.id}: $e');
+          // Continue with other documents
+        }
+      }
+
+      if (deletedCount > 0) {
+        await batch.commit();
+        print('✅ Cleaned up $deletedCount old dailySummary documents (older than 7 days)');
+      }
+    } catch (e) {
+      print('❌ Error cleaning up old dailySummary data: $e');
+      // Don't throw - cleanup failure shouldn't break the app
+    }
   }
 }

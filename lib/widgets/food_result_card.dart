@@ -24,7 +24,7 @@ class FoodResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 12 : 16),
       decoration: const BoxDecoration(
         color: kSurfaceColor,
         borderRadius: BorderRadius.all(Radius.circular(20)),
@@ -35,7 +35,7 @@ class FoodResultCard extends StatelessWidget {
         children: [
           // Header with gradient
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
             decoration: const BoxDecoration(
               gradient: kPrimaryGradient,
               borderRadius: BorderRadius.only(
@@ -64,11 +64,13 @@ class FoodResultCard extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
-                          fontSize: 20,
+                        style: TextStyle(
+                          fontSize: MediaQuery.of(context).size.width < 360 ? 18 : 20,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
                       ),
                       if (calories != null) ...[
                         const SizedBox(height: 4),
@@ -90,7 +92,7 @@ class FoodResultCard extends StatelessWidget {
 
           // Content
           Padding(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -128,6 +130,8 @@ class FoodResultCard extends StatelessWidget {
                               color: kTextPrimary,
                               fontStyle: FontStyle.italic,
                             ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 4,
                           ),
                         ),
                       ],

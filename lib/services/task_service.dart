@@ -154,7 +154,10 @@ class TaskService {
       return;
     }
     
-    print('📋 Task service: Initializing for user ${_currentUserId}');
+    print('📋 Task service: Initializing for user $_currentUserId');
+    
+    // Delete any existing example tasks first
+    await _deleteAllExampleTasks();
     
     // Start listening to tasks changes
     _startTasksListener();
@@ -163,19 +166,65 @@ class TaskService {
     await _loadInitialTasks();
   }
   
-  /// Load initial tasks from Firestore
+  /// Delete all example tasks from Firebase and local cache
+  Future<void> _deleteAllExampleTasks() async {
+    if (_currentUserId == null) return;
+    
+    try {
+      // Get all tasks directly from Firestore (not using getTasks to avoid recursion)
+      final snapshot = await _firestore
+          .collection('tasks')
+          .where('userId', isEqualTo: _currentUserId)
+          .get();
+      
+      final allTasks = snapshot.docs
+          .map((doc) => Task.fromFirestore(doc))
+          .toList();
+      
+      // Find example tasks
+      final exampleTasks = allTasks.where((task) => _isExampleTask(task)).toList();
+      
+      if (exampleTasks.isEmpty) {
+        print('📋 No example tasks found to delete');
+        return;
+      }
+      
+      print('📋 Found ${exampleTasks.length} example tasks to delete');
+      
+      // Delete from Firestore
+      final batch = _firestore.batch();
+      for (final task in exampleTasks) {
+        batch.delete(_firestore.collection('tasks').doc(task.id));
+        // Also remove from local list
+        _localTasks.removeWhere((t) => t.id == task.id);
+      }
+      
+      await batch.commit();
+      
+      // Update UI to remove example tasks
+      _tasksController.add(List.from(_localTasks));
+      
+      print('📋 Deleted ${exampleTasks.length} example tasks');
+    } catch (e) {
+      print('📋 Error deleting example tasks: $e');
+    }
+  }
+  
+  /// Load initial tasks from Firestore (excluding example tasks)
   Future<void> _loadInitialTasks() async {
     try {
-      final tasks = await getTasks();
-      _localTasks = tasks;
-      _tasksController.add(tasks);
-      print('📋 Task service: Loaded ${tasks.length} initial tasks');
+      final allTasks = await getTasks();
+      // Filter out example tasks
+      final userTasks = allTasks.where((task) => !_isExampleTask(task)).toList();
+      _localTasks = userTasks;
+      _tasksController.add(userTasks);
+      print('📋 Task service: Loaded ${userTasks.length} user tasks (filtered out ${allTasks.length - userTasks.length} example tasks)');
     } catch (e) {
       print('📋 Task service: Error loading initial tasks: $e');
     }
   }
 
-  /// Start listening to tasks changes in Firestore
+  /// Start listening to tasks changes in Firestore (excluding example tasks)
   void _startTasksListener() {
     if (_currentUserId == null) return;
 
@@ -185,11 +234,21 @@ class TaskService {
         .snapshots()
         .listen((snapshot) {
       print('📋 Firestore listener triggered, ${snapshot.docs.length} documents');
-      final tasks = snapshot.docs
+      final allTasks = snapshot.docs
           .map((doc) => Task.fromFirestore(doc))
           .toList()
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt)); // Sort by creation date descending
-      print('📋 Parsed ${tasks.length} tasks from Firestore');
+      
+      // Filter out example tasks
+      final tasks = allTasks.where((task) => !_isExampleTask(task)).toList();
+      
+      // If we found example tasks in the stream, delete them
+      if (allTasks.length != tasks.length) {
+        print('📋 Found example tasks in stream, deleting them...');
+        _deleteExampleTasksFromFirestore(allTasks.where((task) => _isExampleTask(task)).toList());
+      }
+      
+      print('📋 Parsed ${tasks.length} user tasks from Firestore (filtered out example tasks)');
       print('📋 Firestore task titles: ${tasks.map((t) => t.title).toList()}');
       print('📋 Local tasks before update: ${_localTasks.map((t) => t.title).toList()}');
       
@@ -200,8 +259,24 @@ class TaskService {
       _tasksController.add(_localTasks);
     });
   }
+  
+  /// Delete example tasks from Firestore
+  Future<void> _deleteExampleTasksFromFirestore(List<Task> exampleTasks) async {
+    if (exampleTasks.isEmpty) return;
+    
+    try {
+      final batch = _firestore.batch();
+      for (final task in exampleTasks) {
+        batch.delete(_firestore.collection('tasks').doc(task.id));
+      }
+      await batch.commit();
+      print('📋 Deleted ${exampleTasks.length} example tasks from Firestore');
+    } catch (e) {
+      print('📋 Error deleting example tasks from Firestore: $e');
+    }
+  }
 
-  /// Get all tasks for the current user
+  /// Get all tasks for the current user (excluding example tasks)
   Future<List<Task>> getTasks() async {
     if (_currentUserId == null) return [];
 
@@ -211,11 +286,21 @@ class TaskService {
           .where('userId', isEqualTo: _currentUserId)
           .get();
 
-      final tasks = snapshot.docs
+      final allTasks = snapshot.docs
           .map((doc) => Task.fromFirestore(doc))
           .toList()
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt)); // Sort by creation date descending
-      return tasks;
+      
+      // Filter out example tasks
+      final userTasks = allTasks.where((task) => !_isExampleTask(task)).toList();
+      
+      // If we found example tasks, delete them
+      if (allTasks.length != userTasks.length) {
+        print('📋 Found example tasks in getTasks, deleting them...');
+        _deleteExampleTasksFromFirestore(allTasks.where((task) => _isExampleTask(task)).toList());
+      }
+      
+      return userTasks;
     } catch (e) {
       print('Error getting tasks: $e');
       return [];

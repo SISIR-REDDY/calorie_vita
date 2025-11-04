@@ -99,11 +99,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   // Rewards data
   UserProgress? _userProgress;
-  List<UserReward> _recentRewards = [];
+  final List<UserReward> _recentRewards = [];
   bool _isStreakLoading = true;
   
   // Debug panel
-  bool _showDebugPanel = false;
+  final bool _showDebugPanel = false;
   
   // Initialization tracking
   bool _hasInitialized = false;
@@ -118,7 +118,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   int? _googleFitWorkoutSessions;
   double? _googleFitWorkoutDuration;
   String _activityLevel = 'Unknown';
-  bool _isLiveSyncing = false;
+  final bool _isLiveSyncing = false;
   bool _isGoogleFitLoading = false;
   DateTime? _lastSyncTime;
 
@@ -146,6 +146,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   StreamSubscription<int>? _todaysFoodCaloriesSubscription;
   StreamSubscription<Map<String, double>>? _todaysFoodMacroSubscription;
   Timer? _goalsCheckTimer;
+  Timer? _goalsDebounceTimer;
   Timer? _googleFitRefreshTimer;
   Timer? _streakRefreshTimer;
   UserStreakSummary _streakSummary = UserStreakSummary(
@@ -240,16 +241,40 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       });
       
       // Listen to consumed calories stream (same data as TodaysFoodScreen)
-      _todaysFoodCaloriesSubscription = _todaysFoodDataService.consumedCaloriesStream.listen((calories) {
-        _debounceUIUpdate(() {
-          if (!mounted) return;
-          // Respect manual override for the current session
-          if (_manualCaloriesConsumedOverride != null) return;
-          if (_dailySummary != null) {
-            _dailySummary = _dailySummary!.copyWith(caloriesConsumed: calories);
-          }
-        });
-      });
+      _todaysFoodCaloriesSubscription?.cancel(); // Cancel existing subscription first
+      _todaysFoodCaloriesSubscription = _todaysFoodDataService.consumedCaloriesStream.listen(
+        (calories) {
+          _debounceUIUpdate(() {
+            if (!mounted) return;
+            // Respect manual override for the current session
+            if (_manualCaloriesConsumedOverride != null) return;
+            // Always update calories from TodaysFoodDataService (primary source)
+            if (_dailySummary != null) {
+              setState(() {
+                _dailySummary = _dailySummary!.copyWith(caloriesConsumed: calories);
+              });
+              print('✅ Home: Calories updated from TodaysFoodDataService: $calories');
+            } else {
+              // Create daily summary if it doesn't exist
+              setState(() {
+                _dailySummary = DailySummary(
+                  caloriesConsumed: calories,
+                  caloriesBurned: 0,
+                  caloriesGoal: 2000,
+                  steps: 0,
+                  stepsGoal: 10000,
+                  waterGlasses: 0,
+                  waterGlassesGoal: 8,
+                  date: DateTime.now(),
+                );
+              });
+            }
+          });
+        },
+        onError: (error) {
+          print('❌ Home: Error in consumed calories stream: $error');
+        },
+      );
 
       // Listen to macro nutrients stream (same data as TodaysFoodScreen)
       _todaysFoodMacroSubscription = _todaysFoodDataService.macroNutrientsStream.listen((macros) {
@@ -402,33 +427,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Set up only essential listeners to reduce buffering
   void _setupEssentialListeners() {
     try {
-      // Only set up critical listeners first
-      if (_currentUserId != null) {
-        _realTimeInputService
-            .getTodaySummary(_currentUserId!)
-            .listen((summary) {
-          if (mounted) {
-            setState(() {
-              _dailySummary = summary;
-            });
-          }
-        }).onError((error) {
-          debugPrint('Daily summary stream error: $error');
-        });
-
-        // Listen to enhanced streak updates
-        _enhancedStreakService.streakStream.listen((streakSummary) {
-          if (mounted) {
-            setState(() {
-              _streakSummary = streakSummary;
-            });
-          }
-        }).onError((error) {
-          debugPrint('Enhanced streak stream error: $error');
-        });
-
-        // Listen to task updates with instant state management (no delays)
-        _taskService.tasksStream.listen((tasks) {
+      // Only set up task listeners here - all other listeners are in _setupDataListeners()
+      // Listen to task updates with instant state management (no delays)
+      _tasksSubscription?.cancel();
+      _tasksSubscription = _taskService.tasksStream.listen(
+        (tasks) {
           debugPrint('📋 Task stream received ${tasks.length} tasks');
           debugPrint('📋 Task titles: ${tasks.map((t) => t.title).toList()}');
           if (mounted) {
@@ -444,52 +447,29 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               debugPrint('📋 UI updated instantly with ${_tasks.length} tasks, hasUserTasks: $_hasUserTasks');
             }
             
-            // Add example tasks if user has no tasks and we haven't loaded any yet
-            if (tasks.isEmpty && !_hasUserTasks && !_taskService.hasExampleTasksAdded) {
-              debugPrint('📋 No tasks found, adding example tasks...');
-              _taskService.addExampleTasks();
-            }
+            // Do not add default tasks - users should add their own tasks
+            // Removed automatic example task addition - users must add tasks manually
           }
-        }).onError((error) {
+        },
+        onError: (error) {
           debugPrint('❌ Task stream error: $error');
           if (mounted) {
             setState(() {
               _isTasksLoading = false;
             });
           }
-        });
+        },
+      );
 
-        // Fallback: Load tasks directly after a short delay if stream doesn't work
-        Timer(const Duration(seconds: 1), () {
-          if (_isTasksLoading && mounted) {
-            debugPrint('📋 Task stream timeout, loading tasks directly...');
-            _loadTasksData();
-          }
-        });
-      }
-
-      // Keep existing app state service listeners for backward compatibility
-      _appStateService.macroBreakdownStream.listen((breakdown) {
-        if (mounted) {
-          setState(() {
-            _macroBreakdown = breakdown;
-          });
+      // Fallback: Load tasks directly after a short delay if stream doesn't work
+      Timer(const Duration(seconds: 1), () {
+        if (_isTasksLoading && mounted) {
+          debugPrint('📋 Task stream timeout, loading tasks directly...');
+          _loadTasksData();
         }
-      }).onError((error) {
-        debugPrint('Macro breakdown stream error: $error');
       });
 
-      _appStateService.preferencesStream.listen((preferences) {
-        if (mounted) {
-          setState(() {
-            _preferences = preferences;
-          });
-        }
-      }).onError((error) {
-        debugPrint('Preferences stream error: $error');
-      });
-
-      // Goals stream listener is now in _setupDataListeners() to ensure AppStateService is initialized
+      // All other listeners (daily summary, streaks, goals, macro, preferences) are in _setupDataListeners()
     } catch (e) {
       debugPrint('Stream setup error: $e');
     }
@@ -527,6 +507,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _goalsSubscription?.cancel();
     _goalsEventBusSubscription?.cancel();
     _goalsCheckTimer?.cancel();
+    _goalsDebounceTimer?.cancel();
     _googleFitRefreshTimer?.cancel();
     _streakRefreshTimer?.cancel();
     _googleFitDataSubscription?.cancel();
@@ -537,6 +518,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _fastMacroBreakdownSubscription?.cancel();
     _todaysFoodCaloriesSubscription?.cancel();
     _todaysFoodMacroSubscription?.cancel();
+    _tasksSubscription?.cancel();
     _uiUpdateTimer?.cancel();
     // GoogleFitCacheService removed for simplification
     _fastDataRefreshService.dispose();
@@ -687,17 +669,33 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Load cached data immediately to show something to user
   void _loadCachedDataImmediate() {
     try {
-      // Load cached summary if available
-      _dailySummary ??= DailySummary(
-        caloriesConsumed: 0,
-        caloriesBurned: 0,
-        caloriesGoal: 2000,
-        steps: 0,
-        stepsGoal: 10000,
-        waterGlasses: 0,
-        waterGlassesGoal: 8,
-        date: DateTime.now(),
-      );
+      // Load cached summary if available, but preserve consumed calories if already loaded
+      if (_dailySummary == null) {
+        // Try to get cached calories from TodaysFoodDataService first
+        final cachedCalories = _todaysFoodDataService.getCachedConsumedCalories();
+        _dailySummary = DailySummary(
+          caloriesConsumed: cachedCalories, // Use cached calories instead of 0
+          caloriesBurned: 0,
+          caloriesGoal: 2000,
+          steps: 0,
+          stepsGoal: 10000,
+          waterGlasses: 0,
+          waterGlassesGoal: 8,
+          date: DateTime.now(),
+        );
+        if (cachedCalories > 0) {
+          print('✅ Home: Loaded cached calories: $cachedCalories');
+        }
+      } else {
+        // If summary exists, try to update with cached calories if it's 0
+        final cachedCalories = _todaysFoodDataService.getCachedConsumedCalories();
+        if (_dailySummary!.caloriesConsumed == 0 && cachedCalories > 0) {
+          setState(() {
+            _dailySummary = _dailySummary!.copyWith(caloriesConsumed: cachedCalories);
+          });
+          print('✅ Home: Updated calories from cache: $cachedCalories');
+        }
+      }
 
       // Load Google Fit data immediately if available
       _loadGoogleFitDataImmediate();
@@ -714,21 +712,26 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
-  /// Load consumed calories from food history
+  /// Load consumed calories from food history (deprecated - use TodaysFoodDataService stream instead)
+  /// This is kept for fallback only
   Future<void> _loadConsumedCaloriesFromFoodHistory() async {
     try {
       // Get consumed calories from food history
       final consumedCalories = await FoodHistoryService.getTodaysConsumedCalories();
       
-      if (mounted) {
-        setState(() {
-          if (_dailySummary != null) {
-            _dailySummary = _dailySummary!.copyWith(caloriesConsumed: consumedCalories);
-          }
-        });
+      if (mounted && consumedCalories > 0) {
+        // Only update if we have real data and current value is 0
+        // This prevents overwriting stream data
+        final currentCalories = _dailySummary?.caloriesConsumed ?? 0;
+        if (currentCalories == 0 && consumedCalories > 0) {
+          setState(() {
+            if (_dailySummary != null) {
+              _dailySummary = _dailySummary!.copyWith(caloriesConsumed: consumedCalories);
+            }
+          });
+          print('✅ Loaded consumed calories from food history (fallback): $consumedCalories');
+        }
       }
-      
-      print('✅ Loaded consumed calories from food history: $consumedCalories');
     } catch (e) {
       print('❌ Error loading consumed calories from food history: $e');
     }
@@ -927,37 +930,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   @Deprecated('Use _initializeUnifiedGoogleFit instead')
   Future<void> _initializeGoogleFit() async {
     print('⚠️ _initializeGoogleFit is deprecated - use OptimizedGoogleFitManager');
-    return;
-    
-    // Old code below - not executed
-    try {
-      // Initialize both services
-      // await _googleFitService.initialize();
-      // OptimizedGoogleFitService removed for simplification
-
-      // Check authentication status immediately
-      final isAuthenticated = false; // await _googleFitService.validateAuthentication();
-      setState(() {
-        _isGoogleFitConnected = isAuthenticated;
-      });
-
-      if (_isGoogleFitConnected) {
-        // Load Google Fit data immediately for instant UI update using optimized service
-        await _loadGoogleFitDataOptimized();
-
-        // Live sync handled automatically by OptimizedGoogleFitManager
-        _startGoogleFitRefreshTimer();
-
-        print('Google Fit initialized and connected - UI updated instantly with optimized service');
-      } else {
-        print('Google Fit not connected - user needs to authenticate');
-      }
-    } catch (e) {
-      print('Error initializing Google Fit: $e');
-      setState(() {
-        _isGoogleFitConnected = false;
-      });
-    }
+    // Old implementation removed - use OptimizedGoogleFitManager instead
   }
 
   /// Initialize Google Fit cache service for enhanced performance
@@ -1109,7 +1082,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       }
 
       print(
-          'Google Fit data loaded (fallback): Steps=$steps, Calories=$calories, Workouts=${_googleFitWorkoutSessions}');
+          'Google Fit data loaded (fallback): Steps=$steps, Calories=$calories, Workouts=$_googleFitWorkoutSessions');
     } catch (e) {
       print('Fallback Google Fit loading failed: $e');
       if (mounted) {
@@ -1267,12 +1240,13 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
   /// Set up periodic streak refresh to ensure data stays current
+  /// OPTIMIZED: Reduced from 30s to 5 minutes to reduce API calls and improve performance
   void _setupPeriodicStreakRefresh() {
     _streakRefreshTimer?.cancel();
-    _streakRefreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    _streakRefreshTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
       _refreshStreaksPeriodically();
     });
-    debugPrint('Periodic streak refresh timer set up');
+    debugPrint('Periodic streak refresh timer set up (optimized: 5 min interval)');
   }
 
   /// Refresh streaks periodically to ensure data stays current
@@ -1345,40 +1319,75 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   /// Set up real-time data listeners from AppStateService
   void _setupDataListeners() {
-    // Listen to daily summary updates
+    // Listen to daily summary updates with debouncing
     _dailySummarySubscription?.cancel();
     _dailySummarySubscription =
         _appStateService.dailySummaryStream.listen((summary) async {
-      if (mounted) {
+      if (!mounted) return;
+      
+      // Only update if data actually changed
+      if (_dailySummary?.toMap() != summary?.toMap()) {
         setState(() {
-          _dailySummary = summary;
+          // Preserve consumed calories from TodaysFoodDataService if it's already set
+          // This prevents AppStateService from overwriting with 0
+          final currentConsumedCalories = _dailySummary?.caloriesConsumed ?? 0;
+          final newConsumedCalories = summary?.caloriesConsumed ?? 0;
+          
+          // Only use AppStateService calories if:
+          // 1. We don't have current calories (0 or null), OR
+          // 2. The new value is greater than 0 (real data)
+          // This prevents overwriting real data with 0
+          if (summary != null) {
+            if (currentConsumedCalories == 0 && newConsumedCalories > 0) {
+              // Use AppStateService value if we have no current value but new value is valid
+              _dailySummary = summary;
+            } else if (currentConsumedCalories > 0) {
+              // Preserve current calories from TodaysFoodDataService
+              _dailySummary = summary.copyWith(caloriesConsumed: currentConsumedCalories);
+            } else {
+              // Default case - use summary as is
+              _dailySummary = summary;
+            }
+          } else {
+            // If summary is null, keep current summary
+            // Don't set to null
+          }
         });
         
-        // Refresh streaks when daily summary changes
-        try {
-          await _enhancedStreakService.refreshStreaks();
-        } catch (e) {
-          debugPrint('Error refreshing streaks after daily summary update: $e');
-        }
+        // OPTIMIZED: Removed automatic streak refresh here to prevent excessive API calls
+        // Streaks are refreshed periodically (every 5 min) and after user actions
+        // This prevents refreshing on every stream update
       }
     });
 
-    // Listen to macro breakdown updates
+    // Listen to macro breakdown updates with change detection
     _macroBreakdownSubscription?.cancel();
     _macroBreakdownSubscription =
         _appStateService.macroBreakdownStream.listen((breakdown) {
-      if (mounted) {
+      if (!mounted) return;
+      
+      // Only update if macro data actually changed
+      if (_hasMacroDataChanged({
+        'protein': breakdown.protein,
+        'carbs': breakdown.carbs,
+        'fat': breakdown.fat,
+        'fiber': breakdown.fiber,
+        'sugar': breakdown.sugar,
+      })) {
         setState(() {
           _macroBreakdown = breakdown;
         });
       }
     });
 
-    // Listen to preferences updates
+    // Listen to preferences updates with change detection
     _preferencesSubscription?.cancel();
     _preferencesSubscription =
         _appStateService.preferencesStream.listen((preferences) {
-      if (mounted) {
+      if (!mounted) return;
+      
+      // Only update if preferences actually changed
+      if (_preferences.toMap() != preferences.toMap()) {
         setState(() {
           _preferences = preferences;
         });
@@ -1390,44 +1399,68 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     // Set up Google Fit listeners
     _setupGoogleFitListeners();
 
-    // Listen to goals updates
+    // Listen to goals updates with debouncing and change detection
     debugPrint('Setting up goals stream listener in _setupDataListeners');
     _goalsSubscription?.cancel();
     _goalsSubscription = _appStateService.goalsStream.listen(
-      (goals) async {
-        debugPrint('=== HOME SCREEN GOALS STREAM UPDATE ===');
-        debugPrint('Received goals update: ${goals?.toMap()}');
-        debugPrint(
-            'Current daily summary before update: ${_dailySummary?.toMap()}');
-        if (mounted) {
-          // Force a complete refresh of the daily summary
-          await _refreshDailySummaryWithNewGoals(goals);
-          debugPrint('Daily summary after update: ${_dailySummary?.toMap()}');
-          debugPrint(
-              'UI should now show updated goals: Calorie=${goals?.calorieGoal}, Steps=${goals?.stepsPerDayGoal}, Water=${goals?.waterGlassesGoal}');
+      (goals) {
+        if (!mounted) return;
+        
+        // OPTIMIZED: Increased debounce from 300ms to 1s to prevent rapid refreshes
+        _goalsDebounceTimer?.cancel();
+        _goalsDebounceTimer = Timer(const Duration(seconds: 1), () async {
+          if (!mounted) return;
           
-          // Force UI refresh to ensure changes are visible
-          setState(() {
-            // Trigger a rebuild to show updated goals
-          });
-        }
-        debugPrint('=== END HOME SCREEN GOALS STREAM UPDATE ===');
+          // Only update if goals actually changed
+          final currentGoals = _appStateService.userGoals;
+          final currentMap = currentGoals?.toMap();
+          final newMap = goals?.toMap();
+          if (currentMap != newMap) {
+            debugPrint('Goals changed, refreshing daily summary');
+            await _refreshDailySummaryWithNewGoals(goals);
+            
+            if (mounted) {
+              setState(() {
+                // Trigger a rebuild to show updated goals
+              });
+            }
+          } else {
+            debugPrint('Goals stream update skipped - no actual change detected');
+          }
+        });
       },
       onError: (error) {
         debugPrint('Goals stream error: $error');
+        // Show user-friendly error
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error updating goals. Please try again.'),
+              backgroundColor: Colors.orange[600],
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
       },
     );
-    debugPrint('Goals stream listener set up successfully');
+    debugPrint('Goals stream listener set up successfully (optimized: 1s debounce)');
 
     // Listen to goals event bus for immediate updates
+    // OPTIMIZED: Added change detection to prevent duplicate refreshes
     _goalsEventBusSubscription?.cancel();
     _goalsEventBusSubscription = GoalsEventBus().goalsStream.listen(
       (goals) async {
         debugPrint('=== HOME SCREEN GOALS EVENT BUS UPDATE ===');
         debugPrint('Received goals update via event bus: ${goals.toMap()}');
         if (mounted) {
-          // Force a complete refresh of the daily summary
-          await _refreshDailySummaryWithNewGoals(goals);
+          // Check if goals actually changed before refreshing
+          final currentGoalsMap = _appStateService.userGoals?.toMap();
+          final newGoalsMap = goals.toMap();
+          if (currentGoalsMap != newGoalsMap) {
+            await _refreshDailySummaryWithNewGoals(goals);
+          } else {
+            debugPrint('Goals event bus update skipped - no actual change');
+          }
         }
         debugPrint('=== END HOME SCREEN GOALS EVENT BUS UPDATE ===');
       },
@@ -1435,30 +1468,50 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         debugPrint('Goals event bus error: $error');
       },
     );
-    debugPrint('Goals event bus listener set up successfully');
+    debugPrint('Goals event bus listener set up successfully (optimized: change detection)');
 
     // Register global callback for immediate goals updates
+    // OPTIMIZED: Added change detection to prevent duplicate refreshes
     GlobalGoalsManager().setGoalsUpdateCallback((goals) async {
       debugPrint('=== GLOBAL GOALS CALLBACK TRIGGERED ===');
       debugPrint('Received goals update via global callback: ${goals.toMap()}');
       if (mounted) {
-        await _refreshDailySummaryWithNewGoals(goals);
-        // Also force a complete UI refresh
-        forceUIRefresh();
+        // Check if goals actually changed before refreshing
+        final currentGoalsMap = _appStateService.userGoals?.toMap();
+        final newGoalsMap = goals.toMap();
+        if (currentGoalsMap != newGoalsMap) {
+          await _refreshDailySummaryWithNewGoals(goals);
+          // Also force a complete UI refresh
+          forceUIRefresh();
+        } else {
+          debugPrint('Global goals callback skipped - no actual change');
+        }
       }
       debugPrint('=== END GLOBAL GOALS CALLBACK ===');
     });
-    debugPrint('Global goals callback registered');
+    debugPrint('Global goals callback registered (optimized: change detection)');
 
-    // Set up periodic goals check (optimized - every 30 seconds instead of 2 seconds)
-    _goalsCheckTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    // Set up periodic goals check (optimized - every 5 minutes instead of 30 seconds)
+    // Goals are already updated via streams, so periodic check is just a safety net
+    _goalsCheckTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
       _checkForGoalsUpdate();
     });
-    debugPrint('Periodic goals check timer set up (optimized: 30s interval)');
+    debugPrint('Periodic goals check timer set up (optimized: 5 min interval)');
 
-    // Listen to achievements updates
+    // Listen to achievements updates with change detection
     _analyticsService.achievementsStream.listen((achievements) {
-      if (mounted) {
+      if (!mounted) return;
+      
+      // Only update if achievements list actually changed
+      bool hasChanged = _achievements.length != achievements.length;
+      if (!hasChanged) {
+        // Check if any achievement IDs changed
+        final currentIds = _achievements.map((a) => a.id).toList();
+        final newIds = achievements.map((a) => a.id).toList();
+        hasChanged = currentIds.join(',') != newIds.join(',');
+      }
+      
+      if (hasChanged) {
         setState(() {
           _achievements = achievements;
         });
@@ -1569,28 +1622,39 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
   /// Check for goals update periodically
-  void _checkForGoalsUpdate() {
+  /// OPTIMIZED: Added change detection to prevent unnecessary refreshes
+  Future<void> _checkForGoalsUpdate() async {
     if (!mounted) return;
 
-    final simpleGoals = SimpleGoalsNotifier().currentGoals;
-    final appStateGoals = _appStateService.userGoals;
+    try {
+      final simpleGoals = SimpleGoalsNotifier().currentGoals;
+      final appStateGoals = _appStateService.userGoals;
 
-    // Reduced logging frequency - only log when goals actually change
-    if (simpleGoals?.toMap() != appStateGoals?.toMap()) {
-      debugPrint('Periodic goals check - Goals changed: Simple: ${simpleGoals?.toMap()}, AppState: ${appStateGoals?.toMap()}');
-    }
-
-    // Check if goals have changed
-    if (simpleGoals != null && appStateGoals != null) {
-      if (simpleGoals.calorieGoal != appStateGoals.calorieGoal ||
-          simpleGoals.stepsPerDayGoal != appStateGoals.stepsPerDayGoal ||
-          simpleGoals.waterGlassesGoal != appStateGoals.waterGlassesGoal) {
-        debugPrint('Goals change detected via periodic check - refreshing UI');
-        _refreshDailySummaryWithNewGoals(simpleGoals);
+      // Check if goals actually changed
+      final simpleMap = simpleGoals?.toMap();
+      final appStateMap = appStateGoals?.toMap();
+      
+      // Only log when there's a change
+      if (simpleMap != appStateMap) {
+        debugPrint('Periodic goals check - Simple: ${simpleMap != null ? "present" : "null"}, AppState: ${appStateMap != null ? "present" : "null"}');
       }
-    } else if (simpleGoals != null && appStateGoals == null) {
-      debugPrint('Simple goals available but AppState goals null - refreshing with simple goals');
-      _refreshDailySummaryWithNewGoals(simpleGoals);
+
+      // Only refresh if there's an actual difference
+      if (simpleGoals != null && appStateGoals != null) {
+        if (simpleMap != appStateMap) {
+          debugPrint('Goals change detected via periodic check - refreshing UI');
+          await _refreshDailySummaryWithNewGoals(simpleGoals);
+        } else {
+          debugPrint('Periodic goals check - no change detected, skipping refresh');
+        }
+      } else if (simpleGoals != null && appStateGoals == null) {
+        debugPrint('Simple goals available but AppState goals null - refreshing with simple goals');
+        await _refreshDailySummaryWithNewGoals(simpleGoals);
+      } else {
+        debugPrint('Periodic goals check - both null or no change, skipping');
+      }
+    } catch (e) {
+      debugPrint('Error checking for goals update: $e');
     }
   }
 
@@ -1702,12 +1766,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       await _saveDailySummaryToFirestore();
     }
     
-    // Refresh streaks after calorie update
-    try {
-      await _enhancedStreakService.refreshStreaks();
-    } catch (e) {
-      debugPrint('Error refreshing streaks after calorie update: $e');
-    }
+    // OPTIMIZED: Streaks are refreshed periodically (every 5 min) instead of after every update
+    // This reduces API calls significantly while still keeping data fresh
+    // Streaks will be refreshed on next periodic timer (5 min) or when user explicitly refreshes
   }
 
   /// Update water glasses value and save to Firestore
@@ -1720,12 +1781,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
     await _saveDailySummaryToFirestore();
     
-    // Refresh streaks after water update
-    try {
-      await _enhancedStreakService.refreshStreaks();
-    } catch (e) {
-      debugPrint('Error refreshing streaks after water update: $e');
-    }
+    // OPTIMIZED: Streaks are refreshed periodically (every 5 min) instead of after every update
+    // This reduces API calls significantly while still keeping data fresh
   }
 
   /// Update water target value and save to Firestore
@@ -1743,12 +1800,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         _appStateService.userGoals?.copyWith(waterGlassesGoal: value) ??
             const UserGoals(waterGlassesGoal: 8));
     
-    // Refresh streaks after water target update
-    try {
-      await _enhancedStreakService.refreshStreaks();
-    } catch (e) {
-      debugPrint('Error refreshing streaks after water target update: $e');
-    }
+    // OPTIMIZED: Streaks are refreshed periodically (every 5 min) instead of after every update
+    // This reduces API calls significantly while still keeping data fresh
   }
 
   /// Show water glasses input dialog
@@ -1841,12 +1894,12 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
+                color: kSuccessColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info, color: Colors.green, size: 16),
+                  const Icon(Icons.info, color: kSuccessColor, size: 16),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -2440,18 +2493,31 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                gradient: kPrimaryGradient,
-                borderRadius: BorderRadius.circular(40),
-              ),
-              child: const Icon(
-                Icons.local_fire_department,
-                color: Colors.white,
-                size: 40,
-              ),
+            Builder(
+              builder: (context) {
+                final screenWidth = MediaQuery.of(context).size.width;
+                final iconSize = screenWidth < 360 ? 60.0 : (screenWidth < 600 ? 80.0 : 100.0);
+                final iconInnerSize = iconSize * 0.5;
+                return Container(
+                  width: iconSize,
+                  height: iconSize,
+                  constraints: const BoxConstraints(
+                    minWidth: 50,
+                    maxWidth: 100,
+                    minHeight: 50,
+                    maxHeight: 100,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: kPrimaryGradient,
+                    borderRadius: BorderRadius.circular(iconSize / 2),
+                  ),
+                  child: Icon(
+                    Icons.local_fire_department,
+                    color: Colors.white,
+                    size: iconInnerSize,
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 24),
             Text(
@@ -2479,10 +2545,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     final now = DateTime.now();
     final greeting = _getGreeting(now.hour);
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final margin = screenWidth < 360 ? 12.0 : (screenWidth < 600 ? 20.0 : 24.0);
+    final padding = screenWidth < 360 ? 16.0 : (screenWidth < 600 ? 24.0 : 28.0);
+    
     return SliverToBoxAdapter(
       child: Container(
-        margin: const EdgeInsets.all(20),
-        padding: const EdgeInsets.all(24),
+        margin: EdgeInsets.all(margin),
+        padding: EdgeInsets.all(padding),
         decoration: BoxDecoration(
           gradient: kPrimaryGradient,
           borderRadius: BorderRadius.circular(24),
@@ -2781,7 +2851,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     fontWeight: FontWeight.w600,
                     color: Theme.of(context).colorScheme.onSurface,
                   ),
-                  overflow: TextOverflow.visible,
+                  overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),
               ),
@@ -2791,11 +2861,13 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           Text(
             '$value $unit',
             style: GoogleFonts.poppins(
-              fontSize: 20,
+              fontSize: MediaQuery.of(context).size.width < 360 ? 18 : 20,
               fontWeight: FontWeight.bold,
               color: color,
             ),
             textAlign: TextAlign.left,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
           const SizedBox(height: 4),
           Text(
@@ -2915,11 +2987,13 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                       ? 'Congratulations! 🎉'
                       : '${_calorieUnitsService.formatCaloriesShort(caloriesToTarget.abs().toDouble())} ${_calorieUnitsService.unitSuffix} remaining',
                   style: GoogleFonts.poppins(
-                    fontSize: 18,
+                    fontSize: MediaQuery.of(context).size.width < 360 ? 16 : 18,
                     fontWeight: FontWeight.bold,
                     color: color,
                   ),
                   textAlign: TextAlign.left,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -3183,8 +3257,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         isCompleted ? kSuccessColor : color; // Use original colors
 
     Widget cardContent = Container(
-      height: 180, // Fixed height for consistent sizing
-      padding: const EdgeInsets.all(18),
+      height: MediaQuery.of(context).size.width < 360 ? 160 : 180,
+      padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 14 : 18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -3254,7 +3328,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               Text(
                 current,
                 style: GoogleFonts.poppins(
-                  fontSize: 28,
+                  fontSize: MediaQuery.of(context).size.width < 360 ? 24 : 28,
                   fontWeight: FontWeight.bold,
                   color: progressColor,
                   height: 1.1,
@@ -3890,7 +3964,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               });
               
               // Check if this date has rewards (simplified - could be enhanced)
-              final hasReward = false; // Could be enhanced with actual reward data
+              const hasReward = false; // Could be enhanced with actual reward data
 
               return Expanded(
                 child: Padding(
@@ -4138,7 +4212,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         // Show success message INSTANTLY (no delays)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Task added'),
+            content: const Text('Task added'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -4151,7 +4225,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to add task'),
+            content: const Text('Failed to add task'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -4203,7 +4277,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         // Show success message INSTANTLY (no delays)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Task updated'),
+            content: const Text('Task updated'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -4218,7 +4292,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         print('🔄 Toggle failed');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to update task'),
+            content: const Text('Failed to update task'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -4268,7 +4342,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         // Show success message INSTANTLY (no delays)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Task deleted'),
+            content: const Text('Task deleted'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -4281,7 +4355,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to delete task'),
+            content: const Text('Failed to delete task'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -4449,7 +4523,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                           color: AppColors.primaryColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.restaurant_menu,
                           color: AppColors.primaryColor,
                           size: 20,
@@ -4485,7 +4559,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     ),
                     child: IconButton(
                       onPressed: () => _showAllFoodHistory(),
-                      icon: Icon(
+                      icon: const Icon(
                         Icons.arrow_forward_ios,
                         color: AppColors.primaryColor,
                         size: 16,
@@ -4627,41 +4701,41 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
-  /// Get food icon color based on category
+  /// Get food icon color based on category (using app_colors constants)
   Color _getFoodIconColor(FoodHistoryEntry entry) {
     final category = entry.category?.toLowerCase();
-    if (category == null) return AppColors.primaryColor;
+    if (category == null) return kPrimaryColor;
     
     if (category.contains('fruit') || category.contains('apple') || category.contains('banana')) {
-      return Colors.red[600]!;
+      return kErrorColor; // Red for fruits
     } else if (category.contains('vegetable') || category.contains('salad')) {
-      return Colors.green[600]!;
+      return kSuccessColor; // Green for vegetables
     } else if (category.contains('meat') || category.contains('chicken') || category.contains('beef')) {
-      return Colors.brown[600]!;
+      return kAccentColor; // Orange/Amber for meat
     } else if (category.contains('dairy') || category.contains('milk') || category.contains('cheese')) {
-      return Colors.blue[600]!;
+      return kInfoColor; // Blue for dairy
     } else if (category.contains('bread') || category.contains('grain') || category.contains('rice')) {
-      return Colors.orange[600]!;
+      return kAccentColor; // Orange/Amber for grains
     } else if (category.contains('drink') || category.contains('beverage')) {
-      return Colors.cyan[600]!;
+      return kInfoColor; // Blue for drinks
     } else if (category.contains('snack') || category.contains('chip')) {
-      return Colors.purple[600]!;
+      return kAccentPurple; // Purple for snacks
     } else {
-      return AppColors.primaryColor;
+      return kPrimaryColor;
     }
   }
 
-  /// Get source color based on source type
+  /// Get source color based on source type (using app_colors constants)
   Color _getSourceColor(String source) {
     switch (source) {
       case 'camera_scan':
-        return Colors.blue[600]!;
+        return kInfoColor; // Blue for camera
       case 'barcode_scan':
-        return Colors.green[600]!;
+        return kSuccessColor; // Green for barcode
       case 'manual_entry':
-        return Colors.orange[600]!;
+        return kAccentColor; // Orange/Amber for manual
       default:
-        return AppColors.primaryColor;
+        return kPrimaryColor;
     }
   }
 

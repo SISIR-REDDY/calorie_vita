@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 import 'main_app.dart';
 import 'services/network_service.dart';
@@ -12,6 +13,7 @@ import 'services/logger_service.dart';
 import 'services/push_notification_service.dart';
 import 'config/production_config.dart';
 import 'config/ai_config.dart';
+import 'utils/feature_status_checker.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,13 +57,51 @@ void main() async {
 
   // Initialize Firebase services
   await _initializeFirebaseServices();
+  
+  // Enable Firestore persistence for offline support
+  try {
+    await FirebaseFirestore.instance.enablePersistence();
+    logger.info('Firestore persistence enabled');
+  } catch (e) {
+    logger.warning('Firestore persistence already enabled or not available');
+  }
 
   // Initialize secure configuration service
+  // Note: Config may fail to load if user is not authenticated (security rules require auth)
+  // The config will be loaded automatically after user authentication via AppStateManager
   try {
     await AIConfig.initialize();
-    logger.info('Secure configuration initialized successfully');
+    logger.info('Secure configuration initialization attempted');
+    
+    // Log API key source for debugging
+    final apiKey = AIConfig.apiKey;
+    if (apiKey.isNotEmpty) {
+      print('🔑 API Key Status: ${apiKey.length} characters (${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)})');
+      print('   📍 Check FirestoreConfigService logs above to see if it came from Firebase or code');
+    } else {
+      print('⚠️ API Key is EMPTY - will load after user authentication');
+      print('   📌 Security: Config requires authentication (see firestore.rules)');
+      print('   📌 Config will be loaded automatically when user logs in');
+    }
+    
+    // Print feature status report
+    try {
+      await Future.delayed(const Duration(milliseconds: 500)); // Wait for config to load
+      FeatureStatusChecker.printStatusReport();
+    } catch (e) {
+      // Feature status checker not critical, just log
+      logger.debug('Feature status check skipped', {'error': e.toString()});
+    }
   } catch (e) {
-    logger.error('Secure configuration initialization error', {'error': e.toString()});
+    // Config load failure is expected if user is not authenticated
+    // It will be loaded automatically after authentication
+    if (e.toString().contains('permission') || e.toString().contains('Permission')) {
+      logger.info('Config load requires authentication - will load after user login');
+      print('ℹ️ Config requires authentication - will load after user login');
+    } else {
+      logger.warning('Secure configuration initialization error', {'error': e.toString()});
+      print('⚠️ Config initialization error: $e (may be due to missing auth)');
+    }
   }
 
   // Initialize push notification service

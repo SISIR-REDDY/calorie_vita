@@ -271,11 +271,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       child: Column(
         children: [
           // Logo
-          Image.asset(
-            'calorie_logo.png',
-            width: 60,
-            height: 60,
-            fit: BoxFit.contain,
+          Container(
+            width: MediaQuery.of(context).size.width < 360 ? 50 : 60,
+            height: MediaQuery.of(context).size.width < 360 ? 50 : 60,
+            constraints: const BoxConstraints(
+              minWidth: 40,
+              maxWidth: 70,
+              minHeight: 40,
+              maxHeight: 70,
+            ),
+            child: Image.asset(
+              'calorie_logo.png',
+              fit: BoxFit.contain,
+            ),
           ),
           const SizedBox(height: 12),
           
@@ -283,7 +291,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           Text(
             'Welcome to Calorie Vita!',
             style: GoogleFonts.poppins(
-              fontSize: 22,
+              fontSize: MediaQuery.of(context).size.width < 360 ? 20 : 22,
               fontWeight: FontWeight.bold,
               color: kTextPrimary,
             ),
@@ -445,7 +453,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 _selectedActivityLevel = value;
               });
             },
-          )).toList(),
+          )),
           const SizedBox(height: 24), // Extra spacing at bottom
         ],
     );
@@ -483,7 +491,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 _selectedFitnessGoal = value;
               });
             },
-          )).toList(),
+          )),
           const SizedBox(height: 24), // Extra spacing at bottom
         ],
     );
@@ -521,7 +529,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 _selectedDietPreference = value;
               });
             },
-          )).toList(),
+          )),
           const SizedBox(height: 24), // Extra spacing at bottom
         ],
     );
@@ -619,15 +627,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             suffixText: suffix,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: kBorderColor),
+              borderSide: const BorderSide(color: kBorderColor),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: kBorderColor),
+              borderSide: const BorderSide(color: kBorderColor),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: kPrimaryColor, width: 2),
+              borderSide: const BorderSide(color: kPrimaryColor, width: 2),
             ),
             filled: true,
             fillColor: kSurfaceColor,
@@ -763,7 +771,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: kBorderColor),
+                    side: const BorderSide(color: kBorderColor),
                   ),
                 ),
                 child: Text(

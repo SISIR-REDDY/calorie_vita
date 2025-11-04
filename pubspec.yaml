@@ -70,6 +70,7 @@ flutter:
     - assets/indian_foods.json
     - assets/comprehensive_indian_foods.json
     - assets/indian_packaged.json
+    - assets/calorie_data.json
     - calorie_logo.png
     - google-fit-png-logo.png
 

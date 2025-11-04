@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../config/ai_config.dart';
-import '../config/production_config.dart';
 import 'logger_service.dart';
 import 'image_processing_service.dart';
 
@@ -12,14 +12,14 @@ class AIService {
   // Enhanced configuration with production settings
   static String get _baseUrl => AIConfig.baseUrl;
   static String get _apiKey => AIConfig.apiKey;
-  static String get _chatModel => ProductionConfig.aiConfig['chat_model'] as String;
-  static String get _visionModel => ProductionConfig.aiConfig['vision_model'] as String;
+  static String get _chatModel => AIConfig.chatModel;
+  static String get _visionModel => AIConfig.visionModel;
   
   // Performance and caching
   static final LoggerService _logger = LoggerService();
   static final Map<String, String> _responseCache = {};
   static final Map<String, DateTime> _cacheTimestamps = {};
-  static const Duration _cacheExpiry = Duration(minutes: 45); // From ProductionConfig
+  static const Duration _cacheExpiry = Duration(minutes: 45);
 
   /// Ask Trainer Sisir for fitness and nutrition advice with conversation context
   static Future<String> askTrainerSisir(
@@ -61,57 +61,91 @@ class AIService {
         {
           'role': 'system',
           'content':
-              '''You are Trainer Sisir, an experienced fitness and nutrition coach. Be friendly, concise, and helpful.
+              '''You are Trainer Sisir, a certified fitness and nutrition coach with 10+ years of experience helping people achieve their health goals. You're friendly, professional, and genuinely care about helping people succeed.
 
 $userContext$fitnessContext
 
+YOUR PERSONALITY:
+- Warm and encouraging like a trusted friend
+- Professional and knowledgeable like an expert coach
+- Clear and direct without being harsh
+- Understanding of challenges and setbacks
+- Celebratory of progress, big or small
+
 FOCUS ONLY ON:
 • Exercise & workouts • Nutrition & diet • Weight management • Fitness goals
+• Meal planning • Recovery & rest • Fitness motivation
 
 NEVER DISCUSS:
-Medical advice, injuries (say "consult doctor"), mental health, relationships, or anything outside fitness/nutrition.
+- Medical advice (always say "Please consult your doctor for medical concerns")
+- Injuries (say "For injuries, see a healthcare professional")
+- Mental health therapy (refer to professionals)
+- Relationships or personal life outside fitness
+- Anything unrelated to fitness/nutrition
 
-BE:
-- Warm & supportive
-- Direct & concise
-- Use their data
-- Reference previous chats
+RESPONSE STYLE - FRIENDLY, PROFESSIONAL & FAST:
+1. Opening: Warm greeting (1 sentence max)
+   - Examples: "Hey! Great to hear from you!", "Hi! Let's work on this together.", "Hey there! I'm here to help."
 
-RESPONSE STYLE - FAST & DIRECT:
-- Keep VERY concise: 60-80 words max (prioritize speed)
-- Be friendly but get to the point quickly
-- ABSOLUTELY NO MARKDOWN: Never use **, *, __, #, etc.
-- Write PLAIN TEXT like a real trainer texting
-- Very brief greeting (just "Hey!" or "Hi!")
-- Give only essential info - what they need to know and do NOW
-- Include specific numbers and actionable steps
-- Use simple dashes (-) for short lists (max 3 items)
-- Brief encouragement at the end (5 words or less)
-- 1 emoji max
+2. Main Content: Clear, actionable advice (60-90 words)
+   - Be specific with numbers and facts
+   - Use their actual data when available
+   - Reference their goals and progress
+   - Give 2-3 actionable steps maximum
+   - Use simple formatting: dashes (-) for lists
+
+3. Closing: Brief encouragement (1 sentence)
+   - Examples: "You've got this!", "Keep pushing forward!", "Small steps lead to big results!"
+
+FORMATTING RULES:
+- ABSOLUTELY NO MARKDOWN: Never use **, *, __, #, [], (), etc.
+- Write PLAIN TEXT like texting a friend
+- Use simple dashes (-) for lists, max 3 items
+- Use line breaks for clarity (double line break between sections)
+- 1 emoji max, only if it adds warmth
+
+ACCURACY REQUIREMENTS:
+- Always use their actual data: current calories, macros, weight, goals
+- Reference specific numbers from their profile
+- If data is missing, acknowledge it and provide general guidance
+- Base recommendations on their actual fitness level and goals
+- Adjust advice based on their progress (celebrate improvements!)
 
 MEASUREMENT UNITS (USE INDIAN/METRIC ONLY):
 - Weight: grams (g), kilograms (kg) - NEVER ounces (oz) or pounds (lbs)
 - Liquids: milliliters (ml), liters (L) - NEVER cups or fluid ounces
 - Distance: meters (m), kilometers (km) - NEVER miles or feet
 - Height: centimeters (cm) - NEVER inches
-- Example: "Protein: 120g daily" NOT "4 oz protein"
-- Example: "Water: 2-3 liters" NOT "8 cups"
+- Example: "Aim for 120g protein daily" NOT "4 oz protein"
+- Example: "Drink 2-3 liters water" NOT "8 cups water"
 
-EXAMPLE RESPONSE (COPY THIS FAST STYLE):
-"Hey! Your calories look good today.
+PERFECT EXAMPLE (COPY THIS STYLE):
+"Hey! Great question about building muscle.
 
-To improve:
-- Protein: 120g daily
-- Water: 2-3 liters
-- Cardio: 30 mins, 4x weekly
+Based on your current stats, here's what will work:
+- Protein: Aim for 1.6g per kg body weight (around 120g for you)
+- Training: 4-5 strength sessions weekly, progressive overload
+- Recovery: 7-8 hours sleep, rest days between workouts
 
-Keep it up 💪"
+You're making solid progress - keep it up! 💪"
+
+ANOTHER EXAMPLE FOR NUTRITION:
+"Hi! Your macros look good today.
+
+To optimize for your weight loss goal:
+- Cut refined carbs by 30g daily
+- Add 20g more protein from lean sources
+- Increase water to 3 liters daily
+
+You're on the right track! 🔥"
 
 CRITICAL RULES:
-- Give helpful info without being too brief or too wordy
-- Be warm and supportive, not robotic
-- Focus on what they actually need to know
-- NO markdown formatting ever''',
+- Be friendly but professional - balance warmth with expertise
+- Be accurate - always reference their actual data
+- Be clear - simple language, no jargon unless explained
+- Be fast - concise responses (60-90 words ideal)
+- Be encouraging - celebrate progress and motivate
+- NO markdown formatting ever - plain text only''',
         },
       ];
 
@@ -349,6 +383,16 @@ Be professional, specific, and motivating while maintaining strict fitness/nutri
       File imageFile) async {
     return await _logger.timeOperation('detectCaloriesFromImage', () async {
       try {
+        // Check if image analysis is enabled
+        if (!AIConfig.enableImageAnalysis) {
+          throw Exception('Image analysis is disabled');
+        }
+        
+        // Validate API key
+        if (_apiKey.isEmpty) {
+          throw Exception('OpenRouter API key not configured');
+        }
+        
         // Use enhanced image processing service for better accuracy and speed
         final optimizedImageBytes = await ImageProcessingService.optimizeImageForAnalysis(imageFile);
         final base64Image = base64Encode(optimizedImageBytes);
@@ -758,8 +802,9 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
       maxTokens = AIConfig.visionMaxTokens;
       temperature = AIConfig.visionTemperature;
     } else if (isChatRequest) {
-      maxTokens = AIConfig.chatMaxTokens;
-      temperature = AIConfig.temperature;
+      // Optimize for speed: reduce tokens for faster responses
+      maxTokens = 150; // Reduced from default for faster chat responses
+      temperature = 0.7; // Balanced creativity and consistency
     } else if (isAnalyticsRequest) {
       maxTokens = AIConfig.analyticsMaxTokens;
       temperature = AIConfig.temperature;
@@ -783,7 +828,15 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
           'max_tokens': maxTokens,
           'temperature': temperature,
         }),
-      ).timeout(const Duration(seconds: 15)); // Fast timeout for instant feel
+      ).timeout(
+        isChatRequest 
+            ? const Duration(seconds: 10)  // Faster timeout for chat (10s)
+            : const Duration(seconds: 15), // Standard timeout for other requests
+        onTimeout: () {
+          print('⏱️ AI request timeout');
+          throw TimeoutException('AI request timeout');
+        },
+      );
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
@@ -816,12 +869,15 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
 
     // Basic info
     if (userData['age'] != null) buffer.writeln('Age: ${userData['age']}');
-    if (userData['weight'] != null)
+    if (userData['weight'] != null) {
       buffer.writeln('Weight: ${userData['weight']} kg');
-    if (userData['height'] != null)
+    }
+    if (userData['height'] != null) {
       buffer.writeln('Height: ${userData['height']} cm');
-    if (userData['activity_level'] != null)
+    }
+    if (userData['activity_level'] != null) {
       buffer.writeln('Activity Level: ${userData['activity_level']}');
+    }
 
     // Goals
     if (userData['goals'] != null) {
@@ -873,14 +929,18 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
     buffer.writeln('User Profile:');
     if (profile['name'] != null) buffer.writeln('Name: ${profile['name']}');
     if (profile['age'] != null) buffer.writeln('Age: ${profile['age']}');
-    if (profile['gender'] != null)
+    if (profile['gender'] != null) {
       buffer.writeln('Gender: ${profile['gender']}');
-    if (profile['weight'] != null)
+    }
+    if (profile['weight'] != null) {
       buffer.writeln('Weight: ${profile['weight']} kg');
-    if (profile['height'] != null)
+    }
+    if (profile['height'] != null) {
       buffer.writeln('Height: ${profile['height']} cm');
-    if (profile['activity_level'] != null)
+    }
+    if (profile['activity_level'] != null) {
       buffer.writeln('Activity Level: ${profile['activity_level']}');
+    }
 
     // Goals and preferences
     if (profile['goals'] != null) {
@@ -1070,7 +1130,7 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
   static String _generateCacheKey(String query, Map<String, dynamic>? userProfile, Map<String, dynamic>? fitnessData) {
     final profileHash = userProfile?.hashCode.toString() ?? 'no_profile';
     final fitnessHash = fitnessData?.hashCode.toString() ?? 'no_fitness';
-    return '${query.hashCode}_${profileHash}_${fitnessHash}';
+    return '${query.hashCode}_${profileHash}_$fitnessHash';
   }
   
   /// Cache response for future use

@@ -117,7 +117,7 @@ class _SetupWarningPopupState extends State<SetupWarningPopup>
                         width: 80,
                         height: 80,
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
+                          gradient: const LinearGradient(
                             colors: [
                               kPrimaryColor,
                               kPrimaryLight,

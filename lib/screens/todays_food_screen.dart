@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../ui/app_colors.dart';
 import '../models/food_history_entry.dart';
 import '../services/food_history_service.dart';
@@ -47,10 +46,12 @@ class _TodaysFoodScreenState extends State<TodaysFoodScreen> {
         title: Text(
           'Today\'s Food',
           style: GoogleFonts.inter(
-            fontSize: 20,
+            fontSize: MediaQuery.of(context).size.width < 360 ? 18 : 20,
             fontWeight: FontWeight.w700,
             color: Theme.of(context).textTheme.bodyLarge?.color,
           ),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
         ),
         centerTitle: true,
       ),
@@ -144,8 +145,14 @@ class _TodaysFoodScreenState extends State<TodaysFoodScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 120,
-            height: 120,
+            width: MediaQuery.of(context).size.width < 360 ? 100 : 120,
+            height: MediaQuery.of(context).size.width < 360 ? 100 : 120,
+            constraints: const BoxConstraints(
+              minWidth: 80,
+              maxWidth: 140,
+              minHeight: 80,
+              maxHeight: 140,
+            ),
             decoration: BoxDecoration(
               color: AppColors.primaryColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(60),
@@ -196,7 +203,7 @@ class _TodaysFoodScreenState extends State<TodaysFoodScreen> {
   Widget _buildSummaryCard() {
     return Container(
       margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -223,7 +230,7 @@ class _TodaysFoodScreenState extends State<TodaysFoodScreen> {
                   color: AppColors.primaryColor.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.dashboard,
                   color: AppColors.primaryColor,
                   size: 24,
@@ -301,7 +308,7 @@ class _TodaysFoodScreenState extends State<TodaysFoodScreen> {
                     color: AppColors.primaryColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.local_fire_department,
                     color: AppColors.primaryColor,
                     size: 24,

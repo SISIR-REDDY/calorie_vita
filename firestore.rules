@@ -1,7 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions
+    // ===================================================================
+    // HELPER FUNCTIONS
+    // ===================================================================
+    
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -10,8 +13,8 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
     
-    function isValidTimestamp(timestamp) {
-      return timestamp is timestamp && timestamp <= request.time;
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
     }
     
     function isValidString(str, maxLength) {
@@ -22,91 +25,352 @@ service cloud.firestore {
       return num is number && num >= min && num <= max;
     }
     
-    // App configuration - read-only for authenticated users
-    match /app_config/{document} {
-      allow read: if isAuthenticated();
-      allow write: if false; // Only admins can write
+    function isValidEmail(email) {
+      return email is string && (email.size() == 0 || email.matches('.*@.*\\..*'));
     }
     
-    // Main user collection - simplified structure
+    function isValidUrl(url) {
+      return url is string && (url.size() == 0 || url.matches('https?://.*') || url.matches('gs://.*'));
+    }
+    
+    // ===================================================================
+    // APP CONFIGURATION
+    // ===================================================================
+
+    match /app_config/{document} {
+      // Require authentication to read config (better security for API keys)
+      // Note: App should initialize config after user authentication
+      allow read: if isAuthenticated();
+      allow write: if false; // Only admins can write (via Firebase Console or server-side scripts)
+    }
+    
+    // ===================================================================
+    // USER DATA COLLECTIONS (Nested Structure)
+    // ===================================================================
+    
     match /users/{userId} {
-      // User profile document
+      // Root user document - owner only access
       allow read, write: if isOwner(userId);
       
-      // Food entries
-      match /food_entries/{entryId} {
+      // =================================================================
+      // FOOD ENTRIES
+      // Path: users/{userId}/entries/{entryId}
+      // =================================================================
+      
+      match /entries/{entryId} {
         allow read, write: if isOwner(userId);
         allow create, update: if isOwner(userId) &&
           isValidString(resource.data.name, 200) &&
           isValidNumber(resource.data.calories, 0, 10000) &&
-          isValidTimestamp(resource.data.timestamp);
+          isValidTimestamp(resource.data.timestamp) &&
+          (!('imageUrl' in resource.data) || isValidUrl(resource.data.imageUrl));
       }
       
-      // Daily summaries
-      match /daily_summaries/{dateKey} {
+      // =================================================================
+      // GOALS SUB-COLLECTION
+      // Path: users/{userId}/goals/{documentId}
+      // =================================================================
+      
+      match /goals/{documentId} {
         allow read, write: if isOwner(userId);
         allow create, update: if isOwner(userId) &&
-          isValidString(resource.data.dateKey, 20) &&
+          (!('calorieGoal' in resource.data) || isValidNumber(resource.data.calorieGoal, 500, 10000)) &&
+          (!('waterGlassesGoal' in resource.data) || isValidNumber(resource.data.waterGlassesGoal, 1, 50)) &&
+          (!('stepsPerDayGoal' in resource.data) || isValidNumber(resource.data.stepsPerDayGoal, 1000, 100000)) &&
+          (!('weightGoal' in resource.data) || isValidNumber(resource.data.weightGoal, 10, 1000)) &&
+          (!('bmiGoal' in resource.data) || isValidNumber(resource.data.bmiGoal, 10, 50));
+      }
+      
+      // =================================================================
+      // STREAKS SUB-COLLECTION
+      // Path: users/{userId}/streaks/{documentId}
+      // =================================================================
+      
+      match /streaks/{documentId} {
+        allow read, write: if isOwner(userId);
+        allow create, update: if isOwner(userId);
+      }
+      
+      // =================================================================
+      // PROFILE SUB-COLLECTION
+      // Path: users/{userId}/profile/{document}
+      // =================================================================
+      
+      match /profile/{document} {
+        allow read, write: if isOwner(userId);
+        
+        // userData document
+        match /userData {
+          allow create, update: if isOwner(userId) &&
+            (!('onboardingCompleted' in resource.data) || resource.data.onboardingCompleted is bool) &&
+            (!('email' in resource.data) || isValidEmail(resource.data.email)) &&
+            (!('photoURL' in resource.data) || isValidUrl(resource.data.photoURL)) &&
+            (!('displayName' in resource.data) || isValidString(resource.data.displayName, 100));
+        }
+        
+        // goals document (legacy path)
+        match /goals {
+          allow read, write: if isOwner(userId);
+          allow create, update: if isOwner(userId) &&
+            (!('calorieGoal' in resource.data) || isValidNumber(resource.data.calorieGoal, 500, 10000)) &&
+            (!('waterGlassesGoal' in resource.data) || isValidNumber(resource.data.waterGlassesGoal, 1, 50)) &&
+            (!('stepsPerDayGoal' in resource.data) || isValidNumber(resource.data.stepsPerDayGoal, 1000, 100000)) &&
+            (!('weightGoal' in resource.data) || isValidNumber(resource.data.weightGoal, 10, 1000)) &&
+            (!('bmiGoal' in resource.data) || isValidNumber(resource.data.bmiGoal, 10, 50));
+        }
+        
+        // preferences document
+        match /preferences {
+          allow create, update: if isOwner(userId);
+        }
+        
+        // achievements document
+        match /achievements {
+          allow read, write: if isOwner(userId);
+          allow create, update: if isOwner(userId);
+        }
+      }
+      
+      // =================================================================
+      // DAILY SUMMARY (Nested - both naming conventions)
+      // Path: users/{userId}/dailySummary/{dateKey}
+      // Path: users/{userId}/daily_summaries/{dateKey}
+      // =================================================================
+      
+      match /dailySummary/{dateKey} {
+        allow read, write: if isOwner(userId);
+        allow create, update: if isOwner(userId) &&
+          isValidString(dateKey, 20) &&
           isValidNumber(resource.data.caloriesConsumed, 0, 50000) &&
           isValidNumber(resource.data.caloriesBurned, 0, 10000) &&
           isValidNumber(resource.data.steps, 0, 100000) &&
           isValidTimestamp(resource.data.date);
       }
       
-      // Weight logs
-      match /weight_logs/{logId} {
+      match /daily_summaries/{dateKey} {
+        allow read, write: if isOwner(userId);
+        allow create, update: if isOwner(userId) &&
+          isValidString(dateKey, 20) &&
+          isValidNumber(resource.data.caloriesConsumed, 0, 50000) &&
+          isValidNumber(resource.data.caloriesBurned, 0, 10000) &&
+          isValidNumber(resource.data.steps, 0, 100000) &&
+          isValidTimestamp(resource.data.date);
+      }
+      
+      // =================================================================
+      // TRAINER CHATS
+      // Path: users/{userId}/trainerChats/{messageId}
+      // =================================================================
+      
+      match /trainerChats/{messageId} {
+        allow read, write: if isOwner(userId);
+        allow create, update: if isOwner(userId) &&
+          isValidString(resource.data.sender, 50) &&
+          isValidString(resource.data.text, 5000) &&
+          isValidTimestamp(resource.data.timestamp) &&
+          resource.data.sender in ['user', 'assistant', 'Sisir'];
+      }
+      
+      // =================================================================
+      // CHAT SESSIONS
+      // Path: users/{userId}/chatSessions/{sessionId}
+      // =================================================================
+      
+      match /chatSessions/{sessionId} {
+        allow read, write: if isOwner(userId);
+        allow create, update: if isOwner(userId) &&
+          isValidString(resource.data.title, 200) &&
+          isValidTimestamp(resource.data.lastMessageTime) &&
+          (!('messageCount' in resource.data) || isValidNumber(resource.data.messageCount, 0, 10000));
+      }
+      
+      // =================================================================
+      // WEIGHT LOGS
+      // Path: users/{userId}/weightLogs/{logId}
+      // =================================================================
+      
+      match /weightLogs/{logId} {
         allow read, write: if isOwner(userId);
         allow create, update: if isOwner(userId) &&
           isValidNumber(resource.data.weight, 10, 1000) &&
           isValidTimestamp(resource.data.date) &&
-          isValidTimestamp(resource.data.createdAt);
+          (!('bmi' in resource.data) || isValidNumber(resource.data.bmi, 10, 50));
       }
       
-      // User goals (single document)
-      match /goals/goal {
+      // =================================================================
+      // PROGRESS (for analytics)
+      // Path: users/{userId}/progress/{progressId}
+      // =================================================================
+      
+      match /progress/{progressId} {
         allow read, write: if isOwner(userId);
-        allow create, update: if isOwner(userId) &&
-          isValidNumber(resource.data.calorieGoal, 500, 10000) &&
-          isValidNumber(resource.data.waterGlassesGoal, 1, 50) &&
-          isValidNumber(resource.data.stepsPerDayGoal, 1000, 100000);
+        allow create, update: if isOwner(userId);
       }
       
-      // Achievements
-      match /achievements/{achievementId} {
-        allow read, write: if isOwner(userId);
-        allow create, update: if isOwner(userId) &&
-          isValidString(resource.data.title, 100) &&
-          isValidString(resource.data.description, 500) &&
-          isValidNumber(resource.data.points, 0, 10000) &&
-          isValidTimestamp(resource.data.unlockedAt);
-      }
+      // =================================================================
+      // FOOD HISTORY
+      // Path: users/{userId}/food_history/entries/{entryId}
+      // =================================================================
       
-      // Streaks (single document)
-      match /streaks/streak {
+      match /food_history/{allPaths=**} {
         allow read, write: if isOwner(userId);
-        allow create, update: if isOwner(userId) &&
-          isValidNumber(resource.data.totalActiveStreaks, 0, 100) &&
-          isValidNumber(resource.data.longestOverallStreak, 0, 10000) &&
-          isValidTimestamp(resource.data.lastActivityDate);
-      }
-      
-      // AI trainer chats
-      match /chats/{sessionId} {
-        allow read, write: if isOwner(userId);
-        allow create, update: if isOwner(userId) &&
-          isValidString(resource.data.title, 200) &&
-          isValidTimestamp(resource.data.timestamp);
+        
+        match /entries/{entryId} {
+          allow create, update: if isOwner(userId) &&
+            isValidString(resource.data.foodName, 200) &&
+            isValidNumber(resource.data.calories, 0, 10000) &&
+            isValidNumber(resource.data.weightGrams, 0, 100000) &&
+            isValidString(resource.data.source, 50) &&
+            isValidTimestamp(resource.data.timestamp) &&
+            resource.data.source in ['camera_scan', 'barcode_scan', 'manual_entry'] &&
+            (!('imagePath' in resource.data) || isValidUrl(resource.data.imagePath));
+        }
       }
     }
     
-    // Public food database
+    // ===================================================================
+    // TOP-LEVEL COLLECTIONS
+    // ===================================================================
+    
+    // Tasks Collection - User-specific tasks
+    match /tasks/{taskId} {
+      // Tasks belong to authenticated users
+      allow read: if isAuthenticated() && 
+        (resource == null || resource.data.userId == request.auth.uid || !('userId' in resource.data));
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        isValidString(request.resource.data.title, 200) &&
+        (!('description' in request.resource.data) || isValidString(request.resource.data.description, 1000));
+      allow update, delete: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // Chat Sessions (Top-level)
+    match /chat_sessions/{sessionId} {
+      allow read: if isAuthenticated() &&
+        (resource == null || resource.data.userId == request.auth.uid || !('userId' in resource.data));
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        isValidTimestamp(request.resource.data.timestamp);
+      allow update, delete: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // Daily Goals (Top-level)
+    match /daily_goals/{goalId} {
+      allow read: if isAuthenticated() &&
+        (resource == null || resource.data.userId == request.auth.uid || !('userId' in resource.data));
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        isValidNumber(request.resource.data.calorieGoal, 500, 10000);
+      allow update, delete: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // Daily Summaries (Top-level)
+    match /daily_summaries/{summaryId} {
+      allow read: if isAuthenticated() &&
+        (resource == null || resource.data.userId == request.auth.uid || !('userId' in resource.data));
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        isValidTimestamp(request.resource.data.date);
+      allow update, delete: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // User Analytics (Top-level)
+    match /user_analytics/{analyticsId} {
+      allow read: if isAuthenticated() &&
+        (resource == null || resource.data.userId == request.auth.uid || !('userId' in resource.data));
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // User Insights (Top-level)
+    match /user_insights/{insightId} {
+      allow read: if isAuthenticated() &&
+        (resource == null || resource.data.userId == request.auth.uid || !('userId' in resource.data));
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // User Profiles (Top-level)
+    match /user_profiles/{profileId} {
+      allow read: if isAuthenticated() &&
+        (resource == null || resource.data.userId == request.auth.uid || profileId == request.auth.uid);
+      allow create: if isAuthenticated() &&
+        (request.resource.data.userId == request.auth.uid || profileId == request.auth.uid) &&
+        (!('email' in request.resource.data) || isValidEmail(request.resource.data.email));
+      allow update, delete: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid || profileId == request.auth.uid);
+    }
+    
+    // User Settings (Top-level)
+    match /user_settings/{settingsId} {
+      allow read: if isAuthenticated() &&
+        (resource == null || resource.data.userId == request.auth.uid || settingsId == request.auth.uid);
+      allow create: if isAuthenticated() &&
+        (request.resource.data.userId == request.auth.uid || settingsId == request.auth.uid);
+      allow update, delete: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid || settingsId == request.auth.uid);
+    }
+    
+    // Food History (Top-level)
+    match /food_history/{userId} {
+      // User's food history collection
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      
+      match /entries/{entryId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+        allow create, update: if isAuthenticated() && request.auth.uid == userId &&
+          isValidString(request.resource.data.foodName, 200) &&
+          isValidNumber(request.resource.data.calories, 0, 10000) &&
+          isValidTimestamp(request.resource.data.timestamp);
+      }
+    }
+    
+    // User Goals (Top-level - legacy support)
+    match /user_goals/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      allow create, update: if isAuthenticated() && request.auth.uid == userId &&
+        (!('calorieGoal' in request.resource.data) || isValidNumber(request.resource.data.calorieGoal, 500, 10000)) &&
+        (!('waterGlassesGoal' in request.resource.data) || isValidNumber(request.resource.data.waterGlassesGoal, 1, 50)) &&
+        (!('stepsPerDayGoal' in request.resource.data) || isValidNumber(request.resource.data.stepsPerDayGoal, 1000, 100000)) &&
+        (!('weightGoal' in request.resource.data) || isValidNumber(request.resource.data.weightGoal, 10, 1000));
+    }
+    
+    // Weight Logs (Top-level)
+    match /weightLogs/{logId} {
+      allow read: if isAuthenticated() &&
+        (resource == null || resource.data.userId == request.auth.uid || !('userId' in resource.data));
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        isValidNumber(request.resource.data.weight, 10, 1000);
+      allow update, delete: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // ===================================================================
+    // PUBLIC FOOD DATABASE
+    // ===================================================================
+    
     match /food_database/{document} {
+      // Public read access for food database
       allow read: if true;
-      allow write: if false; // Only admins can write
+      // Only admins can write (via Firebase Console or server-side scripts)
+      allow write: if false;
     }
     
-    // Admin collections (server-side only)
+    // ===================================================================
+    // ADMIN COLLECTIONS
+    // ===================================================================
+    
     match /admin/{document=**} {
+      // Server-side only - no client access
       allow read, write: if false;
     }
   }

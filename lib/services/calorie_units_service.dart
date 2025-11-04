@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/user_preferences.dart';
-import 'app_state_service.dart';
 
 /// Global service for handling calorie unit conversions and display
 /// This service ensures consistent calorie unit display across the entire app
@@ -10,7 +9,6 @@ class CalorieUnitsService {
   factory CalorieUnitsService() => _instance;
   CalorieUnitsService._internal();
 
-  final AppStateService _appStateService = AppStateService();
   CalorieUnit _currentUnit = CalorieUnit.kcal;
 
   // Stream controller for notifying UI of unit changes

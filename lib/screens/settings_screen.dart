@@ -724,11 +724,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            Image.asset(
-              'calorie_logo.png',
-              width: 40,
-              height: 40,
-              fit: BoxFit.cover,
+            Container(
+              width: MediaQuery.of(context).size.width < 360 ? 35 : 40,
+              height: MediaQuery.of(context).size.width < 360 ? 35 : 40,
+              constraints: const BoxConstraints(
+                minWidth: 30,
+                maxWidth: 50,
+                minHeight: 30,
+                maxHeight: 50,
+              ),
+              child: Image.asset(
+                'calorie_logo.png',
+                fit: BoxFit.cover,
+              ),
             ),
             const SizedBox(width: 12),
             Text(
@@ -744,7 +752,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         elevation: 0,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -853,8 +861,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          height: 80, // Fixed height for all cards
-          padding: const EdgeInsets.all(16),
+          height: MediaQuery.of(context).size.width < 360 ? 70 : 80,
+          padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 12 : 16),
           child: Row(
             children: [
               // Icon Container
@@ -1067,7 +1075,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             : _connectToGoogleFit,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
           child: Row(
             children: [
               // Google Fit Logo
@@ -1176,7 +1184,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onTap: () => _navigateToGoals(),
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
           child: Row(
             children: [
               Container(
@@ -1248,7 +1256,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
         child: Row(
           children: [
             // Avatar

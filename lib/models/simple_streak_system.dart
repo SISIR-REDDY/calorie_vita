@@ -1,4 +1,5 @@
 /// Simple streak system models for tracking user progress and goals
+library;
 
 /// Enum for different types of daily goals
 enum DailyGoalType {

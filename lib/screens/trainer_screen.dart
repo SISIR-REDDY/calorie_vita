@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,6 +8,7 @@ import '../services/firebase_service.dart';
 import '../services/chat_history_manager.dart';
 import '../ui/app_colors.dart';
 import '../mixins/google_fit_sync_mixin.dart';
+import '../models/daily_summary.dart';
 
 class Message {
   final String sender;
@@ -107,6 +109,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
   Map<String, dynamic>? _currentFitnessData;
   StateSetter? _currentModalState; // Store current modal state for updates
   final ValueNotifier<List<ChatSession>> _chatSessionsNotifier = ValueNotifier<List<ChatSession>>([]);
+  StreamSubscription<DailySummary>? _dailySummarySubscription;
 
   @override
   void initState() {
@@ -119,6 +122,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       _loadChatHistory(); // This will try cache first, then Firebase
     });
     initializeGoogleFitSync();
+    _loadTodaysFitnessData(); // Load consumed calories and macros
   }
 
   /// Override mixin method to handle Google Fit data updates
@@ -126,10 +130,45 @@ class _AITrainerScreenState extends State<AITrainerScreen>
   void onGoogleFitDataUpdate(Map<String, dynamic> syncData) {
     super.onGoogleFitDataUpdate(syncData);
 
-    // Store fitness data for AI trainer to use in recommendations
-    _currentFitnessData = syncData;
+    // Merge Google Fit data with existing fitness data
+    if (_currentFitnessData == null) {
+      _currentFitnessData = syncData;
+    } else {
+      _currentFitnessData = {
+        ..._currentFitnessData!,
+        ...syncData,
+      };
+    }
     print(
         'Trainer screen: Updated with Google Fit data - Steps: ${syncData['steps']}');
+  }
+
+  /// Load today's fitness data including consumed calories and macros
+  Future<void> _loadTodaysFitnessData() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      // Listen to daily summary for consumed calories
+      _dailySummarySubscription = _firebaseService.getTodayDailySummary(user.uid).listen((summary) {
+        if (!mounted) return;
+        
+        setState(() {
+          _currentFitnessData = {
+            ..._currentFitnessData ?? {},
+            'caloriesConsumed': summary.caloriesConsumed,
+            'caloriesGoal': summary.caloriesGoal,
+            'proteinConsumed': summary.macroBreakdown.protein,
+            'carbsConsumed': summary.macroBreakdown.carbs,
+            'fatConsumed': summary.macroBreakdown.fat,
+          };
+        });
+        
+        print('Trainer screen: Updated with consumed calories - ${summary.caloriesConsumed} kcal');
+      });
+    } catch (e) {
+      print('Error loading today\'s fitness data: $e');
+    }
   }
 
   /// Override mixin method to handle Google Fit connection changes
@@ -147,6 +186,8 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     _currentModalState = null;
     // Dispose ValueNotifier
     _chatSessionsNotifier.dispose();
+    // Cancel subscription
+    _dailySummarySubscription?.cancel();
     // Save current session when leaving the screen (silently)
     if (currentSessionId != null && messages.length > 1) {
       // Fire and forget - don't await in dispose
@@ -804,12 +845,12 @@ class _AITrainerScreenState extends State<AITrainerScreen>
   Widget _buildPremiumLockScreen() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(40),
+        padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 20 : 40),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
                 decoration: BoxDecoration(
                   color: Colors.amber.withValues(alpha: 0.1),
                   shape: BoxShape.circle,

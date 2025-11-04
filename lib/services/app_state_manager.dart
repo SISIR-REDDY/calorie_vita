@@ -4,6 +4,7 @@ import 'performance_monitor.dart';
 import 'network_service.dart';
 import 'error_handler.dart';
 import 'auth_service.dart';
+import '../config/ai_config.dart';
 
 /// Centralized app state manager that coordinates all services
 class AppStateManager {
@@ -89,6 +90,8 @@ class AppStateManager {
       if (currentUser != null) {
         _currentUserId = currentUser.uid;
         print('Current user found during initialization: ${currentUser.email}');
+        // Load API config after authentication (for secure access)
+        _loadAIConfigAfterAuth();
       }
 
       // Listen to auth changes
@@ -96,6 +99,12 @@ class AppStateManager {
         print(
             'Auth state changed: user=${user?.uid ?? 'null'}, email=${user?.email ?? 'null'}');
         _currentUserId = user?.uid ?? '';
+        
+        // Load API config when user authenticates (for secure access)
+        if (user != null) {
+          _loadAIConfigAfterAuth();
+        }
+        
         _updateAppState();
         _performanceMonitor.startTimer('auth_state_changed');
         _performanceMonitor.stopTimer('auth_state_changed');
@@ -259,6 +268,26 @@ class AppStateManager {
     } catch (e) {
       print('❌ Error clearing caches: $e');
       _errorHandler.handleBusinessError('clear_caches', e);
+    }
+  }
+
+  /// Load AI config after authentication (for secure API key access)
+  Future<void> _loadAIConfigAfterAuth() async {
+    try {
+      print('🔐 User authenticated - loading secure AI config from Firestore...');
+      await AIConfig.refresh();
+      
+      final apiKey = AIConfig.apiKey;
+      if (apiKey.isNotEmpty) {
+        print('✅ API Key loaded after authentication: ${apiKey.length} characters');
+        print('   🔑 Key preview: ${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}');
+      } else {
+        print('⚠️ API Key is still empty after authentication');
+        print('   📌 Check Firestore config at: app_config/ai_settings/openrouter_api_key');
+      }
+    } catch (e) {
+      print('❌ Error loading AI config after authentication: $e');
+      _errorHandler.handleBusinessError('ai_config_load_after_auth', e);
     }
   }
 

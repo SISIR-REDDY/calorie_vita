@@ -6,7 +6,6 @@ import '../models/simple_streak_system.dart';
 import '../models/daily_summary.dart';
 import '../models/user_goals.dart';
 import 'error_handler.dart';
-import 'daily_summary_service.dart';
 
 /// Enhanced streak service that calculates streaks based on actual daily goal achievements
 class EnhancedStreakService {
@@ -17,7 +16,6 @@ class EnhancedStreakService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final ErrorHandler _errorHandler = ErrorHandler();
-  final DailySummaryService _dailySummaryService = DailySummaryService();
 
   // Stream controllers for real-time updates
   final StreamController<UserStreakSummary> _streakController =
@@ -192,15 +190,11 @@ class EnhancedStreakService {
 
     // Calculate longest streak and total days achieved
     int tempStreak = 0;
-    DateTime? tempStreakStart = null;
     
     for (final summary in sortedSummaries) {
       final goalAchieved = _isGoalAchieved(goalType, summary, userGoals);
       
       if (goalAchieved) {
-        if (tempStreak == 0) {
-          tempStreakStart = DateTime(summary.date.year, summary.date.month, summary.date.day);
-        }
         tempStreak++;
         totalDaysAchieved++;
         
@@ -210,7 +204,6 @@ class EnhancedStreakService {
         }
       } else {
         tempStreak = 0;
-        tempStreakStart = null;
       }
     }
 
@@ -287,7 +280,7 @@ class EnhancedStreakService {
         return UserGoals.fromMap(doc.data()!);
       } else {
         // Return default goals
-        return UserGoals(
+        return const UserGoals(
           calorieGoal: 2000,
           stepsPerDayGoal: 10000,
           waterGlassesGoal: 8,
@@ -297,7 +290,7 @@ class EnhancedStreakService {
     } catch (e) {
       _errorHandler.handleDataError('get_user_goals', e);
       // Return default goals on error
-      return UserGoals(
+      return const UserGoals(
         calorieGoal: 2000,
         stepsPerDayGoal: 10000,
         waterGlassesGoal: 8,
@@ -316,7 +309,7 @@ class EnhancedStreakService {
       final querySnapshot = await _firestore
           .collection('users')
           .doc(userId)
-          .collection('daily_summaries')
+          .collection('dailySummary')
           .where('date', isGreaterThanOrEqualTo: startDate.millisecondsSinceEpoch)
           .where('date', isLessThanOrEqualTo: endDate.millisecondsSinceEpoch)
           .orderBy('date', descending: true)

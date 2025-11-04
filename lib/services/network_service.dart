@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
+import 'logger_service.dart';
 
 /// Network service to handle connectivity and offline/online states
 class NetworkService {
@@ -11,6 +12,7 @@ class NetworkService {
   final Connectivity _connectivity = Connectivity();
   final StreamController<bool> _connectivityController =
       StreamController<bool>.broadcast();
+  final LoggerService _logger = LoggerService();
 
   bool _isOnline = true;
   List<ConnectivityResult> _currentConnectivity = [ConnectivityResult.none];
@@ -34,10 +36,12 @@ class NetworkService {
       // Start periodic connectivity checks
       _startConnectivityChecks();
 
-      print(
-          'NetworkService initialized. Online: $_isOnline, Type: $_currentConnectivity');
+      _logger.info('NetworkService initialized', {
+        'online': _isOnline,
+        'connectivity': _currentConnectivity.toString(),
+      });
     } catch (e) {
-      print('Error initializing NetworkService: $e');
+      _logger.error('Error initializing NetworkService', {'error': e.toString()});
     }
   }
 
@@ -49,8 +53,10 @@ class NetworkService {
 
     if (wasOnline != _isOnline) {
       _connectivityController.add(_isOnline);
-      print(
-          'Connectivity changed: ${_isOnline ? 'Online' : 'Offline'} ($results)');
+      _logger.info('Connectivity changed', {
+        'online': _isOnline,
+        'results': results.toString(),
+      });
     }
   }
 
@@ -76,7 +82,7 @@ class NetworkService {
 
       if (wasOnline != _isOnline) {
         _connectivityController.add(_isOnline);
-        print('Connectivity check: ${_isOnline ? 'Online' : 'Offline'}');
+        _logger.debug('Connectivity check', {'online': _isOnline});
       }
     } catch (e) {
       final wasOnline = _isOnline;
@@ -84,7 +90,7 @@ class NetworkService {
 
       if (wasOnline != _isOnline) {
         _connectivityController.add(_isOnline);
-        print('Connectivity check failed: Offline');
+        _logger.warning('Connectivity check failed', {'online': _isOnline});
       }
     }
   }

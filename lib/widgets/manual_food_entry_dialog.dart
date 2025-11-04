@@ -100,8 +100,11 @@ class _ManualFoodEntryDialogState extends State<ManualFoodEntryDialog> {
       ),
       child: Container(
         width: MediaQuery.of(context).size.width * 0.9,
-        constraints: const BoxConstraints(maxHeight: 600),
-        padding: const EdgeInsets.all(20),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.8,
+          maxWidth: MediaQuery.of(context).size.width * 0.9,
+        ),
+        padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,7 +112,7 @@ class _ManualFoodEntryDialogState extends State<ManualFoodEntryDialog> {
             // Header
             Row(
               children: [
-                Icon(
+                const Icon(
                   Icons.restaurant_menu,
                   color: Colors.blue,
                   size: 28,
@@ -119,10 +122,12 @@ class _ManualFoodEntryDialogState extends State<ManualFoodEntryDialog> {
                   child: Text(
                     'Add Food Manually',
                     style: GoogleFonts.poppins(
-                      fontSize: 20,
+                      fontSize: MediaQuery.of(context).size.width < 360 ? 18 : 20,
                       fontWeight: FontWeight.bold,
                       color: Colors.blue[800],
                     ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
                 IconButton(

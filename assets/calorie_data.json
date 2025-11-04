@@ -1,0 +1,261 @@
+{
+  "common_foods": [
+    {
+      "name": "Rice (Cooked)",
+      "calories_per_100g": 130,
+      "protein_per_100g": 2.7,
+      "carbs_per_100g": 28,
+      "fat_per_100g": 0.3,
+      "fiber_per_100g": 0.4,
+      "sugar_per_100g": 0.1,
+      "category": "Grains",
+      "common_serving": 150
+    },
+    {
+      "name": "Roti/Chapati",
+      "calories_per_100g": 297,
+      "protein_per_100g": 11,
+      "carbs_per_100g": 58,
+      "fat_per_100g": 3.7,
+      "fiber_per_100g": 9,
+      "sugar_per_100g": 2,
+      "category": "Bread",
+      "common_serving": 40
+    },
+    {
+      "name": "Dal (Lentils)",
+      "calories_per_100g": 116,
+      "protein_per_100g": 9,
+      "carbs_per_100g": 20,
+      "fat_per_100g": 0.4,
+      "fiber_per_100g": 8,
+      "sugar_per_100g": 1.8,
+      "category": "Legumes",
+      "common_serving": 150
+    },
+    {
+      "name": "Chicken Breast",
+      "calories_per_100g": 165,
+      "protein_per_100g": 31,
+      "carbs_per_100g": 0,
+      "fat_per_100g": 3.6,
+      "fiber_per_100g": 0,
+      "sugar_per_100g": 0,
+      "category": "Meat",
+      "common_serving": 100
+    },
+    {
+      "name": "Egg",
+      "calories_per_100g": 155,
+      "protein_per_100g": 13,
+      "carbs_per_100g": 1.1,
+      "fat_per_100g": 11,
+      "fiber_per_100g": 0,
+      "sugar_per_100g": 1.1,
+      "category": "Protein",
+      "common_serving": 50
+    },
+    {
+      "name": "Milk (Full Fat)",
+      "calories_per_100g": 61,
+      "protein_per_100g": 3.2,
+      "carbs_per_100g": 4.8,
+      "fat_per_100g": 3.2,
+      "fiber_per_100g": 0,
+      "sugar_per_100g": 4.8,
+      "category": "Dairy",
+      "common_serving": 250
+    },
+    {
+      "name": "Banana",
+      "calories_per_100g": 89,
+      "protein_per_100g": 1.1,
+      "carbs_per_100g": 23,
+      "fat_per_100g": 0.3,
+      "fiber_per_100g": 2.6,
+      "sugar_per_100g": 12,
+      "category": "Fruits",
+      "common_serving": 120
+    },
+    {
+      "name": "Apple",
+      "calories_per_100g": 52,
+      "protein_per_100g": 0.3,
+      "carbs_per_100g": 14,
+      "fat_per_100g": 0.2,
+      "fiber_per_100g": 2.4,
+      "sugar_per_100g": 10,
+      "category": "Fruits",
+      "common_serving": 180
+    },
+    {
+      "name": "Potato",
+      "calories_per_100g": 77,
+      "protein_per_100g": 2,
+      "carbs_per_100g": 17,
+      "fat_per_100g": 0.1,
+      "fiber_per_100g": 2.2,
+      "sugar_per_100g": 0.8,
+      "category": "Vegetables",
+      "common_serving": 150
+    },
+    {
+      "name": "Onion",
+      "calories_per_100g": 40,
+      "protein_per_100g": 1.1,
+      "carbs_per_100g": 9.3,
+      "fat_per_100g": 0.1,
+      "fiber_per_100g": 1.7,
+      "sugar_per_100g": 4.2,
+      "category": "Vegetables",
+      "common_serving": 100
+    },
+    {
+      "name": "Tomato",
+      "calories_per_100g": 18,
+      "protein_per_100g": 0.9,
+      "carbs_per_100g": 3.9,
+      "fat_per_100g": 0.2,
+      "fiber_per_100g": 1.2,
+      "sugar_per_100g": 2.6,
+      "category": "Vegetables",
+      "common_serving": 100
+    },
+    {
+      "name": "White Bread",
+      "calories_per_100g": 265,
+      "protein_per_100g": 9,
+      "carbs_per_100g": 49,
+      "fat_per_100g": 3.2,
+      "fiber_per_100g": 2.7,
+      "sugar_per_100g": 5,
+      "category": "Bread",
+      "common_serving": 30
+    },
+    {
+      "name": "Vegetable Oil",
+      "calories_per_100g": 884,
+      "protein_per_100g": 0,
+      "carbs_per_100g": 0,
+      "fat_per_100g": 100,
+      "fiber_per_100g": 0,
+      "sugar_per_100g": 0,
+      "category": "Fats",
+      "common_serving": 10
+    },
+    {
+      "name": "Yogurt (Plain)",
+      "calories_per_100g": 59,
+      "protein_per_100g": 10,
+      "carbs_per_100g": 3.6,
+      "fat_per_100g": 0.4,
+      "fiber_per_100g": 0,
+      "sugar_per_100g": 3.6,
+      "category": "Dairy",
+      "common_serving": 150
+    },
+    {
+      "name": "Almonds",
+      "calories_per_100g": 579,
+      "protein_per_100g": 21,
+      "carbs_per_100g": 22,
+      "fat_per_100g": 50,
+      "fiber_per_100g": 12,
+      "sugar_per_100g": 4,
+      "category": "Nuts",
+      "common_serving": 30
+    }
+  ],
+  "indian_dishes": [
+    {
+      "name": "Samosa",
+      "calories_per_100g": 308,
+      "protein_per_100g": 5.4,
+      "carbs_per_100g": 32,
+      "fat_per_100g": 18,
+      "fiber_per_100g": 3,
+      "sugar_per_100g": 2,
+      "category": "Snacks",
+      "common_serving": 60
+    },
+    {
+      "name": "Dosa",
+      "calories_per_100g": 168,
+      "protein_per_100g": 2.6,
+      "carbs_per_100g": 33,
+      "fat_per_100g": 2.6,
+      "fiber_per_100g": 1.2,
+      "sugar_per_100g": 1,
+      "category": "South Indian",
+      "common_serving": 120
+    },
+    {
+      "name": "Idli",
+      "calories_per_100g": 156,
+      "protein_per_100g": 3.9,
+      "carbs_per_100g": 33,
+      "fat_per_100g": 1.1,
+      "fiber_per_100g": 1.5,
+      "sugar_per_100g": 1,
+      "category": "South Indian",
+      "common_serving": 40
+    },
+    {
+      "name": "Biryani",
+      "calories_per_100g": 200,
+      "protein_per_100g": 8,
+      "carbs_per_100g": 35,
+      "fat_per_100g": 4,
+      "fiber_per_100g": 2,
+      "sugar_per_100g": 2,
+      "category": "Rice Dishes",
+      "common_serving": 250
+    },
+    {
+      "name": "Paneer",
+      "calories_per_100g": 321,
+      "protein_per_100g": 25,
+      "carbs_per_100g": 3.6,
+      "fat_per_100g": 25,
+      "fiber_per_100g": 0,
+      "sugar_per_100g": 3.6,
+      "category": "Dairy",
+      "common_serving": 100
+    }
+  ],
+  "beverages": [
+    {
+      "name": "Tea (with milk and sugar)",
+      "calories_per_100g": 30,
+      "protein_per_100g": 1.2,
+      "carbs_per_100g": 5.5,
+      "fat_per_100g": 0.8,
+      "fiber_per_100g": 0,
+      "sugar_per_100g": 5.5,
+      "category": "Beverages",
+      "common_serving": 200
+    },
+    {
+      "name": "Coffee (with milk)",
+      "calories_per_100g": 25,
+      "protein_per_100g": 1,
+      "carbs_per_100g": 4,
+      "fat_per_100g": 0.8,
+      "fiber_per_100g": 0,
+      "sugar_per_100g": 4,
+      "category": "Beverages",
+      "common_serving": 150
+    },
+    {
+      "name": "Lassi",
+      "calories_per_100g": 89,
+      "protein_per_100g": 3.5,
+      "carbs_per_100g": 13,
+      "fat_per_100g": 2.7,
+      "fiber_per_100g": 0,
+      "sugar_per_100g": 13,
+      "category": "Beverages",
+      "common_serving": 250
+    }
+  ]
+}

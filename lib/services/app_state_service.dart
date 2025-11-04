@@ -133,14 +133,24 @@ class AppStateService {
         .collection('entries')
         .orderBy('timestamp', descending: true)
         .snapshots()
-        .listen((snapshot) {
-      _foodEntries =
-          snapshot.docs.map((doc) => FoodEntry.fromFirestore(doc)).toList();
-      _foodEntriesController.add(_foodEntries);
-      updateDailySummary();
-      _updateMacroBreakdown();
-      _cacheFoodEntries();
-    });
+        .listen(
+          (snapshot) {
+            try {
+              _foodEntries =
+                  snapshot.docs.map((doc) => FoodEntry.fromFirestore(doc)).toList();
+              _foodEntriesController.add(_foodEntries);
+              updateDailySummary();
+              _updateMacroBreakdown();
+              _cacheFoodEntries();
+            } catch (e) {
+              print('Error processing food entries snapshot: $e');
+            }
+          },
+          onError: (error) {
+            print('Food entries listener error: $error');
+            // Don't crash - just log the error
+          },
+        );
 
     // Goals listener
     _goalsSubscription?.cancel();
@@ -150,15 +160,24 @@ class AppStateService {
         .collection('profile')
         .doc('goals')
         .snapshots()
-        .listen((snapshot) {
-      if (snapshot.exists) {
-        _userGoals = UserGoals.fromMap(snapshot.data()!);
-      } else {
-        _userGoals = null;
-      }
-      _goalsController.add(_userGoals);
-      _cacheUserGoals();
-    });
+        .listen(
+          (snapshot) {
+            try {
+              if (snapshot.exists) {
+                _userGoals = UserGoals.fromMap(snapshot.data()!);
+              } else {
+                _userGoals = null;
+              }
+              _goalsController.add(_userGoals);
+              _cacheUserGoals();
+            } catch (e) {
+              print('Error processing goals snapshot: $e');
+            }
+          },
+          onError: (error) {
+            print('Goals listener error: $error');
+          },
+        );
 
     // Preferences listener
     _preferencesSubscription?.cancel();
@@ -168,15 +187,24 @@ class AppStateService {
         .collection('profile')
         .doc('preferences')
         .snapshots()
-        .listen((snapshot) {
-      if (snapshot.exists) {
-        _userPreferences = UserPreferences.fromMap(snapshot.data()!);
-      } else {
-        _userPreferences = const UserPreferences();
-      }
-      _preferencesController.add(_userPreferences);
-      _cacheUserPreferences();
-    });
+        .listen(
+          (snapshot) {
+            try {
+              if (snapshot.exists) {
+                _userPreferences = UserPreferences.fromMap(snapshot.data()!);
+              } else {
+                _userPreferences = const UserPreferences();
+              }
+              _preferencesController.add(_userPreferences);
+              _cacheUserPreferences();
+            } catch (e) {
+              print('Error processing preferences snapshot: $e');
+            }
+          },
+          onError: (error) {
+            print('Preferences listener error: $error');
+          },
+        );
 
     // Achievements listener
     _achievementsSubscription?.cancel();
@@ -186,19 +214,28 @@ class AppStateService {
         .collection('profile')
         .doc('achievements')
         .snapshots()
-        .listen((snapshot) {
-      if (snapshot.exists) {
-        final data = snapshot.data()!;
-        _achievements = (data['achievements'] as List?)
-                ?.map((a) => UserAchievement.fromJson(a))
-                .toList() ??
-            [];
-      } else {
-        _achievements = [];
-      }
-      _achievementsController.add(_achievements);
-      _cacheAchievements();
-    });
+        .listen(
+          (snapshot) {
+            try {
+              if (snapshot.exists) {
+                final data = snapshot.data()!;
+                _achievements = (data['achievements'] as List?)
+                        ?.map((a) => UserAchievement.fromJson(a))
+                        .toList() ??
+                    [];
+              } else {
+                _achievements = [];
+              }
+              _achievementsController.add(_achievements);
+              _cacheAchievements();
+            } catch (e) {
+              print('Error processing achievements snapshot: $e');
+            }
+          },
+          onError: (error) {
+            print('Achievements listener error: $error');
+          },
+        );
 
     // Profile data listener (for height, weight, etc.)
     _profileDataSubscription?.cancel();
@@ -208,19 +245,28 @@ class AppStateService {
         .collection('profile')
         .doc('userData')
         .snapshots()
-        .listen((snapshot) {
-      print(
-          'Profile data snapshot received in AppStateService: ${snapshot.exists}');
-      if (snapshot.exists) {
-        _profileData = snapshot.data()!;
-        print('Profile data updated: $_profileData');
-      } else {
-        _profileData = null;
-        print('Profile data document does not exist');
-      }
-      _profileDataController.add(_profileData);
-      _cacheProfileData();
-    });
+        .listen(
+          (snapshot) {
+            try {
+              print(
+                  'Profile data snapshot received in AppStateService: ${snapshot.exists}');
+              if (snapshot.exists) {
+                _profileData = snapshot.data()!;
+                print('Profile data updated: $_profileData');
+              } else {
+                _profileData = null;
+                print('Profile data document does not exist');
+              }
+              _profileDataController.add(_profileData);
+              _cacheProfileData();
+            } catch (e) {
+              print('Error processing profile data snapshot: $e');
+            }
+          },
+          onError: (error) {
+            print('Profile data listener error: $error');
+          },
+        );
   }
 
   /// Update daily summary based on current food entries and health data
@@ -318,26 +364,50 @@ class AppStateService {
 
       // Load cached food entries
       final cachedEntries = prefs.getStringList('cached_food_entries') ?? [];
-      _foodEntries = cachedEntries
-          .map((json) =>
-              FoodEntry.fromJson(Map<String, dynamic>.from(jsonDecode(json))))
-          .toList();
+      _foodEntries = [];
+      for (final json in cachedEntries) {
+        try {
+          if (json.isNotEmpty) {
+            final decoded = jsonDecode(json);
+            _foodEntries.add(FoodEntry.fromJson(Map<String, dynamic>.from(decoded)));
+          }
+        } catch (e) {
+          print('⚠️ Skipping invalid cached entry: $e');
+          // Continue with other entries
+        }
+      }
       _foodEntriesController.add(_foodEntries);
 
       // Load cached preferences
       final cachedPrefs = prefs.getString('cached_preferences');
-      if (cachedPrefs != null) {
-        _userPreferences = UserPreferences.fromMap(
-            Map<String, dynamic>.from(jsonDecode(cachedPrefs)));
-        _preferencesController.add(_userPreferences);
+      if (cachedPrefs != null && cachedPrefs.isNotEmpty) {
+        try {
+          // Try to parse as JSON first
+          final decoded = jsonDecode(cachedPrefs);
+          _userPreferences = UserPreferences.fromMap(
+              Map<String, dynamic>.from(decoded));
+          _preferencesController.add(_userPreferences);
+        } catch (e) {
+          // If JSON parsing fails, try to parse as Map directly
+          print('⚠️ Cached preferences not valid JSON, clearing cache: $e');
+          // Clear invalid cache
+          await prefs.remove('cached_preferences');
+        }
       }
 
       // Load cached goals
       final cachedGoals = prefs.getString('cached_goals');
-      if (cachedGoals != null) {
-        _userGoals = UserGoals.fromMap(
-            Map<String, dynamic>.from(jsonDecode(cachedGoals)));
-        _goalsController.add(_userGoals);
+      if (cachedGoals != null && cachedGoals.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(cachedGoals);
+          _userGoals = UserGoals.fromMap(
+              Map<String, dynamic>.from(decoded));
+          _goalsController.add(_userGoals);
+        } catch (e) {
+          print('⚠️ Cached goals not valid JSON, clearing cache: $e');
+          // Clear invalid cache
+          await prefs.remove('cached_goals');
+        }
       }
     } catch (e) {
       print('Error loading cached data: $e');
@@ -348,9 +418,8 @@ class AppStateService {
   Future<void> _cacheFoodEntries() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final entriesJson = _foodEntries.map((entry) => entry.toJson()).toList();
-      await prefs.setStringList('cached_food_entries',
-          entriesJson.map((json) => json.toString()).toList());
+      final entriesJson = _foodEntries.map((entry) => jsonEncode(entry.toJson())).toList();
+      await prefs.setStringList('cached_food_entries', entriesJson);
     } catch (e) {
       print('Error caching food entries: $e');
     }
@@ -361,7 +430,7 @@ class AppStateService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
-          'cached_preferences', _userPreferences.toMap().toString());
+          'cached_preferences', jsonEncode(_userPreferences.toMap()));
     } catch (e) {
       print('Error caching preferences: $e');
     }
@@ -371,8 +440,11 @@ class AppStateService {
   Future<void> _cacheUserGoals() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-          'cached_goals', _userGoals?.toMap().toString() ?? '');
+      if (_userGoals != null) {
+        await prefs.setString('cached_goals', jsonEncode(_userGoals!.toMap()));
+      } else {
+        await prefs.remove('cached_goals');
+      }
     } catch (e) {
       print('Error caching goals: $e');
     }
@@ -382,9 +454,8 @@ class AppStateService {
   Future<void> _cacheAchievements() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final achievementsJson = _achievements.map((a) => a.toJson()).toList();
-      await prefs.setStringList('cached_achievements',
-          achievementsJson.map((json) => json.toString()).toList());
+      final achievementsJson = _achievements.map((a) => jsonEncode(a.toJson())).toList();
+      await prefs.setStringList('cached_achievements', achievementsJson);
     } catch (e) {
       print('Error caching achievements: $e');
     }

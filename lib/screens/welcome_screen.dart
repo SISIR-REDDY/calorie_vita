@@ -196,11 +196,19 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Image.asset(
-            'calorie_logo.png',
-            width: 80,
-            height: 80,
-            fit: BoxFit.contain,
+          Container(
+            width: MediaQuery.of(context).size.width < 360 ? 60 : 80,
+            height: MediaQuery.of(context).size.width < 360 ? 60 : 80,
+            constraints: const BoxConstraints(
+              minWidth: 50,
+              maxWidth: 100,
+              minHeight: 50,
+              maxHeight: 100,
+            ),
+            child: Image.asset(
+              'calorie_logo.png',
+              fit: BoxFit.contain,
+            ),
           ),
           const SizedBox(height: 24),
           Text(
@@ -227,11 +235,19 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
         child: Column(
           children: [
-            Image.asset(
-              'calorie_logo.png',
-              width: 100,
-              height: 100,
-              fit: BoxFit.contain,
+            Container(
+              width: MediaQuery.of(context).size.width < 360 ? 80 : 100,
+              height: MediaQuery.of(context).size.width < 360 ? 80 : 100,
+              constraints: const BoxConstraints(
+                minWidth: 70,
+                maxWidth: 120,
+                minHeight: 70,
+                maxHeight: 120,
+              ),
+              child: Image.asset(
+                'calorie_logo.png',
+                fit: BoxFit.contain,
+              ),
             ),
             const SizedBox(height: 24),
             Text(

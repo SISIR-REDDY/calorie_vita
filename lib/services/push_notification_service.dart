@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -120,7 +118,7 @@ class PushNotificationService {
     try {
       final token = await _messaging!.getToken();
       if (token != null) {
-        _logger.info('FCM Token obtained', {'token': token.substring(0, 20) + '...'});
+        _logger.info('FCM Token obtained', {'token': '${token.substring(0, 20)}...'});
         
         // Save token to user profile
         await _saveTokenToUserProfile(token);

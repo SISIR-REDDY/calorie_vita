@@ -5,11 +5,13 @@ import '../models/food_history_entry.dart';
 import '../models/nutrition_info.dart';
 import '../models/food_entry.dart';
 import 'daily_summary_service.dart';
+import 'logger_service.dart';
 
 /// Service for managing food history entries
 class FoodHistoryService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
+  static final LoggerService _logger = LoggerService();
   
   static const String _collectionName = 'food_history';
   static const int _maxHistoryEntries = 100; // Limit to prevent excessive data
@@ -21,21 +23,21 @@ class FoodHistoryService {
   static Future<bool> addFoodEntry(FoodHistoryEntry entry) async {
     try {
       if (_userId == null) {
-        print('❌ User not authenticated');
+        _logger.warning('User not authenticated when adding food entry');
         return false;
       }
 
       // Validate entry data
       if (entry.id.isEmpty) {
-        print('❌ Entry ID cannot be empty');
+        _logger.warning('Entry ID cannot be empty');
         return false;
       }
       if (entry.foodName.isEmpty) {
-        print('❌ Food name cannot be empty');
+        _logger.warning('Food name cannot be empty');
         return false;
       }
       if (entry.calories < 0) {
-        print('❌ Calories cannot be negative');
+        _logger.warning('Calories cannot be negative');
         return false;
       }
 
@@ -53,10 +55,10 @@ class FoodHistoryService {
       // Clean up old entries if we exceed the limit
       await _cleanupOldEntries();
 
-      print('✅ Food entry added to history: ${entry.foodName}');
+      _logger.info('Food entry added to history', {'foodName': entry.foodName});
       return true;
     } catch (e) {
-      print('❌ Error adding food entry to history: $e');
+      _logger.error('Error adding food entry to history', {'error': e.toString()});
       return false;
     }
   }
@@ -90,7 +92,7 @@ class FoodHistoryService {
 
       return await addFoodEntry(entry);
     } catch (e) {
-      print('❌ Error creating food entry from nutrition info: $e');
+      _logger.error('Error creating food entry from nutrition info', {'error': e.toString()});
       return false;
     }
   }
@@ -103,31 +105,65 @@ class FoodHistoryService {
   }) async {
     try {
       if (_userId == null) {
-        print('❌ User not authenticated');
+        _logger.warning('User not authenticated when getting food history');
         return [];
       }
 
-      Query query = _firestore
-          .collection(_collectionName)
-          .doc(_userId)
-          .collection('entries')
-          .orderBy('timestamp', descending: true)
-          .limit(limit);
-
-      // Add date filters if provided
-      if (startDate != null) {
-        query = query.where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+      // Build query efficiently - add where clauses before orderBy
+      Query query;
+      
+      if (startDate != null && endDate != null) {
+        // Both filters - orderBy must match first where clause
+        query = _firestore
+            .collection(_collectionName)
+            .doc(_userId)
+            .collection('entries')
+            .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+            .where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+            .orderBy('timestamp', descending: true)
+            .limit(limit);
+      } else if (startDate != null) {
+        query = _firestore
+            .collection(_collectionName)
+            .doc(_userId)
+            .collection('entries')
+            .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+            .orderBy('timestamp', descending: true)
+            .limit(limit);
+      } else if (endDate != null) {
+        query = _firestore
+            .collection(_collectionName)
+            .doc(_userId)
+            .collection('entries')
+            .where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+            .orderBy('timestamp', descending: true)
+            .limit(limit);
+      } else {
+        query = _firestore
+            .collection(_collectionName)
+            .doc(_userId)
+            .collection('entries')
+            .orderBy('timestamp', descending: true)
+            .limit(limit);
       }
-      if (endDate != null) {
-        query = query.where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endDate));
-      }
 
-      final snapshot = await query.get();
+      final snapshot = await query.get().timeout(
+        const Duration(seconds: 10),
+      );
+      
       return snapshot.docs
-          .map((doc) => FoodHistoryEntry.fromMap(doc.data() as Map<String, dynamic>))
+          .map((doc) {
+            try {
+              return FoodHistoryEntry.fromMap(doc.data() as Map<String, dynamic>);
+            } catch (e) {
+              _logger.error('Error parsing food history entry', {'id': doc.id, 'error': e.toString()});
+              return null;
+            }
+          })
+          .whereType<FoodHistoryEntry>()
           .toList();
     } catch (e) {
-      print('❌ Error getting food history: $e');
+      _logger.error('Error getting food history', {'error': e.toString()});
       return [];
     }
   }
@@ -145,12 +181,12 @@ class FoodHistoryService {
         limit: 50,
       );
     } catch (e) {
-      print('❌ Error getting today\'s food entries: $e');
+      _logger.error('Error getting today\'s food entries', {'error': e.toString()});
       return [];
     }
   }
 
-  /// Get today's food entries as a stream
+  /// Get today's food entries as a stream (optimized)
   static Stream<List<FoodHistoryEntry>> getTodaysFoodEntriesStream() {
     if (_userId == null) {
       return Stream.value([]);
@@ -168,9 +204,28 @@ class FoodHistoryService {
         .where('timestamp', isLessThan: Timestamp.fromDate(endOfDay))
         .orderBy('timestamp', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => FoodHistoryEntry.fromMap(doc.data() as Map<String, dynamic>))
-            .toList());
+        .map((snapshot) {
+          try {
+            return snapshot.docs
+                .map((doc) {
+                  try {
+                    return FoodHistoryEntry.fromMap(doc.data());
+                  } catch (e) {
+                    _logger.error('Error parsing entry', {'id': doc.id, 'error': e.toString()});
+                    return null;
+                  }
+                })
+                .whereType<FoodHistoryEntry>()
+                .toList();
+          } catch (e) {
+            _logger.error('Error processing food entries stream', {'error': e.toString()});
+            return <FoodHistoryEntry>[];
+          }
+        })
+        .handleError((error) {
+          _logger.error('Stream error getting today food entries', {'error': error.toString()});
+          return <FoodHistoryEntry>[];
+        });
   }
 
   /// Get recent food entries (last 7 days)
@@ -178,7 +233,7 @@ class FoodHistoryService {
     try {
       return await getFoodHistory(limit: limit);
     } catch (e) {
-      print('❌ Error getting recent food entries: $e');
+      _logger.error('Error getting recent food entries', {'error': e.toString()});
       return [];
     }
   }
@@ -187,7 +242,7 @@ class FoodHistoryService {
   static Future<bool> deleteFoodEntry(String entryId) async {
     try {
       if (_userId == null) {
-        print('❌ User not authenticated');
+        _logger.warning('User not authenticated when deleting food entry');
         return false;
       }
 
@@ -198,10 +253,10 @@ class FoodHistoryService {
           .doc(entryId)
           .delete();
 
-      print('✅ Food entry deleted: $entryId');
+      _logger.info('Food entry deleted', {'entryId': entryId});
       return true;
     } catch (e) {
-      print('❌ Error deleting food entry: $e');
+      _logger.error('Error deleting food entry', {'error': e.toString()});
       return false;
     }
   }
@@ -210,7 +265,7 @@ class FoodHistoryService {
   static Future<bool> clearAllHistory() async {
     try {
       if (_userId == null) {
-        print('❌ User not authenticated');
+        _logger.warning('User not authenticated when clearing history');
         return false;
       }
 
@@ -226,10 +281,10 @@ class FoodHistoryService {
       }
 
       await batch.commit();
-      print('✅ All food history cleared');
+      _logger.info('All food history cleared');
       return true;
     } catch (e) {
-      print('❌ Error clearing food history: $e');
+      _logger.error('Error clearing food history', {'error': e.toString()});
       return false;
     }
   }
@@ -240,7 +295,7 @@ class FoodHistoryService {
       final todaysEntries = await getTodaysFoodEntries();
       return todaysEntries.fold<double>(0.0, (total, entry) => total + entry.calories);
     } catch (e) {
-      print('❌ Error calculating today\'s total calories: $e');
+      _logger.error('Error calculating today\'s total calories', {'error': e.toString()});
       return 0.0;
     }
   }
@@ -259,7 +314,7 @@ class FoodHistoryService {
       
       return entries.fold<double>(0.0, (total, entry) => total + entry.calories);
     } catch (e) {
-      print('❌ Error calculating recent total calories: $e');
+      _logger.error('Error calculating recent total calories', {'error': e.toString()});
       return 0.0;
     }
   }
@@ -286,7 +341,7 @@ class FoodHistoryService {
         'lastEntry': recentEntries.isNotEmpty ? recentEntries.first.timestamp : null,
       };
     } catch (e) {
-      print('❌ Error getting history stats: $e');
+      _logger.error('Error getting history stats', {'error': e.toString()});
       return {};
     }
   }
@@ -330,9 +385,9 @@ class FoodHistoryService {
       final dailySummaryService = DailySummaryService();
       await dailySummaryService.onMealLogged(_userId!, foodEntry);
 
-      print('✅ Synced food entry with daily summary: ${entry.foodName}');
+      _logger.info('Synced food entry with daily summary', {'foodName': entry.foodName});
     } catch (e) {
-      print('❌ Error syncing with daily summary: $e');
+      _logger.error('Error syncing with daily summary', {'error': e.toString()});
     }
   }
 
@@ -342,7 +397,7 @@ class FoodHistoryService {
       final entries = await getTodaysFoodEntries();
       return entries.fold<int>(0, (total, entry) => total + entry.calories.round());
     } catch (e) {
-      print('❌ Error calculating today\'s consumed calories: $e');
+      _logger.error('Error calculating today\'s consumed calories', {'error': e.toString()});
       return 0;
     }
   }
@@ -375,10 +430,10 @@ class FoodHistoryService {
         }
         
         await batch.commit();
-        print('✅ Cleaned up ${entriesToDelete.length} old food history entries');
+        _logger.info('Cleaned up old food history entries', {'deleted': entriesToDelete.length});
       }
     } catch (e) {
-      print('❌ Error cleaning up old entries: $e');
+      _logger.error('Error cleaning up old entries', {'error': e.toString()});
     }
   }
 
@@ -396,7 +451,7 @@ class FoodHistoryService {
         .limit(limit)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => FoodHistoryEntry.fromMap(doc.data() as Map<String, dynamic>))
+            .map((doc) => FoodHistoryEntry.fromMap(doc.data()))
             .toList());
   }
 
@@ -422,7 +477,7 @@ class FoodHistoryService {
         .limit(limit)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => FoodHistoryEntry.fromMap(doc.data() as Map<String, dynamic>))
+            .map((doc) => FoodHistoryEntry.fromMap(doc.data()))
             .toList());
   }
 }

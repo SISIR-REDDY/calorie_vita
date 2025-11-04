@@ -52,7 +52,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
   // Stream subscriptions
   StreamSubscription<Map<String, dynamic>?>? _profileDataSubscription;
-  StreamSubscription<Map<String, dynamic>>? _fastMacroBreakdownSubscription;
+  StreamSubscription<MacroBreakdown>? _fastMacroBreakdownSubscription; // Changed from Map to MacroBreakdown
   StreamSubscription<UserGoals?>? _goalsSubscription;
   StreamSubscription<Map<String, double>>? _todaysFoodMacroSubscription;
   StreamSubscription<int>? _todaysFoodCaloriesSubscription;
@@ -91,6 +91,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     _loadCachedAnalyticsData();
     
     // Initialize services asynchronously
+    _initializeAppStateService(); // Initialize first for macro breakdown stream
     _setupTodaysFoodDataService();
     _initializeGoogleFitData();
     
@@ -165,8 +166,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
       }
 
-      // 3. Load default Google Fit data immediately
-      _todayGoogleFitData ??= GoogleFitData(
+      // 3. Load default Google Fit data immediately (already initialized, just update if needed)
+      _todayGoogleFitData = GoogleFitData(
         date: DateTime.now(),
         steps: 0,
         caloriesBurned: 0.0,
@@ -230,7 +231,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
       // AI Insights generation removed
     } catch (e) {
-      // Don't show error to user, just log it
+      // Log error and show user-friendly message
+      print('❌ Error loading fresh analytics data: $e');
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load analytics. Tap to retry.';
+        });
+      }
     } finally {
       if (mounted) {
         setState(() => _isRefreshing = false);
@@ -243,9 +250,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     try {
       if (!_appStateService.isInitialized) {
         await _appStateService.initialize().timeout(const Duration(seconds: 3),
-            onTimeout: () => null);
+            onTimeout: () {
+          print('⚠️ AppStateService initialization timed out');
+          return null;
+        });
       }
     } catch (e) {
+      print('❌ Error initializing AppStateService: $e');
+      // Continue without blocking UI
     }
   }
 
@@ -255,8 +267,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       final days = _getDaysForPeriod(_selectedPeriod);
       await _analyticsService.initializeRealTimeAnalytics(days: days).timeout(
           const Duration(seconds: 4),
-          onTimeout: () => null);
+          onTimeout: () {
+        print('⚠️ Analytics service initialization timed out');
+        return null;
+      });
     } catch (e) {
+      print('❌ Error initializing analytics service: $e');
+      // Continue without blocking UI
     }
   }
 
@@ -307,7 +324,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           if (_userHeight != newHeight || _userGender != newGender || _userAge != newAge) {
             // Debounce the update to prevent excessive rebuilds
             _profileUpdateTimer?.cancel();
-            _profileUpdateTimer = Timer(Duration(milliseconds: 100), () {
+            _profileUpdateTimer = Timer(const Duration(milliseconds: 100), () {
               if (mounted) {
                 setState(() {
                   _userHeight = newHeight;
@@ -349,9 +366,35 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         if (mounted) {
           setState(() {
             _recommendations = recommendations;
+            print('📊 Recommendations updated: ${recommendations.length} items');
+          });
+        }
+      }, onError: (error) {
+        print('❌ Recommendations stream error: $error');
+        if (mounted) {
+          setState(() {
+            _recommendations = [];
           });
         }
       });
+      
+      // Load initial recommendations from cache
+      setState(() {
+        _recommendations = _analyticsService.cachedRecommendations;
+        print('📊 Loaded ${_recommendations.length} cached recommendations');
+      });
+      
+      // Generate recommendations if empty
+      if (_recommendations.isEmpty) {
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted && _recommendations.isEmpty) {
+            final userId = FirebaseAuth.instance.currentUser?.uid;
+            if (userId != null) {
+              _analyticsService.initializeRealTimeAnalytics(days: 7);
+            }
+          }
+        });
+      }
     } catch (e) {
       print('Error setting up real-time listeners: $e');
     }
@@ -434,21 +477,52 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       });
       
       // Listen to macro nutrients stream (same data as TodaysFoodScreen)
-      _todaysFoodMacroSubscription = _todaysFoodDataService.macroNutrientsStream.listen((macros) {
-        if (mounted) {
-          setState(() {
-            _macroBreakdown = MacroBreakdown(
-              protein: macros['protein'] ?? 0.0,
-              carbs: macros['carbs'] ?? 0.0,
-              fat: macros['fat'] ?? 0.0,
-              fiber: macros['fiber'] ?? 0.0,
-              sugar: macros['sugar'] ?? 0.0,
-            );
-          });
-          print('✅ Analytics: Macro breakdown updated from TodaysFoodDataService');
-          print('   Protein: ${macros['protein'] ?? 0.0}g, Carbs: ${macros['carbs'] ?? 0.0}g, Fat: ${macros['fat'] ?? 0.0}g');
-        }
-      });
+      _todaysFoodMacroSubscription?.cancel(); // Cancel existing subscription first
+      _todaysFoodMacroSubscription = _todaysFoodDataService.macroNutrientsStream.listen(
+        (macros) {
+          if (mounted) {
+            setState(() {
+              _macroBreakdown = MacroBreakdown(
+                protein: macros['protein'] ?? 0.0,
+                carbs: macros['carbs'] ?? 0.0,
+                fat: macros['fat'] ?? 0.0,
+                fiber: macros['fiber'] ?? 0.0,
+                sugar: macros['sugar'] ?? 0.0,
+              );
+            });
+            print('✅ Analytics: Macro breakdown updated from TodaysFoodDataService');
+            print('   Protein: ${macros['protein'] ?? 0.0}g, Carbs: ${macros['carbs'] ?? 0.0}g, Fat: ${macros['fat'] ?? 0.0}g');
+          }
+        },
+        onError: (error) {
+          print('❌ Analytics: Error in macro nutrients stream: $error');
+        },
+      );
+      
+      // Also listen to AppStateService macroBreakdownStream as backup/primary source
+      // This ensures we get updates from both sources
+      _fastMacroBreakdownSubscription?.cancel();
+      _fastMacroBreakdownSubscription = _appStateService.macroBreakdownStream.listen(
+        (breakdown) {
+          if (mounted) {
+            // Only update if data is different (avoid unnecessary updates)
+            if (_macroBreakdown.protein != breakdown.protein ||
+                _macroBreakdown.carbs != breakdown.carbs ||
+                _macroBreakdown.fat != breakdown.fat ||
+                _macroBreakdown.fiber != breakdown.fiber ||
+                _macroBreakdown.sugar != breakdown.sugar) {
+              setState(() {
+                _macroBreakdown = breakdown;
+              });
+              print('✅ Analytics: Macro breakdown updated from AppStateService');
+              print('   Protein: ${breakdown.protein}g, Carbs: ${breakdown.carbs}g, Fat: ${breakdown.fat}g');
+            }
+          }
+        },
+        onError: (error) {
+          print('❌ Analytics: Error in AppStateService macro breakdown stream: $error');
+        },
+      );
       
       print('✅ Today\'s food data service initialized for analytics');
     } catch (e) {
@@ -490,7 +564,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               _todayGoogleFitData = todayData;
             });
             
-            print('✅ Analytics: Google Fit live data loaded: ${_todayGoogleFitData?.steps} steps, ${_todayGoogleFitData?.caloriesBurned} calories, ${_todayGoogleFitData?.workoutSessions} workouts');
+            print('✅ Analytics: Google Fit live data loaded: ${_todayGoogleFitData.steps} steps, ${_todayGoogleFitData.caloriesBurned} calories, ${_todayGoogleFitData.workoutSessions} workouts');
           } else {
             print('⚠️ Analytics: Google Fit live data is null, trying fallback...');
             // Fallback to original service
@@ -565,7 +639,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         // Loading state handled by OptimizedGoogleFitManager
       });
       
-      print('Google Fit today data loaded (fallback): ${_todayGoogleFitData?.steps} steps');
+      print('Google Fit today data loaded (fallback): ${_todayGoogleFitData.steps} steps');
     } catch (dataError) {
       print('Error loading Google Fit data fallback: $dataError');
       setState(() {
@@ -621,27 +695,63 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   Future<void> _loadSingleDayGoogleFitData(
       DateTime date, List<GoogleFitData> weeklyData, {bool forceRefresh = false}) async {
     try {
-      // Get data from optimized manager
-      final data = _googleFitManager.getCurrentData();
-      if (data == null) return null;
+      // Try to get data from daily summaries first (real historical data)
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId != null) {
+        final dateKey = '${date.year}-${date.month}-${date.day}';
+        try {
+          final summaryDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .collection('dailySummary')
+              .doc(dateKey)
+              .get()
+              .timeout(const Duration(seconds: 2));
+          
+          if (summaryDoc.exists) {
+            final data = summaryDoc.data()!;
+            final steps = data['steps'] as int? ?? 0;
+            final caloriesBurned = (data['caloriesBurned'] as int?)?.toDouble() ?? 0.0;
+            final workoutSessions = caloriesBurned > 0 ? 1 : 0; // Count as workout if calories burned
+            
+            weeklyData.add(GoogleFitData(
+              date: date,
+              steps: steps,
+              caloriesBurned: caloriesBurned,
+              workoutSessions: workoutSessions,
+              workoutDuration: 0.0,
+            ));
+            return;
+          }
+        } catch (e) {
+          // Fall through to Google Fit data
+        }
+      }
       
-      final futures = [data.steps ?? 0, data.caloriesBurned ?? 0.0, data.workoutSessions ?? 0];
-
-      final steps = futures[0] as int? ?? 0;
-      final calories = futures[1] as double? ?? 0.0;
-      final workoutSessions = futures[2] as int? ?? 0;
-
+      // Fallback: Get data from optimized manager (only for today)
+      final today = DateTime.now();
+      if (date.year == today.year && date.month == today.month && date.day == today.day) {
+        final data = _googleFitManager.getCurrentData();
+        if (data != null) {
+          weeklyData.add(GoogleFitData(
+            date: date,
+            steps: data.steps ?? 0,
+            caloriesBurned: data.caloriesBurned ?? 0.0,
+            workoutSessions: data.workoutSessions ?? 0,
+            workoutDuration: 0.0,
+          ));
+          return;
+        }
+      }
+      
+      // No data available for this date - add empty entry
       weeklyData.add(GoogleFitData(
         date: date,
-        steps: steps,
-        caloriesBurned: calories,
-        workoutSessions: workoutSessions,
+        steps: 0,
+        caloriesBurned: 0,
+        workoutSessions: 0,
         workoutDuration: 0.0,
       ));
-      
-      if (forceRefresh) {
-        // Reduced logging - only log summary, not every day
-      }
     } catch (e) {
       // Add empty data if loading fails
       weeklyData.add(GoogleFitData(
@@ -846,9 +956,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
       print('✅ Analytics: Data refreshed successfully');
     } catch (e) {
-      setState(() {
-        _error = 'Failed to refresh data: ${e.toString()}';
-      });
+      // Show error to user instead of silently failing
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to refresh data. Please try again.';
+        });
+        // Show snackbar for user feedback
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to refresh analytics data'),
+            backgroundColor: Colors.red[600],
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
       print('❌ Error refreshing analytics data: $e');
     } finally {
       setState(() {
@@ -1354,19 +1476,94 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         break;
 
       case 'Weekly':
-        // Use actual Google Fit weekly data that's being loaded
+        // Calculate weekly totals as sum of last 7 days (including today) from current daily data
+        final today = DateTime.now();
+        final startDate = DateTime(today.year, today.month, today.day).subtract(const Duration(days: 6)); // Last 7 days including today
+        final endDate = DateTime(today.year, today.month, today.day).add(const Duration(days: 1)); // End of today
+        
+        // Helper function to normalize date to midnight for comparison
+        DateTime normalizeDate(DateTime date) {
+          return DateTime(date.year, date.month, date.day);
+        }
+        
+        // Filter daily summaries to only include the last 7 days from today
+        final last7DaysSummaries = _dailySummaries.where((summary) {
+          final normalizedSummaryDate = normalizeDate(summary.date);
+          // Include dates from startDate (inclusive) to endDate (exclusive, which is start of tomorrow)
+          return !normalizedSummaryDate.isBefore(startDate) && normalizedSummaryDate.isBefore(endDate);
+        }).toList();
+        
+        if (last7DaysSummaries.isNotEmpty) {
+          // Sum calories burned from the last 7 days (to match Daily view which shows caloriesBurned)
+          totalCalories = last7DaysSummaries
+              .fold(0, (sum, summary) => sum + summary.caloriesBurned);
+          // Sum steps from the last 7 days
+          totalSteps = last7DaysSummaries
+              .fold(0, (sum, summary) => sum + summary.steps);
+        } else if (_dailySummaries.isNotEmpty) {
+          // Fallback: if filtering didn't work, try using all summaries but ensure we have at least some data
+          // Filter to last 7 days manually
+          final todayNormalized = normalizeDate(today);
+          final fallbackLast7Days = _dailySummaries.where((summary) {
+            final normalizedDate = normalizeDate(summary.date);
+            final daysDiff = todayNormalized.difference(normalizedDate).inDays;
+            return daysDiff >= 0 && daysDiff < 7;
+          }).toList();
+          
+          if (fallbackLast7Days.isNotEmpty) {
+            totalCalories = fallbackLast7Days
+                .fold(0, (sum, summary) => sum + summary.caloriesBurned);
+            totalSteps = fallbackLast7Days
+                .fold(0, (sum, summary) => sum + summary.steps);
+          } else {
+            // Use all summaries as last resort
+            totalCalories = _dailySummaries
+                .fold(0, (sum, summary) => sum + summary.caloriesBurned);
+            totalSteps = _dailySummaries
+                .fold(0, (sum, summary) => sum + summary.steps);
+          }
+        }
+        
+        // If we still don't have calories/steps data, try using Google Fit weekly data
+        if (totalCalories == 0 && totalSteps == 0 && _weeklyGoogleFitData.isNotEmpty) {
+          final last7DaysGoogleFitForCalories = _weeklyGoogleFitData.where((data) {
+            final normalizedDataDate = normalizeDate(data.date);
+            return !normalizedDataDate.isBefore(startDate) && normalizedDataDate.isBefore(endDate);
+          }).toList();
+          
+          if (last7DaysGoogleFitForCalories.isNotEmpty) {
+            totalCalories = last7DaysGoogleFitForCalories
+                .fold(0, (sum, data) => sum + (data.caloriesBurned?.round() ?? 0));
+            totalSteps = last7DaysGoogleFitForCalories
+                .fold(0, (sum, data) => sum + (data.steps ?? 0));
+          }
+        }
+        
+        // For workouts, use Google Fit weekly data if available (has actual workout sessions count)
         if (_weeklyGoogleFitData.isNotEmpty) {
-          // Calculate totals from the weekly Google Fit data
-          totalCalories = _weeklyGoogleFitData
-              .fold(0, (sum, data) => sum + (data.caloriesBurned?.round() ?? 0));
-          totalSteps = _weeklyGoogleFitData
-              .fold(0, (sum, data) => sum + (data.steps ?? 0));
-          totalWorkouts = _weeklyGoogleFitData
-              .fold(0, (sum, data) => sum + (data.workoutSessions ?? 0));
+          // Filter weekly Google Fit data to last 7 days
+          final last7DaysGoogleFit = _weeklyGoogleFitData.where((data) {
+            final normalizedDataDate = normalizeDate(data.date);
+            // Include dates from startDate (inclusive) to endDate (exclusive, which is start of tomorrow)
+            return !normalizedDataDate.isBefore(startDate) && normalizedDataDate.isBefore(endDate);
+          }).toList();
+          
+          if (last7DaysGoogleFit.isNotEmpty) {
+            // Sum actual workout sessions from Google Fit data
+            totalWorkouts = last7DaysGoogleFit
+                .fold(0, (sum, data) => sum + (data.workoutSessions ?? 0));
+          } else {
+            // Fallback: use all weekly Google Fit data
+            totalWorkouts = _weeklyGoogleFitData
+                .fold(0, (sum, data) => sum + (data.workoutSessions ?? 0));
+          }
+        } else if (last7DaysSummaries.isNotEmpty) {
+          // Fallback: count days with calories burned > 0 from daily summaries
+          totalWorkouts = last7DaysSummaries
+              .where((summary) => summary.caloriesBurned > 0)
+              .length;
         } else {
-          // Fallback to today's data if weekly stats not available
-          totalCalories = _todayGoogleFitData.caloriesBurned?.round() ?? 0;
-          totalSteps = _todayGoogleFitData.steps ?? 0;
+          // Last resort: use today's workout sessions
           totalWorkouts = _todayGoogleFitData.workoutSessions ?? 0;
         }
         break;
@@ -1477,7 +1674,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               ),
               child: Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.info_outline,
                     color: kWarningColor,
                     size: 20,
@@ -1488,7 +1685,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       currentWeight == null 
                           ? 'Weight data unavailable. Please update your profile in settings.'
                           : 'Set your weight goal in settings to track progress.',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 14,
                         color: kWarningColor,
                         fontWeight: FontWeight.w500,
@@ -1511,7 +1708,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     String fitnessGoal = 'maintenance';
     
     if (userGoals != null) {
-      fitnessGoal = userGoals!.fitnessGoal ?? 'maintenance';
+      fitnessGoal = userGoals.fitnessGoal ?? 'maintenance';
       // Debug logging removed
     } else {
       // Fallback: userGoals is null, use default
@@ -3065,8 +3262,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       recommendation['title']?.toString() ?? 'Recommendation',
                       recommendation['description']?.toString() ??
                           'No description available',
-                      _getRecommendationIcon(
-                          recommendation['type']?.toString() ?? 'general'),
+                      _getRecommendationIcon(recommendation['type']?.toString() ?? 'general'),
                       _getRecommendationColor(
                           recommendation['priority']?.toString() ?? 'medium'),
                     ),
@@ -3080,8 +3276,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
   Widget _buildRecommendationItem(
       String title, String description, IconData icon, Color color) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final padding = screenWidth < 360 ? 10.0 : 12.0;
+    final iconPadding = screenWidth < 360 ? 6.0 : 8.0;
+    final iconSize = screenWidth < 360 ? 14.0 : 16.0;
+    final fontSize = screenWidth < 360 ? 13.0 : 14.0;
+    final descFontSize = screenWidth < 360 ? 11.0 : 12.0;
+    
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(padding),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
@@ -3094,14 +3297,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: EdgeInsets.all(iconPadding),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: color, size: 16),
+            child: Icon(icon, color: color, size: iconSize),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: screenWidth < 360 ? 10 : 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -3110,18 +3313,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: fontSize,
                     fontWeight: FontWeight.w600,
                     color: color,
                   ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 2,
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: screenWidth < 360 ? 3 : 4),
                 Text(
                   description,
-                  style: const TextStyle(
-                    fontSize: 12,
+                  style: TextStyle(
+                    fontSize: descFontSize,
                     color: kTextSecondary,
                     height: 1.3,
                   ),

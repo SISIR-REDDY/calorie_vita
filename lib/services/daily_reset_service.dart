@@ -113,9 +113,9 @@ class DailyResetService {
 
       // Reset daily summary
       await _firestore
-          .collection('daily_summaries')
+          .collection('users')
           .doc(userId)
-          .collection('entries')
+          .collection('dailySummary')
           .doc(todayStr)
           .set({
         'date': todayStr,

@@ -240,7 +240,7 @@ class ProfileWidgets {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
+                  gradient: const LinearGradient(
                     colors: [
                       Colors.orange, 
                       Colors.deepOrange, 
@@ -421,7 +421,7 @@ class ProfileWidgets {
         ),
         child: Column(
           children: [
-            Icon(
+            const Icon(
               Icons.emoji_events_outlined,
               size: 28,
               color: Colors.orange,

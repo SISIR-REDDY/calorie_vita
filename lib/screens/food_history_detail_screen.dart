@@ -53,7 +53,7 @@ class _FoodHistoryDetailScreenState extends State<FoodHistoryDetailScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -83,7 +83,7 @@ class _FoodHistoryDetailScreenState extends State<FoodHistoryDetailScreen> {
   Widget _buildFoodNameCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -169,7 +169,7 @@ class _FoodHistoryDetailScreenState extends State<FoodHistoryDetailScreen> {
   Widget _buildNutritionCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -251,18 +251,22 @@ class _FoodHistoryDetailScreenState extends State<FoodHistoryDetailScreen> {
             ),
             child: Row(
               children: [
-                Icon(
+                const Icon(
                   Icons.scale,
                   color: AppColors.primaryColor,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  'Weight: ${widget.entry.weightGrams.toStringAsFixed(1)}g',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.primaryColor,
+                Expanded(
+                  child: Text(
+                    'Weight: ${widget.entry.weightGrams.toStringAsFixed(1)}g',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primaryColor,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
               ],
@@ -309,7 +313,7 @@ class _FoodHistoryDetailScreenState extends State<FoodHistoryDetailScreen> {
   Widget _buildAdditionalInfoCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -373,7 +377,7 @@ class _FoodHistoryDetailScreenState extends State<FoodHistoryDetailScreen> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),

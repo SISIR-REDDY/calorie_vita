@@ -68,6 +68,33 @@ class ResponsiveUtils {
     return (baseSpacing * multiplier).clamp(baseSpacing * 0.7, baseSpacing * 1.3);
   }
   
+  /// Get responsive padding (common values)
+  static EdgeInsets getResponsivePaddingAll(BuildContext context, double basePadding) {
+    final padding = getResponsiveSpacing(context, basePadding);
+    return EdgeInsets.all(padding);
+  }
+  
+  /// Get responsive padding for small screens
+  static EdgeInsets getResponsivePaddingSmall(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final padding = screenWidth < 360 ? 12.0 : (screenWidth < 600 ? 16.0 : 20.0);
+    return EdgeInsets.all(padding);
+  }
+  
+  /// Get responsive padding for medium screens
+  static EdgeInsets getResponsivePaddingMedium(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final padding = screenWidth < 360 ? 16.0 : (screenWidth < 600 ? 20.0 : 24.0);
+    return EdgeInsets.all(padding);
+  }
+  
+  /// Get responsive padding for large screens
+  static EdgeInsets getResponsivePaddingLarge(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final padding = screenWidth < 360 ? 20.0 : (screenWidth < 600 ? 24.0 : 28.0);
+    return EdgeInsets.all(padding);
+  }
+  
   /// Get responsive border radius
   static double getResponsiveBorderRadius(BuildContext context, double baseRadius) {
     final multiplier = getScreenWidthMultiplier(context);

@@ -254,21 +254,24 @@ class ImageProcessingService {
     
     // Size factor
     final sizeKB = bytes.length / 1024;
-    if (sizeKB > 1000) score += 30; // Large files benefit more
-    else if (sizeKB > 500) score += 20;
+    if (sizeKB > 1000) {
+      score += 30; // Large files benefit more
+    } else if (sizeKB > 500) score += 20;
     else if (sizeKB > 100) score += 10;
     
     // Dimension factor
     final maxDimension = image.width > image.height ? image.width : image.height;
-    if (maxDimension > 2000) score += 25;
-    else if (maxDimension > 1500) score += 15;
+    if (maxDimension > 2000) {
+      score += 25;
+    } else if (maxDimension > 1500) score += 15;
     else if (maxDimension > 1000) score += 10;
     
     // Quality factor (estimated from file size vs dimensions)
     final expectedSize = (image.width * image.height * 3) / 1024; // Rough estimate
     final compressionRatio = bytes.length / 1024 / expectedSize;
-    if (compressionRatio > 0.8) score += 20; // Low compression
-    else if (compressionRatio > 0.5) score += 10;
+    if (compressionRatio > 0.8) {
+      score += 20; // Low compression
+    } else if (compressionRatio > 0.5) score += 10;
     
     return score.clamp(0, 100);
   }

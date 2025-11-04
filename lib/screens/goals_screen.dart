@@ -362,7 +362,7 @@ class _GoalsScreenState extends State<GoalsScreen>
               child: SlideTransition(
                 position: _slideAnimation,
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
+                  padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -394,8 +394,14 @@ class _GoalsScreenState extends State<GoalsScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 80,
-            height: 80,
+            width: MediaQuery.of(context).size.width < 360 ? 60 : 80,
+            height: MediaQuery.of(context).size.width < 360 ? 60 : 80,
+            constraints: const BoxConstraints(
+              minWidth: 50,
+              maxWidth: 100,
+              minHeight: 50,
+              maxHeight: 100,
+            ),
             decoration: BoxDecoration(
               gradient: kPrimaryGradient,
               borderRadius: BorderRadius.circular(40),
@@ -428,7 +434,7 @@ class _GoalsScreenState extends State<GoalsScreen>
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 18 : 24),
       decoration: BoxDecoration(
         gradient: kPrimaryGradient,
         borderRadius: BorderRadius.circular(24),
