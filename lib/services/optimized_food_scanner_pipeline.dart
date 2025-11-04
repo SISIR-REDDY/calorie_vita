@@ -569,7 +569,14 @@ class OptimizedFoodScannerPipeline {
       }
       
       final base64Image = base64Encode(optimizedBytes);
-      print('✅ Image encoded: ${(optimizedBytes.length / 1024).toStringAsFixed(1)}KB → base64 length: ${base64Image.length}');
+      final base64SizeKB = base64Image.length / 1024;
+      print('✅ Image encoded: ${(optimizedBytes.length / 1024).toStringAsFixed(1)}KB → base64 length: ${base64SizeKB.toStringAsFixed(1)}KB');
+      
+      // Warn if base64 image is very large (might cause timeout)
+      if (base64SizeKB > 1000) { // > 1MB base64
+        print('⚠️ WARNING: Base64 image is very large (${base64SizeKB.toStringAsFixed(1)}KB) - this may cause timeout');
+        print('   Consider reducing image size for faster processing');
+      }
       
       // Validate base64 encoding
       if (base64Image.isEmpty) {
@@ -582,17 +589,59 @@ class OptimizedFoodScannerPipeline {
       
       print('✅ Image validation passed - ready for AI vision');
 
-      // Optimized prompt - concise for faster processing, focused on calories
+      // Enhanced prompt - trained to identify food even with other objects present
       const prompt = '''
-Analyze image. Return ONLY JSON. If food: identify name, estimate weight, calculate calories + macros. If not food: isFood=false.
+You are an expert food nutrition analyzer. Your task is to identify FOOD items in images, even when other objects (plates, utensils, backgrounds, people, etc.) are visible.
 
-Food JSON format:
-{"isFood":true,"foodName":"food name","ingredients":["ing1","ing2"],"weightGrams":200,"volumeEstimate":"1 plate","calories":350,"protein":25,"carbs":45,"fat":10,"fiber":3,"sugar":5,"category":"category","cuisine":"cuisine"}
+CRITICAL INSTRUCTIONS:
+1. Focus ONLY on food items - ignore plates, utensils, backgrounds, people, or other non-food objects
+2. If multiple food items are present, identify the PRIMARY food item (largest/most prominent)
+3. If food is partially visible or in the background, still analyze it if identifiable
+4. Even if the image contains other objects, if FOOD is visible, you MUST analyze it
+5. Return ONLY valid JSON - no explanations, no markdown, no text outside JSON
 
-Not food JSON format:
-{"isFood":false,"foodName":"Not a food item","message":"Food not clearly visible","confidence":0,"calories":0,"protein":0,"carbs":0,"fat":0,"fiber":0,"sugar":0,"weightGrams":0}
+SCENARIOS TO HANDLE:
+- Food on a plate with utensils → Analyze the food, ignore plate/utensils
+- Food with people in background → Analyze the food, ignore people
+- Food on table with other items → Focus on food items, ignore other objects
+- Multiple food items → Identify primary food item or combine them
+- Food partially visible → Still analyze if identifiable
+- Food in container/package → Analyze the visible food portion
 
-Requirements: JSON only. Estimate weight visually. Calories = (protein×4 + carbs×4 + fat×9) ± 10%.
+ANALYSIS REQUIREMENTS (when food is present):
+1. Identify the food name (be VERY specific - e.g., "Grilled Chicken Breast with Rice" not just "Chicken")
+2. Estimate the visible portion size in grams (weightGrams) - focus on the food only
+3. Calculate calories based on food type and estimated portion
+4. Estimate macros: protein, carbs, fat, fiber, sugar
+5. List main ingredients if visible
+6. Provide category (e.g., "Main Course", "Snack", "Dessert", "Side Dish")
+7. Provide cuisine type if identifiable (e.g., "Indian", "Italian", "American")
+8. Provide confidence level (0.0-1.0)
+
+Food JSON format (required when isFood=true):
+{"isFood":true,"foodName":"specific food name with details","ingredients":["ingredient1","ingredient2"],"weightGrams":200,"volumeEstimate":"1 plate","calories":350,"protein":25,"carbs":45,"fat":10,"fiber":3,"sugar":5,"category":"category name","cuisine":"cuisine type","confidence":0.9}
+
+Not food JSON format (ONLY use if NO food is visible at all):
+{"isFood":false,"foodName":"Not a food item","message":"No food items visible in the image","confidence":0,"calories":0,"protein":0,"carbs":0,"fat":0,"fiber":0,"sugar":0,"weightGrams":0}
+
+CRITICAL RULES:
+1. Always return valid JSON starting with { and ending with }
+2. If ANY food is visible (even partially), set isFood=true and analyze it
+3. Ignore non-food objects completely - they should not affect your analysis
+4. Estimate weightGrams based on VISIBLE food portion only
+5. Calculate calories: (protein×4 + carbs×4 + fat×9) ± 10%
+6. Be specific with food names - include cooking method if visible (grilled, fried, baked, etc.)
+7. If multiple foods are visible, identify the primary/main food item
+8. If unsure about exact nutrition, provide best estimates based on food type and portion size
+9. Confidence should reflect how clearly the food is visible (0.9+ for clear food, 0.7-0.9 for partially visible)
+
+EXAMPLES:
+- Image with pasta on plate, fork, and table → Analyze pasta, ignore plate/fork/table
+- Image with burger on table, phone visible → Analyze burger, ignore phone
+- Image with rice and curry, person in background → Analyze rice and curry, ignore person
+- Image with pizza slice on plate with other items → Analyze pizza slice, ignore other items
+
+Remember: Your ONLY job is to identify and analyze FOOD items. Everything else is irrelevant.
 ''';
 
       print('📡 Calling OpenRouter AI Vision API...');
@@ -601,9 +650,9 @@ Requirements: JSON only. Estimate weight visually. Calories = (protein×4 + carb
       print('   Base URL: ${AIConfig.baseUrl}');
       
       final response = await _callOpenRouterVisionFast(prompt, base64Image).timeout(
-        const Duration(seconds: 18), // Faster timeout for speed (allows 3 attempts × 15s + overhead)
+        const Duration(seconds: 60), // Increased timeout to allow both models to complete (45s + 30s + overhead)
         onTimeout: () {
-          print('⏱️ AI vision API call timed out after 18 seconds (all models exhausted)');
+          print('⏱️ AI vision API call timed out after 60 seconds (all models exhausted)');
           return null;
         },
       );
@@ -629,30 +678,69 @@ Requirements: JSON only. Estimate weight visually. Calories = (protein×4 + carb
         cleanedResponse = cleanedResponse.replaceAll('```json', '').replaceAll('```', '').trim();
         
         // Check if response contains error message (not JSON)
-        if (cleanedResponse.toLowerCase().contains("i'm sorry") || 
-            cleanedResponse.toLowerCase().contains("i can't") ||
-            cleanedResponse.toLowerCase().contains("cannot") ||
-            cleanedResponse.toLowerCase().contains("does not depict")) {
+        final lowerResponse = cleanedResponse.toLowerCase();
+        if (lowerResponse.contains("i'm sorry") || 
+            lowerResponse.contains("i can't") ||
+            lowerResponse.contains("cannot") ||
+            lowerResponse.contains("does not depict") ||
+            lowerResponse.contains("unable to") ||
+            lowerResponse.contains("i don't") ||
+            lowerResponse.contains("i cannot")) {
           print('⚠️ AI returned error message instead of JSON');
-          print('   Response: ${cleanedResponse.substring(0, cleanedResponse.length > 100 ? 100 : cleanedResponse.length)}...');
-          return {
-            'success': false,
-            'error': 'AI could not identify food in the image. Please try a clearer photo or enter manually.',
-          };
+          print('   Response preview: ${cleanedResponse.substring(0, cleanedResponse.length > 200 ? 200 : cleanedResponse.length)}...');
+          print('   Full response length: ${cleanedResponse.length}');
+          
+          // Try to extract JSON even if there's an error message
+          final jsonMatch = RegExp(r'\{[\s\S]*\}', dotAll: true).firstMatch(cleanedResponse);
+          if (jsonMatch != null) {
+            print('   ✅ Found JSON in response despite error message, attempting to parse...');
+            try {
+              final extractedJson = jsonMatch.group(0)!.trim();
+              final parsedResult = jsonDecode(extractedJson) as Map<String, dynamic>;
+              final isFood = parsedResult['isFood'] as bool? ?? true;
+              if (isFood) {
+                print('   ✅ JSON parsed successfully, isFood=true');
+                cleanedResponse = extractedJson;
+                // Continue with normal parsing below
+              } else {
+                return {
+                  'success': false,
+                  'error': parsedResult['message'] as String? ?? 'AI could not identify food in the image. Please try a clearer photo or enter manually.',
+                  'isFood': false,
+                };
+              }
+            } catch (e) {
+              print('   ❌ Failed to parse extracted JSON: $e');
+              return {
+                'success': false,
+                'error': 'AI could not identify food in the image. Please try a clearer photo or enter manually.',
+              };
+            }
+          } else {
+            return {
+              'success': false,
+              'error': 'AI could not identify food in the image. Please try a clearer photo or enter manually.',
+            };
+          }
         }
         
-        // Try to extract JSON from the response
-        final jsonMatch = RegExp(r'\{[\s\S]*\}', dotAll: true).firstMatch(cleanedResponse);
-        if (jsonMatch != null) {
-          cleanedResponse = jsonMatch.group(0)!.trim();
-        } else {
-          // No JSON found in response
-          print('❌ No JSON found in AI response');
-          print('   Response: ${cleanedResponse.substring(0, cleanedResponse.length > 200 ? 200 : cleanedResponse.length)}');
-          return {
-            'success': false,
-            'error': 'AI returned invalid response format. Please try again or enter manually.',
-          };
+        // Try to extract JSON from the response (if not already extracted above)
+        if (!cleanedResponse.trim().startsWith('{')) {
+          final jsonMatch = RegExp(r'\{[\s\S]*\}', dotAll: true).firstMatch(cleanedResponse);
+          if (jsonMatch != null) {
+            print('   📝 Extracting JSON from response...');
+            cleanedResponse = jsonMatch.group(0)!.trim();
+          } else {
+            // No JSON found in response
+            print('❌ No JSON found in AI response');
+            print('   Response preview: ${cleanedResponse.substring(0, cleanedResponse.length > 300 ? 300 : cleanedResponse.length)}');
+            print('   Full response length: ${cleanedResponse.length}');
+            print('   Response starts with: ${cleanedResponse.substring(0, cleanedResponse.length > 50 ? 50 : cleanedResponse.length)}');
+            return {
+              'success': false,
+              'error': 'AI returned invalid response format. The image may be unclear or the service is having issues. Please try again with a clearer photo or enter manually.',
+            };
+          }
         }
         
         final result = jsonDecode(cleanedResponse) as Map<String, dynamic>;
@@ -698,6 +786,7 @@ Requirements: JSON only. Estimate weight visually. Calories = (protein×4 + carb
         
         print('📊 Parsed AI response (Food detected):');
         print('   Food: $foodName');
+        print('   Confidence: ${(confidence * 100).toStringAsFixed(1)}%');
         if (ingredientsList.isNotEmpty) {
           print('   Ingredients: ${ingredientsList.join(", ")}');
         }
@@ -707,6 +796,14 @@ Requirements: JSON only. Estimate weight visually. Calories = (protein×4 + carb
         print('   Weight: ${weightGrams ?? "missing"}g');
         print('   Calories: ${calories ?? "missing"}');
         print('   Protein: ${protein ?? "missing"}g, Carbs: ${carbs ?? "missing"}g, Fat: ${fat ?? "missing"}g');
+        
+        // Log if food name suggests multiple items or complex dish
+        if (foodName.toLowerCase().contains('with') || 
+            foodName.toLowerCase().contains('and') ||
+            foodName.toLowerCase().contains('+') ||
+            ingredientsList.length > 3) {
+          print('   ℹ️ Complex dish detected - analyzing combined items');
+        }
         
         // Validate that we have at least calories OR macros
         if ((calories == null || calories == 0) && 
@@ -1102,13 +1199,13 @@ Requirements: JSON only. Estimate weight visually. Calories = (protein×4 + carb
         print('🤖 Attempting vision analysis with model: $model (attempt ${attempt + 1})');
 
         try {
-          // Build request body with system message to enforce JSON
+          // Build request body with strong system message to enforce JSON
           final body = <String, dynamic>{
             'model': model,
             'messages': [
               {
                 'role': 'system',
-                'content': 'You are a nutrition analysis API. You MUST ALWAYS respond with ONLY valid JSON. Never include explanatory text, apologies, markdown, or any text outside JSON. Analyze the image: if it shows food, return JSON with isFood=true and nutrition data. If it does not show food, return JSON with isFood=false and a message. Never return plain text - always JSON.',
+                'content': 'You are an expert food nutrition analysis API. Your ONLY job is to identify and analyze FOOD items in images, even when other objects (plates, utensils, people, backgrounds) are visible. Focus ONLY on food - ignore everything else. You MUST respond with ONLY valid JSON. Never include markdown, explanations, or text outside JSON. Your response must start with { and end with }. If ANY food is visible (even partially), return JSON with isFood=true and complete nutrition data. Only return isFood=false if NO food is visible at all. CRITICAL: Return ONLY the JSON object, nothing else.',
               },
               {
                 'role': 'user',
@@ -1118,7 +1215,7 @@ Requirements: JSON only. Estimate weight visually. Calories = (protein×4 + carb
                     'type': 'image_url',
                     'image_url': {
                       'url': 'data:image/jpeg;base64,$base64Image',
-                      'detail': attempt == 0 ? 'low' : 'high', // Low detail for speed on first attempt, high for accuracy on backup
+                      'detail': 'high', // Use high detail for better food identification when other objects are present
                     }
                   }
                 ],
@@ -1137,8 +1234,9 @@ Requirements: JSON only. Estimate weight visually. Calories = (protein×4 + carb
             print('   ⚠️ Model may not support response_format - will rely on prompt');
           }
 
-          // Optimized timeout for faster responses (Gemini 1.5 Flash is fast)
-          const timeout = Duration(seconds: 15); // Faster timeout for speed
+          // Increased timeout for vision API calls (needs more time for high-detail image analysis)
+          // Use longer timeout for first attempt, shorter for fallback
+          final timeout = Duration(seconds: attempt == 0 ? 45 : 30); // Longer timeout for primary model, shorter for fallback
           
           print('📤 Sending request to OpenRouter:');
           print('   Model: $model');
@@ -1261,10 +1359,16 @@ Requirements: JSON only. Estimate weight visually. Calories = (protein×4 + carb
             continue; // Try next model
           }
         } on TimeoutException {
-          print('⏱️ Timeout for model: $model (timeout: 20s)');
+          final timeoutSeconds = attempt == 0 ? 45 : 30;
+          print('⏱️ Timeout for model: $model (timeout: ${timeoutSeconds}s)');
+          print('   This may be due to:');
+          print('   1. Large image size taking longer to process');
+          print('   2. Network latency');
+          print('   3. API service being slow');
+          print('   Attempting fallback model...');
           if (attempt < models.length - 1) {
             // Wait briefly before trying next model
-            await Future.delayed(const Duration(milliseconds: 300)); // Faster retry delay
+            await Future.delayed(const Duration(milliseconds: 500)); // Slightly longer delay before fallback
           }
           continue; // Try next model
         } catch (e, stackTrace) {

@@ -47,9 +47,9 @@ class AIConfig {
   static String get chatModel => _config.getString('chat_model', 
       defaultValue: 'openai/gpt-3.5-turbo');
   static String get visionModel => _config.getString('vision_model', 
-      defaultValue: 'google/gemini-1.5-flash'); // Primary vision model - Gemini 1.5 Flash
+      defaultValue: 'openai/gpt-4o'); // Primary vision model - GPT-4o (working model)
   static String get backupVisionModel => _config.getString('backup_vision_model', 
-      defaultValue: 'openai/gpt-4o'); // Fallback vision model - GPT-4o if Gemini fails
+      defaultValue: 'openai/gpt-4o-mini'); // Fallback vision model - GPT-4o Mini if GPT-4o fails
 
   /// Token Limits
   static int get maxTokens => _config.getInt('max_tokens', defaultValue: 100);
