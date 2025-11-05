@@ -29,6 +29,7 @@ class FirestoreConfigService {
   DateTime? _lastFetchTime;
   DateTime? _lastRefreshTime;
   static const Duration _refreshDebounce = Duration(seconds: 5); // Prevent continuous refresh calls
+  bool _hasLoggedApiKey = false; // Track if API key has been logged to prevent duplicate logs
 
   /// Initialize the configuration service
   Future<void> initialize() async {
@@ -62,17 +63,20 @@ class FirestoreConfigService {
         _config = doc.data()!;
         _lastFetchTime = DateTime.now();
         _logger.info('Loaded config from Firestore');
-        print('✅ Successfully loaded config from Firestore');
-        print('📋 Config keys loaded: ${_config.keys.toList()}');
+        // Reduced logging - only log once per load, not on every refresh
+        if (kDebugMode) {
+          print('✅ Config loaded from Firestore');
+        }
         
         // Log API key status for verification - SAFE: Only log length, never preview
         if (_config.containsKey('openrouter_api_key') && _config['openrouter_api_key'] != null) {
           final apiKey = _config['openrouter_api_key'] as String;
           if (apiKey.isNotEmpty) {
             // SECURITY: Never log API key previews in production
-            if (kDebugMode) {
-              print('🔑 API Key loaded FROM FIREBASE: ${apiKey.length} characters');
-              print('   ✅ Source: Firestore app_config/ai_settings/openrouter_api_key');
+            // Reduced logging - only log API key status once per session
+            if (kDebugMode && !_hasLoggedApiKey) {
+              print('🔑 API Key loaded: ${apiKey.length} chars from Firestore');
+              _hasLoggedApiKey = true;
             }
           } else {
             print('❌ API key is EMPTY in Firestore document');

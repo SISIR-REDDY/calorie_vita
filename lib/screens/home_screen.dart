@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -126,6 +127,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   List<Task> _tasks = [];
   bool _isTasksLoading = true;
   bool _hasUserTasks = false;
+  bool _hasLoggedNoGoogleFitData = false; // Track if "No Google Fit data" has been logged
+  bool _hasLoggedGoalsRefreshDuplicate = false; // Track if goals refresh duplicate has been logged
+  bool _hasLoggedStreakTimeout = false; // Track if streak timeout has been logged
 
   // Food entries
   List<FoodHistoryEntry> _todaysFoodEntries = [];
@@ -478,8 +482,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       _tasksSubscription?.cancel();
       _tasksSubscription = _taskService.tasksStream.listen(
         (tasks) {
-          debugPrint('📋 Task stream received ${tasks.length} tasks');
-          debugPrint('📋 Task titles: ${tasks.map((t) => t.title).toList()}');
+          // Reduced logging - only log when tasks actually change
           if (mounted) {
             // Only update state if tasks actually changed
             if (_tasks.length != tasks.length || 
@@ -490,7 +493,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     _isTasksLoading = false;
                     _hasUserTasks = _taskService.hasUserTasks();
                   });
-              debugPrint('📋 UI updated instantly with ${_tasks.length} tasks, hasUserTasks: $_hasUserTasks');
+              // Only log when tasks change, not on every stream update
+              if (kDebugMode) {
+                debugPrint('📋 Tasks updated: ${tasks.length} tasks');
+              }
             }
             
             // Do not add default tasks - users should add their own tasks
@@ -705,7 +711,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           _activityLevel = 'Unknown';
           _isGoogleFitConnected = false;
         });
-        print('⚠️ Home: No Google Fit data available');
+        // Reduced logging - only log once, not on every check
+        if (kDebugMode && !_hasLoggedNoGoogleFitData) {
+          debugPrint('⚠️ Home: No Google Fit data available');
+          _hasLoggedNoGoogleFitData = true;
+        }
       }
     } catch (e) {
       print('❌ Home: Error loading Google Fit data: $e');
@@ -1460,7 +1470,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _setupGoogleFitListeners();
 
     // Listen to goals updates with debouncing and change detection
-    debugPrint('Setting up goals stream listener in _setupDataListeners');
+    // Debug logging removed for performance
     _goalsSubscription?.cancel();
     _goalsSubscription = _appStateService.goalsStream.listen(
       (goals) {
@@ -1471,12 +1481,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         _goalsDebounceTimer = Timer(const Duration(seconds: 1), () async {
           if (!mounted) return;
           
-          // Only update if goals actually changed
+          // Only update if goals actually changed (debug logging removed)
           final currentGoals = _appStateService.userGoals;
           final currentMap = currentGoals?.toMap();
           final newMap = goals?.toMap();
           if (currentMap != newMap) {
-            debugPrint('Goals changed, refreshing daily summary');
             await _refreshDailySummaryWithNewGoals(goals);
             
             if (mounted) {
@@ -1484,12 +1493,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 // Trigger a rebuild to show updated goals
               });
             }
-          } else {
-            debugPrint('Goals stream update skipped - no actual change detected');
           }
         });
       },
       onError: (error) {
+        // Only log errors, not normal operations
         debugPrint('Goals stream error: $error');
         // Show user-friendly error
         if (mounted) {
@@ -1503,32 +1511,25 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         }
       },
     );
-    debugPrint('Goals stream listener set up successfully (optimized: 1s debounce)');
 
     // Listen to goals event bus for immediate updates
     // OPTIMIZED: Added change detection to prevent duplicate refreshes
     _goalsEventBusSubscription?.cancel();
     _goalsEventBusSubscription = GoalsEventBus().goalsStream.listen(
       (goals) async {
-        debugPrint('=== HOME SCREEN GOALS EVENT BUS UPDATE ===');
-        debugPrint('Received goals update via event bus: ${goals.toMap()}');
         if (mounted) {
-          // Check if goals actually changed before refreshing
+          // Check if goals actually changed before refreshing (debug logging removed)
           final currentGoalsMap = _appStateService.userGoals?.toMap();
           final newGoalsMap = goals.toMap();
           if (currentGoalsMap != newGoalsMap) {
             await _refreshDailySummaryWithNewGoals(goals);
-          } else {
-            debugPrint('Goals event bus update skipped - no actual change');
           }
         }
-        debugPrint('=== END HOME SCREEN GOALS EVENT BUS UPDATE ===');
       },
       onError: (error) {
         debugPrint('Goals event bus error: $error');
       },
     );
-    debugPrint('Goals event bus listener set up successfully (optimized: change detection)');
 
     // Register global callback for immediate goals updates
     // OPTIMIZED: Added change detection and debouncing to prevent duplicate refreshes
@@ -1538,30 +1539,23 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       _goalsDebounceTimer = Timer(const Duration(milliseconds: 500), () async {
         if (!mounted) return;
         
-        debugPrint('=== GLOBAL GOALS CALLBACK TRIGGERED ===');
-        debugPrint('Received goals update via global callback: ${goals.toMap()}');
-        
-        // Check if goals actually changed before refreshing
+        // Check if goals actually changed before refreshing (debug logging removed)
         final currentGoalsMap = _appStateService.userGoals?.toMap();
         final newGoalsMap = goals.toMap();
         if (currentGoalsMap != newGoalsMap) {
           await _refreshDailySummaryWithNewGoals(goals);
           // Also force a complete UI refresh
           forceUIRefresh();
-        } else {
-          debugPrint('Global goals callback skipped - no actual change');
         }
-        debugPrint('=== END GLOBAL GOALS CALLBACK ===');
       });
     });
-    debugPrint('Global goals callback registered (optimized: change detection)');
 
     // Set up periodic goals check (optimized - every 5 minutes instead of 30 seconds)
     // Goals are already updated via streams, so periodic check is just a safety net
     _goalsCheckTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
       _checkForGoalsUpdate();
     });
-    debugPrint('Periodic goals check timer set up (optimized: 5 min interval)');
+    // Debug logging removed for performance
 
     // Listen to achievements updates with change detection
     _analyticsService.achievementsStream.listen((achievements) {
@@ -1610,7 +1604,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   Future<void> _refreshDailySummaryWithNewGoals(UserGoals? goals) async {
     // Prevent duplicate concurrent calls
     if (_isRefreshingGoals) {
-      debugPrint('⚠️ Goals refresh already in progress, skipping duplicate call');
+      // Reduced logging - only log once per session
+      if (kDebugMode && !_hasLoggedGoalsRefreshDuplicate) {
+        debugPrint('⚠️ Goals refresh already in progress, skipping duplicate call');
+        _hasLoggedGoalsRefreshDuplicate = true;
+      }
       return;
     }
     
@@ -1626,10 +1624,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _lastGoalsRefreshTime = now;
     
     try {
-      debugPrint('=== REFRESHING DAILY SUMMARY WITH NEW GOALS ===');
-      debugPrint('New goals: ${goals?.toMap()}');
-      debugPrint(
-          'Current daily summary before update: ${_dailySummary?.toMap()}');
+      // Debug logging removed for performance - only log on errors
 
       if (mounted) {
         setState(() {
@@ -1640,12 +1635,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               stepsGoal: goals?.stepsPerDayGoal ?? 10000,
               waterGlassesGoal: goals?.waterGlassesGoal ?? 8,
             );
-            debugPrint('Updated existing daily summary with new goals');
+            // Debug logging removed for performance
           } else {
             _dailySummary = _getEmptyDailySummary();
-            debugPrint('Created new daily summary with goals');
+            // Debug logging removed for performance
           }
-          debugPrint('Daily summary after setState: ${_dailySummary?.toMap()}');
         });
 
         // Save updated daily summary to Firestore with new goals
@@ -1670,7 +1664,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     } finally {
       _isRefreshingGoals = false;
     }
-    debugPrint('=== END REFRESHING DAILY SUMMARY WITH NEW GOALS ===');
+        // Debug logging removed for performance
   }
   
   /// Refresh streaks with debouncing to prevent excessive calls
@@ -1723,14 +1717,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Force refresh goals to ensure UI is up to date
   Future<void> _forceRefreshGoals() async {
     try {
-      debugPrint('Force refreshing goals...');
+      // Debug logging removed for performance
       final currentGoals = _appStateService.userGoals;
       if (currentGoals != null) {
-        debugPrint('Current goals from AppState: ${currentGoals.toMap()}');
         await _refreshDailySummaryWithNewGoals(currentGoals);
-        debugPrint('Goals force refreshed successfully');
-      } else {
-        debugPrint('No goals available in AppState');
       }
     } catch (e) {
       debugPrint('Error force refreshing goals: $e');
@@ -1750,10 +1740,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       final simpleMap = simpleGoals?.toMap();
       final appStateMap = appStateGoals?.toMap();
       
-      // Only log when there's a change
-      if (simpleMap != appStateMap) {
-        debugPrint('Periodic goals check - Simple: ${simpleMap != null ? "present" : "null"}, AppState: ${appStateMap != null ? "present" : "null"}');
-      }
+      // Debug logging removed - only refresh if there's an actual difference
 
       // Only refresh if there's an actual difference
       if (simpleGoals != null && appStateGoals != null) {
@@ -2154,7 +2141,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       _enhancedStreakService.initialize().timeout(
         const Duration(seconds: 1),
         onTimeout: () {
-          debugPrint('⚠️ Streak service initialization timeout');
+          // Reduced logging - only log once per session
+          if (kDebugMode && !_hasLoggedStreakTimeout) {
+            debugPrint('⚠️ Streak service initialization timeout');
+            _hasLoggedStreakTimeout = true;
+          }
         },
       ).then((_) {
         // Update with fresh data if initialization succeeds
@@ -2299,9 +2290,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Load tasks data immediately without loading state (for instant display)
   void _loadTasksDataImmediate() {
     try {
-      debugPrint('📋 Loading tasks data immediately...');
+      // Reduced logging - tasks are loaded silently via stream
       final tasks = _taskService.getCurrentTasks();
-      debugPrint('📋 Loaded ${tasks.length} tasks immediately from service');
       
       if (mounted) {
         setState(() {
@@ -2323,9 +2313,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Load tasks data with fallback
   Future<void> _loadTasksData() async {
     try {
-      debugPrint('📋 Loading tasks data...');
+      // Reduced logging - tasks are loaded silently via stream
       final tasks = await _taskService.getTasks();
-      debugPrint('📋 Loaded ${tasks.length} tasks from service');
       
       if (mounted) {
         setState(() {

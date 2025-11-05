@@ -162,8 +162,12 @@ class _CameraScreenState extends State<CameraScreen> {
           if (!result.success) {
             _error = result.error ?? "Couldn't analyze image. Please try again or add food manually.";
             print('❌ Image analysis failed: ${result.error}');
-          } else if (result.success && result.portionResult != null) {
-            _selectedPortion = result.portionResult!.estimatedWeight;
+          } else {
+            // Clear error on success to avoid showing duplicate errors
+            _error = null;
+            if (result.portionResult != null) {
+              _selectedPortion = result.portionResult!.estimatedWeight;
+            }
           }
         });
 
@@ -315,8 +319,11 @@ class _CameraScreenState extends State<CameraScreen> {
         setState(() {
           _scannerResult = result;
           if (!result.success) {
-          _error = result.error ?? "Barcode not found in any database";
-        }
+            _error = result.error ?? "Barcode not found in any database";
+          } else {
+            // Clear error on success to avoid showing duplicate errors
+            _error = null;
+          }
         });
         
         // Auto-save successful barcode scan results
@@ -764,11 +771,14 @@ class _CameraScreenState extends State<CameraScreen> {
       child: Column(
         children: [
           if (_loading) _buildLoadingState(),
-          if (_error != null) _buildErrorState(),
+          // Show error only if there's an error AND no scanner result (to avoid duplication)
+          // If scanner result exists, let _buildResultState handle the error display
+          if (_error != null && _scannerResult == null) _buildErrorState(),
+          // Show result state only if we have a result (it will handle its own errors)
           if (_scannerResult != null) _buildResultState(),
           if (_showPortionSelector) _buildPortionSelector(),
           if (_imageFile != null && _scannerResult == null) _buildImagePreview(),
-          if (_scannerResult == null && !_loading) _buildActionButtons(),
+          if (_scannerResult == null && !_loading && _error == null) _buildActionButtons(),
         ],
       ),
     );
@@ -890,9 +900,11 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Widget _buildResultState() {
-    if (_scannerResult == null || !_scannerResult!.success) {
+    // Only show error from result if result exists and failed
+    // Don't show error if result is null (that's handled by _buildErrorState)
+    if (_scannerResult != null && !_scannerResult!.success) {
       // Check if error is due to AI credits exhaustion
-      final errorMessage = _scannerResult?.error ?? 'Unknown error';
+      final errorMessage = _scannerResult!.error ?? 'Unknown error';
       final isAICreditsExhausted = errorMessage.contains('service limits') || 
                                   errorMessage.contains('AI_CREDITS_EXCEEDED') ||
                                   errorMessage.contains('temporarily unavailable');

@@ -151,7 +151,7 @@ class AnalyticsService {
       // CRITICAL: Generate recommendations immediately and ensure they always generate
       // Remove timeout to ensure recommendations always complete
       _generateRecommendations(userId).then((_) {
-        print('✅ Analytics: Recommendations generation completed successfully');
+        // Debug logging removed for performance
       }).catchError((error) {
         _logger.error('Error generating recommendations', {'error': error.toString()});
         print('❌ Analytics: Error generating recommendations: $error');
@@ -508,7 +508,7 @@ class AnalyticsService {
   /// This ensures recommendations use actual today's data, not historical averages
   void updateTodayMacroBreakdown(MacroBreakdown todayMacros) {
     _todayMacroBreakdown = todayMacros;
-    print('📊 Analytics: Today\'s macro breakdown updated for recommendations - Protein: ${todayMacros.protein}g, Carbs: ${todayMacros.carbs}g, Fat: ${todayMacros.fat}g');
+    // Debug logging removed for performance
     
     // Regenerate recommendations with updated today's data
     final userId = _auth.currentUser?.uid;
@@ -522,14 +522,14 @@ class AnalyticsService {
   /// Generate personalized recommendations
   Future<void> _generateRecommendations(String userId) async {
     try {
-      print('🔄 Analytics: Generating recommendations for user: $userId');
+      // Debug logging removed for performance
       final recommendations = <Map<String, dynamic>>[];
 
       // Get user profile for personalized recommendations
       Map<String, dynamic>? profile;
       try {
         profile = await _firebaseService.getUserProfile(userId);
-        print('📊 Analytics: User profile loaded: ${profile.isNotEmpty}');
+        // Debug logging removed for performance
       } catch (e) {
         print('⚠️ Could not load user profile for recommendations: $e');
       }
@@ -537,22 +537,22 @@ class AnalyticsService {
       // Get user goals for better recommendations
       final userGoals = await _getUserGoals(userId);
       final calorieGoal = userGoals['caloriesGoal'] ?? 2000;
-      print('📊 Analytics: User calorie goal: $calorieGoal');
+      // Debug logging removed for performance
 
       // Calorie-based recommendations - use TODAY's data from today's food entries
       int todayCalories = 0;
       if (_cachedDailySummaries.isNotEmpty) {
         final today = _cachedDailySummaries.last;
         todayCalories = today.caloriesConsumed;
-        print('📊 Analytics: Today\'s calories from daily summaries: $todayCalories');
+        // Debug logging removed for performance
       } else if (_todayMacroBreakdown != null) {
         // If no daily summaries, calculate calories from today's macros
         todayCalories = (_todayMacroBreakdown!.protein * 4 + 
                         _todayMacroBreakdown!.carbs * 4 + 
                         _todayMacroBreakdown!.fat * 9).round();
-        print('📊 Analytics: Today\'s calories calculated from macros: $todayCalories');
+        // Debug logging removed for performance
       } else {
-        print('⚠️ Analytics: No today\'s calorie data available');
+        // Debug logging removed - only log on errors
       }
       
       if (todayCalories > 0) {
@@ -607,10 +607,10 @@ class AnalyticsService {
         todayFat = _cachedMacroBreakdown.fat / _cachedDailySummaries.length;
         print('📊 Using average macro values for recommendations (today\'s data not available)');
       } else {
-        print('⚠️ Analytics: No macro data available for recommendations');
+        // Debug logging removed - only log on errors
       }
       
-      print('📊 Analytics: Using macro values - Protein: ${todayProtein}g, Carbs: ${todayCarbs}g, Fat: ${todayFat}g');
+      // Debug logging removed for performance
 
       // Protein recommendations - based on TODAY's actual values
       if (todayProtein < 80 && todayProtein > 0) {

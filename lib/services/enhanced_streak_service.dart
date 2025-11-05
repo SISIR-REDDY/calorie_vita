@@ -37,6 +37,7 @@ class EnhancedStreakService {
   bool _isCalculatingStreaks = false;
   DateTime? _lastCalculationTime;
   Timer? _refreshDebounceTimer;
+  bool _hasLoggedDuplicateCall = false; // Track if duplicate call has been logged
 
   /// Initialize enhanced streak service with timeout to prevent blocking
   Future<void> initialize() async {
@@ -48,7 +49,7 @@ class EnhancedStreakService {
         return;
       }
 
-      debugPrint('🔥 Initializing enhanced streak service for user: ${user.uid}');
+      // Debug logging removed for performance
 
       // Add timeout to prevent blocking the UI
       await _calculateAndUpdateStreaks().timeout(
@@ -59,7 +60,7 @@ class EnhancedStreakService {
         },
       );
 
-      debugPrint('✅ Enhanced streak service initialized successfully');
+      // Debug logging removed for performance
     } catch (e) {
       debugPrint('❌ Error initializing enhanced streak service: $e');
       _errorHandler.handleDataError('enhanced_streak_init', e);
@@ -74,15 +75,14 @@ class EnhancedStreakService {
       final user = _auth.currentUser;
       if (user == null) return;
 
-      debugPrint('=== ENHANCED STREAK CALCULATION ===');
+      // Debug logging removed for performance - only log on errors
       
       // Get user goals for current targets
       final userGoals = await _getUserGoals(user.uid);
-      debugPrint('User goals: ${userGoals.toMap()}');
       
       // Get daily summaries for the last 30 days
       final dailySummaries = await _getDailySummaries(user.uid, days: 30);
-      debugPrint('Found ${dailySummaries.length} daily summaries');
+      // Debug logging removed - only log on errors or significant changes
       
       // Calculate streaks for each goal type (only main goals)
       final goalStreaks = <DailyGoalType, GoalStreak>{};
@@ -101,7 +101,7 @@ class EnhancedStreakService {
           dailySummaries, 
           userGoals
         );
-        debugPrint('${goalType.displayName}: Current=${goalStreaks[goalType]!.currentStreak}, Longest=${goalStreaks[goalType]!.longestStreak}, AchievedToday=${goalStreaks[goalType]!.achievedToday}');
+        // Debug logging removed for performance - only log on errors
       }
 
       // Calculate overall statistics
@@ -264,10 +264,8 @@ class EnhancedStreakService {
         break;
     }
     
-    // Reduced logging - only log achievements, not every check
-    if (achieved) {
-      debugPrint('✅ Goal ${goalType.displayName}: ACHIEVED (Calories: ${summary.caloriesConsumed}, Steps: ${summary.steps}, Burned: ${summary.caloriesBurned}, Water: ${summary.waterGlasses})');
-    }
+    // Debug logging removed - this method is called in loops multiple times
+    // Logging is done at the streak calculation level instead
     return achieved;
   }
 
@@ -351,7 +349,11 @@ class EnhancedStreakService {
   Future<void> refreshStreaks() async {
     // Prevent duplicate concurrent calls
     if (_isCalculatingStreaks) {
-      debugPrint('⚠️ Streak calculation already in progress, skipping duplicate call');
+      // Reduced logging - only log once per session to avoid spam
+      if (kDebugMode && !_hasLoggedDuplicateCall) {
+        debugPrint('⚠️ Streak calculation already in progress, skipping duplicate call');
+        _hasLoggedDuplicateCall = true;
+      }
       return;
     }
     
@@ -373,16 +375,14 @@ class EnhancedStreakService {
     _refreshDebounceTimer?.cancel();
     
     try {
-      debugPrint('🔄 Refreshing streaks...');
+      // Debug logging removed for performance
       await _calculateAndUpdateStreaks();
       
       // Notify listeners of updated streak data
       _streakController.add(_currentStreaks);
       
-      // Reduced logging frequency - only log on significant changes
-      if (_currentStreaks.totalActiveStreaks > 0) {
-        debugPrint('✅ Streaks refreshed successfully - Active streaks: ${_currentStreaks.totalActiveStreaks}');
-      }
+      // Reduced logging - only log on errors or when active streaks change significantly
+      // Debug logging removed for performance - streaks are updated via streams
     } catch (e) {
       debugPrint('❌ Error refreshing streaks: $e');
       _errorHandler.handleDataError('streak_refresh', e);
@@ -393,7 +393,7 @@ class EnhancedStreakService {
 
   /// Force refresh streaks with new data
   Future<void> forceRefreshStreaks() async {
-    debugPrint('🔄 Force refreshing streaks...');
+    // Debug logging removed for performance
     try {
       await _calculateAndUpdateStreaks();
       debugPrint('✅ Force refresh completed');

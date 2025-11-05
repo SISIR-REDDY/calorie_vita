@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/task.dart';
 import 'dynamic_icon_service.dart';
 
@@ -218,7 +219,10 @@ class TaskService {
       final userTasks = allTasks.where((task) => !_isExampleTask(task)).toList();
       _localTasks = userTasks;
       _tasksController.add(userTasks);
-      print('📋 Task service: Loaded ${userTasks.length} user tasks (filtered out ${allTasks.length - userTasks.length} example tasks)');
+      // Reduced logging - only log in debug mode and when tasks change
+      if (kDebugMode) {
+        debugPrint('📋 Tasks loaded: ${userTasks.length} user tasks');
+      }
     } catch (e) {
       print('📋 Task service: Error loading initial tasks: $e');
     }
@@ -233,28 +237,34 @@ class TaskService {
         .where('userId', isEqualTo: _currentUserId)
         .snapshots()
         .listen((snapshot) {
-      print('📋 Firestore listener triggered, ${snapshot.docs.length} documents');
+      // Reduced logging - only log when tasks actually change
       final allTasks = snapshot.docs
-          .map((doc) => Task.fromFirestore(doc))
-          .toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt)); // Sort by creation date descending
+        .map((doc) => Task.fromFirestore(doc))
+        .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt)); // Sort by creation date descending
       
       // Filter out example tasks
       final tasks = allTasks.where((task) => !_isExampleTask(task)).toList();
       
       // If we found example tasks in the stream, delete them
       if (allTasks.length != tasks.length) {
-        print('📋 Found example tasks in stream, deleting them...');
+        if (kDebugMode) {
+          debugPrint('📋 Found example tasks in stream, deleting them...');
+        }
         _deleteExampleTasksFromFirestore(allTasks.where((task) => _isExampleTask(task)).toList());
       }
       
-      print('📋 Parsed ${tasks.length} user tasks from Firestore (filtered out example tasks)');
-      print('📋 Firestore task titles: ${tasks.map((t) => t.title).toList()}');
-      print('📋 Local tasks before update: ${_localTasks.map((t) => t.title).toList()}');
+      // Only log when tasks actually change, not on every stream update
+      final tasksChanged = _localTasks.length != tasks.length || 
+          !_localTasks.every((task) => tasks.any((t) => t.id == task.id));
       
       // Update local tasks from Firestore (but don't override optimistic updates)
       _localTasks = tasks;
-      print('📋 Local tasks updated from Firestore: ${_localTasks.map((t) => t.title).toList()}');
+      
+      // Only log when tasks change, not on every stream update
+      if (kDebugMode && tasksChanged) {
+        debugPrint('📋 Tasks updated: ${tasks.length} tasks');
+      }
       
       _tasksController.add(_localTasks);
     });

@@ -55,7 +55,7 @@ class AIConfig {
   static int get maxTokens => _config.getInt('max_tokens', defaultValue: 100);
   static int get chatMaxTokens => _config.getInt('chat_max_tokens', defaultValue: 100);
   static int get analyticsMaxTokens => _config.getInt('analytics_max_tokens', defaultValue: 120);
-  static int get visionMaxTokens => _config.getInt('vision_max_tokens', defaultValue: 120); // Reduced for faster responses
+  static int get visionMaxTokens => _config.getInt('vision_max_tokens', defaultValue: 100); // Reduced for faster responses and lower costs
   
   /// Temperature Settings
   static double get temperature => _config.getDouble('temperature', defaultValue: 0.7);

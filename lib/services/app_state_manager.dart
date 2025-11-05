@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'firebase_service.dart';
 import 'performance_monitor.dart';
 import 'network_service.dart';
@@ -279,8 +280,10 @@ class AppStateManager {
       
       final apiKey = AIConfig.apiKey;
       if (apiKey.isNotEmpty) {
-        print('✅ API Key loaded after authentication: ${apiKey.length} characters');
-        print('   🔑 Key preview: ${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}');
+        // Reduced logging - API key status already logged by FirestoreConfigService
+        if (kDebugMode) {
+          debugPrint('✅ API Key verified: ${apiKey.length} chars');
+        }
       } else {
         print('⚠️ API Key is still empty after authentication');
         print('   📌 Check Firestore config at: app_config/ai_settings/openrouter_api_key');

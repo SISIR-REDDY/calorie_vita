@@ -371,6 +371,18 @@ service cloud.firestore {
     }
     
     // ===================================================================
+    // CONNECTIVITY TEST (for network connectivity checks)
+    // ===================================================================
+    
+    match /connectivity/{document} {
+      // Allow authenticated users to read connectivity test document
+      // This is used by the app to check network connectivity
+      allow read: if isAuthenticated();
+      // No writes needed - this is just for connectivity testing
+      allow write: if false;
+    }
+    
+    // ===================================================================
     // ADMIN COLLECTIONS
     // ===================================================================
     

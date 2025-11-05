@@ -2128,43 +2128,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     bool isGoalAchieved = false;
     final fitnessGoalLower = fitnessGoal.toLowerCase();
     
-    // Handle all possible fitness goal formats (underscore, space, title case, etc.)
-    if (kDebugMode) {
-      print('Weight Progress Debug - About to check fitness goal: "$fitnessGoalLower"');
-      print('Weight Progress Debug - weightDifference: $weightDifference');
-    }
-    
     // Normalize the fitness goal to handle all possible formats
     final normalizedGoal = fitnessGoalLower
         .replaceAll('_', ' ')
         .replaceAll('-', ' ')
         .trim();
     
-    if (kDebugMode) print('Weight Progress Debug - Normalized fitness goal: "$normalizedGoal"');
-    
+    // Determine if goal is achieved (debug logging removed for performance)
     if (normalizedGoal == 'weight loss' || normalizedGoal == 'general fitness') {
       // Weight Loss + General Fitness: Success when current weight ≤ goal weight (losing weight)
       isGoalAchieved = weightDifference <= 0;
-      if (kDebugMode) print('Weight Progress Debug - Weight Loss/General Fitness: isGoalAchieved = $isGoalAchieved (weightDifference <= 0: ${weightDifference <= 0})');
     } else if (normalizedGoal == 'weight gain' || normalizedGoal == 'muscle building' || normalizedGoal == 'athletic performance') {
       // Weight Gain + Muscle Building + Athletic Performance: Success when current weight ≥ goal weight (gaining weight)
       isGoalAchieved = weightDifference >= 0;
-      if (kDebugMode) print('Weight Progress Debug - Weight Gain/Muscle Building/Athletic Performance: isGoalAchieved = $isGoalAchieved (weightDifference >= 0: ${weightDifference >= 0})');
     } else if (normalizedGoal == 'maintenance') {
       // Maintenance: Success when current weight is within 2kg of goal weight
       isGoalAchieved = weightDifference.abs() <= 2.0;
-      if (kDebugMode) print('Weight Progress Debug - Maintenance: isGoalAchieved = $isGoalAchieved (weightDifference.abs() <= 2.0: ${weightDifference.abs() <= 2.0})');
     } else {
       // Default to maintenance logic for unknown goals
       isGoalAchieved = weightDifference.abs() <= 2.0;
-      if (kDebugMode) print('Weight Progress Debug - Unknown goal "$normalizedGoal", using maintenance logic: isGoalAchieved = $isGoalAchieved');
-    }
-    
-    // Debug logging for weight progress
-    if (kDebugMode) {
-      print('Weight Progress Calculation - Current: $currentWeight, Goal: $weightGoal, Difference: $weightDifference, Progress: $progressPercentage%, Fitness Goal: $fitnessGoal, Achieved: $isGoalAchieved');
-      print('Weight Progress Debug - isGoalAchieved: $isGoalAchieved, weightDifference: $weightDifference, fitnessGoal: $fitnessGoal');
-      print('Weight Progress Debug - weightDifference <= 0: ${weightDifference <= 0}, weightDifference >= 0: ${weightDifference >= 0}');
     }
     
     // Determine progress color and status based on fitness goal
@@ -2176,21 +2158,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       progressColor = kSuccessColor; // Green color for success
       progressStatus = 'Goal Achieved!';
       progressIcon = Icons.check_circle;
-      if (kDebugMode) print('Weight Progress Debug - Using GREEN color for achieved goal');
     } else {
-      // Handle color determination based on fitness goal rules
+      // Handle color determination based on fitness goal rules (debug logging removed for performance)
       if (normalizedGoal == 'weight loss' || normalizedGoal == 'general fitness') {
         // Weight Loss + General Fitness: Orange when above goal, Blue when on track
         if (weightDifference > 0) {
           progressColor = kWarningColor; // Orange for above goal
           progressStatus = 'Above Goal';
           progressIcon = Icons.trending_up;
-          if (kDebugMode) print('Weight Progress Debug - Using ORANGE color for weight loss above goal');
         } else {
           progressColor = kInfoColor; // Blue for on track
           progressStatus = 'On Track';
           progressIcon = Icons.trending_down;
-          if (kDebugMode) print('Weight Progress Debug - Using BLUE color for weight loss on track');
         }
       } else if (normalizedGoal == 'weight gain' || normalizedGoal == 'muscle building' || normalizedGoal == 'athletic performance') {
         // Weight Gain + Muscle Building + Athletic Performance: Orange when below goal, Blue when on track
@@ -2198,12 +2177,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           progressColor = kWarningColor; // Orange for below goal
           progressStatus = 'Below Goal';
           progressIcon = Icons.trending_down;
-          if (kDebugMode) print('Weight Progress Debug - Using ORANGE color for weight gain below goal');
         } else {
           progressColor = kInfoColor; // Blue for on track
           progressStatus = 'On Track';
           progressIcon = Icons.trending_up;
-          if (kDebugMode) print('Weight Progress Debug - Using BLUE color for weight gain on track');
         }
       } else {
         // Maintenance or default case: Orange when off target, Green when within 2kg
@@ -2211,12 +2188,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           progressColor = kWarningColor; // Orange for off target
           progressStatus = 'Off Target';
           progressIcon = weightDifference > 0 ? Icons.trending_up : Icons.trending_down;
-          if (kDebugMode) print('Weight Progress Debug - Using ORANGE color for maintenance off target');
         } else {
           progressColor = kSuccessColor; // Green for maintenance success
           progressStatus = 'Goal Achieved!';
           progressIcon = Icons.check_circle;
-          if (kDebugMode) print('Weight Progress Debug - Using GREEN color for maintenance success');
         }
       }
     }
@@ -2702,8 +2677,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     final userGoals = _appStateService.userGoals;
     final macroGoals = userGoals?.macroGoals;
     
-    // Debug logging
-    if (kDebugMode) print('🔍 Analytics Macro Breakdown UI - Protein: ${_macroBreakdown.protein}g, Carbs: ${_macroBreakdown.carbs}g, Fat: ${_macroBreakdown.fat}g');
+    // Debug logging removed for performance (build method called frequently)
     
     return Container(
       padding: const EdgeInsets.all(20),
@@ -3081,8 +3055,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     final hasHeight = _userHeight != null && _userHeight! > 0;
     final hasWeight = _userWeight != null && _userWeight! > 0;
     
-    // Debug logging
-    if (kDebugMode) print('BMI Analytics Debug - Height: $_userHeight, Weight: $_userWeight');
+    // Debug logging removed for performance (build method called frequently)
     
     if (!hasHeight || !hasWeight) {
       // Show message if either height or weight is missing
