@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'logger_service.dart';
 
@@ -64,12 +65,15 @@ class FirestoreConfigService {
         print('✅ Successfully loaded config from Firestore');
         print('📋 Config keys loaded: ${_config.keys.toList()}');
         
-        // Log masked API key for verification
+        // Log API key status for verification - SAFE: Only log length, never preview
         if (_config.containsKey('openrouter_api_key') && _config['openrouter_api_key'] != null) {
           final apiKey = _config['openrouter_api_key'] as String;
           if (apiKey.isNotEmpty) {
-            print('🔑 API Key loaded FROM FIREBASE: ${apiKey.length} characters (${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)})');
-            print('   ✅ Source: Firestore app_config/ai_settings/openrouter_api_key');
+            // SECURITY: Never log API key previews in production
+            if (kDebugMode) {
+              print('🔑 API Key loaded FROM FIREBASE: ${apiKey.length} characters');
+              print('   ✅ Source: Firestore app_config/ai_settings/openrouter_api_key');
+            }
           } else {
             print('❌ API key is EMPTY in Firestore document');
             print('   ⚠️ AI features will NOT work - configure openrouter_api_key in Firebase');

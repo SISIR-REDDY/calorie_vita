@@ -1,9 +1,19 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
+}
+
+// Load keystore properties for production signing
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
 android {
@@ -17,7 +27,10 @@ android {
     }
 
     tasks.withType<JavaCompile> {
-        options.compilerArgs.addAll(listOf("-Xlint:-options"))
+        options.compilerArgs.addAll(listOf(
+            "-Xlint:-options",
+            "-Xlint:-deprecation"  // Suppress deprecation warnings (dependencies may use deprecated APIs)
+        ))
     }
 
     kotlinOptions {
@@ -35,6 +48,13 @@ android {
         versionName = flutter.versionName
     }
     
+    // Exclude integration_test from release builds
+    configurations {
+        releaseImplementation {
+            exclude(group = "dev.flutter.plugins.integration_test")
+        }
+    }
+    
     // Split APKs disabled for now - will enable after testing
     // splits {
     //     abi {
@@ -45,10 +65,28 @@ android {
     //     }
     // }
 
+    signingConfigs {
+        // Only create release signing config if keystore properties file exists
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                keyAlias = keystoreProperties["keyAlias"] as String?
+                keyPassword = keystoreProperties["keyPassword"] as String?
+                val keystoreFile = keystoreProperties["storeFile"] as String?
+                storeFile = keystoreFile?.let { file(it) }
+                storePassword = keystoreProperties["storePassword"] as String?
+            }
+        }
+    }
+
     buildTypes {
         release {
             // Production signing configuration
-            signingConfig = signingConfigs.getByName("debug") // TODO: Replace with production signing
+            // Use release signing if keystore exists, otherwise fall back to debug (for development)
+            signingConfig = if (keystorePropertiesFile.exists() && signingConfigs.findByName("release") != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             
             // Production optimizations - re-enabled for size reduction
             isMinifyEnabled = true

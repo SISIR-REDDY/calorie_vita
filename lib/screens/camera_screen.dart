@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -63,11 +64,14 @@ class _CameraScreenState extends State<CameraScreen> {
 
     try {
       // Preflight: ensure AI vision is enabled, API key present, and network online
-      print('🔍 Preflight checks for image analysis...');
-      print('   - Image analysis enabled: ${AIConfig.enableImageAnalysis}');
-      print('   - API key configured: ${AIConfig.apiKey.isNotEmpty} (length: ${AIConfig.apiKey.length})');
-      print('   - Network online: ${NetworkService().isOnline}');
-      print('   - Vision model: ${AIConfig.visionModel}');
+      if (kDebugMode) {
+        print('🔍 Preflight checks for image analysis...');
+        print('   - Image analysis enabled: ${AIConfig.enableImageAnalysis}');
+        // SECURITY: Never log API key details in production
+        print('   - API key configured: ${AIConfig.apiKey.isNotEmpty}');
+        print('   - Network online: ${NetworkService().isOnline}');
+        print('   - Vision model: ${AIConfig.visionModel}');
+      }
       
       if (!AIConfig.enableImageAnalysis) {
         print('❌ Image analysis is disabled in configuration');

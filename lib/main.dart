@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -88,15 +89,17 @@ void main() async {
     AIConfig.initialize().then((_) {
       logger.info('Secure configuration initialization attempted');
       
-      // Log API key source for debugging (in background)
+      // Log API key status for debugging (in background) - SAFE: Only log length, never preview
       final apiKey = AIConfig.apiKey;
-      if (apiKey.isNotEmpty) {
-        print('🔑 API Key Status: ${apiKey.length} characters (${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)})');
-        print('   📍 Check FirestoreConfigService logs above to see if it came from Firebase or code');
-      } else {
-        print('⚠️ API Key is EMPTY - will load after user authentication');
-        print('   📌 Security: Config requires authentication (see firestore.rules)');
-        print('   📌 Config will be loaded automatically when user logs in');
+      if (kDebugMode) {
+        if (apiKey.isNotEmpty) {
+          print('🔑 API Key Status: ${apiKey.length} characters loaded');
+          print('   📍 Check FirestoreConfigService logs above to see if it came from Firebase or code');
+        } else {
+          print('⚠️ API Key is EMPTY - will load after user authentication');
+          print('   📌 Security: Config requires authentication (see firestore.rules)');
+          print('   📌 Config will be loaded automatically when user logs in');
+        }
       }
       
       // Print feature status report in background (non-blocking, no delay)

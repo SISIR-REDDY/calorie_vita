@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
@@ -1168,13 +1169,15 @@ Remember: Your ONLY job is to identify and analyze FOOD items. Everything else i
   /// Fast OpenRouter vision call with model fallback and better error handling
   static Future<String?> _callOpenRouterVisionFast(String prompt, String base64Image) async {
     try {
-      print('🔧 AI Vision Configuration:');
-      print('   - Base URL: ${AIConfig.baseUrl}');
-      print('   - API Key: ${AIConfig.apiKey.isNotEmpty ? "${AIConfig.apiKey.substring(0, 12)}..." : "MISSING"}');
-      print('   - API Key length: ${AIConfig.apiKey.length}');
-      print('   - Primary Model: ${AIConfig.visionModel}');
-      print('   - Fallback Model: ${AIConfig.backupVisionModel}');
-      print('   - Image size: ${(base64Image.length / 1024).toStringAsFixed(1)}KB base64');
+      if (kDebugMode) {
+        print('🔧 AI Vision Configuration:');
+        print('   - Base URL: ${AIConfig.baseUrl}');
+        // SECURITY: Never log API key previews in production
+        print('   - API Key: ${AIConfig.apiKey.isNotEmpty ? "CONFIGURED (${AIConfig.apiKey.length} chars)" : "MISSING"}');
+        print('   - Primary Model: ${AIConfig.visionModel}');
+        print('   - Fallback Model: ${AIConfig.backupVisionModel}');
+        print('   - Image size: ${(base64Image.length / 1024).toStringAsFixed(1)}KB base64');
+      }
       
       // Validate configuration FIRST before making any API calls
       if (AIConfig.apiKey.isEmpty) {
@@ -1199,21 +1202,25 @@ Remember: Your ONLY job is to identify and analyze FOOD items. Everything else i
         }
       }
       
-      // Verify API key format (OpenRouter keys start with 'sk-or-v1-')
-      if (!AIConfig.apiKey.startsWith('sk-or-v1-') && !AIConfig.apiKey.startsWith('sk-')) {
-        print('⚠️ API key format may be incorrect (should start with sk-or-v1- or sk-)');
-        print('   Current key starts with: ${AIConfig.apiKey.substring(0, AIConfig.apiKey.length > 10 ? 10 : AIConfig.apiKey.length)}');
+      // SECURITY: Never log API key previews in production
+      if (kDebugMode) {
+        // Verify API key format (OpenRouter keys start with 'sk-or-v1-')
+        if (!AIConfig.apiKey.startsWith('sk-or-v1-') && !AIConfig.apiKey.startsWith('sk-')) {
+          print('⚠️ API key format may be incorrect (should start with sk-or-v1- or sk-)');
+        }
       }
       
       // Build headers with API key - ensure it's properly formatted
       final apiKey = AIConfig.apiKey.trim(); // Remove any whitespace
-      print('🔑 Using API key: ${apiKey.substring(0, apiKey.length > 12 ? 12 : apiKey.length)}... (length: ${apiKey.length})');
       
-      // Verify API key format
-      if (!apiKey.startsWith('sk-or-v1-') && !apiKey.startsWith('sk-')) {
-        print('⚠️ WARNING: API key format may be incorrect');
-        print('   Expected: starts with "sk-or-v1-" or "sk-"');
-        print('   Actual: starts with "${apiKey.substring(0, apiKey.length > 10 ? 10 : apiKey.length)}"');
+      // SECURITY: Never log API key previews in production
+      if (kDebugMode) {
+        print('🔑 Using API key (length: ${apiKey.length})');
+        // Verify API key format (only in debug mode)
+        if (!apiKey.startsWith('sk-or-v1-') && !apiKey.startsWith('sk-')) {
+          print('⚠️ WARNING: API key format may be incorrect');
+          print('   Expected: starts with "sk-or-v1-" or "sk-"');
+        }
       }
       
       final headers = {
@@ -1223,10 +1230,13 @@ Remember: Your ONLY job is to identify and analyze FOOD items. Everything else i
         'X-Title': AIConfig.appName,
       };
       
-      print('📡 Request headers prepared:');
-      print('   - Authorization: Bearer ${apiKey.substring(0, 12)}...');
-      print('   - HTTP-Referer: ${AIConfig.appUrl}');
-      print('   - X-Title: ${AIConfig.appName}');
+      // SECURITY: Never log Authorization header in production
+      if (kDebugMode) {
+        print('📡 Request headers prepared:');
+        print('   - Authorization: Bearer [REDACTED]');
+        print('   - HTTP-Referer: ${AIConfig.appUrl}');
+        print('   - X-Title: ${AIConfig.appName}');
+      }
 
       // Try primary model (Gemini 1.5 Flash), fallback to GPT-4o if it fails
       final models = [
@@ -1360,7 +1370,10 @@ Remember: Your ONLY job is to identify and analyze FOOD items. Everything else i
           } else if (response.statusCode == 401) {
             print('❌ Authentication failed (401 Unauthorized)');
             print('   This means the API key is invalid, expired, or not authorized for this model');
-            print('   API key used: ${apiKey.substring(0, 12)}...');
+            // SECURITY: Never log API key previews in production
+            if (kDebugMode) {
+              print('   API key length: ${apiKey.length}');
+            }
             print('   Model attempted: $model');
             print('   Response body: ${response.body}');
             print('   Check Firestore config at app_config/ai_settings/openrouter_api_key');

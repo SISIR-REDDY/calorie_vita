@@ -38,10 +38,15 @@ service cloud.firestore {
     // ===================================================================
 
     match /app_config/{document} {
-      // Require authentication to read config (better security for API keys)
-      // Note: App should initialize config after user authentication
-      allow read: if isAuthenticated();
+      // SECURITY: Require authentication to read config (API keys are stored here)
+      // This ensures only authenticated app users can access configuration
+      // Note: For production, consider moving to server-side config loading
+      allow read: if isAuthenticated(); // Require authentication for security
       allow write: if false; // Only admins can write (via Firebase Console or server-side scripts)
+      
+      // Future enhancement: Restrict to admin users only for better security
+      // allow read: if isAuthenticated() && 
+      //   get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
     
     // ===================================================================

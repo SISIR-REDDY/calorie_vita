@@ -1,0 +1,20 @@
+# Production Keystore Configuration Template
+# 
+# IMPORTANT: 
+# 1. Copy this file to android/key.properties
+# 2. Replace the placeholder values with your actual keystore information
+# 3. NEVER commit key.properties to version control - it's in .gitignore
+# 4. Generate your keystore using:
+#    keytool -genkey -v -keystore calorie-vita-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias calorie-vita
+#
+# Example values:
+# storePassword=YourSecurePassword123!
+# keyPassword=YourSecurePassword123!
+# keyAlias=calorie-vita
+# storeFile=../calorie-vita-release.jks
+
+storePassword=YOUR_STORE_PASSWORD_HERE
+keyPassword=YOUR_KEY_PASSWORD_HERE
+keyAlias=calorie-vita
+storeFile=../calorie-vita-release.jks
+
