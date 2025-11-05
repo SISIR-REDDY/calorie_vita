@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "868343457049-rvhl3japp8clvabuj728o9ftplk4ma4s.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sisirlabs.calorievita",
+            "certificate_hash": "aaa2e09cfc7787ec3526c8bfe1cd4294fc7a5402"
+          }
+        },
+        {
           "client_id": "868343457049-pbua5cqj3qre9qsnkerr23hvkt850o1e.apps.googleusercontent.com",
           "client_type": 3
         }

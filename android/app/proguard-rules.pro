@@ -12,15 +12,8 @@
 -keep class com.google.firebase.** { *; }
 -keep class com.google.android.gms.** { *; }
 
-# Keep only essential AI service classes
--keep class com.sisirlabs.calorievita.services.AIService { *; }
--keep class com.sisirlabs.calorievita.services.LoggerService { *; }
--keep class com.sisirlabs.calorievita.services.AuthService { *; }
--keep class com.sisirlabs.calorievita.config.ProductionConfig { *; }
-
-# Keep essential model classes only
--keep class com.sisirlabs.calorievita.models.FoodEntry { *; }
--keep class com.sisirlabs.calorievita.models.UserPreferences { *; }
+# Keep all app classes (safe - prevents any functionality breakage)
+# Keeping all services, models, widgets, screens, and config classes
 
 # Keep serialization (minimal)
 -keepattributes *Annotation*
@@ -44,6 +37,11 @@
 -dontwarn retrofit2.**
 -dontwarn com.bumptech.glide.**
 
+# Remove unused classes from dependencies (safe - only suppresses warnings)
+-dontwarn org.apache.**
+-dontwarn javax.annotation.**
+-dontwarn javax.inject.**
+
 # Aggressive logging removal
 -assumenosideeffects class android.util.Log {
     public static boolean isLoggable(java.lang.String, int);
@@ -60,7 +58,7 @@
     public void println(...);
 }
 
-# Aggressive optimization for size
+# Aggressive optimization for size reduction
 -optimizations !code/simplification/arithmetic,!code/simplification/cast,!field/*,!class/merging/*
 -optimizationpasses 7
 -allowaccessmodification
@@ -70,10 +68,7 @@
 -dontwarn **
 -ignorewarnings
 
-# Aggressive shrinking for maximum size reduction
--optimizationpasses 7
--allowaccessmodification
--dontpreverify
+# ProGuard output files (for debugging if needed)
 -verbose
 -dump class_files.txt
 -printseeds seeds.txt
@@ -89,3 +84,15 @@
 # Keep only essential classes
 -keep public class com.sisirlabs.calorievita.MainActivity { *; }
 -keep public class com.sisirlabs.calorievita.MainApplication { *; }
+
+# Keep all models and services from your app (safe - prevents breaking functionality)
+-keep class com.sisirlabs.calorievita.models.** { *; }
+-keep class com.sisirlabs.calorievita.services.** { *; }
+-keep class com.sisirlabs.calorievita.widgets.** { *; }
+-keep class com.sisirlabs.calorievita.screens.** { *; }
+-keep class com.sisirlabs.calorievita.config.** { *; }
+
+# Remove unused resources more aggressively
+-keepclassmembers class **.R$* {
+    public static <fields>;
+}

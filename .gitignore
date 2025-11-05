@@ -59,8 +59,16 @@ firebase.json
 *.zip
 *.tar.gz
 *.apk
+*.aab
 *.ipa
 commandlinetools.zip
+
+# ProGuard output files (contain sensitive info)
+**/seeds.txt
+**/mapping.txt
+**/unused.txt
+**/class_files.txt
+**/debug-info/
 
 # Test/Setup Scripts (if you don’t want to ignore them, remove these)
 # setup_android.ps1

@@ -60,10 +60,12 @@ Write-Host ""
 Write-Host "🔨 Generating keystore..." -ForegroundColor Yellow
 
 # Generate keystore
+# Construct DN string - values with spaces are fine, keytool handles them
 $dname = "CN=$firstName, OU=$organizationalUnit, O=$organization, L=$city, ST=$state, C=$countryCode"
 
 try {
-    $process = Start-Process -FilePath "keytool" -ArgumentList @(
+    # Use & operator to call keytool directly for better argument handling
+    $keytoolArgs = @(
         "-genkey",
         "-v",
         "-keystore", $keystorePath,
@@ -74,13 +76,17 @@ try {
         "-storepass", $storePasswordPlain,
         "-keypass", $keyPasswordPlain,
         "-dname", $dname
-    ) -Wait -NoNewWindow -PassThru
+    )
+    
+    $output = & keytool $keytoolArgs 2>&1
+    $exitCode = $LASTEXITCODE
 
-    if ($process.ExitCode -eq 0) {
+    if ($exitCode -eq 0) {
         Write-Host "✅ Keystore generated successfully!" -ForegroundColor Green
         Write-Host "   Location: $keystorePath" -ForegroundColor Cyan
     } else {
         Write-Host "❌ Keystore generation failed!" -ForegroundColor Red
+        Write-Host $output
         exit 1
     }
 } catch {
