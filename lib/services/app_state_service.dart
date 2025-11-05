@@ -400,8 +400,12 @@ class AppStateService {
       if (cachedGoals != null && cachedGoals.isNotEmpty) {
         try {
           final decoded = jsonDecode(cachedGoals);
-          _userGoals = UserGoals.fromMap(
-              Map<String, dynamic>.from(decoded));
+          final goalsMap = Map<String, dynamic>.from(decoded);
+          // Convert timestamp back to DateTime if needed
+          if (goalsMap['lastUpdated'] != null && goalsMap['lastUpdated'] is int) {
+            goalsMap['lastUpdated'] = DateTime.fromMillisecondsSinceEpoch(goalsMap['lastUpdated'] as int);
+          }
+          _userGoals = UserGoals.fromMap(goalsMap);
           _goalsController.add(_userGoals);
         } catch (e) {
           print('⚠️ Cached goals not valid JSON, clearing cache: $e');
@@ -441,7 +445,12 @@ class AppStateService {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (_userGoals != null) {
-        await prefs.setString('cached_goals', jsonEncode(_userGoals!.toMap()));
+        // Convert DateTime to timestamp for JSON encoding
+        final goalsMap = _userGoals!.toMap();
+        if (goalsMap['lastUpdated'] != null && goalsMap['lastUpdated'] is DateTime) {
+          goalsMap['lastUpdated'] = (goalsMap['lastUpdated'] as DateTime).millisecondsSinceEpoch;
+        }
+        await prefs.setString('cached_goals', jsonEncode(goalsMap));
       } else {
         await prefs.remove('cached_goals');
       }

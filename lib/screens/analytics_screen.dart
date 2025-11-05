@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../ui/app_colors.dart';
@@ -78,6 +79,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   List<GoogleFitData> _weeklyGoogleFitData = [];
   bool _isGoogleFitConnected = false;
 
+  // Weekly data cache - stores last 7 days from Firebase (x, x-1, ..., x-6)
+  Map<String, DailySummary?> _weeklyDataCache = {};
+
   // User profile data for BMI calculation
   double? _userHeight; // in meters
   double? _userWeight; // in kg
@@ -101,6 +105,24 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     
     // Force initialize analytics service to generate recommendations
     _initializeAnalyticsForRecommendations();
+    
+    // Initialize weekly data cache if Weekly period is selected
+    if (_selectedPeriod == 'Weekly') {
+      _fetchLast7DaysFromFirebase().then((weeklyData) {
+        if (mounted) {
+          setState(() {
+            _weeklyDataCache = weeklyData;
+          });
+        }
+      }).catchError((e) {
+        if (kDebugMode) print('⚠️ Error initializing weekly data cache: $e');
+      });
+    }
+    
+    // Cleanup old data (older than 7 days) on app start
+    _cleanupOldDailySummaryData().catchError((e) {
+      if (kDebugMode) print('⚠️ Error cleaning up old data on init: $e');
+    });
   }
 
   /// Initialize analytics service to generate recommendations
@@ -108,11 +130,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     try {
       final userId = FirebaseAuth.instance.currentUser?.uid;
       if (userId != null) {
-        print('🔄 Analytics: Initializing analytics service for recommendations...');
+        if (kDebugMode) print('🔄 Analytics: Initializing analytics service for recommendations...');
         
         // Initialize analytics service - don't timeout, let it complete
         _analyticsService.initializeRealTimeAnalytics(days: 7).then((_) {
-          print('✅ Analytics: Real-time analytics initialized successfully');
+          if (kDebugMode) print('✅ Analytics: Real-time analytics initialized successfully');
           
           // Wait a bit for recommendations to generate, then check
           Future.delayed(const Duration(seconds: 3), () {
@@ -120,11 +142,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               // Check if recommendations were generated
               final cachedRecs = _analyticsService.cachedRecommendations;
               if (cachedRecs.isEmpty) {
-                print('⚠️ Analytics: No recommendations after initialization, generating fallback...');
+                if (kDebugMode) print('⚠️ Analytics: No recommendations after initialization, generating fallback...');
                 // Force generate recommendations directly
                 _forceGenerateRecommendations();
               } else {
-                print('✅ Analytics: Recommendations found: ${cachedRecs.length} items');
+                if (kDebugMode) print('✅ Analytics: Recommendations found: ${cachedRecs.length} items');
                 setState(() {
                   _recommendations = cachedRecs;
                 });
@@ -133,21 +155,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               // Update today's macro breakdown if available
               if (_macroBreakdown.totalCalories > 0) {
                 _analyticsService.updateTodayMacroBreakdown(_macroBreakdown);
-                print('📊 Analytics: Updated today\'s macro breakdown for recommendations');
+                if (kDebugMode) print('📊 Analytics: Updated today\'s macro breakdown for recommendations');
               }
             }
           });
         }).catchError((e) {
-          print('❌ Analytics: Error initializing real-time analytics: $e');
+          if (kDebugMode) print('❌ Analytics: Error initializing real-time analytics: $e');
           // Generate fallback recommendations on error
           _forceGenerateRecommendations();
         });
       } else {
-        print('⚠️ Analytics: No user ID, generating fallback recommendations');
+        if (kDebugMode) print('⚠️ Analytics: No user ID, generating fallback recommendations');
         _forceGenerateRecommendations();
       }
     } catch (e) {
-      print('❌ Analytics: Error initializing for recommendations: $e');
+      if (kDebugMode) print('❌ Analytics: Error initializing for recommendations: $e');
       // Generate fallback recommendations on error
       _forceGenerateRecommendations();
     }
@@ -158,7 +180,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     try {
       final userId = FirebaseAuth.instance.currentUser?.uid;
       if (userId != null) {
-        print('🔄 Analytics: Force generating recommendations...');
+        if (kDebugMode) print('🔄 Analytics: Force generating recommendations...');
         // Directly call the generation method via updateTodayMacroBreakdown
         // This will trigger recommendation generation
         _analyticsService.updateTodayMacroBreakdown(_macroBreakdown);
@@ -171,13 +193,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               setState(() {
                 _recommendations = cachedRecs;
               });
-              print('✅ Analytics: Force generated recommendations: ${cachedRecs.length} items');
+              if (kDebugMode) print('✅ Analytics: Force generated recommendations: ${cachedRecs.length} items');
             }
           }
         });
       }
     } catch (e) {
-      print('❌ Analytics: Error force generating recommendations: $e');
+      if (kDebugMode) print('❌ Analytics: Error force generating recommendations: $e');
     }
   }
 
@@ -326,7 +348,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       // AI Insights generation removed
     } catch (e) {
       // Log error and show user-friendly message
-      print('❌ Error loading fresh analytics data: $e');
+      if (kDebugMode) print('❌ Error loading fresh analytics data: $e');
       if (mounted) {
         setState(() {
           _error = 'Failed to load analytics. Tap to retry.';
@@ -345,12 +367,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       if (!_appStateService.isInitialized) {
         await _appStateService.initialize().timeout(const Duration(seconds: 3),
             onTimeout: () {
-          print('⚠️ AppStateService initialization timed out');
+          if (kDebugMode) print('⚠️ AppStateService initialization timed out');
           return null;
         });
       }
     } catch (e) {
-      print('❌ Error initializing AppStateService: $e');
+      if (kDebugMode) print('❌ Error initializing AppStateService: $e');
       // Continue without blocking UI
     }
   }
@@ -362,11 +384,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       await _analyticsService.initializeRealTimeAnalytics(days: days).timeout(
           const Duration(seconds: 4),
           onTimeout: () {
-        print('⚠️ Analytics service initialization timed out');
+        if (kDebugMode) print('⚠️ Analytics service initialization timed out');
         return null;
       });
     } catch (e) {
-      print('❌ Error initializing analytics service: $e');
+      if (kDebugMode) print('❌ Error initializing analytics service: $e');
       // Continue without blocking UI
     }
   }
@@ -396,7 +418,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             _dailySummaries = summaries;
           });
         }
-      }, onError: (error) => print('Daily summaries stream error: $error'));
+      }, onError: (error) {
+        if (kDebugMode) print('Daily summaries stream error: $error');
+      });
 
       // Note: Macro breakdown is handled by TodaysFoodDataService for real-time updates
 
@@ -407,7 +431,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       _profileDataSubscription?.cancel();
       _profileDataSubscription =
           _appStateService.profileDataStream.listen((profileData) {
-        print('Profile data stream received in analytics: $profileData');
+        if (kDebugMode) print('Profile data stream received in analytics: $profileData');
         if (mounted && profileData != null) {
           // Only update if there are actual changes to avoid unnecessary rebuilds
           final heightCm = profileData['height']?.toDouble();
@@ -426,13 +450,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   _userGender = newGender;
                   _userAge = newAge;
                 });
-                print('Profile data updated in analytics: Height=${_userHeight}m');
-                print('BMI will be recalculated with new values');
+                if (kDebugMode) {
+                  print('Profile data updated in analytics: Height=${_userHeight}m');
+                  print('BMI will be recalculated with new values');
+                }
               }
             });
           }
         } else {
-          print('Profile data is null or widget not mounted');
+          if (kDebugMode) print('Profile data is null or widget not mounted');
         }
       });
 
@@ -440,14 +466,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       _goalsSubscription?.cancel();
       _goalsSubscription = _appStateService.goalsStream.listen(
         (goals) {
-          print('Goals stream received in analytics: ${goals?.toMap()}');
+          if (kDebugMode) print('Goals stream received in analytics: ${goals?.toMap()}');
           if (mounted) {
             setState(() {
               // This will trigger UI rebuild with updated macro goals
             });
           }
         },
-        onError: (error) => print('Goals stream error: $error'),
+        onError: (error) {
+          if (kDebugMode) print('Goals stream error: $error');
+        },
       );
 
       // Weight changes handled by OptimizedGoogleFitManager
@@ -461,11 +489,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         if (mounted) {
           setState(() {
             _recommendations = recommendations;
-            print('📊 Recommendations updated: ${recommendations.length} items');
+            if (kDebugMode) print('📊 Recommendations updated: ${recommendations.length} items');
           });
         }
       }, onError: (error) {
-        print('❌ Recommendations stream error: $error');
+        if (kDebugMode) print('❌ Recommendations stream error: $error');
         if (mounted) {
           setState(() {
             _recommendations = [];
@@ -476,20 +504,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       // Load initial recommendations from cache
       setState(() {
         _recommendations = _analyticsService.cachedRecommendations;
-        print('📊 Loaded ${_recommendations.length} cached recommendations');
+        if (kDebugMode) print('📊 Loaded ${_recommendations.length} cached recommendations');
       });
       
       // Generate recommendations if empty or refresh when data is available
       if (_recommendations.isEmpty) {
-        print('📊 Analytics: No recommendations found, generating...');
+        if (kDebugMode) print('📊 Analytics: No recommendations found, generating...');
         // Force generate recommendations immediately
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted && _recommendations.isEmpty) {
             final userId = FirebaseAuth.instance.currentUser?.uid;
             if (userId != null) {
-              print('🔄 Analytics: Initializing real-time analytics for recommendations...');
+              if (kDebugMode) print('🔄 Analytics: Initializing real-time analytics for recommendations...');
               _analyticsService.initializeRealTimeAnalytics(days: 7).then((_) {
-                print('✅ Analytics: Real-time analytics initialized');
+                if (kDebugMode) print('✅ Analytics: Real-time analytics initialized');
                 // Check cache after initialization
                 Future.delayed(const Duration(seconds: 2), () {
                   if (mounted) {
@@ -498,37 +526,37 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       setState(() {
                         _recommendations = cachedRecs;
                       });
-                      print('✅ Analytics: Loaded recommendations from cache: ${cachedRecs.length} items');
+                      if (kDebugMode) print('✅ Analytics: Loaded recommendations from cache: ${cachedRecs.length} items');
                     } else {
-                      print('⚠️ Analytics: Still no recommendations, forcing generation...');
+                      if (kDebugMode) print('⚠️ Analytics: Still no recommendations, forcing generation...');
                       _forceGenerateRecommendations();
                     }
                   }
                 });
               }).catchError((e) {
-                print('❌ Analytics: Error initializing real-time analytics: $e');
+                if (kDebugMode) print('❌ Analytics: Error initializing real-time analytics: $e');
                 // Generate fallback on error
                 _forceGenerateRecommendations();
               });
             } else {
-              print('⚠️ Analytics: No user ID, generating fallback recommendations');
+              if (kDebugMode) print('⚠️ Analytics: No user ID, generating fallback recommendations');
               _forceGenerateRecommendations();
             }
           }
         });
       } else {
-        print('📊 Analytics: Found ${_recommendations.length} cached recommendations');
+        if (kDebugMode) print('📊 Analytics: Found ${_recommendations.length} cached recommendations');
         // If we have cached recommendations but data has changed, regenerate
         // This ensures recommendations stay up-to-date with today's food entries
         final userId = FirebaseAuth.instance.currentUser?.uid;
         if (userId != null && _macroBreakdown.totalCalories > 0) {
           // Update today's macro breakdown to trigger recommendation regeneration
           _analyticsService.updateTodayMacroBreakdown(_macroBreakdown);
-          print('📊 Analytics: Updated today\'s macro breakdown for recommendations');
+          if (kDebugMode) print('📊 Analytics: Updated today\'s macro breakdown for recommendations');
         }
       }
     } catch (e) {
-      print('Error setting up real-time listeners: $e');
+      if (kDebugMode) print('Error setting up real-time listeners: $e');
     }
   }
 
@@ -615,17 +643,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             }
           });
         }
-        print('⚡ Analytics: INSTANT cached data loaded - Calories: $cachedCalories, Protein: ${cachedMacros['protein'] ?? 0.0}g');
+        if (kDebugMode) print('⚡ Analytics: INSTANT cached data loaded - Calories: $cachedCalories, Protein: ${cachedMacros['protein'] ?? 0.0}g');
       }
       
       // Initialize service in background (non-blocking)
       _todaysFoodDataService.initialize().then((_) {
-        print('✅ Analytics: Food data service initialized');
+        if (kDebugMode) print('✅ Analytics: Food data service initialized');
         
         // Initialize will automatically load today's food entries and update streams
         // The streams will emit the latest data automatically
       }).catchError((e) {
-        print('❌ Analytics: Food data service init error: $e');
+        if (kDebugMode) print('❌ Analytics: Food data service init error: $e');
       });
       
       // Listen to consumed calories stream (same data as TodaysFoodScreen)
@@ -642,7 +670,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               );
             }
           });
-          print('✅ Analytics: Consumed calories updated from TodaysFoodDataService: $calories');
+          if (kDebugMode) print('✅ Analytics: Consumed calories updated from TodaysFoodDataService: $calories');
         }
       });
       
@@ -664,12 +692,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             // Update analytics service with today's macro breakdown for recommendations
             _analyticsService.updateTodayMacroBreakdown(_macroBreakdown);
             
-            print('✅ Analytics: Macro breakdown updated from TodaysFoodDataService');
-            print('   Protein: ${macros['protein'] ?? 0.0}g, Carbs: ${macros['carbs'] ?? 0.0}g, Fat: ${macros['fat'] ?? 0.0}g');
+            if (kDebugMode) {
+              print('✅ Analytics: Macro breakdown updated from TodaysFoodDataService');
+              print('   Protein: ${macros['protein'] ?? 0.0}g, Carbs: ${macros['carbs'] ?? 0.0}g, Fat: ${macros['fat'] ?? 0.0}g');
+            }
           }
         },
         onError: (error) {
-          print('❌ Analytics: Error in macro nutrients stream: $error');
+          if (kDebugMode) print('❌ Analytics: Error in macro nutrients stream: $error');
         },
       );
       
@@ -692,19 +722,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               // Update analytics service with today's macro breakdown for recommendations
               _analyticsService.updateTodayMacroBreakdown(breakdown);
               
-              print('✅ Analytics: Macro breakdown updated from AppStateService');
-              print('   Protein: ${breakdown.protein}g, Carbs: ${breakdown.carbs}g, Fat: ${breakdown.fat}g');
+              if (kDebugMode) {
+                print('✅ Analytics: Macro breakdown updated from AppStateService');
+                print('   Protein: ${breakdown.protein}g, Carbs: ${breakdown.carbs}g, Fat: ${breakdown.fat}g');
+              }
             }
           }
         },
         onError: (error) {
-          print('❌ Analytics: Error in AppStateService macro breakdown stream: $error');
+          if (kDebugMode) print('❌ Analytics: Error in AppStateService macro breakdown stream: $error');
         },
       );
       
-      print('✅ Today\'s food data service initialized for analytics');
+      if (kDebugMode) print('✅ Today\'s food data service initialized for analytics');
     } catch (e) {
-      print('❌ Error initializing today\'s food data service for analytics: $e');
+      if (kDebugMode) print('❌ Error initializing today\'s food data service for analytics: $e');
     }
   }
 
@@ -725,7 +757,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             sugar: cachedMacros['sugar'] ?? 0.0,
           );
         });
-        print('⚡ Analytics: Macro data refreshed from cached data - Protein: ${cachedMacros['protein'] ?? 0.0}g, Carbs: ${cachedMacros['carbs'] ?? 0.0}g, Fat: ${cachedMacros['fat'] ?? 0.0}g');
+        if (kDebugMode) print('⚡ Analytics: Macro data refreshed from cached data - Protein: ${cachedMacros['protein'] ?? 0.0}g, Carbs: ${cachedMacros['carbs'] ?? 0.0}g, Fat: ${cachedMacros['fat'] ?? 0.0}g');
       }
       
       // Re-initialize service to reload latest data from today's food entries
@@ -733,7 +765,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       await _todaysFoodDataService.initialize().timeout(
         const Duration(seconds: 3),
         onTimeout: () {
-          print('⚠️ Analytics: Macro data refresh timeout');
+          if (kDebugMode) print('⚠️ Analytics: Macro data refresh timeout');
         },
       );
       
@@ -753,10 +785,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         // Update analytics service with today's macro breakdown for recommendations
         _analyticsService.updateTodayMacroBreakdown(_macroBreakdown);
         
-        print('✅ Analytics: Macro data refreshed from today\'s food - Protein: ${latestMacros['protein'] ?? 0.0}g, Carbs: ${latestMacros['carbs'] ?? 0.0}g, Fat: ${latestMacros['fat'] ?? 0.0}g');
+        if (kDebugMode) print('✅ Analytics: Macro data refreshed from today\'s food - Protein: ${latestMacros['protein'] ?? 0.0}g, Carbs: ${latestMacros['carbs'] ?? 0.0}g, Fat: ${latestMacros['fat'] ?? 0.0}g');
       }
     } catch (e) {
-      print('❌ Error refreshing macro data from today\'s food: $e');
+      if (kDebugMode) print('❌ Error refreshing macro data from today\'s food: $e');
     }
   }
 
@@ -794,28 +826,28 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               _todayGoogleFitData = todayData;
             });
             
-            print('✅ Analytics: Google Fit live data loaded: ${_todayGoogleFitData.steps} steps, ${_todayGoogleFitData.caloriesBurned} calories, ${_todayGoogleFitData.workoutSessions} workouts');
+            if (kDebugMode) print('✅ Analytics: Google Fit live data loaded: ${_todayGoogleFitData.steps} steps, ${_todayGoogleFitData.caloriesBurned} calories, ${_todayGoogleFitData.workoutSessions} workouts');
           } else {
-            print('⚠️ Analytics: Google Fit live data is null, trying fallback...');
+            if (kDebugMode) print('⚠️ Analytics: Google Fit live data is null, trying fallback...');
             // Fallback to original service
             await _loadGoogleFitDataFallback();
           }
           
           // Load weekly data in background
           _loadWeeklyGoogleFitData(forceRefresh: false).catchError((error) {
-            print('Weekly Google Fit data loading failed: $error');
+            if (kDebugMode) print('Weekly Google Fit data loading failed: $error');
           });
         } catch (dataError) {
-          print('Error loading optimized workout data: $dataError');
+          if (kDebugMode) print('Error loading optimized workout data: $dataError');
           await _loadGoogleFitDataFallback();
         }
       } else {
         // Network not available, try cached data
-        print('⚠️ Analytics: No Google Fit connection, trying cached data...');
+        if (kDebugMode) print('⚠️ Analytics: No Google Fit connection, trying cached data...');
         await _loadCachedGoogleFitData();
       }
     } catch (e) {
-      print('Error in Google Fit data loading: $e');
+      if (kDebugMode) print('Error in Google Fit data loading: $e');
       // Try cached data as last resort
       await _loadCachedGoogleFitData();
     }
@@ -839,9 +871,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         _isGoogleFitConnected = false; // Mark as offline
       });
       
-      print('📱 Analytics: Using cached Google Fit data (offline mode)');
+      if (kDebugMode) print('📱 Analytics: Using cached Google Fit data (offline mode)');
     } catch (e) {
-      print('❌ Analytics: Error loading cached data: $e');
+      if (kDebugMode) print('❌ Analytics: Error loading cached data: $e');
     }
   }
   Future<void> _loadGoogleFitDataFallback() async {
@@ -869,9 +901,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         // Loading state handled by OptimizedGoogleFitManager
       });
       
-      print('Google Fit today data loaded (fallback): ${_todayGoogleFitData.steps} steps');
+      if (kDebugMode) print('Google Fit today data loaded (fallback): ${_todayGoogleFitData.steps} steps');
     } catch (dataError) {
-      print('Error loading Google Fit data fallback: $dataError');
+      if (kDebugMode) print('Error loading Google Fit data fallback: $dataError');
       setState(() {
         _todayGoogleFitData = GoogleFitData(
           date: DateTime.now(),
@@ -889,7 +921,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   Future<void> _loadWeeklyGoogleFitData({bool forceRefresh = false}) async {
     try {
       if (_isGoogleFitConnected) {
-        print('🔄 Analytics: Loading weekly Google Fit data (forceRefresh: $forceRefresh)');
+        if (kDebugMode) print('🔄 Analytics: Loading weekly Google Fit data (forceRefresh: $forceRefresh)');
         
         // Load weekly data in parallel for faster response
         final now = DateTime.now();
@@ -914,10 +946,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         final totalCalories = weeklyData.fold<double>(0, (sum, data) => sum + (data.caloriesBurned ?? 0));
         final totalWorkouts = weeklyData.fold<int>(0, (sum, data) => sum + (data.workoutSessions ?? 0));
         
-        print('✅ Analytics: Loaded ${_weeklyGoogleFitData.length} days of Google Fit data - Total: $totalSteps steps, $totalCalories calories, $totalWorkouts workouts');
+        if (kDebugMode) print('✅ Analytics: Loaded ${_weeklyGoogleFitData.length} days of Google Fit data - Total: $totalSteps steps, $totalCalories calories, $totalWorkouts workouts');
       }
     } catch (e) {
-      print('❌ Error loading weekly Google Fit data: $e');
+      if (kDebugMode) print('❌ Error loading weekly Google Fit data: $e');
     }
   }
 
@@ -993,7 +1025,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       ));
       
       if (forceRefresh) {
-        print('⚠️ Analytics: Failed to refresh data for ${date.toIso8601String().split('T')[0]}: $e');
+        if (kDebugMode) print('⚠️ Analytics: Failed to refresh data for ${date.toIso8601String().split('T')[0]}: $e');
       }
     }
   }
@@ -1042,7 +1074,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
         if (doc.exists) {
           final data = doc.data()!;
-          print('Profile Data Loaded: $data');
+          if (kDebugMode) print('Profile Data Loaded: $data');
           
           // Height is stored in cm, convert to meters for BMI calculation
           final heightCm = data['height']?.toDouble();
@@ -1059,9 +1091,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             });
           }
           
-          print('Parsed Profile Data - Height: $_userHeight, Weight: $_userWeight, Gender: $_userGender, Age: $_userAge');
+          if (kDebugMode) print('Parsed Profile Data - Height: $_userHeight, Weight: $_userWeight, Gender: $_userGender, Age: $_userAge');
         } else {
-          print('Profile document does not exist');
+          if (kDebugMode) print('Profile document does not exist');
           if (mounted) {
             setState(() {
               _userHeight = null;
@@ -1073,7 +1105,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         }
       }
     } catch (e) {
-      print('Error loading user profile data: $e');
+      if (kDebugMode) print('Error loading user profile data: $e');
       // Don't set default values - let user input their data
       if (mounted) {
         setState(() {
@@ -1149,11 +1181,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   /// Refresh data for current period
   Future<void> _refreshData() async {
     if (_isRefreshing) {
-      print('⚠️ Analytics: Refresh already in progress, skipping...');
+      if (kDebugMode) print('⚠️ Analytics: Refresh already in progress, skipping...');
       return;
     }
 
-    print('🔄 Analytics: Starting data refresh...');
+    if (kDebugMode) print('🔄 Analytics: Starting data refresh...');
     setState(() {
       _isRefreshing = true;
       _error = null;
@@ -1170,10 +1202,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
       // Refresh Google Fit data if connected
       if (_isGoogleFitConnected) {
-        print('🔄 Analytics: Refreshing Google Fit data for $_selectedPeriod view...');
+        if (kDebugMode) print('🔄 Analytics: Refreshing Google Fit data for $_selectedPeriod view...');
         futures.add(_loadGoogleFitDataForPeriod(_selectedPeriod, forceRefresh: true));
       } else {
-        print('⚠️ Analytics: Google Fit not connected, skipping Google Fit refresh');
+        if (kDebugMode) print('⚠️ Analytics: Google Fit not connected, skipping Google Fit refresh');
       }
 
       // Refresh user profile data
@@ -1184,7 +1216,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
       // AI Insights generation removed
 
-      print('✅ Analytics: Data refreshed successfully');
+      if (kDebugMode) print('✅ Analytics: Data refreshed successfully');
     } catch (e) {
       // Show error to user instead of silently failing
       if (mounted) {
@@ -1201,12 +1233,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           ),
         );
       }
-      print('❌ Error refreshing analytics data: $e');
+      if (kDebugMode) print('❌ Error refreshing analytics data: $e');
     } finally {
       setState(() {
         _isRefreshing = false;
       });
-      print('🔄 Analytics: Refresh completed');
+      if (kDebugMode) print('🔄 Analytics: Refresh completed');
     }
   }
 
@@ -1219,12 +1251,22 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     });
 
     try {
+      // Fetch weekly data from Firebase when switching to Weekly
+      if (period == 'Weekly') {
+        final weeklyData = await _fetchLast7DaysFromFirebase();
+        if (mounted) {
+          setState(() {
+            _weeklyDataCache = weeklyData;
+          });
+        }
+      }
+
       // Only refresh Google Fit data for the new period
       if (_isGoogleFitConnected) {
         await _loadGoogleFitDataForPeriod(period, forceRefresh: true);
       }
     } catch (e) {
-      print('Error refreshing data for period $period: $e');
+      if (kDebugMode) print('Error refreshing data for period $period: $e');
     }
   }
 
@@ -1240,7 +1282,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           if (forceRefresh) {
             // Force refresh from Google Fit API
             todayData = await _googleFitManager.forceRefresh();
-            print('🔄 Analytics: Force refreshed today\'s data from Google Fit API');
+            if (kDebugMode) print('🔄 Analytics: Force refreshed today\'s data from Google Fit API');
           } else {
             // Use cached data
             todayData = _googleFitManager.getCurrentData();
@@ -1250,9 +1292,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             setState(() {
               _todayGoogleFitData = todayData!;
             });
-            print('✅ Analytics: Today\'s Google Fit data loaded: ${todayData.steps} steps, ${todayData.caloriesBurned} calories, ${todayData.workoutSessions} workouts');
+            if (kDebugMode) print('✅ Analytics: Today\'s Google Fit data loaded: ${todayData.steps} steps, ${todayData.caloriesBurned} calories, ${todayData.workoutSessions} workouts');
           } else {
-            print('⚠️ Analytics: No Google Fit data available for today');
+            if (kDebugMode) print('⚠️ Analytics: No Google Fit data available for today');
           }
           break;
 
@@ -1262,7 +1304,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           break;
       }
     } catch (e) {
-      print('❌ Error loading Google Fit data for period $period: $e');
+      if (kDebugMode) print('❌ Error loading Google Fit data for period $period: $e');
     }
   }
 
@@ -1328,7 +1370,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             : 0,
       };
 
-      print('Generating fresh AI insights for period: $_selectedPeriod');
+      if (kDebugMode) print('Generating fresh AI insights for period: $_selectedPeriod');
       
       // Convert GoogleFitData to Map for AI service
       final fitnessDataMap = _googleFitManager.currentData != null ? {
@@ -1348,7 +1390,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         _isGeneratingInsights = false;
       });
     } catch (e) {
-      print('Error generating AI insights: $e');
+      if (kDebugMode) print('Error generating AI insights: $e');
       setState(() {
         _aiInsights = '⚠️ AI service unavailable, please try again later.';
         _isGeneratingInsights = false;
@@ -1687,6 +1729,147 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     );
   }
 
+  /// Get date key for Firebase (format: YYYY-MM-DD)
+  String _getDateKey(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  /// Fetch last 7 days from Firebase directly (x, x-1, x-2, ..., x-6)
+  /// Returns a map of date keys to DailySummary, missing days will have null values
+  Future<Map<String, DailySummary?>> _fetchLast7DaysFromFirebase() async {
+    final Map<String, DailySummary?> result = {};
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    
+    if (userId == null) {
+      // Return empty map with null values for all 7 days
+      final today = DateTime.now();
+      for (int i = 0; i < 7; i++) {
+        final date = today.subtract(Duration(days: i));
+        result[_getDateKey(date)] = null;
+      }
+      return result;
+    }
+
+    try {
+      final today = DateTime.now();
+      final futures = <Future>[];
+
+      // Fetch all 7 days in parallel (x, x-1, x-2, ..., x-6)
+      for (int i = 0; i < 7; i++) {
+        final date = today.subtract(Duration(days: i));
+        final dateKey = _getDateKey(date);
+        
+        futures.add(
+          FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .collection('dailySummary')
+              .doc(dateKey)
+              .get()
+              .timeout(const Duration(seconds: 3))
+              .then((doc) {
+            if (doc.exists) {
+              result[dateKey] = DailySummary.fromMap(doc.data()!);
+            } else {
+              result[dateKey] = null; // Missing day = null (will be treated as 0)
+            }
+          }).catchError((e) {
+            // On error, set as null
+            result[dateKey] = null;
+          })
+        );
+      }
+
+      await Future.wait(futures);
+      
+      // Cleanup old data (older than 7 days) after fetching
+      _cleanupOldDailySummaryData();
+      
+      return result;
+    } catch (e) {
+      if (kDebugMode) print('❌ Error fetching last 7 days from Firebase: $e');
+      // Return empty map with null values for all 7 days on error
+      final today = DateTime.now();
+      for (int i = 0; i < 7; i++) {
+        final date = today.subtract(Duration(days: i));
+        result[_getDateKey(date)] = null;
+      }
+      return result;
+    }
+  }
+
+  /// Cleanup old daily summary data (remove data older than 7 days)
+  /// This removes x-6 (7th day) and keeps only the last 7 days (x, x-1, ..., x-5)
+  Future<void> _cleanupOldDailySummaryData() async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return;
+
+      final today = DateTime.now();
+      final cutoffDate = today.subtract(const Duration(days: 7)); // Remove data older than 7 days
+
+      // Get all dailySummary documents
+      final allSummaries = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('dailySummary')
+          .get()
+          .timeout(const Duration(seconds: 5));
+
+      final batch = FirebaseFirestore.instance.batch();
+      int deletedCount = 0;
+
+      for (final doc in allSummaries.docs) {
+        try {
+          // Check if document date is older than 7 days (x-6 and older)
+          final docDateKey = doc.id;
+          
+          // Parse date from document ID (format: YYYY-MM-DD)
+          final parts = docDateKey.split('-');
+          if (parts.length == 3) {
+            final docDate = DateTime(
+              int.parse(parts[0]),
+              int.parse(parts[1]),
+              int.parse(parts[2]),
+            );
+            
+            // Delete if older than 7 days (strictly before cutoff)
+            if (docDate.isBefore(cutoffDate)) {
+              batch.delete(doc.reference);
+              deletedCount++;
+            }
+          } else {
+            // If date key format is invalid, try to parse from data
+            final data = doc.data();
+            final dateValue = data['date'];
+            
+            DateTime? docDate;
+            if (dateValue is Timestamp) {
+              docDate = dateValue.toDate();
+            } else if (dateValue is DateTime) {
+              docDate = dateValue;
+            }
+            
+            if (docDate != null && docDate.isBefore(cutoffDate)) {
+              batch.delete(doc.reference);
+              deletedCount++;
+            }
+          }
+        } catch (e) {
+          if (kDebugMode) print('⚠️ Error processing document ${doc.id} for cleanup: $e');
+          // Continue with other documents
+        }
+      }
+
+      if (deletedCount > 0) {
+        await batch.commit();
+        if (kDebugMode) print('✅ Cleaned up $deletedCount old daily summary documents (older than 7 days)');
+      }
+    } catch (e) {
+      if (kDebugMode) print('❌ Error cleaning up old daily summary data: $e');
+    }
+  }
+
   Widget _buildSummaryCards() {
     // Always show the summary cards with Google Fit data
     // The data should be available from initialization
@@ -1706,56 +1889,56 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         break;
 
       case 'Weekly':
-        // Calculate weekly totals as sum of last 7 days (including today) from current daily data
+        // Calculate weekly totals by fetching last 7 days from Firebase directly
+        // x = today, x-1 = yesterday, ..., x-6 = 6 days ago
+        // Missing days will be treated as 0
+        
         final today = DateTime.now();
-        final startDate = DateTime(today.year, today.month, today.day).subtract(const Duration(days: 6)); // Last 7 days including today
-        final endDate = DateTime(today.year, today.month, today.day).add(const Duration(days: 1)); // End of today
         
         // Helper function to normalize date to midnight for comparison
         DateTime normalizeDate(DateTime date) {
           return DateTime(date.year, date.month, date.day);
         }
         
-        // Filter daily summaries to only include the last 7 days from today
-        final last7DaysSummaries = _dailySummaries.where((summary) {
-          final normalizedSummaryDate = normalizeDate(summary.date);
-          // Include dates from startDate (inclusive) to endDate (exclusive, which is start of tomorrow)
-          return !normalizedSummaryDate.isBefore(startDate) && normalizedSummaryDate.isBefore(endDate);
-        }).toList();
-        
-        if (last7DaysSummaries.isNotEmpty) {
-          // Sum calories burned from the last 7 days (to match Daily view which shows caloriesBurned)
-          totalCalories = last7DaysSummaries
-              .fold(0, (sum, summary) => sum + summary.caloriesBurned);
-          // Sum steps from the last 7 days
-          totalSteps = last7DaysSummaries
-              .fold(0, (sum, summary) => sum + summary.steps);
-        } else if (_dailySummaries.isNotEmpty) {
-          // Fallback: if filtering didn't work, try using all summaries but ensure we have at least some data
-          // Filter to last 7 days manually
-          final todayNormalized = normalizeDate(today);
-          final fallbackLast7Days = _dailySummaries.where((summary) {
-            final normalizedDate = normalizeDate(summary.date);
-            final daysDiff = todayNormalized.difference(normalizedDate).inDays;
-            return daysDiff >= 0 && daysDiff < 7;
-          }).toList();
+        // Calculate totals from last 7 days (x, x-1, x-2, x-3, x-4, x-5, x-6)
+        // Use cached weekly data if available, otherwise use daily summaries
+        for (int i = 0; i < 7; i++) {
+          final date = today.subtract(Duration(days: i));
+          final dateKey = _getDateKey(date);
+          final normalizedDate = normalizeDate(date);
           
-          if (fallbackLast7Days.isNotEmpty) {
-            totalCalories = fallbackLast7Days
-                .fold(0, (sum, summary) => sum + summary.caloriesBurned);
-            totalSteps = fallbackLast7Days
-                .fold(0, (sum, summary) => sum + summary.steps);
+          DailySummary? summary;
+          
+          // First, try to use cached weekly data from Firebase
+          if (_weeklyDataCache.containsKey(dateKey) && _weeklyDataCache[dateKey] != null) {
+            summary = _weeklyDataCache[dateKey];
           } else {
-            // Use all summaries as last resort
-            totalCalories = _dailySummaries
-                .fold(0, (sum, summary) => sum + summary.caloriesBurned);
-            totalSteps = _dailySummaries
-                .fold(0, (sum, summary) => sum + summary.steps);
+            // Fallback: try to find summary in cached _dailySummaries
+            if (_dailySummaries.any((s) => normalizeDate(s.date) == normalizedDate)) {
+              summary = _dailySummaries.firstWhere(
+                (s) => normalizeDate(s.date) == normalizedDate,
+              );
+            }
+            // If not found, summary remains null (missing day = 0)
           }
+          
+          // Sum available days (missing days = 0)
+          if (summary != null) {
+            totalCalories += summary.caloriesBurned;
+            totalSteps += summary.steps;
+            // Count workout days (days with calories burned > 0)
+            if (summary.caloriesBurned > 0) {
+              totalWorkouts++;
+            }
+          }
+          // If summary is null, day is missing, so add 0 (no-op)
         }
         
-        // If we still don't have calories/steps data, try using Google Fit weekly data
+        // Fallback: If no data found, try Google Fit weekly data
         if (totalCalories == 0 && totalSteps == 0 && _weeklyGoogleFitData.isNotEmpty) {
+          final startDate = DateTime(today.year, today.month, today.day).subtract(const Duration(days: 6));
+          final endDate = DateTime(today.year, today.month, today.day).add(const Duration(days: 1));
+          
           final last7DaysGoogleFitForCalories = _weeklyGoogleFitData.where((data) {
             final normalizedDataDate = normalizeDate(data.date);
             return !normalizedDataDate.isBefore(startDate) && normalizedDataDate.isBefore(endDate);
@@ -1766,35 +1949,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                 .fold(0, (sum, data) => sum + (data.caloriesBurned?.round() ?? 0));
             totalSteps = last7DaysGoogleFitForCalories
                 .fold(0, (sum, data) => sum + (data.steps ?? 0));
-          }
-        }
-        
-        // For workouts, use Google Fit weekly data if available (has actual workout sessions count)
-        if (_weeklyGoogleFitData.isNotEmpty) {
-          // Filter weekly Google Fit data to last 7 days
-          final last7DaysGoogleFit = _weeklyGoogleFitData.where((data) {
-            final normalizedDataDate = normalizeDate(data.date);
-            // Include dates from startDate (inclusive) to endDate (exclusive, which is start of tomorrow)
-            return !normalizedDataDate.isBefore(startDate) && normalizedDataDate.isBefore(endDate);
-          }).toList();
-          
-          if (last7DaysGoogleFit.isNotEmpty) {
-            // Sum actual workout sessions from Google Fit data
-            totalWorkouts = last7DaysGoogleFit
-                .fold(0, (sum, data) => sum + (data.workoutSessions ?? 0));
-          } else {
-            // Fallback: use all weekly Google Fit data
-            totalWorkouts = _weeklyGoogleFitData
+            totalWorkouts = last7DaysGoogleFitForCalories
                 .fold(0, (sum, data) => sum + (data.workoutSessions ?? 0));
           }
-        } else if (last7DaysSummaries.isNotEmpty) {
-          // Fallback: count days with calories burned > 0 from daily summaries
-          totalWorkouts = last7DaysSummaries
-              .where((summary) => summary.caloriesBurned > 0)
-              .length;
-        } else {
-          // Last resort: use today's workout sessions
-          totalWorkouts = _todayGoogleFitData.workoutSessions ?? 0;
         }
         break;
     }
@@ -1972,8 +2129,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     final fitnessGoalLower = fitnessGoal.toLowerCase();
     
     // Handle all possible fitness goal formats (underscore, space, title case, etc.)
-    print('Weight Progress Debug - About to check fitness goal: "$fitnessGoalLower"');
-    print('Weight Progress Debug - weightDifference: $weightDifference');
+    if (kDebugMode) {
+      print('Weight Progress Debug - About to check fitness goal: "$fitnessGoalLower"');
+      print('Weight Progress Debug - weightDifference: $weightDifference');
+    }
     
     // Normalize the fitness goal to handle all possible formats
     final normalizedGoal = fitnessGoalLower
@@ -1981,30 +2140,32 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         .replaceAll('-', ' ')
         .trim();
     
-    print('Weight Progress Debug - Normalized fitness goal: "$normalizedGoal"');
+    if (kDebugMode) print('Weight Progress Debug - Normalized fitness goal: "$normalizedGoal"');
     
     if (normalizedGoal == 'weight loss' || normalizedGoal == 'general fitness') {
       // Weight Loss + General Fitness: Success when current weight ≤ goal weight (losing weight)
       isGoalAchieved = weightDifference <= 0;
-      print('Weight Progress Debug - Weight Loss/General Fitness: isGoalAchieved = $isGoalAchieved (weightDifference <= 0: ${weightDifference <= 0})');
+      if (kDebugMode) print('Weight Progress Debug - Weight Loss/General Fitness: isGoalAchieved = $isGoalAchieved (weightDifference <= 0: ${weightDifference <= 0})');
     } else if (normalizedGoal == 'weight gain' || normalizedGoal == 'muscle building' || normalizedGoal == 'athletic performance') {
       // Weight Gain + Muscle Building + Athletic Performance: Success when current weight ≥ goal weight (gaining weight)
       isGoalAchieved = weightDifference >= 0;
-      print('Weight Progress Debug - Weight Gain/Muscle Building/Athletic Performance: isGoalAchieved = $isGoalAchieved (weightDifference >= 0: ${weightDifference >= 0})');
+      if (kDebugMode) print('Weight Progress Debug - Weight Gain/Muscle Building/Athletic Performance: isGoalAchieved = $isGoalAchieved (weightDifference >= 0: ${weightDifference >= 0})');
     } else if (normalizedGoal == 'maintenance') {
       // Maintenance: Success when current weight is within 2kg of goal weight
       isGoalAchieved = weightDifference.abs() <= 2.0;
-      print('Weight Progress Debug - Maintenance: isGoalAchieved = $isGoalAchieved (weightDifference.abs() <= 2.0: ${weightDifference.abs() <= 2.0})');
+      if (kDebugMode) print('Weight Progress Debug - Maintenance: isGoalAchieved = $isGoalAchieved (weightDifference.abs() <= 2.0: ${weightDifference.abs() <= 2.0})');
     } else {
       // Default to maintenance logic for unknown goals
       isGoalAchieved = weightDifference.abs() <= 2.0;
-      print('Weight Progress Debug - Unknown goal "$normalizedGoal", using maintenance logic: isGoalAchieved = $isGoalAchieved');
+      if (kDebugMode) print('Weight Progress Debug - Unknown goal "$normalizedGoal", using maintenance logic: isGoalAchieved = $isGoalAchieved');
     }
     
     // Debug logging for weight progress
-    print('Weight Progress Calculation - Current: $currentWeight, Goal: $weightGoal, Difference: $weightDifference, Progress: $progressPercentage%, Fitness Goal: $fitnessGoal, Achieved: $isGoalAchieved');
-    print('Weight Progress Debug - isGoalAchieved: $isGoalAchieved, weightDifference: $weightDifference, fitnessGoal: $fitnessGoal');
-    print('Weight Progress Debug - weightDifference <= 0: ${weightDifference <= 0}, weightDifference >= 0: ${weightDifference >= 0}');
+    if (kDebugMode) {
+      print('Weight Progress Calculation - Current: $currentWeight, Goal: $weightGoal, Difference: $weightDifference, Progress: $progressPercentage%, Fitness Goal: $fitnessGoal, Achieved: $isGoalAchieved');
+      print('Weight Progress Debug - isGoalAchieved: $isGoalAchieved, weightDifference: $weightDifference, fitnessGoal: $fitnessGoal');
+      print('Weight Progress Debug - weightDifference <= 0: ${weightDifference <= 0}, weightDifference >= 0: ${weightDifference >= 0}');
+    }
     
     // Determine progress color and status based on fitness goal
     Color progressColor;
@@ -2015,7 +2176,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       progressColor = kSuccessColor; // Green color for success
       progressStatus = 'Goal Achieved!';
       progressIcon = Icons.check_circle;
-      print('Weight Progress Debug - Using GREEN color for achieved goal');
+      if (kDebugMode) print('Weight Progress Debug - Using GREEN color for achieved goal');
     } else {
       // Handle color determination based on fitness goal rules
       if (normalizedGoal == 'weight loss' || normalizedGoal == 'general fitness') {
@@ -2024,12 +2185,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           progressColor = kWarningColor; // Orange for above goal
           progressStatus = 'Above Goal';
           progressIcon = Icons.trending_up;
-          print('Weight Progress Debug - Using ORANGE color for weight loss above goal');
+          if (kDebugMode) print('Weight Progress Debug - Using ORANGE color for weight loss above goal');
         } else {
           progressColor = kInfoColor; // Blue for on track
           progressStatus = 'On Track';
           progressIcon = Icons.trending_down;
-          print('Weight Progress Debug - Using BLUE color for weight loss on track');
+          if (kDebugMode) print('Weight Progress Debug - Using BLUE color for weight loss on track');
         }
       } else if (normalizedGoal == 'weight gain' || normalizedGoal == 'muscle building' || normalizedGoal == 'athletic performance') {
         // Weight Gain + Muscle Building + Athletic Performance: Orange when below goal, Blue when on track
@@ -2037,12 +2198,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           progressColor = kWarningColor; // Orange for below goal
           progressStatus = 'Below Goal';
           progressIcon = Icons.trending_down;
-          print('Weight Progress Debug - Using ORANGE color for weight gain below goal');
+          if (kDebugMode) print('Weight Progress Debug - Using ORANGE color for weight gain below goal');
         } else {
           progressColor = kInfoColor; // Blue for on track
           progressStatus = 'On Track';
           progressIcon = Icons.trending_up;
-          print('Weight Progress Debug - Using BLUE color for weight gain on track');
+          if (kDebugMode) print('Weight Progress Debug - Using BLUE color for weight gain on track');
         }
       } else {
         // Maintenance or default case: Orange when off target, Green when within 2kg
@@ -2050,12 +2211,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           progressColor = kWarningColor; // Orange for off target
           progressStatus = 'Off Target';
           progressIcon = weightDifference > 0 ? Icons.trending_up : Icons.trending_down;
-          print('Weight Progress Debug - Using ORANGE color for maintenance off target');
+          if (kDebugMode) print('Weight Progress Debug - Using ORANGE color for maintenance off target');
         } else {
           progressColor = kSuccessColor; // Green for maintenance success
           progressStatus = 'Goal Achieved!';
           progressIcon = Icons.check_circle;
-          print('Weight Progress Debug - Using GREEN color for maintenance success');
+          if (kDebugMode) print('Weight Progress Debug - Using GREEN color for maintenance success');
         }
       }
     }
@@ -2219,42 +2380,41 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
   /// Build individual weight display
   Widget _buildWeightDisplay(String label, String value, Color color, IconData icon) {
-    return Flexible(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: color,
-            size: 24,
-          ),
-          const SizedBox(height: 8),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
+    // Return Column directly since it's already wrapped in Expanded when used
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          color: color,
+          size: 24,
+        ),
+        const SizedBox(height: 8),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
             style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: color.withValues(alpha: 0.7),
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color,
             ),
             textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: color.withValues(alpha: 0.7),
+          ),
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
+        ),
+      ],
     );
   }
 
@@ -2543,7 +2703,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     final macroGoals = userGoals?.macroGoals;
     
     // Debug logging
-    print('🔍 Analytics Macro Breakdown UI - Protein: ${_macroBreakdown.protein}g, Carbs: ${_macroBreakdown.carbs}g, Fat: ${_macroBreakdown.fat}g');
+    if (kDebugMode) print('🔍 Analytics Macro Breakdown UI - Protein: ${_macroBreakdown.protein}g, Carbs: ${_macroBreakdown.carbs}g, Fat: ${_macroBreakdown.fat}g');
     
     return Container(
       padding: const EdgeInsets.all(20),
@@ -2922,7 +3082,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     final hasWeight = _userWeight != null && _userWeight! > 0;
     
     // Debug logging
-    print('BMI Analytics Debug - Height: $_userHeight, Weight: $_userWeight');
+    if (kDebugMode) print('BMI Analytics Debug - Height: $_userHeight, Weight: $_userWeight');
     
     if (!hasHeight || !hasWeight) {
       // Show message if either height or weight is missing
@@ -2982,8 +3142,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     final bmiColor = _getBMIColor(bmi);
 
     // Debug logging
-    print('BMI Debug - Weight: $_userWeight, Height: $_userHeight');
-    print('BMI Debug - Calculated BMI: $bmi');
+    if (kDebugMode) {
+      print('BMI Debug - Weight: $_userWeight, Height: $_userHeight');
+      print('BMI Debug - Calculated BMI: $bmi');
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),

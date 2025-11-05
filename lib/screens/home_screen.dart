@@ -149,6 +149,12 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   Timer? _goalsDebounceTimer;
   Timer? _googleFitRefreshTimer;
   Timer? _streakRefreshTimer;
+  
+  // Prevent duplicate operations
+  bool _isRefreshingGoals = false;
+  bool _isRefreshingStreaks = false;
+  DateTime? _lastGoalsRefreshTime;
+  DateTime? _lastStreakRefreshTime;
   UserStreakSummary _streakSummary = UserStreakSummary(
     goalStreaks: {},
     totalActiveStreaks: 0,
@@ -1525,11 +1531,16 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     debugPrint('Goals event bus listener set up successfully (optimized: change detection)');
 
     // Register global callback for immediate goals updates
-    // OPTIMIZED: Added change detection to prevent duplicate refreshes
+    // OPTIMIZED: Added change detection and debouncing to prevent duplicate refreshes
     GlobalGoalsManager().setGoalsUpdateCallback((goals) async {
-      debugPrint('=== GLOBAL GOALS CALLBACK TRIGGERED ===');
-      debugPrint('Received goals update via global callback: ${goals.toMap()}');
-      if (mounted) {
+      // Debounce to prevent rapid successive calls
+      _goalsDebounceTimer?.cancel();
+      _goalsDebounceTimer = Timer(const Duration(milliseconds: 500), () async {
+        if (!mounted) return;
+        
+        debugPrint('=== GLOBAL GOALS CALLBACK TRIGGERED ===');
+        debugPrint('Received goals update via global callback: ${goals.toMap()}');
+        
         // Check if goals actually changed before refreshing
         final currentGoalsMap = _appStateService.userGoals?.toMap();
         final newGoalsMap = goals.toMap();
@@ -1540,8 +1551,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         } else {
           debugPrint('Global goals callback skipped - no actual change');
         }
-      }
-      debugPrint('=== END GLOBAL GOALS CALLBACK ===');
+        debugPrint('=== END GLOBAL GOALS CALLBACK ===');
+      });
     });
     debugPrint('Global goals callback registered (optimized: change detection)');
 
@@ -1595,47 +1606,98 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
   /// Refresh daily summary with new goals
+  /// OPTIMIZED: Added locking to prevent duplicate concurrent calls
   Future<void> _refreshDailySummaryWithNewGoals(UserGoals? goals) async {
-    debugPrint('=== REFRESHING DAILY SUMMARY WITH NEW GOALS ===');
-    debugPrint('New goals: ${goals?.toMap()}');
-    debugPrint(
-        'Current daily summary before update: ${_dailySummary?.toMap()}');
+    // Prevent duplicate concurrent calls
+    if (_isRefreshingGoals) {
+      debugPrint('⚠️ Goals refresh already in progress, skipping duplicate call');
+      return;
+    }
+    
+    // Prevent rapid successive calls (debounce within 500ms)
+    final now = DateTime.now();
+    if (_lastGoalsRefreshTime != null && 
+        now.difference(_lastGoalsRefreshTime!).inMilliseconds < 500) {
+      debugPrint('⚠️ Goals refresh called too soon after last refresh, skipping');
+      return;
+    }
+    
+    _isRefreshingGoals = true;
+    _lastGoalsRefreshTime = now;
+    
+    try {
+      debugPrint('=== REFRESHING DAILY SUMMARY WITH NEW GOALS ===');
+      debugPrint('New goals: ${goals?.toMap()}');
+      debugPrint(
+          'Current daily summary before update: ${_dailySummary?.toMap()}');
 
-    if (mounted) {
-      setState(() {
-        // Goals updated - refresh daily summary with new goals
-        if (_dailySummary != null) {
-          _dailySummary = _dailySummary!.copyWith(
-            caloriesGoal: goals?.calorieGoal ?? 2000,
-            stepsGoal: goals?.stepsPerDayGoal ?? 10000,
-            waterGlassesGoal: goals?.waterGlassesGoal ?? 8,
-          );
-          debugPrint('Updated existing daily summary with new goals');
-        } else {
-          _dailySummary = _getEmptyDailySummary();
-          debugPrint('Created new daily summary with goals');
+      if (mounted) {
+        setState(() {
+          // Goals updated - refresh daily summary with new goals
+          if (_dailySummary != null) {
+            _dailySummary = _dailySummary!.copyWith(
+              caloriesGoal: goals?.calorieGoal ?? 2000,
+              stepsGoal: goals?.stepsPerDayGoal ?? 10000,
+              waterGlassesGoal: goals?.waterGlassesGoal ?? 8,
+            );
+            debugPrint('Updated existing daily summary with new goals');
+          } else {
+            _dailySummary = _getEmptyDailySummary();
+            debugPrint('Created new daily summary with goals');
+          }
+          debugPrint('Daily summary after setState: ${_dailySummary?.toMap()}');
+        });
+
+        // Save updated daily summary to Firestore with new goals
+        try {
+          await _saveDailySummaryToFirestore();
+          debugPrint('Daily summary saved to Firestore successfully');
+        } catch (e) {
+          debugPrint('Error saving updated daily summary: $e');
         }
-        debugPrint('Daily summary after setState: ${_dailySummary?.toMap()}');
-      });
 
-      // Save updated daily summary to Firestore with new goals
-      try {
-        await _saveDailySummaryToFirestore();
-        debugPrint('Daily summary saved to Firestore successfully');
-      } catch (e) {
-        debugPrint('Error saving updated daily summary: $e');
+        // Recalculate streaks and achievements based on new goals (debounced)
+        // Only refresh streaks if not already refreshing
+        if (!_isRefreshingStreaks) {
+          try {
+            await _refreshStreaksDebounced();
+            debugPrint('Streaks and achievements recalculated successfully');
+          } catch (e) {
+            debugPrint('Error recalculating streaks and achievements: $e');
+          }
+        }
       }
-
-      // Recalculate streaks and achievements based on new goals
-      try {
-        await _analyticsService.calculateStreaksAndAchievements();
-        await _enhancedStreakService.refreshStreaks();
-        debugPrint('Streaks and achievements recalculated successfully');
-      } catch (e) {
-        debugPrint('Error recalculating streaks and achievements: $e');
-      }
+    } finally {
+      _isRefreshingGoals = false;
     }
     debugPrint('=== END REFRESHING DAILY SUMMARY WITH NEW GOALS ===');
+  }
+  
+  /// Refresh streaks with debouncing to prevent excessive calls
+  Future<void> _refreshStreaksDebounced() async {
+    // Prevent duplicate concurrent calls
+    if (_isRefreshingStreaks) {
+      debugPrint('⚠️ Streak refresh already in progress, skipping duplicate call');
+      return;
+    }
+    
+    // Prevent rapid successive calls (debounce within 2 seconds)
+    final now = DateTime.now();
+    if (_lastStreakRefreshTime != null && 
+        now.difference(_lastStreakRefreshTime!).inSeconds < 2) {
+      debugPrint('⚠️ Streak refresh called too soon after last refresh, skipping');
+      return;
+    }
+    
+    _isRefreshingStreaks = true;
+    _lastStreakRefreshTime = now;
+    
+    try {
+      await _analyticsService.calculateStreaksAndAchievements();
+      await _enhancedStreakService.refreshStreaks();
+    } finally {
+      _isRefreshingStreaks = false;
+    }
   }
 
   /// Force refresh the daily summary with current goals from AppStateService

@@ -36,6 +36,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   static final LoggerService _logger = LoggerService();
   bool _hasShownSetupWarning = false;
   StreamSubscription<AppState>? _appStateSubscription;
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
@@ -77,16 +78,19 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
       }
 
       // Show warning after a delay to ensure UI is ready (non-blocking)
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted && !_hasShownSetupWarning) {
-          setState(() {
-            _hasShownSetupWarning = true;
-          });
-          
-          if (mounted) {
-            _showSetupWarning();
+      // Use addPostFrameCallback to ensure MaterialApp is built before showing dialog
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted && !_hasShownSetupWarning) {
+            setState(() {
+              _hasShownSetupWarning = true;
+            });
+            
+            if (mounted) {
+              _showSetupWarning();
+            }
           }
-        }
+        });
       });
     } catch (e) {
       print('Error checking setup warning: $e');
@@ -94,8 +98,21 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   }
 
   void _showSetupWarning() {
+    if (!mounted) return;
+    
+    // Use navigator key to get a valid context with MaterialLocalizations
+    final navigatorContext = _navigatorKey.currentContext;
+    if (navigatorContext == null) {
+      print('⚠️ Navigator context not available yet, retrying...');
+      // Retry after a short delay
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) _showSetupWarning();
+      });
+      return;
+    }
+    
     showDialog(
-      context: context,
+      context: navigatorContext,
       barrierDismissible: false,
       builder: (context) => SetupWarningPopup(
         onComplete: () {
@@ -103,8 +120,8 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
           print('User chose to complete setup later');
         },
         onNavigateToSettings: () {
-          // Navigate to settings screen
-          Navigator.of(context).push(
+          // Navigate to settings screen using root navigator
+          Navigator.of(navigatorContext).push(
             MaterialPageRoute(
               builder: (context) => const SettingsScreen(),
             ),
@@ -255,6 +272,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Calorie Vita',
       theme: AppTheme.lightTheme,

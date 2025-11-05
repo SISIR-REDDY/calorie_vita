@@ -32,8 +32,10 @@ class UserGoals {
       fitnessGoal: map['fitnessGoal']?.toString(),
       lastUpdated: map['lastUpdated'] != null 
           ? (map['lastUpdated'] is DateTime 
-              ? map['lastUpdated'] 
-              : map['lastUpdated'].toDate())
+              ? map['lastUpdated'] as DateTime
+              : map['lastUpdated'] is int
+                  ? DateTime.fromMillisecondsSinceEpoch(map['lastUpdated'] as int)
+                  : (map['lastUpdated'] as dynamic).toDate())
           : null,
     );
   }

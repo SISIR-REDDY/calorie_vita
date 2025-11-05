@@ -32,6 +32,11 @@ class EnhancedStreakService {
     lastActivityDate: DateTime.now(),
     totalDaysActive: 0,
   );
+  
+  // Prevent duplicate operations
+  bool _isCalculatingStreaks = false;
+  DateTime? _lastCalculationTime;
+  Timer? _refreshDebounceTimer;
 
   /// Initialize enhanced streak service with timeout to prevent blocking
   Future<void> initialize() async {
@@ -342,7 +347,31 @@ class EnhancedStreakService {
   }
 
   /// Refresh streaks (call this when daily summary is updated)
+  /// OPTIMIZED: Added debouncing to prevent excessive calls
   Future<void> refreshStreaks() async {
+    // Prevent duplicate concurrent calls
+    if (_isCalculatingStreaks) {
+      debugPrint('⚠️ Streak calculation already in progress, skipping duplicate call');
+      return;
+    }
+    
+    // Debounce rapid successive calls (within 2 seconds)
+    final now = DateTime.now();
+    if (_lastCalculationTime != null && 
+        now.difference(_lastCalculationTime!).inSeconds < 2) {
+      debugPrint('⚠️ Streak refresh called too soon after last calculation, debouncing...');
+      // Cancel previous debounce timer and set new one
+      _refreshDebounceTimer?.cancel();
+      _refreshDebounceTimer = Timer(const Duration(seconds: 2), () {
+        refreshStreaks();
+      });
+      return;
+    }
+    
+    _isCalculatingStreaks = true;
+    _lastCalculationTime = now;
+    _refreshDebounceTimer?.cancel();
+    
     try {
       debugPrint('🔄 Refreshing streaks...');
       await _calculateAndUpdateStreaks();
@@ -357,6 +386,8 @@ class EnhancedStreakService {
     } catch (e) {
       debugPrint('❌ Error refreshing streaks: $e');
       _errorHandler.handleDataError('streak_refresh', e);
+    } finally {
+      _isCalculatingStreaks = false;
     }
   }
 
