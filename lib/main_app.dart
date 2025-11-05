@@ -10,13 +10,11 @@ import 'screens/settings_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/admin_notification_screen.dart';
 import 'widgets/reward_notification_widget.dart';
-import 'widgets/setup_warning_popup.dart';
 import 'ui/app_theme.dart';
 import 'ui/app_colors.dart';
 // Unused import removed
 import 'services/app_state_manager.dart';
 import 'services/optimized_google_fit_manager.dart';
-import 'services/setup_check_service.dart';
 import 'services/firebase_service.dart';
 import 'services/daily_reset_service.dart';
 import 'services/logger_service.dart';
@@ -34,7 +32,6 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   final AppStateManager _appStateManager = AppStateManager();
   final OptimizedGoogleFitManager _googleFitManager = OptimizedGoogleFitManager();
   static final LoggerService _logger = LoggerService();
-  bool _hasShownSetupWarning = false;
   StreamSubscription<AppState>? _appStateSubscription;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
@@ -58,77 +55,6 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
     
     // Initialize daily reset service
     DailyResetService.initialize();
-    
-    // Check and show setup warning if needed
-    _checkAndShowSetupWarning();
-  }
-
-  Future<void> _checkAndShowSetupWarning() async {
-    try {
-      // Check if warning has been shown before
-      final hasShownWarning = await SetupWarningService.hasShownWarning();
-      if (hasShownWarning) return;
-
-      // Check if setup is complete
-      final isSetupComplete = await SetupCheckService.isSetupComplete();
-      if (isSetupComplete) {
-        // Mark warning as shown since setup is complete
-        await SetupWarningService.markWarningAsShown();
-        return;
-      }
-
-      // Show warning after a delay to ensure UI is ready (non-blocking)
-      // Use addPostFrameCallback to ensure MaterialApp is built before showing dialog
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Future.delayed(const Duration(seconds: 3), () {
-          if (mounted && !_hasShownSetupWarning) {
-            setState(() {
-              _hasShownSetupWarning = true;
-            });
-            
-            if (mounted) {
-              _showSetupWarning();
-            }
-          }
-        });
-      });
-    } catch (e) {
-      print('Error checking setup warning: $e');
-    }
-  }
-
-  void _showSetupWarning() {
-    if (!mounted) return;
-    
-    // Use navigator key to get a valid context with MaterialLocalizations
-    final navigatorContext = _navigatorKey.currentContext;
-    if (navigatorContext == null) {
-      print('⚠️ Navigator context not available yet, retrying...');
-      // Retry after a short delay
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) _showSetupWarning();
-      });
-      return;
-    }
-    
-    showDialog(
-      context: navigatorContext,
-      barrierDismissible: false,
-      builder: (context) => SetupWarningPopup(
-        onComplete: () {
-          // User chose "Maybe Later"
-          print('User chose to complete setup later');
-        },
-        onNavigateToSettings: () {
-          // Navigate to settings screen using root navigator
-          Navigator.of(navigatorContext).push(
-            MaterialPageRoute(
-              builder: (context) => const SettingsScreen(),
-            ),
-          );
-        },
-      ),
-    );
   }
 
   void _initializeAppStateManager() async {

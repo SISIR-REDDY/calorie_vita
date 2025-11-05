@@ -45,20 +45,44 @@
 ## ⚠️ **REMAINING 5% (Quick Fixes)**
 
 ### **1. Production Keystore** ⚠️
-**Status:** Configuration ready, needs generation  
+**Status:** Scripts ready, needs generation  
 **Priority:** HIGH (Required for Play Store)  
 **Time:** 5 minutes
 
 **Action:**
-```bash
+```powershell
+# Windows PowerShell (Recommended)
+.\generate_keystore.ps1
+
+# Or manually:
 keytool -genkey -v -keystore android/calorie-vita-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias calorie-vita
 ```
 
-Then create `android/key.properties` from template.
+Then create `android/key.properties` from template (or script will do it automatically).
+
+**✅ Script Created:** `generate_keystore.ps1` - Automated keystore generation
 
 ---
 
-### **2. Testing** ⚠️
+### **2. Production Build** ✅
+**Status:** Scripts ready, build when needed  
+**Priority:** HIGH  
+**Time:** 10-15 minutes
+
+**Action:**
+```powershell
+# Windows PowerShell (Recommended)
+.\launch_production.ps1
+
+# Or manually:
+flutter build appbundle --release
+```
+
+**✅ Script Created:** `launch_production.ps1` - Automated production build
+
+---
+
+### **3. Testing** ⚠️
 **Status:** Builds work, needs verification  
 **Priority:** HIGH  
 **Time:** 1-2 hours

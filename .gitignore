@@ -23,6 +23,8 @@ android/app/debug/
 android/app/profile/
 android/app/release/
 *.keystore
+*.jks
+android/key.properties
 
 # iOS/macOS (if added later)
 ios/Flutter/Flutter.podspec
