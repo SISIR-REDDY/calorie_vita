@@ -217,11 +217,28 @@ class TaskService {
       final allTasks = await getTasks();
       // Filter out example tasks
       final userTasks = allTasks.where((task) => !_isExampleTask(task)).toList();
-      _localTasks = userTasks;
-      _tasksController.add(userTasks);
-      // Reduced logging - only log in debug mode and when tasks change
-      if (kDebugMode) {
-        debugPrint('📋 Tasks loaded: ${userTasks.length} user tasks');
+      
+      // CRITICAL: Preserve temp tasks when loading initial tasks
+      // Don't overwrite temp tasks that might have been added before initialization completes
+      final tempTasks = _localTasks.where((task) => task.id.startsWith('temp_')).toList();
+      
+      if (tempTasks.isNotEmpty) {
+        // Merge Firestore tasks with temp tasks
+        final merged = <Task>[];
+        merged.addAll(userTasks);
+        merged.addAll(tempTasks);
+        merged.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _localTasks = merged;
+        _tasksController.add(List.from(_localTasks));
+        if (kDebugMode) {
+          debugPrint('📋 Initial tasks loaded: ${userTasks.length} from Firestore, ${tempTasks.length} temp tasks preserved');
+        }
+      } else {
+        _localTasks = userTasks;
+        _tasksController.add(userTasks);
+        if (kDebugMode) {
+          debugPrint('📋 Tasks loaded: ${userTasks.length} user tasks');
+        }
       }
     } catch (e) {
       print('📋 Task service: Error loading initial tasks: $e');
@@ -237,6 +254,10 @@ class TaskService {
         .where('userId', isEqualTo: _currentUserId)
         .snapshots()
         .listen((snapshot) {
+      // CRITICAL: Capture temp tasks FIRST before processing Firestore data
+      // This prevents race conditions where _localTasks gets overwritten
+      final tempTasks = _localTasks.where((task) => task.id.startsWith('temp_')).toList();
+      
       // Reduced logging - only log when tasks actually change
       final allTasks = snapshot.docs
         .map((doc) => Task.fromFirestore(doc))
@@ -254,19 +275,70 @@ class TaskService {
         _deleteExampleTasksFromFirestore(allTasks.where((task) => _isExampleTask(task)).toList());
       }
       
-      // Only log when tasks actually change, not on every stream update
-      final tasksChanged = _localTasks.length != tasks.length || 
-          !_localTasks.every((task) => tasks.any((t) => t.id == task.id));
+      // CRITICAL FIX: Merge Firestore tasks with local optimistic updates
+      // Preserve tasks with temp IDs (optimistic updates) until they're saved to Firestore
       
-      // Update local tasks from Firestore (but don't override optimistic updates)
-      _localTasks = tasks;
+      // Merge: Start with Firestore tasks, then add temp tasks that aren't in Firestore yet
+      final mergedTasks = <Task>[];
       
-      // Only log when tasks change, not on every stream update
-      if (kDebugMode && tasksChanged) {
-        debugPrint('📋 Tasks updated: ${tasks.length} tasks');
+      // Add all Firestore tasks first
+      mergedTasks.addAll(tasks);
+      
+      // Add temp tasks that haven't been saved to Firestore yet
+      for (final tempTask in tempTasks) {
+        // Check if this temp task has been saved to Firestore
+        // Match by title and creation time (within 5 seconds) since IDs will be different
+        final foundInFirestore = tasks.any((ft) => 
+          ft.title == tempTask.title && 
+          ft.createdAt.difference(tempTask.createdAt).inSeconds.abs() < 5 &&
+          ft.userId == tempTask.userId
+        );
+        
+        if (!foundInFirestore) {
+          // Task hasn't been saved to Firestore yet, keep it in the list
+          mergedTasks.insert(0, tempTask); // Insert at beginning for newest first
+          if (kDebugMode) {
+            debugPrint('📋 Keeping temp task in list: ${tempTask.title} (ID: ${tempTask.id})');
+          }
+        } else {
+          // Task has been saved to Firestore, it will be in the merged list from Firestore
+          if (kDebugMode) {
+            debugPrint('📋 Temp task found in Firestore, will use Firestore version: ${tempTask.title}');
+          }
+        }
       }
       
-      _tasksController.add(_localTasks);
+      // Sort by creation date descending
+      mergedTasks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      
+      // CRITICAL: Don't overwrite if we have temp tasks and Firestore is empty
+      // This prevents the listener from clearing temp tasks before they're saved
+      if (tempTasks.isNotEmpty && tasks.isEmpty && _localTasks.isNotEmpty) {
+        // We have temp tasks that haven't been saved yet, and Firestore is empty
+        // Keep the current _localTasks (which includes temp tasks) and don't overwrite
+        if (kDebugMode) {
+          debugPrint('📋 Preserving temp tasks: Firestore is empty but we have ${tempTasks.length} temp tasks');
+          debugPrint('📋 Temp tasks: ${tempTasks.map((t) => t.title).join(", ")}');
+        }
+        // Don't update _localTasks or emit - keep existing state
+        return;
+      }
+      
+      // Always update local tasks with merged list (even if unchanged)
+      // This ensures temp tasks are always included
+      _localTasks = mergedTasks;
+      
+      // Always emit to stream to ensure UI is updated
+      // This is critical for temp tasks to appear immediately
+      _tasksController.add(List.from(_localTasks));
+      
+      // Log for debugging
+      if (kDebugMode) {
+        debugPrint('📋 Tasks updated: ${mergedTasks.length} tasks (${tasks.length} from Firestore, ${tempTasks.length} temp)');
+        if (tempTasks.isNotEmpty) {
+          debugPrint('📋 Temp tasks preserved: ${tempTasks.map((t) => t.title).join(", ")}');
+        }
+      }
     });
   }
   
@@ -375,15 +447,22 @@ class TaskService {
         priority: TaskPriority.medium, // Default priority
         createdAt: DateTime.now(),
         category: taskCategory,
-        description: description,
+        description: description, // Can be null - that's fine
         tags: tags,
         userId: _currentUserId,
       );
 
       // INSTANTLY add to local list and notify UI (no delays at all)
       _localTasks.insert(0, task); // Insert at beginning for newest first
-      _tasksController.add(List.from(_localTasks));
-      print('📋 Task INSTANTLY added to UI: ${task.title}');
+      
+      // CRITICAL: Emit to stream IMMEDIATELY with a copy to ensure UI sees it
+      // This must happen BEFORE any Firestore operations
+      final tasksCopy = List<Task>.from(_localTasks);
+      _tasksController.add(tasksCopy);
+      
+      print('📋 Task INSTANTLY added to UI: ${task.title}, description: ${description ?? "null"}, total tasks: ${_localTasks.length}');
+      print('📋 Current _localTasks: ${_localTasks.map((t) => '${t.id}:${t.title}').join(", ")}');
+      print('📋 Emitted to stream: ${tasksCopy.length} tasks');
       
       // Add to Firestore in background (completely separate from UI)
       _addTaskToFirestoreAsync(task);
@@ -418,8 +497,15 @@ class TaskService {
   /// Add task to Firestore (background operation)
   Future<Task?> _addTaskToFirestore(Task task) async {
     try {
-      final docRef = await _firestore.collection('tasks').add(task.toFirestore());
-      print('📋 Task added to Firestore with ID: ${docRef.id}');
+      // Ensure description is properly handled (can be null)
+      final firestoreData = task.toFirestore();
+      // Remove null description from Firestore data if it's null (optional field)
+      if (firestoreData['description'] == null) {
+        firestoreData.remove('description');
+      }
+      
+      final docRef = await _firestore.collection('tasks').add(firestoreData);
+      print('📋 Task added to Firestore with ID: ${docRef.id}, description: ${task.description ?? "null"}');
       
       // Update the task with the generated ID
       final createdTask = task.copyWith(id: docRef.id);
@@ -432,6 +518,7 @@ class TaskService {
       return createdTask;
     } catch (e) {
       print('Error adding task to Firestore: $e');
+      print('📋 Task that failed: title=${task.title}, description=${task.description ?? "null"}');
       return null;
     }
   }

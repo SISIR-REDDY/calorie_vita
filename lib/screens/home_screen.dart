@@ -482,25 +482,21 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       _tasksSubscription?.cancel();
       _tasksSubscription = _taskService.tasksStream.listen(
         (tasks) {
-          // Reduced logging - only log when tasks actually change
+          // Always update state when stream emits to ensure UI is in sync
           if (mounted) {
-            // Only update state if tasks actually changed
-            if (_tasks.length != tasks.length || 
-                !_listsEqual(_tasks, tasks)) {
-              // Update immediately without delay to prevent buffering
-                  setState(() {
-                    _tasks = tasks;
-                    _isTasksLoading = false;
-                    _hasUserTasks = _taskService.hasUserTasks();
-                  });
-              // Only log when tasks change, not on every stream update
-              if (kDebugMode) {
-                debugPrint('📋 Tasks updated: ${tasks.length} tasks');
+            // Update immediately without delay to prevent buffering
+            setState(() {
+              _tasks = tasks;
+              _isTasksLoading = false;
+              _hasUserTasks = _taskService.hasUserTasks();
+            });
+            // Log for debugging
+            if (kDebugMode) {
+              debugPrint('📋 Tasks updated from stream: ${tasks.length} tasks, hasUserTasks: $_hasUserTasks');
+              if (tasks.isNotEmpty) {
+                debugPrint('📋 Task titles: ${tasks.map((t) => t.title).join(", ")}');
               }
             }
-            
-            // Do not add default tasks - users should add their own tasks
-            // Removed automatic example task addition - users must add tasks manually
           }
         },
         onError: (error) {
@@ -2313,8 +2309,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Load tasks data with fallback
   Future<void> _loadTasksData() async {
     try {
-      // Reduced logging - tasks are loaded silently via stream
-      final tasks = await _taskService.getTasks();
+      // CRITICAL FIX: Use getCurrentTasks() instead of getTasks()
+      // getCurrentTasks() returns from _localTasks (includes temp tasks)
+      // getTasks() queries Firestore directly (doesn't include unsaved temp tasks)
+      final tasks = _taskService.getCurrentTasks();
       
       if (mounted) {
         setState(() {
@@ -2340,7 +2338,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   Future<void> _refreshTasksData() async {
     try {
       debugPrint('📋 Refreshing tasks data...');
-      final tasks = await _taskService.getTasks();
+      // CRITICAL FIX: Use getCurrentTasks() to preserve temp tasks
+      final tasks = _taskService.getCurrentTasks();
       debugPrint('📋 Refreshed ${tasks.length} tasks from service');
       
       if (mounted) {
@@ -3585,19 +3584,27 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   ),
                 ),
               )
-            else if (_tasks.isEmpty && !_hasUserTasks)
+            else if (_tasks.isNotEmpty)
+              // Show tasks if they exist - this takes priority over everything
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: _tasks.map((task) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: TaskCard(
+                    task: task,
+                    onToggleCompletion: () => _toggleTaskCompletion(task.id),
+                    onDelete: () => _deleteTask(task.id),
+                  ),
+                )).toList(),
+              )
+            else if (!_hasUserTasks)
+              // Only show example widget if no tasks exist
               ExampleTasksWidget(
                 onAddTask: () => _showAddTaskDialog(),
               )
             else
-              ..._tasks.map((task) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: TaskCard(
-                  task: task,
-                  onToggleCompletion: () => _toggleTaskCompletion(task.id),
-                  onDelete: () => _deleteTask(task.id),
-                ),
-              )),
+              // Empty state
+              const SizedBox.shrink(),
           ],
         ),
       ),
@@ -4314,18 +4321,34 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       );
 
       if (task != null) {
-        // Show success message INSTANTLY (no delays)
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Task added'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            duration: const Duration(milliseconds: 800),
-          ),
-        );
+        // FORCE immediate UI update BEFORE showing snackbar
+        // This ensures tasks are visible immediately
+        if (mounted) {
+          final currentTasks = _taskService.getCurrentTasks();
+          setState(() {
+            _tasks = currentTasks;
+            _isTasksLoading = false;
+            _hasUserTasks = _taskService.hasUserTasks();
+          });
+          print('📋 Task added immediately: ${task.title}, total tasks: ${_tasks.length}');
+          print('📋 Current _tasks in UI: ${_tasks.map((t) => '${t.id}:${t.title}').join(", ")}');
+          print('📋 _hasUserTasks: $_hasUserTasks');
+        }
         
-        // FORCE immediate UI update - bypass stream completely
+        // Show success message INSTANTLY (no delays)
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Task added'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              duration: const Duration(milliseconds: 800),
+            ),
+          );
+        }
+        
+        // Also refresh to ensure consistency
         _refreshTasks();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
