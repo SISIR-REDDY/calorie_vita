@@ -42,7 +42,7 @@ android {
         applicationId = "com.sisirlabs.calorievita"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 26
+        minSdk = 28  // Android 9.0+ required for Health Connect
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -145,8 +145,15 @@ dependencies {
     
     implementation("com.google.android.gms:play-services-auth:20.7.0")
     implementation("com.google.android.gms:play-services-location:21.0.1")
+    
+    // Health Connect SDK (compatible with AGP 8.7.3)
     implementation("androidx.health.connect:connect-client:1.1.0-alpha07")
-    // Google Fit dependencies
+    
+    // Coroutines for Health Connect
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    
+    // Google Fit dependencies (kept for backward compatibility during migration)
     implementation("com.google.android.gms:play-services-fitness:21.1.0")
     implementation("com.google.android.gms:play-services-identity:18.0.1")
 }

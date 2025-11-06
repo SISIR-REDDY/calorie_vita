@@ -11,7 +11,7 @@ import '../services/analytics_service.dart';
 import '../services/firebase_service.dart';
 import '../services/ai_service.dart';
 import '../services/app_state_service.dart';
-import '../services/optimized_google_fit_manager.dart';
+import '../services/health_connect_manager.dart';
 import '../services/todays_food_data_service.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
@@ -37,7 +37,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   // Services
   final AnalyticsService _analyticsService = AnalyticsService();
   final AppStateService _appStateService = AppStateService();
-  final OptimizedGoogleFitManager _googleFitManager = OptimizedGoogleFitManager();
+  final HealthConnectManager _healthConnectManager = HealthConnectManager();
   final TodaysFoodDataService _todaysFoodDataService = TodaysFoodDataService();
 
   // State management
@@ -581,10 +581,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   /// Initialize Google Fit data with better error handling
   Future<void> _initializeGoogleFitData() async {
     try {
-      await _googleFitManager.initialize();
+      await _healthConnectManager.initialize();
       
       // Get instant cached data
-      final currentData = _googleFitManager.getCurrentData();
+      final currentData = _healthConnectManager.getCurrentData();
       if (currentData != null && mounted) {
         setState(() {
           _todayGoogleFitData = currentData;
@@ -593,13 +593,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       }
       
       // Set up real-time listeners
-      _googleFitDataSubscription = _googleFitManager.dataStream.listen((data) {
+      _googleFitDataSubscription = _healthConnectManager.dataStream.listen((data) {
         if (mounted && data != null) {
           setState(() => _todayGoogleFitData = data);
         }
       });
       
-      _googleFitConnectionSubscription = _googleFitManager.connectionStream.listen((isConnected) {
+      _googleFitConnectionSubscription = _healthConnectManager.connectionStream.listen((isConnected) {
         if (mounted) {
           setState(() => _isGoogleFitConnected = isConnected);
         }
@@ -810,7 +810,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       // Loading state handled by OptimizedGoogleFitManager
       
       // Check authentication - using optimized manager
-      final isAuthenticated = _googleFitManager.isConnected;
+      final isAuthenticated = _healthConnectManager.isConnected;
       
       setState(() {
         _isGoogleFitConnected = isAuthenticated;
@@ -819,7 +819,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       if (_isGoogleFitConnected) {
         try {
           // Use optimized Google Fit data
-          final todayData = _googleFitManager.getCurrentData();
+          final todayData = _healthConnectManager.getCurrentData();
           
           if (todayData != null) {
             setState(() {
@@ -880,14 +880,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     try {
       final today = DateTime.now();
       // Use optimized manager with force refresh
-      final batchData = await _googleFitManager.forceRefresh();
+      final batchData = await _healthConnectManager.forceRefresh();
       
       GoogleFitData todayData;
       if (batchData != null) {
         todayData = batchData;
       } else {
         // Fallback to cached data
-        todayData = _googleFitManager.getCurrentData() ?? GoogleFitData(
+        todayData = _healthConnectManager.getCurrentData() ?? GoogleFitData(
           date: today,
           steps: 0,
           caloriesBurned: 0.0,
@@ -993,7 +993,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       // Fallback: Get data from optimized manager (only for today)
       final today = DateTime.now();
       if (date.year == today.year && date.month == today.month && date.day == today.day) {
-        final data = _googleFitManager.getCurrentData();
+        final data = _healthConnectManager.getCurrentData();
         if (data != null) {
           weeklyData.add(GoogleFitData(
             date: date,
@@ -1281,11 +1281,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           
           if (forceRefresh) {
             // Force refresh from Google Fit API
-            todayData = await _googleFitManager.forceRefresh();
+            todayData = await _healthConnectManager.forceRefresh();
             if (kDebugMode) print('🔄 Analytics: Force refreshed today\'s data from Google Fit API');
           } else {
             // Use cached data
-            todayData = _googleFitManager.getCurrentData();
+            todayData = _healthConnectManager.getCurrentData();
           }
           
           if (todayData != null) {
@@ -1373,11 +1373,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       if (kDebugMode) print('Generating fresh AI insights for period: $_selectedPeriod');
       
       // Convert GoogleFitData to Map for AI service
-      final fitnessDataMap = _googleFitManager.currentData != null ? {
-        'steps': _googleFitManager.currentData!.steps,
-        'caloriesBurned': _googleFitManager.currentData!.caloriesBurned,
-        'workoutSessions': _googleFitManager.currentData!.workoutSessions,
-        'workoutDuration': _googleFitManager.currentData!.workoutDuration,
+      final fitnessDataMap = _healthConnectManager.currentData != null ? {
+        'steps': _healthConnectManager.currentData!.steps,
+        'caloriesBurned': _healthConnectManager.currentData!.caloriesBurned,
+        'workoutSessions': _healthConnectManager.currentData!.workoutSessions,
+        'workoutDuration': _healthConnectManager.currentData!.workoutDuration,
       } : null;
       
       final insights = await AIService.getAnalyticsInsights(

@@ -46,6 +46,8 @@ class FirebaseService {
       return snapshot.docs.map((doc) => FoodEntry.fromFirestore(doc)).toList();
     }).handleError((error) {
       print('Error getting user food entries: $error');
+      // Check if error is due to deleted user
+      _handleAuthError(error);
       return <FoodEntry>[];
     });
   }
@@ -1222,6 +1224,32 @@ class FirebaseService {
     } catch (e) {
       print('❌ Error cleaning up old dailySummary data: $e');
       // Don't throw - cleanup failure shouldn't break the app
+    }
+  }
+
+  /// Handle authentication errors (e.g., user deleted from Firebase)
+  void _handleAuthError(dynamic error) {
+    try {
+      final errorString = error.toString().toLowerCase();
+      
+      // Check for authentication-related errors
+      if (errorString.contains('permission-denied') ||
+          errorString.contains('unauthenticated') ||
+          errorString.contains('user-not-found') ||
+          errorString.contains('invalid-user-token') ||
+          errorString.contains('user-disabled')) {
+        print('⚠️ Authentication error detected: $error');
+        print('🔄 Signing out user due to authentication error');
+        
+        // Sign out the user
+        _auth.signOut().then((_) {
+          print('✅ User signed out due to authentication error');
+        }).catchError((e) {
+          print('❌ Error signing out: $e');
+        });
+      }
+    } catch (e) {
+      print('Error handling auth error: $e');
     }
   }
 }

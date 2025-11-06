@@ -14,7 +14,7 @@ import 'ui/app_theme.dart';
 import 'ui/app_colors.dart';
 // Unused import removed
 import 'services/app_state_manager.dart';
-import 'services/optimized_google_fit_manager.dart';
+import 'services/health_connect_manager.dart';
 import 'services/firebase_service.dart';
 import 'services/daily_reset_service.dart';
 import 'services/logger_service.dart';
@@ -30,7 +30,7 @@ class MainApp extends StatefulWidget {
 
 class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   final AppStateManager _appStateManager = AppStateManager();
-  final OptimizedGoogleFitManager _googleFitManager = OptimizedGoogleFitManager();
+  final HealthConnectManager _healthConnectManager = HealthConnectManager();
   static final LoggerService _logger = LoggerService();
   StreamSubscription<AppState>? _appStateSubscription;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
@@ -51,7 +51,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
     _initializeAppStateManager();
 
     // Initialize global Google Fit manager
-    _initializeGoogleFitManager();
+    _initializeHealthConnectManager();
     
     // Initialize daily reset service
     DailyResetService.initialize();
@@ -82,12 +82,12 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
     }
   }
 
-  void _initializeGoogleFitManager() async {
+  void _initializeHealthConnectManager() async {
     try {
       print('Initializing GlobalGoogleFitManager in background...');
 
       // Initialize Google Fit manager for global sync
-      await _googleFitManager.initialize();
+      await _healthConnectManager.initialize();
 
       print('✅ GlobalGoogleFitManager initialization completed');
     } catch (e) {
@@ -102,7 +102,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
     switch (state) {
       case AppLifecycleState.resumed:
         print('🔄 App resumed - Ensuring Google Fit sync...');
-        _googleFitManager.forceRefresh();
+        _healthConnectManager.forceRefresh();
         break;
       case AppLifecycleState.paused:
         print('⏸️ App paused - Google Fit will continue in background');
@@ -236,7 +236,7 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObserver {
   int _currentIndex = 0;
-  final OptimizedGoogleFitManager _googleFitManager = OptimizedGoogleFitManager();
+  final HealthConnectManager _healthConnectManager = HealthConnectManager();
   final FirebaseService _firebaseService = FirebaseService();
   bool _isCheckingOnboarding = true;
   bool _onboardingCompleted = false;
@@ -311,7 +311,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
     print('Tab selected: $index'); // Debug log
 
     // Trigger Google Fit sync whenever a screen is opened
-    _googleFitManager.forceRefresh().catchError((e) {
+    _healthConnectManager.forceRefresh().catchError((e) {
       print('Failed to ensure Google Fit sync on screen change: $e');
       return null;
     });

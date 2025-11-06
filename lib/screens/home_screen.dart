@@ -28,7 +28,7 @@ import '../widgets/profile_widgets.dart';
 import '../services/calorie_units_service.dart';
 import '../services/analytics_service.dart';
 import '../services/goals_event_bus.dart';
-import '../services/optimized_google_fit_manager.dart';
+import '../services/health_connect_manager.dart';
 import '../services/global_goals_manager.dart';
 import '../models/google_fit_data.dart';
 import '../services/simple_goals_notifier.dart';
@@ -72,7 +72,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   final CalorieUnitsService _calorieUnitsService = CalorieUnitsService();
   final AnalyticsService _analyticsService = AnalyticsService();
   final RewardsService _rewardsService = RewardsService();
-  final OptimizedGoogleFitManager _googleFitManager = OptimizedGoogleFitManager();
+  final HealthConnectManager _healthConnectManager = HealthConnectManager();
   final TaskService _taskService = TaskService();
   final FastDataRefreshService _fastDataRefreshService = FastDataRefreshService();
   final TodaysFoodDataService _todaysFoodDataService = TodaysFoodDataService();
@@ -362,7 +362,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Preload Google Fit data for instant display
   Future<void> _preloadGoogleFitData() async {
     try {
-      await _googleFitManager.initialize();
+      await _healthConnectManager.initialize();
       print('✅ Home screen: Google Fit data preloaded');
     } catch (e) {
       print('❌ Home screen: Google Fit data preload failed: $e');
@@ -426,14 +426,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   Future<void> _initializeUnifiedGoogleFit() async {
     try {
       print('🚀 Home: Starting optimized Google Fit initialization...');
-      await _googleFitManager.initialize();
+      await _healthConnectManager.initialize();
       
       // Check connection status
-      final isConnected = _googleFitManager.isConnected;
+      final isConnected = _healthConnectManager.isConnected;
       print('🔍 Home: Google Fit connection status: $isConnected');
       
       // INSTANT: Load current data immediately (0ms delay) from cache
-      final currentData = _googleFitManager.getCurrentData();
+      final currentData = _healthConnectManager.getCurrentData();
       print('📊 Home: Current Google Fit data: $currentData');
       
       if (currentData != null && mounted) {
@@ -687,7 +687,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   void _loadGoogleFitDataImmediate() {
     try {
       // Get current data from optimized manager (instant from cache)
-      final currentData = _googleFitManager.getCurrentData();
+      final currentData = _healthConnectManager.getCurrentData();
       if (currentData != null) {
         setState(() {
           _googleFitSteps = currentData.steps ?? 0;
@@ -695,7 +695,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           _googleFitWorkoutSessions = currentData.workoutSessions ?? 0;
           _googleFitWorkoutDuration = currentData.workoutDuration ?? 0.0;
           _activityLevel = _calculateActivityLevel(currentData.steps);
-          _isGoogleFitConnected = _googleFitManager.isConnected;
+          _isGoogleFitConnected = _healthConnectManager.isConnected;
         });
         print('✅ Home: Loaded Google Fit data immediately - Steps: ${currentData.steps}, Calories: ${currentData.caloriesBurned}');
       } else {
@@ -1073,7 +1073,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       }
 
       // Force refresh data from optimized manager
-      final workoutData = await _googleFitManager.forceRefresh();
+      final workoutData = await _healthConnectManager.forceRefresh();
 
       if (workoutData != null && mounted) {
         setState(() {
@@ -1114,7 +1114,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       final today = DateTime.now();
 
       // Use optimized manager for data
-      final data = _googleFitManager.getCurrentData();
+      final data = _healthConnectManager.getCurrentData();
       final steps = data?.steps ?? 0;
       final calories = data?.caloriesBurned ?? 0.0;
 
@@ -1197,7 +1197,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Connect to Google Fit using unified manager
   Future<void> _connectToGoogleFit() async {
     try {
-      final success = await _googleFitManager.authenticate();
+      final success = await _healthConnectManager.requestPermissions();
       if (success) {
         // Show success message
         if (mounted) {
@@ -1248,7 +1248,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       
       // Force refresh from optimized manager with timeout
     if (_isGoogleFitConnected) {
-        final data = await _googleFitManager.forceRefresh().timeout(
+        final data = await _healthConnectManager.forceRefresh().timeout(
           const Duration(seconds: 5),
           onTimeout: () {
             print('⚠️ Google Fit data refresh timeout');
@@ -1329,7 +1329,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   void _setupGoogleFitListeners() {
     // Listen to optimized Google Fit data stream
     _googleFitDataSubscription?.cancel();
-    _googleFitDataSubscription = _googleFitManager.dataStream.listen((data) {
+    _googleFitDataSubscription = _healthConnectManager.dataStream.listen((data) {
       if (mounted && data != null) {
         setState(() {
           _googleFitSteps = data.steps ?? 0;
@@ -1347,7 +1347,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     
     // Listen to connection status
     _googleFitConnectionSubscription?.cancel();
-    _googleFitConnectionSubscription = _googleFitManager.connectionStream.listen((isConnected) {
+    _googleFitConnectionSubscription = _healthConnectManager.connectionStream.listen((isConnected) {
       if (mounted) {
         setState(() {
           _isGoogleFitConnected = isConnected;
@@ -1358,7 +1358,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     
     // Listen to loading status
     _googleFitLoadingSubscription?.cancel();
-    _googleFitLoadingSubscription = _googleFitManager.loadingStream.listen((isLoading) {
+    _googleFitLoadingSubscription = _healthConnectManager.loadingStream.listen((isLoading) {
       if (mounted) {
         setState(() {
           _isGoogleFitLoading = isLoading;

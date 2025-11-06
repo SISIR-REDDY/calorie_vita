@@ -16,10 +16,8 @@ class AuthService {
       'email',
       'profile',
       'openid', // Required for Firebase authentication
-      'https://www.googleapis.com/auth/fitness.activity.read',
-      'https://www.googleapis.com/auth/fitness.body.read',
-      'https://www.googleapis.com/auth/fitness.nutrition.read',
-      'https://www.googleapis.com/auth/fitness.sleep.read',
+      // Google Fit scopes removed - using Health Connect instead
+      // Health Connect doesn't require OAuth scopes, avoiding "unverified app" warning
     ],
     // Let Google Sign-In use the default configuration from google-services.json
   );
@@ -32,6 +30,7 @@ class AuthService {
   bool _isInitialized = false;
   bool _isFirebaseAvailable = false;
   String? _verificationId; // For phone authentication
+  Timer? _tokenValidationTimer; // Periodic token validation
 
   // Stream for user authentication state
   Stream<AuthUser?> get userStream => _userController.stream;
@@ -91,9 +90,20 @@ class AuthService {
     // Check if there's already a current user
     final currentUser = _firebaseAuth.currentUser;
     if (currentUser != null) {
-      _currentUser = AuthUser.fromFirebaseUser(currentUser);
-      _userController.add(_currentUser);
-      print('Firebase current user found: ${currentUser.email}');
+      // Validate the user's token to ensure they still exist
+      final isValid = await _validateUserToken(currentUser);
+      if (isValid) {
+        _currentUser = AuthUser.fromFirebaseUser(currentUser);
+        _userController.add(_currentUser);
+        print('Firebase current user found: ${currentUser.email}');
+      } else {
+        // User was deleted or token is invalid, sign out
+        print('User token validation failed, signing out');
+        await _firebaseAuth.signOut();
+        await _googleSignIn.signOut();
+        _currentUser = null;
+        _userController.add(null);
+      }
     }
 
     // Listen to Firebase auth state changes
@@ -108,6 +118,84 @@ class AuthService {
         print('Firebase user signed out');
       }
     });
+
+    // Listen to ID token changes (fires more frequently and catches token revocations)
+    _firebaseAuth.idTokenChanges().listen((User? user) async {
+      if (user != null) {
+        // Validate token when it changes
+        final isValid = await _validateUserToken(user);
+        if (!isValid) {
+          print('User token invalidated, signing out');
+          await _firebaseAuth.signOut();
+          await _googleSignIn.signOut();
+          _currentUser = null;
+          _userController.add(null);
+          _stopTokenValidationTimer();
+        } else {
+          _currentUser = AuthUser.fromFirebaseUser(user);
+          _userController.add(_currentUser);
+          _startTokenValidationTimer();
+        }
+      } else {
+        _currentUser = null;
+        _userController.add(null);
+        _stopTokenValidationTimer();
+      }
+    });
+
+    // Start periodic token validation if user is already logged in
+    if (_currentUser != null) {
+      _startTokenValidationTimer();
+    }
+  }
+
+  /// Start periodic token validation (every 5 minutes)
+  void _startTokenValidationTimer() {
+    _stopTokenValidationTimer(); // Stop existing timer if any
+    
+    _tokenValidationTimer = Timer.periodic(const Duration(minutes: 5), (timer) async {
+      final currentUser = _firebaseAuth.currentUser;
+      if (currentUser != null) {
+        final isValid = await _validateUserToken(currentUser);
+        if (!isValid) {
+          print('Periodic token validation failed, signing out');
+          await _firebaseAuth.signOut();
+          await _googleSignIn.signOut();
+          _currentUser = null;
+          _userController.add(null);
+          _stopTokenValidationTimer();
+        }
+      } else {
+        _stopTokenValidationTimer();
+      }
+    });
+  }
+
+  /// Stop periodic token validation
+  void _stopTokenValidationTimer() {
+    _tokenValidationTimer?.cancel();
+    _tokenValidationTimer = null;
+  }
+
+  /// Validate user token by attempting to refresh it
+  /// Returns false if user was deleted or token is invalid
+  Future<bool> _validateUserToken(User user) async {
+    try {
+      // Try to get a fresh ID token - this will fail if user was deleted
+      await user.getIdToken(true); // Force refresh
+      return true;
+    } catch (e) {
+      print('Token validation failed: $e');
+      // Check for specific error codes that indicate user was deleted
+      if (e.toString().contains('user-not-found') ||
+          e.toString().contains('user-disabled') ||
+          e.toString().contains('invalid-credential') ||
+          e.toString().contains('invalid-user-token')) {
+        return false;
+      }
+      // For other errors, assume token is still valid (might be network issue)
+      return true;
+    }
   }
 
   /// Sign in with email and password
@@ -171,6 +259,9 @@ class AuthService {
     try {
       _logger.info('Starting complete sign out process');
       
+      // Stop token validation timer
+      _stopTokenValidationTimer();
+      
       // Disconnect Google Fit (with timeout to prevent hanging)
       _logger.info('Disconnecting Google Fit services');
       final googleFitManager = OptimizedGoogleFitManager();
@@ -198,9 +289,21 @@ class AuthService {
       // Force clear user data even if sign out fails
       _currentUser = null;
       _userController.add(null);
+      _stopTokenValidationTimer();
       
       // Don't rethrow to prevent UI blocking
       _logger.warning('Sign out completed with errors, but user data cleared');
+    }
+  }
+
+  /// Sign out from Google Sign-In only (keeps Firebase auth if exists)
+  Future<void> signOutFromGoogleSignInOnly() async {
+    try {
+      _logger.info('Signing out from Google Sign-In only');
+      await _googleSignIn.signOut();
+      _logger.info('Google Sign-In sign out successful');
+    } catch (e) {
+      _logger.error('Google Sign-In sign out error', {'error': e.toString()});
     }
   }
 
@@ -212,6 +315,10 @@ class AuthService {
     }
 
     try {
+      // Sign out from Google Sign-In first to force account picker
+      // This ensures user always sees account selection
+      await _googleSignIn.signOut();
+      
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         print('Google sign in cancelled');

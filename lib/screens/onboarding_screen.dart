@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../ui/app_colors.dart';
 import '../services/firebase_service.dart';
 import '../services/app_state_service.dart';
+import '../services/auth_service.dart';
 import '../models/user_goals.dart';
 import '../models/user_preferences.dart';
 
@@ -873,7 +874,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   /// Navigate back to welcome screen
-  void _goBackToWelcomeScreen() {
+  void _goBackToWelcomeScreen() async {
+    // Sign out completely since user hasn't completed onboarding
+    // This allows user to sign in with a different account if needed
+    try {
+      final authService = AuthService();
+      await authService.signOut();
+      print('✅ Signed out completely when going back from onboarding');
+    } catch (e) {
+      print('Error signing out: $e');
+    }
+    
     // Navigate to welcome screen
     Navigator.of(context).pushReplacementNamed('/welcome');
   }

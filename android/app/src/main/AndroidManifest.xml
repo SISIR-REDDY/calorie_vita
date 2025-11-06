@@ -94,6 +94,9 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        
+        <!-- Health Connect intent filter -->
+        <package android:name="com.google.android.apps.healthdata" />
     </queries>
 
 </manifest>
