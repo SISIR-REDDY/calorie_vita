@@ -153,15 +153,24 @@ class HealthConnectManager {
     }
   }
   
-  /// Open Health Connect settings (if available)
-  Future<void> openHealthConnectSettings() async {
+  /// Open Health Connect settings directly
+  Future<bool> openHealthConnectSettings() async {
     try {
       print('📱 HealthConnectManager: Opening Health Connect settings...');
-      // Note: This requires adding an intent handler in native code
-      // For now, just log instructions
-      print('💡 Please manually open: Settings → Health Connect → App permissions → CalorieVita');
+      
+      // Try to open Health Connect settings via native method
+      final result = await _channel.invokeMethod<bool>('openHealthConnectSettings');
+      
+      if (result == true) {
+        print('✅ Health Connect settings opened successfully');
+        return true;
+      } else {
+        print('⚠️ Could not open Health Connect settings');
+        return false;
+      }
     } catch (e) {
       print('❌ Failed to open Health Connect settings: $e');
+      return false;
     }
   }
 

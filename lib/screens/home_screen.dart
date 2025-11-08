@@ -298,26 +298,37 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             if (!mounted) return;
             // Respect manual override for the current session
             if (_manualCaloriesConsumedOverride != null) return;
-            // Always update calories from TodaysFoodDataService (primary source)
-            if (_dailySummary != null) {
-              setState(() {
-                _dailySummary = _dailySummary!.copyWith(caloriesConsumed: calories);
-              });
-              print('✅ Home: Calories updated from TodaysFoodDataService: $calories');
+            
+            // CRITICAL FIX: Prevent flickering by never overwriting with 0 if we have valid data
+            final currentCalories = _dailySummary?.caloriesConsumed ?? 0;
+            
+            // Only update if:
+            // 1. New calories are greater than 0, OR
+            // 2. Current calories are 0 (initial load)
+            // This prevents stream from overwriting valid data with 0
+            if (calories > 0 || currentCalories == 0) {
+              if (_dailySummary != null) {
+                setState(() {
+                  _dailySummary = _dailySummary!.copyWith(caloriesConsumed: calories);
+                });
+                print('✅ Home: Calories updated from TodaysFoodDataService: $calories (current: $currentCalories)');
+              } else {
+                // Create daily summary if it doesn't exist
+                setState(() {
+                  _dailySummary = DailySummary(
+                    caloriesConsumed: calories,
+                    caloriesBurned: 0,
+                    caloriesGoal: 2000,
+                    steps: 0,
+                    stepsGoal: 10000,
+                    waterGlasses: 0,
+                    waterGlassesGoal: 8,
+                    date: DateTime.now(),
+                  );
+                });
+              }
             } else {
-              // Create daily summary if it doesn't exist
-              setState(() {
-                _dailySummary = DailySummary(
-                  caloriesConsumed: calories,
-                  caloriesBurned: 0,
-                  caloriesGoal: 2000,
-                  steps: 0,
-                  stepsGoal: 10000,
-                  waterGlasses: 0,
-                  waterGlassesGoal: 8,
-                  date: DateTime.now(),
-                );
-              });
+              print('🚫 Home: Skipped calories update (new: $calories, current: $currentCalories) - preserving current value');
             }
           });
         },

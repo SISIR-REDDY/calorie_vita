@@ -965,7 +965,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  /// Connect to Google Fit
+  /// Connect to Google Fit with improved user experience
   Future<void> _connectToGoogleFit() async {
     if (_isConnectingToGoogleFit) return;
 
@@ -974,43 +974,427 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
 
     try {
+      // Step 1: Check if Health Connect is available
+      final isAvailable = _healthConnectManager.isAvailable;
+      
+      if (!isAvailable) {
+        // Health Connect is not installed
+        setState(() {
+          _isConnectingToGoogleFit = false;
+        });
+        _showHealthConnectNotInstalledDialog();
+        return;
+      }
+
+      // Step 2: Check if permissions are granted
       final success = await _healthConnectManager.requestPermissions();
+      
       if (success) {
+        // Permissions granted successfully
         setState(() {
           _isGoogleFitConnected = true;
           _lastGoogleFitSync = DateTime.now();
+          _isConnectingToGoogleFit = false; // Stop the buffering indicator
         });
 
-        // Show success message
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Successfully connected to Google Fit!'),
+            SnackBar(
+              content: Row(
+                children: const [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text('Successfully connected to Google Fit!'),
+                  ),
+                ],
+              ),
               backgroundColor: kSuccessColor,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           );
         }
 
-        // Check if setup is now complete and mark it
         _checkAndMarkSetupComplete();
       } else {
-        throw Exception('Authentication failed');
+        // Permissions not granted - guide user to Health Connect settings
+        setState(() {
+          _isConnectingToGoogleFit = false;
+        });
+        _showPermissionInstructionsDialog();
       }
     } catch (e) {
       print('Error connecting to Google Fit: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to connect to Google Fit: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
       setState(() {
         _isConnectingToGoogleFit = false;
       });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text('Connection error. Please try again.'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
     }
+  }
+
+  /// Show dialog when Health Connect is not installed
+  void _showHealthConnectNotInstalledDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: kPrimaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.health_and_safety, color: kPrimaryColor, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Health Connect Required',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'To sync your fitness data, you need to install:',
+              style: GoogleFonts.poppins(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            _buildRequirementItem('1. Health Connect by Google', true),
+            const SizedBox(height: 8),
+            _buildRequirementItem('2. Google Fit', true),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: kInfoColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: kInfoColor, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Both apps are free from Play Store',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: kInfoColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Later',
+              style: GoogleFonts.poppins(color: kTextSecondary),
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              // Open Health Connect settings (will redirect to Play Store)
+              await _healthConnectManager.openHealthConnectSettings();
+            },
+            icon: const Icon(Icons.download),
+            label: Text(
+              'Install Now',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kPrimaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show dialog with instructions to grant permissions
+  void _showPermissionInstructionsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: kWarningColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.lock_open, color: kWarningColor, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Grant Permissions',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'To sync your fitness data, please grant the following permissions:',
+              style: GoogleFonts.poppins(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            _buildPermissionStep('1', 'Tap "Open Settings" button below'),
+            const SizedBox(height: 8),
+            _buildPermissionStep('2', 'Find "CalorieVita" in the list'),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 24),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: kWarningColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: kWarningColor.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.phone_android, color: kWarningColor, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Samsung users: Search for "Health Connect" in Settings if not visible',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: kWarningColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildPermissionStep('3', 'Enable these permissions:'),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildRequirementItem('• Steps', false),
+                  const SizedBox(height: 4),
+                  _buildRequirementItem('• Active calories burned', false),
+                  const SizedBox(height: 4),
+                  _buildRequirementItem('• Total calories burned', false),
+                  const SizedBox(height: 4),
+                  _buildRequirementItem('• Exercise', false),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildPermissionStep('4', 'Return to CalorieVita'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: kSuccessColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.security, color: kSuccessColor, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Your data is secure and private',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: kSuccessColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.poppins(color: kTextSecondary),
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              // Open Health Connect settings
+              final opened = await _healthConnectManager.openHealthConnectSettings();
+              
+              if (opened) {
+                // Show a snackbar to remind user to come back
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Grant permissions and come back to CalorieVita',
+                        style: GoogleFonts.poppins(),
+                      ),
+                      duration: const Duration(seconds: 5),
+                      backgroundColor: kInfoColor,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      action: SnackBarAction(
+                        label: 'OK',
+                        textColor: Colors.white,
+                        onPressed: () {},
+                      ),
+                    ),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.settings),
+            label: Text(
+              'Open Settings',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kPrimaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build a requirement item widget
+  Widget _buildRequirementItem(String text, bool showIcon) {
+    return Row(
+      children: [
+        if (showIcon)
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: kPrimaryColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Icon(Icons.download, color: kPrimaryColor, size: 16),
+          ),
+        if (showIcon) const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Build a permission step widget
+  Widget _buildPermissionStep(String number, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: kPrimaryColor,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Center(
+            child: Text(
+              number,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   /// Disconnect from Google Fit
