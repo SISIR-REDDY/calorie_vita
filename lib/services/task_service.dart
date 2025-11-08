@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/task.dart';
+import '../config/production_config.dart';
 import 'dynamic_icon_service.dart';
 
 /// Service for managing user tasks and to-do items
@@ -33,9 +34,13 @@ class TaskService {
   void forceEmitTasks() {
     if (!_tasksController.isClosed) {
       _tasksController.add(List.from(_localTasks));
-      print('📋 Force emitted ${_localTasks.length} tasks to stream');
+      if (ProductionConfig.enableDebugLogs) {
+        debugPrint('📋 Force emitted ${_localTasks.length} tasks to stream');
+      }
     } else {
-      print('📋 Task stream controller is closed, cannot emit tasks');
+      if (ProductionConfig.enableDebugLogs) {
+        debugPrint('📋 Task stream controller is closed, cannot emit tasks');
+      }
     }
   }
   
@@ -49,7 +54,9 @@ class TaskService {
     try {
       return _localTasks.firstWhere((task) => task.id == taskId);
     } catch (e) {
-      print('📋 Task not found with ID: $taskId');
+      if (ProductionConfig.enableDebugLogs) {
+        debugPrint('📋 Task not found with ID: $taskId');
+      }
       return null;
     }
   }
@@ -73,9 +80,12 @@ class TaskService {
       // Reset example tasks flag
       _exampleTasksAdded = false;
       
-      print('📋 All tasks cleared');
+      if (ProductionConfig.enableDebugLogs) {
+        debugPrint('📋 All tasks cleared');
+      }
     } catch (e) {
-      print('Error clearing tasks: $e');
+      // Always log errors
+      debugPrint('Error clearing tasks: $e');
     }
   }
 
@@ -83,7 +93,9 @@ class TaskService {
   void forceClearLocalTasks() {
     _localTasks.clear();
     _tasksController.add([]);
-    print('📋 All local tasks cleared');
+    if (ProductionConfig.enableDebugLogs) {
+      debugPrint('📋 All local tasks cleared');
+    }
   }
 
   /// Force toggle first task (for debugging)
@@ -324,22 +336,40 @@ class TaskService {
         return;
       }
       
-      // Always update local tasks with merged list (even if unchanged)
-      // This ensures temp tasks are always included
+      // Check if tasks actually changed before emitting
+      final tasksChanged = _localTasks.length != mergedTasks.length ||
+          !_tasksAreEqual(_localTasks, mergedTasks);
+      
+      // Update local tasks with merged list
       _localTasks = mergedTasks;
       
-      // Always emit to stream to ensure UI is updated
-      // This is critical for temp tasks to appear immediately
-      _tasksController.add(List.from(_localTasks));
-      
-      // Log for debugging
-      if (kDebugMode) {
-        debugPrint('📋 Tasks updated: ${mergedTasks.length} tasks (${tasks.length} from Firestore, ${tempTasks.length} temp)');
-        if (tempTasks.isNotEmpty) {
-          debugPrint('📋 Temp tasks preserved: ${tempTasks.map((t) => t.title).join(", ")}');
+      // Only emit to stream if tasks actually changed
+      // This prevents unnecessary UI rebuilds
+      if (tasksChanged) {
+        _tasksController.add(List.from(_localTasks));
+        
+        // Log for debugging
+        if (kDebugMode) {
+          debugPrint('📋 Tasks updated: ${mergedTasks.length} tasks (${tasks.length} from Firestore, ${tempTasks.length} temp)');
+          if (tempTasks.isNotEmpty) {
+            debugPrint('📋 Temp tasks preserved: ${tempTasks.map((t) => t.title).join(", ")}');
+          }
         }
       }
     });
+  }
+  
+  /// Check if two task lists are equal (by ID and completion status)
+  bool _tasksAreEqual(List<Task> list1, List<Task> list2) {
+    if (list1.length != list2.length) return false;
+    
+    for (int i = 0; i < list1.length; i++) {
+      if (list1[i].id != list2[i].id || 
+          list1[i].isCompleted != list2[i].isCompleted) {
+        return false;
+      }
+    }
+    return true;
   }
   
   /// Delete example tasks from Firestore

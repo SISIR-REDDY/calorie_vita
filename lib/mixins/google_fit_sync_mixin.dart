@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/health_connect_manager.dart';
 import '../models/google_fit_data.dart';
+import 'package:flutter/foundation.dart';
+import '../config/production_config.dart';
 
 /// Mixin to add automatic Health Connect sync to any screen
 mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
@@ -9,18 +11,18 @@ mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
   // Override these in your widget to handle Google Fit data
   void onGoogleFitDataUpdate(Map<String, dynamic> syncData) {
     // Default implementation - override in your screen
-    print('GoogleFitSyncMixin: Data updated - Steps: ${syncData['steps']}');
+    if (kDebugMode) debugPrint('GoogleFitSyncMixin: Data updated - Steps: ${syncData['steps']}');
   }
 
   void onGoogleFitConnectionChanged(bool isConnected) {
     // Default implementation - override in your screen
-    print('GoogleFitSyncMixin: Connection changed - Connected: $isConnected');
+    if (kDebugMode) debugPrint('GoogleFitSyncMixin: Connection changed - Connected: $isConnected');
   }
 
   /// Initialize Google Fit sync for this screen with enhanced error handling
   Future<void> initializeGoogleFitSync() async {
     try {
-      print('GoogleFitSyncMixin: Initializing sync for ${widget.runtimeType}');
+      if (kDebugMode) debugPrint('GoogleFitSyncMixin: Initializing sync for ${widget.runtimeType}');
 
       // Initialize optimized manager
       await _googleFitManager.initialize();
@@ -38,12 +40,12 @@ mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
               };
               onGoogleFitDataUpdate(syncData);
             } catch (e) {
-              print('GoogleFitSyncMixin: Error in data update callback: $e');
+              if (kDebugMode) debugPrint('GoogleFitSyncMixin: Error in data update callback: $e');
             }
           }
         },
         onError: (error) {
-          print('GoogleFitSyncMixin: Data stream error: $error');
+          if (kDebugMode) debugPrint('GoogleFitSyncMixin: Data stream error: $error');
         },
       );
 
@@ -54,12 +56,12 @@ mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
             try {
               onGoogleFitConnectionChanged(isConnected);
             } catch (e) {
-              print('GoogleFitSyncMixin: Error in connection callback: $e');
+              if (kDebugMode) debugPrint('GoogleFitSyncMixin: Error in connection callback: $e');
             }
           }
         },
         onError: (error) {
-          print('GoogleFitSyncMixin: Connection stream error: $error');
+          if (kDebugMode) debugPrint('GoogleFitSyncMixin: Connection stream error: $error');
         },
       );
 
@@ -75,9 +77,9 @@ mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
         onGoogleFitDataUpdate(syncData);
       }
 
-      print('GoogleFitSyncMixin: Sync initialized for ${widget.runtimeType}');
+      if (kDebugMode) debugPrint('GoogleFitSyncMixin: Sync initialized for ${widget.runtimeType}');
     } catch (e) {
-      print(
+      if (kDebugMode) debugPrint(
           'GoogleFitSyncMixin: Sync initialization failed for ${widget.runtimeType}: $e');
     }
   }
@@ -96,7 +98,7 @@ mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
       }
       return null;
     } catch (e) {
-      print('GoogleFitSyncMixin: Force sync failed: $e');
+      if (kDebugMode) debugPrint('GoogleFitSyncMixin: Force sync failed: $e');
       return null;
     }
   }
@@ -120,7 +122,7 @@ mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
         workoutDuration: (syncData['workoutDuration'] as num?)?.toDouble(),
       );
     } catch (e) {
-      print('GoogleFitSyncMixin: Failed to convert sync data: $e');
+      if (kDebugMode) debugPrint('GoogleFitSyncMixin: Failed to convert sync data: $e');
       return null;
     }
   }
@@ -151,11 +153,11 @@ mixin GoogleFitDataDisplayMixin<T extends StatefulWidget>
             _currentGoogleFitData = data;
             _lastSyncTime = DateTime.now();
           });
-          print('GoogleFitDataDisplayMixin: Data updated - Steps: ${data.steps}, Calories: ${data.caloriesBurned}');
+          if (kDebugMode) debugPrint('GoogleFitDataDisplayMixin: Data updated - Steps: ${data.steps}, Calories: ${data.caloriesBurned}');
         }
       }
     } catch (e) {
-      print('GoogleFitDataDisplayMixin: Error updating data: $e');
+      if (kDebugMode) debugPrint('GoogleFitDataDisplayMixin: Error updating data: $e');
     }
   }
 
@@ -166,7 +168,7 @@ mixin GoogleFitDataDisplayMixin<T extends StatefulWidget>
         setState(() {
           _isGoogleFitConnected = isConnected;
         });
-        print('GoogleFitDataDisplayMixin: Connection changed to: $isConnected');
+        if (kDebugMode) debugPrint('GoogleFitDataDisplayMixin: Connection changed to: $isConnected');
         
         // If disconnected, clear data
         if (!isConnected) {
@@ -177,7 +179,7 @@ mixin GoogleFitDataDisplayMixin<T extends StatefulWidget>
         }
       }
     } catch (e) {
-      print('GoogleFitDataDisplayMixin: Error updating connection state: $e');
+      if (kDebugMode) debugPrint('GoogleFitDataDisplayMixin: Error updating connection state: $e');
     }
   }
 
@@ -199,3 +201,4 @@ mixin GoogleFitDataDisplayMixin<T extends StatefulWidget>
     }
   }
 }
+

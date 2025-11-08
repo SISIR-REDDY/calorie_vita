@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/google_fit_data.dart';
+import '../config/production_config.dart';
 import 'bmr_calculator.dart';
 
 /// Health Connect Manager - Direct interface to Health Connect API
@@ -68,32 +70,32 @@ class HealthConnectManager {
   /// Initialize the manager (uses Health Connect native API)
   Future<void> initialize() async {
     if (_isInitialized) {
-      print('⚡ HealthConnectManager: Already initialized');
+      if (ProductionConfig.enableDebugLogs) debugPrint('⚡ HealthConnectManager: Already initialized');
       return;
     }
 
     try {
-      print('🚀 HealthConnectManager: Initializing with Health Connect API...');
+      if (ProductionConfig.enableDebugLogs) debugPrint('🚀 HealthConnectManager: Initializing with Health Connect API...');
       
       // Check if Health Connect is available
       final available = await _channel.invokeMethod<bool>('checkAvailability') ?? false;
       _isAvailable = available;
 
       if (!_isAvailable) {
-        print('⚠️ HealthConnectManager: Health Connect not available on this device');
-        print('💡 User needs to install Health Connect from Play Store');
+        if (ProductionConfig.enableDebugLogs) debugPrint('⚠️ HealthConnectManager: Health Connect not available on this device');
+        if (ProductionConfig.enableDebugLogs) debugPrint('💡 User needs to install Health Connect from Play Store');
         _isInitialized = true;
         _connectionController.add(false);
         return;
       }
 
-      print('✅ HealthConnectManager: Health Connect is available');
+      if (ProductionConfig.enableDebugLogs) debugPrint('✅ HealthConnectManager: Health Connect is available');
 
       // Check/request permissions
       await requestPermissions();
 
       if (_hasPermissions) {
-        print('✅ HealthConnectManager: Permissions granted - ready to fetch data');
+        if (ProductionConfig.enableDebugLogs) debugPrint('✅ HealthConnectManager: Permissions granted - ready to fetch data');
         
         // Load data immediately
         await _syncData(force: true);
@@ -103,16 +105,16 @@ class HealthConnectManager {
         
         _connectionController.add(true);
       } else {
-        print('⚠️ HealthConnectManager: Permissions not granted');
-        print('💡 User needs to grant permissions in Health Connect settings');
+        if (ProductionConfig.enableDebugLogs) debugPrint('⚠️ HealthConnectManager: Permissions not granted');
+        if (ProductionConfig.enableDebugLogs) debugPrint('💡 User needs to grant permissions in Health Connect settings');
         _connectionController.add(false);
       }
 
       _isInitialized = true;
       
-      print('✅ HealthConnectManager: Initialization complete (using Health Connect API)');
+      if (ProductionConfig.enableDebugLogs) debugPrint('✅ HealthConnectManager: Initialization complete (using Health Connect API)');
     } catch (e) {
-      print('❌ HealthConnectManager: Initialization failed: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('❌ HealthConnectManager: Initialization failed: $e');
       _isInitialized = false;
       _isAvailable = false;
       _connectionController.add(false);
@@ -122,31 +124,31 @@ class HealthConnectManager {
   /// Request permissions from Health Connect
   Future<bool> requestPermissions() async {
     try {
-      print('🔐 HealthConnectManager: Checking Health Connect permissions...');
+      if (ProductionConfig.enableDebugLogs) debugPrint('🔐 HealthConnectManager: Checking Health Connect permissions...');
       
       // Check permissions through native Android
       final result = await _channel.invokeMethod<bool>('requestPermissions');
       _hasPermissions = result ?? false;
       
       if (_hasPermissions) {
-        print('✅ HealthConnectManager: Health Connect permissions granted');
+        if (ProductionConfig.enableDebugLogs) debugPrint('✅ HealthConnectManager: Health Connect permissions granted');
         _connectionController.add(true);
       } else {
-        print('⚠️ HealthConnectManager: Health Connect permissions not granted');
-        print('💡 IMPORTANT: Health Connect requires manual permission grant!');
-        print('   📱 On your phone:');
-        print('   1. Open Settings');
-        print('   2. Search for "Health Connect"');
-        print('   3. Tap "App permissions"');
-        print('   4. Find "CalorieVita"');
-        print('   5. Enable: Steps, Active calories burned, Total calories burned, Exercise');
-        print('   6. Restart this app');
+        if (ProductionConfig.enableDebugLogs) debugPrint('⚠️ HealthConnectManager: Health Connect permissions not granted');
+        if (ProductionConfig.enableDebugLogs) debugPrint('💡 IMPORTANT: Health Connect requires manual permission grant!');
+        if (ProductionConfig.enableDebugLogs) debugPrint('   📱 On your phone:');
+        if (ProductionConfig.enableDebugLogs) debugPrint('   1. Open Settings');
+        if (ProductionConfig.enableDebugLogs) debugPrint('   2. Search for "Health Connect"');
+        if (ProductionConfig.enableDebugLogs) debugPrint('   3. Tap "App permissions"');
+        if (ProductionConfig.enableDebugLogs) debugPrint('   4. Find "CalorieVita"');
+        if (ProductionConfig.enableDebugLogs) debugPrint('   5. Enable: Steps, Active calories burned, Total calories burned, Exercise');
+        if (ProductionConfig.enableDebugLogs) debugPrint('   6. Restart this app');
         _connectionController.add(false);
       }
       
       return _hasPermissions;
     } catch (e) {
-      print('❌ HealthConnectManager: Permission check failed: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('❌ HealthConnectManager: Permission check failed: $e');
       _hasPermissions = false;
       _connectionController.add(false);
       return false;
@@ -156,20 +158,20 @@ class HealthConnectManager {
   /// Open Health Connect settings directly
   Future<bool> openHealthConnectSettings() async {
     try {
-      print('📱 HealthConnectManager: Opening Health Connect settings...');
+      if (ProductionConfig.enableDebugLogs) debugPrint('📱 HealthConnectManager: Opening Health Connect settings...');
       
       // Try to open Health Connect settings via native method
       final result = await _channel.invokeMethod<bool>('openHealthConnectSettings');
       
       if (result == true) {
-        print('✅ Health Connect settings opened successfully');
+        if (ProductionConfig.enableDebugLogs) debugPrint('✅ Health Connect settings opened successfully');
         return true;
       } else {
-        print('⚠️ Could not open Health Connect settings');
+        if (ProductionConfig.enableDebugLogs) debugPrint('⚠️ Could not open Health Connect settings');
         return false;
       }
     } catch (e) {
-      print('❌ Failed to open Health Connect settings: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('❌ Failed to open Health Connect settings: $e');
       return false;
     }
   }
@@ -178,18 +180,18 @@ class HealthConnectManager {
   Future<GoogleFitData?> _syncData({bool force = false}) async {
     // Return cached data if valid and not forced
     if (!force && hasValidCache) {
-      print('⚡ HealthConnectManager: Using cached data (${DateTime.now().difference(_cacheTime!).inSeconds}s old)');
+      if (ProductionConfig.enableDebugLogs) debugPrint('⚡ HealthConnectManager: Using cached data (${DateTime.now().difference(_cacheTime!).inSeconds}s old)');
       return _cachedData;
     }
 
     // Prevent multiple simultaneous syncs
     if (_isSyncing) {
-      print('⚠️ HealthConnectManager: Sync already in progress');
+      if (ProductionConfig.enableDebugLogs) debugPrint('⚠️ HealthConnectManager: Sync already in progress');
       return _cachedData;
     }
 
     if (!_hasPermissions || !_isAvailable) {
-      print('⚠️ HealthConnectManager: Cannot sync - no permissions or Health Connect not available');
+      if (ProductionConfig.enableDebugLogs) debugPrint('⚠️ HealthConnectManager: Cannot sync - no permissions or Health Connect not available');
       return null;
     }
 
@@ -197,7 +199,7 @@ class HealthConnectManager {
     _loadingController.add(true);
 
     try {
-      print('🔄 HealthConnectManager: Fetching data from Health Connect...');
+      if (ProductionConfig.enableDebugLogs) debugPrint('🔄 HealthConnectManager: Fetching data from Health Connect...');
       
       final data = await _fetchTodayData();
       
@@ -208,15 +210,15 @@ class HealthConnectManager {
         // Notify listeners
         _dataController.add(data);
         
-        print('✅ HealthConnectManager: Data synced from Health Connect - Steps: ${data.steps}, Calories: ${data.caloriesBurned}');
-        print('📊 Data source: Health Connect → Google Fit/Samsung Health');
+        if (ProductionConfig.enableDebugLogs) debugPrint('✅ HealthConnectManager: Data synced from Health Connect - Steps: ${data.steps}, Calories: ${data.caloriesBurned}');
+        if (ProductionConfig.enableDebugLogs) debugPrint('📊 Data source: Health Connect → Google Fit/Samsung Health');
       } else {
-        print('⚠️ HealthConnectManager: No data available from Health Connect');
+        if (ProductionConfig.enableDebugLogs) debugPrint('⚠️ HealthConnectManager: No data available from Health Connect');
       }
       
       return data;
     } catch (e) {
-      print('❌ HealthConnectManager: Sync failed: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('❌ HealthConnectManager: Sync failed: $e');
       return _cachedData; // Return cached data on error
     } finally {
       _isSyncing = false;
@@ -235,7 +237,7 @@ class HealthConnectManager {
 
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        print('⚠️ HealthConnectManager: No user logged in');
+        if (ProductionConfig.enableDebugLogs) debugPrint('⚠️ HealthConnectManager: No user logged in');
         return;
       }
 
@@ -248,7 +250,7 @@ class HealthConnectManager {
           .get();
 
       if (!doc.exists) {
-        print('⚠️ HealthConnectManager: No profile data found at users/${user.uid}/profile/userData');
+        if (ProductionConfig.enableDebugLogs) debugPrint('⚠️ HealthConnectManager: No profile data found at users/${user.uid}/profile/userData');
         return;
       }
 
@@ -259,25 +261,25 @@ class HealthConnectManager {
       _userGender = data['gender'] as String?;
       _profileLastFetched = DateTime.now();
 
-      print('✅ HealthConnectManager: User profile loaded for BMR calculation');
-      print('   Weight: $_userWeight kg, Height: $_userHeight cm, Age: $_userAge, Gender: $_userGender');
+      if (ProductionConfig.enableDebugLogs) debugPrint('✅ HealthConnectManager: User profile loaded for BMR calculation');
+      if (ProductionConfig.enableDebugLogs) debugPrint('   Weight: $_userWeight kg, Height: $_userHeight cm, Age: $_userAge, Gender: $_userGender');
     } catch (e) {
-      print('⚠️ HealthConnectManager: Failed to load user profile: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('⚠️ HealthConnectManager: Failed to load user profile: $e');
     }
   }
 
   /// Calculate active calories DIRECTLY from activity data (like Cal AI does)
   /// This is more accurate than trying to parse total calories
   double _calculateActiveCalories(int steps, int workoutSessions, double? workoutDuration) {
-    print('🔍 DEBUG: Calculating active calories from activity data');
-    print('   Steps: $steps, Workouts: $workoutSessions, Duration: ${workoutDuration ?? 0} mins');
+    if (ProductionConfig.enableDebugLogs) debugPrint('🔍 DEBUG: Calculating active calories from activity data');
+    if (ProductionConfig.enableDebugLogs) debugPrint('   Steps: $steps, Workouts: $workoutSessions, Duration: ${workoutDuration ?? 0} mins');
     
     double totalActive = 0.0;
     
     // 1. Calories from STEPS (most accurate for walking/running)
     final stepsCalories = _estimateCaloriesFromSteps(steps);
     totalActive += stepsCalories;
-    print('   📊 Steps calories: ${stepsCalories.toStringAsFixed(1)} kcal');
+    if (ProductionConfig.enableDebugLogs) debugPrint('   📊 Steps calories: ${stepsCalories.toStringAsFixed(1)} kcal');
     
     // 2. Calories from WORKOUTS (if any)
     if (workoutSessions > 0 && workoutDuration != null && workoutDuration > 0) {
@@ -285,7 +287,7 @@ class HealthConnectManager {
       // Use 7 kcal/min as moderate intensity
       final workoutCalories = workoutDuration * 7.0;
       totalActive += workoutCalories;
-      print('   🏋️ Workout calories: ${workoutCalories.toStringAsFixed(1)} kcal');
+      if (ProductionConfig.enableDebugLogs) debugPrint('   🏋️ Workout calories: ${workoutCalories.toStringAsFixed(1)} kcal');
     }
     
     // 3. Add baseline activity calories for the day (phone movements, standing, etc.)
@@ -296,9 +298,9 @@ class HealthConnectManager {
     // Scale baseline by time of day: 100 kcal over 24 hours = ~4 kcal/hour
     final baselineCalories = (hoursElapsed / 24.0) * 100.0;
     totalActive += baselineCalories;
-    print('   🕒 Baseline activity (${hoursElapsed.toStringAsFixed(1)}h): ${baselineCalories.toStringAsFixed(1)} kcal');
+    if (ProductionConfig.enableDebugLogs) debugPrint('   🕒 Baseline activity (${hoursElapsed.toStringAsFixed(1)}h): ${baselineCalories.toStringAsFixed(1)} kcal');
     
-    print('✅ Total active calories: ${totalActive.toStringAsFixed(1)} kcal');
+    if (ProductionConfig.enableDebugLogs) debugPrint('✅ Total active calories: ${totalActive.toStringAsFixed(1)} kcal');
     
     return totalActive;
   }
@@ -325,7 +327,7 @@ class HealthConnectManager {
       final result = await _channel.invokeMethod<Map<dynamic, dynamic>>('getTodayData');
       
       if (result == null) {
-        print('⚠️ HealthConnectManager: getTodayData returned null');
+        if (ProductionConfig.enableDebugLogs) debugPrint('⚠️ HealthConnectManager: getTodayData returned null');
         return null;
       }
 
@@ -345,23 +347,23 @@ class HealthConnectManager {
         workoutDuration: workoutDuration,
       );
       
-      print('📊 HealthConnectManager: Received data from native');
-      print('   Steps: ${data.steps}');
-      print('   Calories (active): ${data.caloriesBurned?.toStringAsFixed(1)}');
-      print('   Workouts: ${data.workoutSessions}');
+      if (ProductionConfig.enableDebugLogs) debugPrint('📊 HealthConnectManager: Received data from native');
+      if (ProductionConfig.enableDebugLogs) debugPrint('   Steps: ${data.steps}');
+      if (ProductionConfig.enableDebugLogs) debugPrint('   Calories (active): ${data.caloriesBurned?.toStringAsFixed(1)}');
+      if (ProductionConfig.enableDebugLogs) debugPrint('   Workouts: ${data.workoutSessions}');
       
       if (data.caloriesBurned == null || data.caloriesBurned == 0.0) {
-        print('⚠️ WARNING: Active calories are ${data.caloriesBurned ?? 'null'}!');
-        print('💡 Possible reasons:');
-        print('   1. Haven\'t done any activity yet today');
-        print('   2. Total calories = basal calories (no active movement)');
+        if (ProductionConfig.enableDebugLogs) debugPrint('⚠️ WARNING: Active calories are ${data.caloriesBurned ?? 'null'}!');
+        if (ProductionConfig.enableDebugLogs) debugPrint('💡 Possible reasons:');
+        if (ProductionConfig.enableDebugLogs) debugPrint('   1. Haven\'t done any activity yet today');
+        if (ProductionConfig.enableDebugLogs) debugPrint('   2. Total calories = basal calories (no active movement)');
       } else {
-        print('✅ Active calories calculated: ${data.caloriesBurned?.toStringAsFixed(1)} kcal');
+        if (ProductionConfig.enableDebugLogs) debugPrint('✅ Active calories calculated: ${data.caloriesBurned?.toStringAsFixed(1)} kcal');
       }
       
       return data;
     } catch (e) {
-      print('❌ HealthConnectManager: Fetch from Health Connect failed: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('❌ HealthConnectManager: Fetch from Health Connect failed: $e');
       return null;
     }
   }
@@ -374,19 +376,19 @@ class HealthConnectManager {
         _syncData(force: false); // Use cache if valid
       }
     });
-    print('🔄 HealthConnectManager: Background sync started ($_syncInterval)');
+    if (ProductionConfig.enableDebugLogs) debugPrint('🔄 HealthConnectManager: Background sync started ($_syncInterval)');
   }
 
   /// Force refresh from Health Connect (public method)
   Future<GoogleFitData?> forceRefresh() async {
-    print('🔄 HealthConnectManager: Force refresh requested from Health Connect');
+    if (ProductionConfig.enableDebugLogs) debugPrint('🔄 HealthConnectManager: Force refresh requested from Health Connect');
     return await _syncData(force: true);
   }
 
   /// Get current data immediately (cached)
   GoogleFitData? getCurrentData() {
     if (hasValidCache) {
-      print('⚡ HealthConnectManager: Returning cached Health Connect data');
+      if (ProductionConfig.enableDebugLogs) debugPrint('⚡ HealthConnectManager: Returning cached Health Connect data');
       return _cachedData;
     }
     
@@ -406,13 +408,13 @@ class HealthConnectManager {
     _userGender = null;
     _profileLastFetched = null;
     BMRCalculator.clearCache();
-    print('🔄 HealthConnectManager: Profile cache cleared');
+    if (ProductionConfig.enableDebugLogs) debugPrint('🔄 HealthConnectManager: Profile cache cleared');
   }
 
   /// Sign out (clear Health Connect data)
   Future<void> signOut() async {
     try {
-      print('🔌 HealthConnectManager: Signing out...');
+      if (ProductionConfig.enableDebugLogs) debugPrint('🔌 HealthConnectManager: Signing out...');
       
       // Stop background sync
       _syncTimer?.cancel();
@@ -429,9 +431,9 @@ class HealthConnectManager {
       _connectionController.add(false);
       _dataController.add(null);
       
-      print('✅ HealthConnectManager: Signed out');
+      if (ProductionConfig.enableDebugLogs) debugPrint('✅ HealthConnectManager: Signed out');
     } catch (e) {
-      print('❌ HealthConnectManager: Sign out failed: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('❌ HealthConnectManager: Sign out failed: $e');
       
       // Force reset
       _hasPermissions = false;
@@ -449,6 +451,6 @@ class HealthConnectManager {
     if (!_connectionController.isClosed) _connectionController.close();
     if (!_loadingController.isClosed) _loadingController.close();
     
-    print('🗑️ HealthConnectManager: Disposed');
+    if (ProductionConfig.enableDebugLogs) debugPrint('🗑️ HealthConnectManager: Disposed');
   }
 }

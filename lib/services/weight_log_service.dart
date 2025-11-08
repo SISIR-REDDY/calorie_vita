@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/weight_log.dart';
+import '../config/production_config.dart';
 
 /// Service for managing weight log entries
 class WeightLogService {
@@ -254,3 +255,4 @@ class WeightLogService {
     return WeightLog.fromFirestore(querySnapshot.docs.first);
   }
 }
+

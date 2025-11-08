@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../config/production_config.dart';
 import '../models/food_entry.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
@@ -18,7 +20,7 @@ class FirebaseService {
       _auth.currentUser;
       return true;
     } catch (e) {
-      print('Firebase not available: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Firebase not available: $e');
       return false;
     }
   }
@@ -32,7 +34,7 @@ class FirebaseService {
     }
 
     if (userId.isEmpty) {
-      print('Error: User ID cannot be empty');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error: User ID cannot be empty');
       return Stream.value([]);
     }
 
@@ -45,7 +47,7 @@ class FirebaseService {
         .map((snapshot) {
       return snapshot.docs.map((doc) => FoodEntry.fromFirestore(doc)).toList();
     }).handleError((error) {
-      print('Error getting user food entries: $error');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error getting user food entries: $error');
       // Check if error is due to deleted user
       _handleAuthError(error);
       return <FoodEntry>[];
@@ -59,7 +61,7 @@ class FirebaseService {
     }
 
     if (userId.isEmpty) {
-      print('Error: User ID cannot be empty');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error: User ID cannot be empty');
       return Stream.value([]);
     }
 
@@ -82,16 +84,16 @@ class FirebaseService {
           try {
             return FoodEntry.fromFirestore(doc);
           } catch (e) {
-            print('Error parsing food entry ${doc.id}: $e');
+            if (ProductionConfig.enableDebugLogs) debugPrint('Error parsing food entry ${doc.id}: $e');
             return null;
           }
         }).whereType<FoodEntry>().toList();
       } catch (e) {
-        print('Error processing food entries snapshot: $e');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Error processing food entries snapshot: $e');
         return <FoodEntry>[];
       }
     }).handleError((error) {
-      print('Error getting today food entries: $error');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error getting today food entries: $error');
       return <FoodEntry>[];
     });
   }
@@ -103,7 +105,7 @@ class FirebaseService {
     }
 
     if (userId.isEmpty) {
-      print('Error: User ID cannot be empty');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error: User ID cannot be empty');
       return Stream.value([]);
     }
 
@@ -126,16 +128,16 @@ class FirebaseService {
           try {
             return FoodEntry.fromFirestore(doc);
           } catch (e) {
-            print('Error parsing food entry ${doc.id}: $e');
+            if (ProductionConfig.enableDebugLogs) debugPrint('Error parsing food entry ${doc.id}: $e');
             return null;
           }
         }).whereType<FoodEntry>().toList();
       } catch (e) {
-        print('Error processing weekly food entries snapshot: $e');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Error processing weekly food entries snapshot: $e');
         return <FoodEntry>[];
       }
     }).handleError((error) {
-      print('Error getting weekly food entries: $error');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error getting weekly food entries: $error');
       return <FoodEntry>[];
     });
   }
@@ -174,7 +176,7 @@ class FirebaseService {
       }
       return {};
     } catch (e) {
-      print('Error fetching user profile: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error fetching user profile: $e');
       return {};
     }
   }
@@ -190,7 +192,7 @@ class FirebaseService {
           .doc('userData')
           .set(profileData, SetOptions(merge: true));
     } catch (e) {
-      print('Error saving user profile: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error saving user profile: $e');
       rethrow;
     }
   }
@@ -207,7 +209,7 @@ class FirebaseService {
       final profile = await getUserProfile(userId);
       return profile['onboardingCompleted'] == true;
     } catch (e) {
-      print('Error checking onboarding status: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error checking onboarding status: $e');
       return false;
     }
   }
@@ -259,7 +261,7 @@ class FirebaseService {
         };
       }).toList();
     } catch (e) {
-      print('Error fetching chat sessions: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error fetching chat sessions: $e');
       return [];
     }
   }
@@ -280,7 +282,7 @@ class FirebaseService {
         'messageCount': FieldValue.increment(1),
       }, SetOptions(merge: true));
     } catch (e) {
-      print('Error saving chat session: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error saving chat session: $e');
     }
   }
 
@@ -310,7 +312,7 @@ class FirebaseService {
         await saveChatSession(userId, sessionId, title, messageText);
       }
     } catch (e) {
-      print('Error saving chat message: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error saving chat message: $e');
       rethrow;
     }
   }
@@ -350,7 +352,7 @@ class FirebaseService {
 
       await batch.commit();
     } catch (e) {
-      print('Error clearing chat history: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error clearing chat history: $e');
       rethrow;
     }
   }
@@ -377,7 +379,7 @@ class FirebaseService {
         }
 
         await batch.commit();
-        print('Cleaned up ${messagesToDelete.length} old chat messages');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Cleaned up ${messagesToDelete.length} old chat messages');
       }
 
       // Clean up old chat sessions (keep only last 5)
@@ -397,10 +399,10 @@ class FirebaseService {
         }
 
         await batch.commit();
-        print('Cleaned up ${sessionsToDelete.length} old chat sessions');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Cleaned up ${sessionsToDelete.length} old chat sessions');
       }
     } catch (e) {
-      print('Error cleaning up chat history: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error cleaning up chat history: $e');
     }
   }
 
@@ -411,18 +413,18 @@ class FirebaseService {
       {int days = 7}) async {
     try {
       if (!isAvailable) {
-        print('Firebase not available');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Firebase not available');
         return [];
       }
 
       if (userId.isEmpty) {
-        print('Error: User ID cannot be empty');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Error: User ID cannot be empty');
         return [];
       }
 
       // Validate days parameter
       if (days < 1 || days > 365) {
-        print('Invalid days parameter: $days, using default 7');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Invalid days parameter: $days, using default 7');
         days = 7;
       }
 
@@ -453,7 +455,7 @@ class FirebaseService {
             entriesByDate.putIfAbsent(dateKey, () => []).add(entry);
           }
         } catch (e) {
-          print('Error processing entry ${doc.id}: $e');
+          if (ProductionConfig.enableDebugLogs) debugPrint('Error processing entry ${doc.id}: $e');
           // Skip invalid entries
         }
       }
@@ -545,12 +547,12 @@ class FirebaseService {
       
       // Clean up old dailySummary data (older than 7 days) - non-blocking
       cleanupOldDailySummaryData(userId).catchError((e) {
-        print('Cleanup error (non-blocking): $e');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Cleanup error (non-blocking): $e');
       });
 
       return summaries;
     } catch (e) {
-      print('Error fetching daily summaries: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error fetching daily summaries: $e');
       return [];
     }
   }
@@ -577,7 +579,7 @@ class FirebaseService {
             sum + FoodEntry.fromFirestore(doc).macroBreakdown,
       );
     } catch (e) {
-      print('Error fetching macro breakdown: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error fetching macro breakdown: $e');
       return MacroBreakdown(carbs: 0, protein: 0, fat: 0, fiber: 0, sugar: 0);
     }
   }
@@ -606,7 +608,7 @@ class FirebaseService {
       // Return default achievements if none exist
       return Achievements.defaultAchievements;
     } catch (e) {
-      print('Error fetching user achievements: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error fetching user achievements: $e');
       return Achievements.defaultAchievements;
     }
   }
@@ -641,7 +643,7 @@ class FirebaseService {
 
       await docRef.set({'achievements': achievements});
     } catch (e) {
-      print('Error saving user achievement: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error saving user achievement: $e');
       rethrow;
     }
   }
@@ -671,7 +673,7 @@ class FirebaseService {
         };
       }).toList();
     } catch (e) {
-      print('Error fetching weight history: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error fetching weight history: $e');
       return [];
     }
   }
@@ -689,7 +691,7 @@ class FirebaseService {
         'date': Timestamp.fromDate(DateTime.now()),
       });
     } catch (e) {
-      print('Error saving weight log: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error saving weight log: $e');
       rethrow;
     }
   }
@@ -745,7 +747,7 @@ class FirebaseService {
 
       return insights;
     } catch (e) {
-      print('Error generating analytics insights: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error generating analytics insights: $e');
       return [];
     }
   }
@@ -797,7 +799,7 @@ class FirebaseService {
 
       return recommendations;
     } catch (e) {
-      print('Error generating personalized recommendations: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error generating personalized recommendations: $e');
       return [];
     }
   }
@@ -812,20 +814,20 @@ class FirebaseService {
           .doc('goals')
           .get();
 
-      print('Getting goals for user: $userId');
-      print('Document exists: ${doc.exists}');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Getting goals for user: $userId');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Document exists: ${doc.exists}');
       
       if (doc.exists) {
         final data = doc.data()!;
-        print('Raw goals data from Firebase: $data');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Raw goals data from Firebase: $data');
         final goals = UserGoals.fromMap(data);
-        print('Parsed goals object: ${goals.toMap()}');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Parsed goals object: ${goals.toMap()}');
         return goals;
       }
-      print('No goals document found for user: $userId');
+      if (ProductionConfig.enableDebugLogs) debugPrint('No goals document found for user: $userId');
       return null;
     } catch (e) {
-      print('Error getting user goals: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error getting user goals: $e');
       return null;
     }
   }
@@ -845,8 +847,8 @@ class FirebaseService {
           .doc('goals')
           .set(goalsMap);
           
-      print('Goals saved successfully for user: $userId');
-      print('Goals data saved: $goalsMap');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Goals saved successfully for user: $userId');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Goals data saved: $goalsMap');
       
       // Verify the data was saved correctly by reading it back immediately
       final verifyDoc = await _firestore
@@ -857,12 +859,12 @@ class FirebaseService {
           .get();
       
       if (verifyDoc.exists) {
-        print('Verification - Goals data in Firebase: ${verifyDoc.data()}');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Verification - Goals data in Firebase: ${verifyDoc.data()}');
       } else {
-        print('ERROR: Goals document not found after saving!');
+        if (ProductionConfig.enableDebugLogs) debugPrint('ERROR: Goals document not found after saving!');
       }
     } catch (e) {
-      print('Error saving user goals: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error saving user goals: $e');
       rethrow;
     }
   }
@@ -897,7 +899,7 @@ class FirebaseService {
       }
       return const UserPreferences();
     } catch (e) {
-      print('Error getting user preferences: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error getting user preferences: $e');
       return const UserPreferences();
     }
   }
@@ -912,7 +914,7 @@ class FirebaseService {
           .doc('preferences')
           .set(preferences.toMap());
     } catch (e) {
-      print('Error saving user preferences: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error saving user preferences: $e');
       rethrow;
     }
   }
@@ -942,7 +944,7 @@ class FirebaseService {
           .doc(entryId)
           .delete();
     } catch (e) {
-      print('Error deleting food entry: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error deleting food entry: $e');
       rethrow;
     }
   }
@@ -950,7 +952,7 @@ class FirebaseService {
   // Save food entry method
   Future<void> saveFoodEntry(String userId, FoodEntry entry) async {
     if (!isAvailable) {
-      print('Firebase not available, cannot save food entry');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Firebase not available, cannot save food entry');
       return;
     }
 
@@ -961,7 +963,7 @@ class FirebaseService {
           .collection('entries')
           .add(entry.toMap());
     } catch (e) {
-      print('Error saving food entry: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error saving food entry: $e');
       rethrow;
     }
   }
@@ -996,7 +998,7 @@ class FirebaseService {
         );
       }
     }).handleError((error) {
-      print('Error getting today daily summary: $error');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error getting today daily summary: $error');
       return DailySummary(
         caloriesConsumed: 0,
         caloriesBurned: 0,
@@ -1041,7 +1043,7 @@ class FirebaseService {
         'date': Timestamp.fromDate(today),
       }, SetOptions(merge: true));
     } catch (e) {
-      print('Error updating exercise: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error updating exercise: $e');
       rethrow;
     }
   }
@@ -1067,7 +1069,7 @@ class FirebaseService {
         'date': Timestamp.fromDate(today),
       }, SetOptions(merge: true));
     } catch (e) {
-      print('Error updating steps: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error updating steps: $e');
       rethrow;
     }
   }
@@ -1098,7 +1100,7 @@ class FirebaseService {
         'date': Timestamp.fromDate(today),
       }, SetOptions(merge: true));
     } catch (e) {
-      print('Error updating weight: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error updating weight: $e');
       rethrow;
     }
   }
@@ -1126,7 +1128,7 @@ class FirebaseService {
 
       await docRef.set(updateData, SetOptions(merge: true));
     } catch (e) {
-      print('Error updating user goals in daily summary: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error updating user goals in daily summary: $e');
       rethrow;
     }
   }
@@ -1150,7 +1152,7 @@ class FirebaseService {
           .map((doc) => DailySummary.fromMap(doc.data()))
           .toList();
     }).handleError((error) {
-      print('Error getting historical daily summaries: $error');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error getting historical daily summaries: $error');
       return <DailySummary>[];
     });
   }
@@ -1212,17 +1214,17 @@ class FirebaseService {
             deletedCount++;
           }
         } catch (e) {
-          print('Error processing summary document ${doc.id}: $e');
+          if (ProductionConfig.enableDebugLogs) debugPrint('Error processing summary document ${doc.id}: $e');
           // Continue with other documents
         }
       }
 
       if (deletedCount > 0) {
         await batch.commit();
-        print('✅ Cleaned up $deletedCount old dailySummary documents (older than 7 days)');
+        if (ProductionConfig.enableDebugLogs) debugPrint('✅ Cleaned up $deletedCount old dailySummary documents (older than 7 days)');
       }
     } catch (e) {
-      print('❌ Error cleaning up old dailySummary data: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('❌ Error cleaning up old dailySummary data: $e');
       // Don't throw - cleanup failure shouldn't break the app
     }
   }
@@ -1238,18 +1240,18 @@ class FirebaseService {
           errorString.contains('user-not-found') ||
           errorString.contains('invalid-user-token') ||
           errorString.contains('user-disabled')) {
-        print('⚠️ Authentication error detected: $error');
-        print('🔄 Signing out user due to authentication error');
+        if (ProductionConfig.enableDebugLogs) debugPrint('⚠️ Authentication error detected: $error');
+        if (ProductionConfig.enableDebugLogs) debugPrint('🔄 Signing out user due to authentication error');
         
         // Sign out the user
         _auth.signOut().then((_) {
-          print('✅ User signed out due to authentication error');
+          if (ProductionConfig.enableDebugLogs) debugPrint('✅ User signed out due to authentication error');
         }).catchError((e) {
-          print('❌ Error signing out: $e');
+          if (ProductionConfig.enableDebugLogs) debugPrint('❌ Error signing out: $e');
         });
       }
     } catch (e) {
-      print('Error handling auth error: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error handling auth error: $e');
     }
   }
 }

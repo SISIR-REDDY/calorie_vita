@@ -499,3 +499,4 @@ class EnhancedStreakService {
     _streakController.close();
   }
 }
+

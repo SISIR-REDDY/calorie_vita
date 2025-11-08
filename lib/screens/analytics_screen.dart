@@ -451,8 +451,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   _userAge = newAge;
                 });
                 if (kDebugMode) {
-                  print('Profile data updated in analytics: Height=${_userHeight}m');
-                  print('BMI will be recalculated with new values');
+                  if (kDebugMode) debugPrint('Profile data updated in analytics: Height=${_userHeight}m');
+                  if (kDebugMode) debugPrint('BMI will be recalculated with new values');
                 }
               }
             });
@@ -693,8 +693,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             _analyticsService.updateTodayMacroBreakdown(_macroBreakdown);
             
             if (kDebugMode) {
-              print('✅ Analytics: Macro breakdown updated from TodaysFoodDataService');
-              print('   Protein: ${macros['protein'] ?? 0.0}g, Carbs: ${macros['carbs'] ?? 0.0}g, Fat: ${macros['fat'] ?? 0.0}g');
+              if (kDebugMode) debugPrint('✅ Analytics: Macro breakdown updated from TodaysFoodDataService');
+              if (kDebugMode) debugPrint('   Protein: ${macros['protein'] ?? 0.0}g, Carbs: ${macros['carbs'] ?? 0.0}g, Fat: ${macros['fat'] ?? 0.0}g');
             }
           }
         },
@@ -723,8 +723,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               _analyticsService.updateTodayMacroBreakdown(breakdown);
               
               if (kDebugMode) {
-                print('✅ Analytics: Macro breakdown updated from AppStateService');
-                print('   Protein: ${breakdown.protein}g, Carbs: ${breakdown.carbs}g, Fat: ${breakdown.fat}g');
+                if (kDebugMode) debugPrint('✅ Analytics: Macro breakdown updated from AppStateService');
+                if (kDebugMode) debugPrint('   Protein: ${breakdown.protein}g, Carbs: ${breakdown.carbs}g, Fat: ${breakdown.fat}g');
               }
             }
           }
@@ -3116,8 +3116,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
     // Debug logging
     if (kDebugMode) {
-      print('BMI Debug - Weight: $_userWeight, Height: $_userHeight');
-      print('BMI Debug - Calculated BMI: $bmi');
+      if (kDebugMode) debugPrint('BMI Debug - Weight: $_userWeight, Height: $_userHeight');
+      if (kDebugMode) debugPrint('BMI Debug - Calculated BMI: $bmi');
     }
 
     return Container(
@@ -3704,3 +3704,4 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     );
   }
 }
+

@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import '../config/production_config.dart';
 
 /// Enhanced chat history manager with persistent caching and offline support
 class ChatHistoryManager {
@@ -39,12 +41,12 @@ class ChatHistoryManager {
 
     // Check if we have recent cached data (within 5 minutes)
     if (!forceRefresh && _isCacheValid()) {
-      print('Using valid in-memory cache: ${_cachedSessions.length} sessions');
+      if (kDebugMode) debugPrint('Using valid in-memory cache: ${_cachedSessions.length} sessions');
       return _cachedSessions;
     }
 
     // Load fresh data from Firebase
-    print('Loading fresh chat history from Firebase');
+    if (kDebugMode) debugPrint('Loading fresh chat history from Firebase');
     return await _loadFromFirebase(user.uid, limit);
   }
 
@@ -105,7 +107,7 @@ class ChatHistoryManager {
 
       return sessions;
     } catch (e) {
-      print('Error loading chat history from Firebase: $e');
+      if (kDebugMode) debugPrint('Error loading chat history from Firebase: $e');
       
       // Return cached data if available
       if (_cachedSessions.isNotEmpty) {
@@ -144,7 +146,7 @@ class ChatHistoryManager {
       
       return [];
     } catch (e) {
-      print('Error loading chat history from cache: $e');
+      if (kDebugMode) debugPrint('Error loading chat history from cache: $e');
       return [];
     }
   }
@@ -165,9 +167,9 @@ class ChatHistoryManager {
       await prefs.setString(cacheKey, jsonEncode(limitedSessions));
       await prefs.setString(lastSyncKey, DateTime.now().toIso8601String());
       
-      print('Chat history cached: ${limitedSessions.length} sessions');
+      if (kDebugMode) debugPrint('Chat history cached: ${limitedSessions.length} sessions');
     } catch (e) {
-      print('Error saving chat history to cache: $e');
+      if (kDebugMode) debugPrint('Error saving chat history to cache: $e');
     }
   }
 
@@ -181,12 +183,12 @@ class ChatHistoryManager {
   Future<void> saveChatSession(Map<String, dynamic> sessionData) async {
     final user = _auth.currentUser;
     if (user == null) {
-      print('ERROR: Cannot save chat session - user is not authenticated');
+      if (kDebugMode) debugPrint('ERROR: Cannot save chat session - user is not authenticated');
       return;
     }
 
     try {
-      print('Saving chat session to Firebase: ${sessionData['id']}');
+      if (kDebugMode) debugPrint('Saving chat session to Firebase: ${sessionData['id']}');
       
       // Prepare data for Firebase - convert timestamp int to Timestamp if needed
       final firebaseData = Map<String, dynamic>.from(sessionData);
@@ -209,7 +211,7 @@ class ChatHistoryManager {
           .set(firebaseData, SetOptions(merge: false))
           .timeout(const Duration(seconds: 5));
 
-      print('✅ Chat session saved successfully to Firebase: ${sessionData['id']}');
+      if (kDebugMode) debugPrint('✅ Chat session saved successfully to Firebase: ${sessionData['id']}');
 
       // Update local cache immediately
       final newSession = {
@@ -230,9 +232,9 @@ class ChatHistoryManager {
       await _saveToCache(_cachedSessions);
       
     } catch (e, stackTrace) {
-      print('❌ ERROR saving chat session to Firebase: $e');
-      print('Stack trace: $stackTrace');
-      print('Session data: ${sessionData.toString()}');
+      if (kDebugMode) debugPrint('❌ ERROR saving chat session to Firebase: $e');
+      if (kDebugMode) debugPrint('Stack trace: $stackTrace');
+      if (kDebugMode) debugPrint('Session data: ${sessionData.toString()}');
       
       // Still add to cache for offline support
       final newSession = {
@@ -275,9 +277,9 @@ class ChatHistoryManager {
       _lastSyncTime = null;
       await _clearCache();
       
-      print('All chat history cleared and cache invalidated');
+      if (kDebugMode) debugPrint('All chat history cleared and cache invalidated');
     } catch (e) {
-      print('Error clearing chat history: $e');
+      if (kDebugMode) debugPrint('Error clearing chat history: $e');
       // Still clear in-memory cache
       _cachedSessions.clear();
       _lastSyncTime = null;
@@ -304,9 +306,9 @@ class ChatHistoryManager {
       _lastSyncTime = null;
       await _clearCache();
       
-      print('Chat session deleted and cache invalidated: $sessionId');
+      if (kDebugMode) debugPrint('Chat session deleted and cache invalidated: $sessionId');
     } catch (e) {
-      print('Error deleting chat session: $e');
+      if (kDebugMode) debugPrint('Error deleting chat session: $e');
       
       // Still remove from in-memory cache
       _cachedSessions.removeWhere((s) => s['id'] == sessionId);
@@ -328,7 +330,7 @@ class ChatHistoryManager {
       await prefs.remove(lastSyncKey);
       
     } catch (e) {
-      print('Error clearing chat cache: $e');
+      if (kDebugMode) debugPrint('Error clearing chat cache: $e');
     }
   }
 
@@ -348,3 +350,4 @@ class ChatHistoryManager {
   /// Get last sync time
   DateTime? get lastSyncTime => _lastSyncTime;
 }
+

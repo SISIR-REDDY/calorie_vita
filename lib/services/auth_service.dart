@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../config/production_config.dart';
 import 'health_connect_manager.dart';
 import 'logger_service.dart';
 
@@ -42,34 +44,34 @@ class AuthService {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    print('Auth service initialization started...');
-    print('🔧 Google Sign-In configuration check...');
-    print('🔧 Package name: com.sisirlabs.calorievita');
-    print('🔧 SHA-1 fingerprint: fc8f2fd7b4c4072afe837b115676feaf70fc7cfd');
+    if (ProductionConfig.enableDebugLogs) debugPrint('Auth service initialization started...');
+    if (ProductionConfig.enableDebugLogs) debugPrint('🔧 Google Sign-In configuration check...');
+    if (ProductionConfig.enableDebugLogs) debugPrint('🔧 Package name: com.sisirlabs.calorievita');
+    if (ProductionConfig.enableDebugLogs) debugPrint('🔧 SHA-1 fingerprint: fc8f2fd7b4c4072afe837b115676feaf70fc7cfd');
 
     try {
       // Quick Firebase check with very short timeout
       _isFirebaseAvailable = await _checkFirebaseAvailability().timeout(
         const Duration(seconds: 2),
         onTimeout: () {
-          print('Firebase check timed out');
+          if (ProductionConfig.enableDebugLogs) debugPrint('Firebase check timed out');
           return false;
         },
       );
 
       if (_isFirebaseAvailable) {
-        print('Firebase is available, using Firebase authentication');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Firebase is available, using Firebase authentication');
         await _initializeFirebaseAuth();
       } else {
-        print('Firebase not available');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Firebase not available');
       }
     } catch (e) {
-      print('Auth service initialization error: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Auth service initialization error: $e');
       _isFirebaseAvailable = false;
     }
 
     _isInitialized = true;
-    print(
+    if (ProductionConfig.enableDebugLogs) debugPrint(
         'Auth service initialization completed. Firebase available: $_isFirebaseAvailable');
   }
 
@@ -80,7 +82,7 @@ class AuthService {
       _firebaseAuth.currentUser;
       return true;
     } catch (e) {
-      print('Firebase availability check failed: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Firebase availability check failed: $e');
       return false;
     }
   }
@@ -95,10 +97,10 @@ class AuthService {
       if (isValid) {
         _currentUser = AuthUser.fromFirebaseUser(currentUser);
         _userController.add(_currentUser);
-        print('Firebase current user found: ${currentUser.email}');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Firebase current user found: ${currentUser.email}');
       } else {
         // User was deleted or token is invalid, sign out
-        print('User token validation failed, signing out');
+        if (ProductionConfig.enableDebugLogs) debugPrint('User token validation failed, signing out');
         await _firebaseAuth.signOut();
         await _googleSignIn.signOut();
         _currentUser = null;
@@ -106,26 +108,14 @@ class AuthService {
       }
     }
 
-    // Listen to Firebase auth state changes
-    _firebaseAuth.authStateChanges().listen((User? user) {
-      if (user != null) {
-        _currentUser = AuthUser.fromFirebaseUser(user);
-        _userController.add(_currentUser);
-        print('Firebase user authenticated: ${user.email}');
-      } else {
-        _currentUser = null;
-        _userController.add(null);
-        print('Firebase user signed out');
-      }
-    });
-
-    // Listen to ID token changes (fires more frequently and catches token revocations)
+    // Listen to ID token changes only (single listener to avoid duplicates)
+    // idTokenChanges fires on both auth state changes AND token refresh
     _firebaseAuth.idTokenChanges().listen((User? user) async {
       if (user != null) {
         // Validate token when it changes
         final isValid = await _validateUserToken(user);
         if (!isValid) {
-          print('User token invalidated, signing out');
+          if (ProductionConfig.enableDebugLogs) debugPrint('User token invalidated, signing out');
           await _firebaseAuth.signOut();
           await _googleSignIn.signOut();
           _currentUser = null;
@@ -135,11 +125,13 @@ class AuthService {
           _currentUser = AuthUser.fromFirebaseUser(user);
           _userController.add(_currentUser);
           _startTokenValidationTimer();
+          if (ProductionConfig.enableDebugLogs) debugPrint('Firebase user authenticated: ${user.email}');
         }
       } else {
         _currentUser = null;
         _userController.add(null);
         _stopTokenValidationTimer();
+        if (ProductionConfig.enableDebugLogs) debugPrint('Firebase user signed out');
       }
     });
 
@@ -158,7 +150,7 @@ class AuthService {
       if (currentUser != null) {
         final isValid = await _validateUserToken(currentUser);
         if (!isValid) {
-          print('Periodic token validation failed, signing out');
+          if (ProductionConfig.enableDebugLogs) debugPrint('Periodic token validation failed, signing out');
           await _firebaseAuth.signOut();
           await _googleSignIn.signOut();
           _currentUser = null;
@@ -185,7 +177,7 @@ class AuthService {
       await user.getIdToken(true); // Force refresh
       return true;
     } catch (e) {
-      print('Token validation failed: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Token validation failed: $e');
       // Check for specific error codes that indicate user was deleted
       if (e.toString().contains('user-not-found') ||
           e.toString().contains('user-disabled') ||
@@ -202,7 +194,7 @@ class AuthService {
   Future<AuthUser?> signInWithEmailAndPassword(
       String email, String password) async {
     if (!_isFirebaseAvailable) {
-      print('Firebase not available for sign in');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Firebase not available for sign in');
       return null;
     }
 
@@ -215,11 +207,11 @@ class AuthService {
       if (credential.user != null) {
         _currentUser = AuthUser.fromFirebaseUser(credential.user!);
         _userController.add(_currentUser);
-        print('Firebase sign in successful: ${_currentUser!.email}');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Firebase sign in successful: ${_currentUser!.email}');
         return _currentUser;
       }
     } catch (e) {
-      print('Firebase sign in error: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Firebase sign in error: $e');
       rethrow;
     }
 
@@ -230,7 +222,7 @@ class AuthService {
   Future<AuthUser?> createUserWithEmailAndPassword(
       String email, String password) async {
     if (!_isFirebaseAvailable) {
-      print('Firebase not available for user creation');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Firebase not available for user creation');
       return null;
     }
 
@@ -243,11 +235,11 @@ class AuthService {
       if (credential.user != null) {
         _currentUser = AuthUser.fromFirebaseUser(credential.user!);
         _userController.add(_currentUser);
-        print('Firebase user creation successful: ${_currentUser!.email}');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Firebase user creation successful: ${_currentUser!.email}');
         return _currentUser;
       }
     } catch (e) {
-      print('Firebase user creation error: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Firebase user creation error: $e');
       rethrow;
     }
 
@@ -310,7 +302,7 @@ class AuthService {
   /// Sign in with Google
   Future<AuthUser?> signInWithGoogle() async {
     if (!_isFirebaseAvailable) {
-      print('Firebase not available for Google sign in');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Firebase not available for Google sign in');
       return null;
     }
 
@@ -321,7 +313,7 @@ class AuthService {
       
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        print('Google sign in cancelled');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Google sign in cancelled');
         return null;
       }
 
@@ -339,11 +331,11 @@ class AuthService {
       if (userCredential.user != null) {
         _currentUser = AuthUser.fromFirebaseUser(userCredential.user!);
         _userController.add(_currentUser);
-        print('Google sign in successful: ${_currentUser!.email}');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Google sign in successful: ${_currentUser!.email}');
         return _currentUser;
       }
     } catch (e) {
-      print('Google sign in error: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Google sign in error: $e');
       rethrow;
     }
 
@@ -353,7 +345,7 @@ class AuthService {
   /// Send phone verification code
   Future<void> sendPhoneVerificationCode(String phoneNumber) async {
     if (!_isFirebaseAvailable) {
-      print('Firebase not available for phone verification');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Firebase not available for phone verification');
       return;
     }
 
@@ -366,22 +358,22 @@ class AuthService {
           if (userCredential.user != null) {
             _currentUser = AuthUser.fromFirebaseUser(userCredential.user!);
             _userController.add(_currentUser);
-            print('Phone verification completed: ${_currentUser!.email}');
+            if (ProductionConfig.enableDebugLogs) debugPrint('Phone verification completed: ${_currentUser!.email}');
           }
         },
         verificationFailed: (FirebaseAuthException e) {
-          print('Phone verification failed: $e');
+          if (ProductionConfig.enableDebugLogs) debugPrint('Phone verification failed: $e');
         },
         codeSent: (String verificationId, int? resendToken) {
           _verificationId = verificationId;
-          print('Phone verification code sent');
+          if (ProductionConfig.enableDebugLogs) debugPrint('Phone verification code sent');
         },
         codeAutoRetrievalTimeout: (String verificationId) {
           _verificationId = verificationId;
         },
       );
     } catch (e) {
-      print('Phone verification error: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Phone verification error: $e');
       rethrow;
     }
   }
@@ -389,7 +381,7 @@ class AuthService {
   /// Verify phone OTP
   Future<AuthUser?> verifyPhoneOTP(String otp) async {
     if (!_isFirebaseAvailable || _verificationId == null) {
-      print('Firebase not available or verification ID missing');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Firebase not available or verification ID missing');
       return null;
     }
 
@@ -405,11 +397,11 @@ class AuthService {
       if (userCredential.user != null) {
         _currentUser = AuthUser.fromFirebaseUser(userCredential.user!);
         _userController.add(_currentUser);
-        print('Phone OTP verification successful: ${_currentUser!.email}');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Phone OTP verification successful: ${_currentUser!.email}');
         return _currentUser;
       }
     } catch (e) {
-      print('Phone OTP verification error: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Phone OTP verification error: $e');
       rethrow;
     }
 
@@ -418,7 +410,7 @@ class AuthService {
 
   /// Sign in with Facebook (placeholder - requires Facebook SDK)
   Future<AuthUser?> signInWithFacebook() async {
-    print('Facebook sign in not implemented - requires Facebook SDK');
+    if (ProductionConfig.enableDebugLogs) debugPrint('Facebook sign in not implemented - requires Facebook SDK');
     return null;
   }
 

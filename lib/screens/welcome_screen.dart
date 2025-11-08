@@ -4,6 +4,8 @@ import 'package:flutter_signin_button/flutter_signin_button.dart';
 import '../ui/app_colors.dart';
 import '../services/auth_service.dart';
 import '../services/app_state_manager.dart';
+import 'package:flutter/foundation.dart';
+import '../config/production_config.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -70,7 +72,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     // Listen to auth state changes for immediate navigation
     _authService.userStream.listen((user) {
       if (user != null && mounted) {
-        print('🔐 Auth state changed in welcome screen: ${user.email}');
+        if (kDebugMode) debugPrint('🔐 Auth state changed in welcome screen: ${user.email}');
         // Navigate to home screen immediately
         Navigator.of(context).pushReplacementNamed('/home');
       }
@@ -92,11 +94,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     });
 
     try {
-      print('🔐 Starting Google Sign-In process...');
+      if (kDebugMode) debugPrint('🔐 Starting Google Sign-In process...');
       final user = await _authService.signInWithGoogle();
       
       if (user != null && mounted) {
-        print('✅ Google Sign-In successful: ${user.email}');
+        if (kDebugMode) debugPrint('✅ Google Sign-In successful: ${user.email}');
         
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
@@ -112,22 +114,22 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         );
 
         // Update app state to trigger navigation
-        print('🔄 Updating app state with user: ${user.uid}');
+        if (kDebugMode) debugPrint('🔄 Updating app state with user: ${user.uid}');
         await _appStateManager.updateUserState(user.uid);
         
         // The navigation will be handled by the StreamBuilder in main_app.dart
         // which listens to the app state changes
-        print('✅ App state updated, navigation should happen automatically');
+        if (kDebugMode) debugPrint('✅ App state updated, navigation should happen automatically');
         
         // Fallback navigation after a short delay if the automatic navigation doesn't work
         Future.delayed(const Duration(seconds: 3), () {
           if (mounted) {
-            print('🔄 Fallback navigation triggered');
+            if (kDebugMode) debugPrint('🔄 Fallback navigation triggered');
             Navigator.of(context).pushReplacementNamed('/home');
           }
         });
       } else {
-        print('❌ Google Sign-In returned null user');
+        if (kDebugMode) debugPrint('❌ Google Sign-In returned null user');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -142,7 +144,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         }
       }
     } catch (e) {
-      print('❌ Google Sign-In error: $e');
+      if (kDebugMode) debugPrint('❌ Google Sign-In error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

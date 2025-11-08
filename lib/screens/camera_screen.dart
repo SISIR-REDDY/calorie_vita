@@ -18,6 +18,7 @@ import '../widgets/manual_food_entry_dialog.dart';
 import '../ui/app_colors.dart';
 import '../services/food_history_service.dart';
 // Unused import removed
+import '../config/production_config.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -54,7 +55,7 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _pickImage() async {
-    print('📸 Image picker initiated');
+    if (kDebugMode) debugPrint('📸 Image picker initiated');
     setState(() {
       _loading = true;
       _error = null;
@@ -65,16 +66,16 @@ class _CameraScreenState extends State<CameraScreen> {
     try {
       // Preflight: ensure AI vision is enabled, API key present, and network online
       if (kDebugMode) {
-        print('🔍 Preflight checks for image analysis...');
-        print('   - Image analysis enabled: ${AIConfig.enableImageAnalysis}');
+        if (kDebugMode) debugPrint('🔍 Preflight checks for image analysis...');
+        if (kDebugMode) debugPrint('   - Image analysis enabled: ${AIConfig.enableImageAnalysis}');
         // SECURITY: Never log API key details in production
-        print('   - API key configured: ${AIConfig.apiKey.isNotEmpty}');
-        print('   - Network online: ${NetworkService().isOnline}');
-        print('   - Vision model: ${AIConfig.visionModel}');
+        if (kDebugMode) debugPrint('   - API key configured: ${AIConfig.apiKey.isNotEmpty}');
+        if (kDebugMode) debugPrint('   - Network online: ${NetworkService().isOnline}');
+        if (kDebugMode) debugPrint('   - Vision model: ${AIConfig.visionModel}');
       }
       
       if (!AIConfig.enableImageAnalysis) {
-        print('❌ Image analysis is disabled in configuration');
+        if (kDebugMode) debugPrint('❌ Image analysis is disabled in configuration');
         setState(() {
           _loading = false;
           _error = 'Image analysis is disabled in configuration. You can add food manually.';
@@ -83,8 +84,8 @@ class _CameraScreenState extends State<CameraScreen> {
       }
 
       if (AIConfig.apiKey.isEmpty) {
-        print('❌ API key is empty - config may not have loaded from Firebase');
-        print('   - Check Firebase console for app_config/ai_settings document');
+        if (kDebugMode) debugPrint('❌ API key is empty - config may not have loaded from Firebase');
+        if (kDebugMode) debugPrint('   - Check Firebase console for app_config/ai_settings document');
         setState(() {
           _loading = false;
           _error = 'AI service is not configured (missing API key). Please sign in and try again later or add food manually.';
@@ -93,7 +94,7 @@ class _CameraScreenState extends State<CameraScreen> {
       }
 
       if (!NetworkService().isOnline) {
-        print('❌ Network is offline');
+        if (kDebugMode) debugPrint('❌ Network is offline');
         setState(() {
           _loading = false;
           _error = 'No internet connection. Please connect to the internet or add food manually.';
@@ -101,10 +102,10 @@ class _CameraScreenState extends State<CameraScreen> {
         return;
       }
       
-      print('✅ All preflight checks passed, proceeding with image capture...');
+      if (kDebugMode) debugPrint('✅ All preflight checks passed, proceeding with image capture...');
 
       final picked = await _picker.pickImage(source: ImageSource.camera).catchError((error) {
-        print('❌ Image picker error: $error');
+        if (kDebugMode) debugPrint('❌ Image picker error: $error');
         if (mounted) {
           setState(() {
             // Provide user-friendly error messages based on error type
@@ -122,15 +123,15 @@ class _CameraScreenState extends State<CameraScreen> {
       });
       
       if (picked != null) {
-        print('✅ Image captured: ${picked.path}');
+        if (kDebugMode) debugPrint('✅ Image captured: ${picked.path}');
         setState(() {
           _imageFile = File(picked.path);
         });
         
         // Process image through the optimized food scanner pipeline
-        print('🚀 Starting image processing pipeline...');
+        if (kDebugMode) debugPrint('🚀 Starting image processing pipeline...');
         var result = await OptimizedFoodScannerPipeline.processFoodImage(_imageFile!);
-        print('📊 Image processing result: success=${result.success}, error=${result.error}');
+        if (kDebugMode) debugPrint('📊 Image processing result: success=${result.success}, error=${result.error}');
 
         // If result is missing calories or macros, attempt to fix via product name lookup
         if (result.success && result.nutritionInfo != null) {
@@ -161,7 +162,7 @@ class _CameraScreenState extends State<CameraScreen> {
           _scannerResult = result;
           if (!result.success) {
             _error = result.error ?? "Couldn't analyze image. Please try again or add food manually.";
-            print('❌ Image analysis failed: ${result.error}');
+            if (kDebugMode) debugPrint('❌ Image analysis failed: ${result.error}');
           } else {
             // Clear error on success to avoid showing duplicate errors
             _error = null;
@@ -192,8 +193,8 @@ class _CameraScreenState extends State<CameraScreen> {
         return;
       }
     } catch (e, stackTrace) {
-      print('❌ Error in image picker: $e');
-      print('Stack trace: $stackTrace');
+      if (kDebugMode) debugPrint('❌ Error in image picker: $e');
+      if (kDebugMode) debugPrint('Stack trace: $stackTrace');
       if (mounted) {
         setState(() {
           _error = "Couldn't capture or analyze image: ${e.toString()}. Please try again or add food manually.";
@@ -210,7 +211,7 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _scanBarcode() async {
-    print('📱 Barcode scanner initiated');
+    if (kDebugMode) debugPrint('📱 Barcode scanner initiated');
     
     // Dispose existing controller if any
     _scannerController?.dispose();
@@ -234,9 +235,9 @@ class _CameraScreenState extends State<CameraScreen> {
     // Ensure scanner starts
     try {
       await _scannerController?.start();
-      print('✅ Barcode scanner started and ready - waiting for barcode detection...');
+      if (kDebugMode) debugPrint('✅ Barcode scanner started and ready - waiting for barcode detection...');
     } catch (e) {
-      print('❌ Error starting scanner: $e');
+      if (kDebugMode) debugPrint('❌ Error starting scanner: $e');
       if (mounted) {
         setState(() {
           // Provide user-friendly error message with actionable guidance
@@ -256,7 +257,7 @@ class _CameraScreenState extends State<CameraScreen> {
   void _onBarcodeDetected(BarcodeCapture capture) async {
     final barcode = capture.barcodes.firstOrNull?.rawValue;
     if (barcode != null && _showBarcodeScanner && !_barcodeProcessing && !_scannerDisabled) { // Only process if still in barcode scanner mode and not already processing
-      print('📱 Barcode detected: $barcode');
+      if (kDebugMode) debugPrint('📱 Barcode detected: $barcode');
       
       // Set processing flag to prevent multiple detections
       _barcodeProcessing = true;
@@ -266,7 +267,7 @@ class _CameraScreenState extends State<CameraScreen> {
       try {
         await _scannerController?.stop();
       } catch (e) {
-        print('⚠️ Error stopping scanner: $e');
+        if (kDebugMode) debugPrint('⚠️ Error stopping scanner: $e');
       }
       _scannerController?.dispose();
       _scannerController = null;
@@ -278,24 +279,24 @@ class _CameraScreenState extends State<CameraScreen> {
       });
       try {
         // Process barcode through the optimized food scanner pipeline
-        print('🔍 Starting barcode processing pipeline for: $barcode');
+        if (kDebugMode) debugPrint('🔍 Starting barcode processing pipeline for: $barcode');
         final result = await OptimizedFoodScannerPipeline.processBarcodeScan(barcode);
-        print('📊 Barcode processing result: success=${result.success}, error=${result.error}');
+        if (kDebugMode) debugPrint('📊 Barcode processing result: success=${result.success}, error=${result.error}');
         
         // Check result and fix missing nutrition data if needed
         if (result.success && result.nutritionInfo != null) {
           final nutrition = result.nutritionInfo!;
-          print('✅ Barcode scan successful: ${nutrition.foodName}');
+          if (kDebugMode) debugPrint('✅ Barcode scan successful: ${nutrition.foodName}');
           
           // Check if nutrition data is valid and try to fix if needed
           if (nutrition.calories == 0 || (nutrition.protein == 0 && nutrition.carbs == 0 && nutrition.fat == 0)) {
-            print('⚠️ Missing nutrition data, attempting to fix...');
+            if (kDebugMode) debugPrint('⚠️ Missing nutrition data, attempting to fix...');
             
             // Try to get nutrition data from product name
             try {
               final fixedNutrition = await _tryFixMissingNutrition(nutrition);
               if (fixedNutrition != null) {
-                print('✅ Fixed nutrition data: ${fixedNutrition.calories} calories');
+                if (kDebugMode) debugPrint('✅ Fixed nutrition data: ${fixedNutrition.calories} calories');
                 final fixedResult = FoodScannerResult(
                   success: true,
                   recognitionResult: result.recognitionResult,
@@ -311,7 +312,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 return;
               }
             } catch (e) {
-              print('❌ Failed to fix nutrition data: $e');
+              if (kDebugMode) debugPrint('❌ Failed to fix nutrition data: $e');
             }
           }
         }
@@ -332,7 +333,7 @@ class _CameraScreenState extends State<CameraScreen> {
         }
         
       } catch (e) {
-        print('❌ Barcode processing error: $e');
+        if (kDebugMode) debugPrint('❌ Barcode processing error: $e');
         if (mounted) {
           setState(() {
             _error = "Couldn't fetch product info. Try again.";
@@ -378,13 +379,13 @@ class _CameraScreenState extends State<CameraScreen> {
   /// Try to fix missing nutrition data by looking up the product name
   Future<NutritionInfo?> _tryFixMissingNutrition(NutritionInfo originalNutrition) async {
     try {
-      print('🔍 Attempting to fix nutrition data for: ${originalNutrition.foodName}');
+      if (kDebugMode) debugPrint('🔍 Attempting to fix nutrition data for: ${originalNutrition.foodName}');
       
       // Use the barcode scanning service to get nutrition from product name
       final fixedNutrition = await BarcodeScanningService.getNutritionFromProductName(originalNutrition.foodName);
       
       if (fixedNutrition != null && fixedNutrition.calories > 0) {
-        print('✅ Found nutrition data for product name: ${fixedNutrition.calories} calories');
+        if (kDebugMode) debugPrint('✅ Found nutrition data for product name: ${fixedNutrition.calories} calories');
         
         // Merge the fixed nutrition with original data
         return NutritionInfo(
@@ -403,7 +404,7 @@ class _CameraScreenState extends State<CameraScreen> {
         );
       }
     } catch (e) {
-      print('❌ Error fixing nutrition data: $e');
+      if (kDebugMode) debugPrint('❌ Error fixing nutrition data: $e');
     }
     
     return null;
@@ -456,14 +457,14 @@ class _CameraScreenState extends State<CameraScreen> {
         final success = await FoodHistoryService.addFoodEntry(entry);
         
         if (success) {
-          print('✅ Food entry saved to history: ${result.nutritionInfo!.foodName}');
+          if (kDebugMode) debugPrint('✅ Food entry saved to history: ${result.nutritionInfo!.foodName}');
           // Don't clear the scanner result - keep showing the food details
           setState(() {
             _loading = false;
             _showPortionSelector = false;
           });
         } else {
-          print('❌ Failed to save food entry to history');
+          if (kDebugMode) debugPrint('❌ Failed to save food entry to history');
           setState(() {
             _loading = false;
             _error = 'Failed to save food entry';
@@ -471,7 +472,7 @@ class _CameraScreenState extends State<CameraScreen> {
         }
       }
     } catch (e) {
-      print('❌ Error saving food entry to history: $e');
+      if (kDebugMode) debugPrint('❌ Error saving food entry to history: $e');
     }
   }
 
@@ -556,9 +557,9 @@ class _CameraScreenState extends State<CameraScreen> {
     try {
       // Save to food history silently
       await _saveToFoodHistory(result, source);
-      print('✅ Auto-saved food: ${result.nutritionInfo!.foodName}');
+      if (kDebugMode) debugPrint('✅ Auto-saved food: ${result.nutritionInfo!.foodName}');
     } catch (e) {
-      print('❌ Error auto-saving food: $e');
+      if (kDebugMode) debugPrint('❌ Error auto-saving food: $e');
     }
   }
 
@@ -982,15 +983,15 @@ class _CameraScreenState extends State<CameraScreen> {
 
     // Check if nutrition data is valid for UI rendering
     if (!nutrition.isValid) {
-      print('❌ Nutrition data is invalid');
+      if (kDebugMode) debugPrint('❌ Nutrition data is invalid');
     }
     
     if (nutrition.calories <= 0) {
-      print('❌ No calories found');
+      if (kDebugMode) debugPrint('❌ No calories found');
     }
     
     if (nutrition.protein == 0 && nutrition.carbs == 0 && nutrition.fat == 0) {
-      print('❌ No macro nutrients found');
+      if (kDebugMode) debugPrint('❌ No macro nutrients found');
     }
 
     // If nutrition data is invalid or missing, show a special message
@@ -1840,3 +1841,4 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
 }
+

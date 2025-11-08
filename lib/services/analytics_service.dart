@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/daily_summary.dart';
 import '../models/macro_breakdown.dart';
 import '../models/user_achievement.dart';
+import '../config/production_config.dart';
 import 'firebase_service.dart';
 import 'logger_service.dart';
 
@@ -154,7 +155,6 @@ class AnalyticsService {
         // Debug logging removed for performance
       }).catchError((error) {
         _logger.error('Error generating recommendations', {'error': error.toString()});
-        print('❌ Analytics: Error generating recommendations: $error');
         // Even on error, generate fallback recommendations
         _generateFallbackRecommendations(userId);
       });
@@ -503,20 +503,35 @@ class AnalyticsService {
 
   // Today's macro breakdown from today's food entries (for accurate recommendations)
   MacroBreakdown? _todayMacroBreakdown;
+  
+  // Debouncing for recommendation generation
+  Timer? _recommendationDebounceTimer;
+  DateTime? _lastRecommendationGeneratedAt;
 
   /// Update today's macro breakdown from today's food entries
   /// This ensures recommendations use actual today's data, not historical averages
   void updateTodayMacroBreakdown(MacroBreakdown todayMacros) {
     _todayMacroBreakdown = todayMacros;
-    // Debug logging removed for performance
     
-    // Regenerate recommendations with updated today's data
-    final userId = _auth.currentUser?.uid;
-    if (userId != null) {
-      _generateRecommendations(userId).catchError((e) {
-        _logger.error('Error regenerating recommendations after macro update', {'error': e.toString()});
-      });
-    }
+    // Cancel existing timer
+    _recommendationDebounceTimer?.cancel();
+    
+    // Debounce recommendations generation (wait 2 seconds before generating)
+    // This prevents generating recommendations multiple times in quick succession
+    _recommendationDebounceTimer = Timer(const Duration(seconds: 2), () {
+      // Only regenerate if it's been at least 5 seconds since last generation
+      final now = DateTime.now();
+      if (_lastRecommendationGeneratedAt == null ||
+          now.difference(_lastRecommendationGeneratedAt!).inSeconds >= 5) {
+        final userId = _auth.currentUser?.uid;
+        if (userId != null) {
+          _lastRecommendationGeneratedAt = now;
+          _generateRecommendations(userId).catchError((e) {
+            _logger.error('Error regenerating recommendations after macro update', {'error': e.toString()});
+          });
+        }
+      }
+    });
   }
 
   /// Generate personalized recommendations
@@ -531,7 +546,9 @@ class AnalyticsService {
         profile = await _firebaseService.getUserProfile(userId);
         // Debug logging removed for performance
       } catch (e) {
-        print('⚠️ Could not load user profile for recommendations: $e');
+        if (ProductionConfig.enableDebugLogs) {
+          debugPrint('⚠️ Could not load user profile for recommendations: $e');
+        }
       }
 
       // Get user goals for better recommendations
@@ -769,9 +786,11 @@ class AnalyticsService {
       // Limit to top 5 recommendations
       final finalRecommendations = recommendations.take(5).toList();
 
-      print('✅ Generated ${finalRecommendations.length} recommendations');
-      for (var i = 0; i < finalRecommendations.length; i++) {
-        print('   ${i + 1}. ${finalRecommendations[i]['title']}');
+      if (ProductionConfig.enableDebugLogs) {
+        debugPrint('✅ Generated ${finalRecommendations.length} recommendations');
+        for (var i = 0; i < finalRecommendations.length; i++) {
+          debugPrint('   ${i + 1}. ${finalRecommendations[i]['title']}');
+        }
       }
 
       _cachedRecommendations = finalRecommendations;
@@ -1271,6 +1290,7 @@ class AnalyticsService {
   /// Dispose method for singleton - only cancel listeners, don't close controllers
   void dispose() {
     _logger.debug('Analytics service dispose called - cleaning up listeners only');
+    _recommendationDebounceTimer?.cancel();
     cleanup();
     // Don't close controllers since this is a singleton that may be reused
   }

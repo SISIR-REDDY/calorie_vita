@@ -20,6 +20,8 @@ import 'privacy_policy_screen.dart';
 import 'terms_conditions_screen.dart';
 import 'goals_screen.dart';
 import 'weight_log_screen.dart';
+import 'package:flutter/foundation.dart';
+import '../config/production_config.dart';
 
 /// Professional Settings Screen for Calorie Vita App
 /// Features: Profile section, settings toggles, navigation options, and logout
@@ -64,21 +66,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _initializeGoogleFit();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Refresh user data and Google Fit status without re-authentication
-    _loadUserData();
-    _refreshGoogleFitStatus();
-  }
-
-  @override
-  void didUpdateWidget(SettingsScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Refresh user data and Google Fit status without re-authentication
-    _loadUserData();
-    _refreshGoogleFitStatus();
-  }
+  // Removed didChangeDependencies and didUpdateWidget to prevent duplicate loads
+  // Stream listeners handle real-time updates automatically
 
   void _setupStreamListeners() {
     // Listen to Firebase user stream
@@ -104,7 +93,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _setupProfileDataListener(user.uid);
           }
         });
-        print('Firebase Auth state changed - User: ${user?.displayName}');
+        if (kDebugMode) debugPrint('Firebase Auth state changed - User: ${user?.displayName}');
       }
     });
 
@@ -153,9 +142,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ? authName
                     : 'User';
 
-            // Debug print to help troubleshoot
-            print(
-                'Settings Screen - Firestore name: $firestoreName, Auth name: $authName, Final name: $_userName');
             _userEmail = user.email ?? 'user@example.com';
             _profileImageUrl = data['profileImageUrl'];
           } else {
@@ -164,8 +150,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ? user.displayName
                 : 'User';
             _userEmail = user.email ?? 'user@example.com';
-            print(
-                'Settings Screen - No Firestore profile data, using Auth name: ${user.displayName}');
           }
         });
       }
@@ -177,8 +161,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               user.displayName?.isNotEmpty == true ? user.displayName : 'User';
           _userEmail = user.email ?? 'user@example.com';
         });
-        print(
-            'Settings Screen - Error loading profile, using Auth name: ${user.displayName}');
       }
     }
   }
@@ -210,13 +192,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   : 'User';
 
           _profileImageUrl = data['profileImageUrl'];
-
-          print(
-              'Settings Screen - Profile data updated in real-time: $_userName');
         });
       }
     }, onError: (error) {
-      print('Settings Screen - Error listening to profile data: $error');
+      if (kDebugMode) debugPrint('Settings Screen - Error listening to profile data: $error');
     });
   }
 
@@ -648,14 +627,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     // Reload user data if profile was updated
     if (result == true) {
-      print('Profile edit completed, refreshing user data...');
+      if (kDebugMode) debugPrint('Profile edit completed, refreshing user data...');
 
       // Add a small delay to ensure Firebase Auth update has propagated
       await Future.delayed(const Duration(milliseconds: 500));
 
       // Force refresh the current user from Firebase Auth
       _user = FirebaseAuth.instance.currentUser;
-      print('Current user after edit: ${_user?.displayName}');
+      if (kDebugMode) debugPrint('Current user after edit: ${_user?.displayName}');
 
       await _loadUserData();
       // Also reload profile data specifically for Firebase users
@@ -928,7 +907,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _isGoogleFitConnected = true;
           _lastGoogleFitSync = DateTime.now();
         });
-        print('Google Fit already connected, skipping initialization');
+        if (kDebugMode) debugPrint('Google Fit already connected, skipping initialization');
         return;
       }
 
@@ -941,10 +920,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
       });
 
-      print(
+      if (kDebugMode) debugPrint(
           'Google Fit initialization completed. Connected: $_isGoogleFitConnected');
     } catch (e) {
-      print('Error initializing Google Fit: $e');
+      if (kDebugMode) debugPrint('Error initializing Google Fit: $e');
       setState(() {
         _isGoogleFitConnected = false;
       });
@@ -1027,7 +1006,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _showPermissionInstructionsDialog();
       }
     } catch (e) {
-      print('Error connecting to Google Fit: $e');
+      if (kDebugMode) debugPrint('Error connecting to Google Fit: $e');
       setState(() {
         _isConnectingToGoogleFit = false;
       });
@@ -1415,7 +1394,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       }
     } catch (e) {
-      print('Error disconnecting from Google Fit: $e');
+      if (kDebugMode) debugPrint('Error disconnecting from Google Fit: $e');
     }
   }
 
@@ -1444,10 +1423,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       
       if (isComplete) {
         await SetupWarningService.markSetupComplete();
-        print('Setup marked as complete!');
+        if (kDebugMode) debugPrint('Setup marked as complete!');
       }
     } catch (e) {
-      print('Error checking setup completion: $e');
+      if (kDebugMode) debugPrint('Error checking setup completion: $e');
     }
   }
 
@@ -1635,10 +1614,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final currentUser = FirebaseAuth.instance.currentUser;
     final displayName = currentUser?.displayName;
 
-    // Debug print to see what we're getting
-    print(
-        'Profile Card - Current user displayName: $displayName, _userName: $_userName');
-
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1750,3 +1725,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 }
+

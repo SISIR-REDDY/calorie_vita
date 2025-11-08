@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import '../config/production_config.dart';
 
 /// Service for handling daily resets and data cleanup
 class DailyResetService {
@@ -28,7 +30,7 @@ class DailyResetService {
       _scheduleNextReset(); // Schedule the next reset
     });
 
-    print('🕛 Daily reset scheduled for ${tomorrow.toString()}');
+    if (kDebugMode) debugPrint('🕛 Daily reset scheduled for ${tomorrow.toString()}');
   }
 
   /// Check if reset is needed and perform it
@@ -51,7 +53,7 @@ class DailyResetService {
   /// Perform daily reset
   static Future<void> _performDailyReset() async {
     try {
-      print('🔄 Performing daily reset...');
+      if (kDebugMode) debugPrint('🔄 Performing daily reset...');
       
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
@@ -66,9 +68,9 @@ class DailyResetService {
       // Reset daily counters and goals
       await _resetDailyCounters();
 
-      print('✅ Daily reset completed successfully');
+      if (kDebugMode) debugPrint('✅ Daily reset completed successfully');
     } catch (e) {
-      print('❌ Error during daily reset: $e');
+      if (kDebugMode) debugPrint('❌ Error during daily reset: $e');
     }
   }
 
@@ -95,10 +97,10 @@ class DailyResetService {
         }
         await batch.commit();
         
-        print('🧹 Cleaned up ${snapshot.docs.length} old food history entries');
+        if (kDebugMode) debugPrint('🧹 Cleaned up ${snapshot.docs.length} old food history entries');
       }
     } catch (e) {
-      print('❌ Error cleaning up old food history: $e');
+      if (kDebugMode) debugPrint('❌ Error cleaning up old food history: $e');
     }
   }
 
@@ -148,9 +150,9 @@ class DailyResetService {
         'lastUpdated': Timestamp.now(),
       }, SetOptions(merge: true));
 
-      print('📊 Reset daily counters and goals for $todayStr');
+      if (kDebugMode) debugPrint('📊 Reset daily counters and goals for $todayStr');
     } catch (e) {
-      print('❌ Error resetting daily counters: $e');
+      if (kDebugMode) debugPrint('❌ Error resetting daily counters: $e');
     }
   }
 
@@ -172,7 +174,7 @@ class DailyResetService {
       }
       return null;
     } catch (e) {
-      print('❌ Error getting last reset date: $e');
+      if (kDebugMode) debugPrint('❌ Error getting last reset date: $e');
       return null;
     }
   }
@@ -191,7 +193,7 @@ class DailyResetService {
         'lastUpdated': Timestamp.now(),
       }, SetOptions(merge: true));
     } catch (e) {
-      print('❌ Error setting last reset date: $e');
+      if (kDebugMode) debugPrint('❌ Error setting last reset date: $e');
     }
   }
 
@@ -206,3 +208,4 @@ class DailyResetService {
     _resetTimer = null;
   }
 }
+

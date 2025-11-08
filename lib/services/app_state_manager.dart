@@ -6,6 +6,7 @@ import 'network_service.dart';
 import 'error_handler.dart';
 import 'auth_service.dart';
 import '../config/ai_config.dart';
+import '../config/production_config.dart';
 
 /// Centralized app state manager that coordinates all services
 class AppStateManager {
@@ -25,6 +26,10 @@ class AppStateManager {
   bool _isOnline = true;
   bool _isFirebaseAvailable = false;
   String _currentUserId = '';
+  
+  // Debouncing for auth state changes
+  Timer? _authStateDebounceTimer;
+  DateTime? _lastAuthStateChange;
 
   // Streams
   final StreamController<AppState> _stateController =
@@ -52,7 +57,9 @@ class AppStateManager {
     if (_isInitialized) return;
 
     try {
-      print('🚀 Initializing AppStateManager...');
+      if (ProductionConfig.enableDebugLogs) {
+        debugPrint('🚀 Initializing AppStateManager...');
+      }
 
       // Initialize services
       _firebaseService = FirebaseService();
@@ -90,25 +97,43 @@ class AppStateManager {
       final currentUser = _authService.currentUser;
       if (currentUser != null) {
         _currentUserId = currentUser.uid;
-        print('Current user found during initialization: ${currentUser.email}');
+        if (ProductionConfig.enableDebugLogs) {
+          debugPrint('Current user found during initialization: ${currentUser.email}');
+        }
         // Load API config after authentication (for secure access)
         _loadAIConfigAfterAuth();
       }
 
-      // Listen to auth changes
+      // Listen to auth changes with debouncing to prevent duplicate processing
       _authService.userStream.listen((user) {
-        print(
-            'Auth state changed: user=${user?.uid ?? 'null'}, email=${user?.email ?? 'null'}');
-        _currentUserId = user?.uid ?? '';
-        
-        // Load API config when user authenticates (for secure access)
-        if (user != null) {
-          _loadAIConfigAfterAuth();
+        if (ProductionConfig.enableDebugLogs) {
+          debugPrint('Auth state changed: user=${user?.uid ?? 'null'}, email=${user?.email ?? 'null'}');
         }
         
-        _updateAppState();
-        _performanceMonitor.startTimer('auth_state_changed');
-        _performanceMonitor.stopTimer('auth_state_changed');
+        // Cancel existing timer
+        _authStateDebounceTimer?.cancel();
+        
+        // Debounce auth state changes (500ms delay)
+        // This prevents multiple rapid auth state changes from triggering duplicate operations
+        _authStateDebounceTimer = Timer(const Duration(milliseconds: 500), () {
+          // Only process if it's been at least 1 second since last change
+          final now = DateTime.now();
+          if (_lastAuthStateChange == null ||
+              now.difference(_lastAuthStateChange!).inMilliseconds >= 1000) {
+            _lastAuthStateChange = now;
+            
+            _currentUserId = user?.uid ?? '';
+            
+            // Load API config when user authenticates (for secure access)
+            if (user != null) {
+              _loadAIConfigAfterAuth();
+            }
+            
+            _updateAppState();
+            _performanceMonitor.startTimer('auth_state_changed');
+            _performanceMonitor.stopTimer('auth_state_changed');
+          }
+        });
       });
 
       _isInitialized = true;
@@ -116,9 +141,12 @@ class AppStateManager {
       _updateAppState();
 
       _performanceMonitor.stopTimer('app_state_init');
-      print('✅ AppStateManager initialized successfully');
+      if (ProductionConfig.enableDebugLogs) {
+        debugPrint('✅ AppStateManager initialized successfully');
+      }
     } catch (e) {
-      print('❌ Error initializing AppStateManager: $e');
+      // Always log errors
+      debugPrint('❌ Error initializing AppStateManager: $e');
       _errorHandler.handleBusinessError('app_state_init', e);
       _initializationController.add(false);
     }
@@ -134,17 +162,22 @@ class AppStateManager {
       timestamp: DateTime.now(),
     );
 
-    print(
-        'Updating app state: userId=$_currentUserId, initialized=$_isInitialized');
+    if (ProductionConfig.enableDebugLogs) {
+      debugPrint('Updating app state: userId=$_currentUserId, initialized=$_isInitialized');
+    }
     _stateController.add(state);
   }
 
   /// Manually update user state (useful for immediate navigation)
   Future<void> updateUserState(String userId) async {
-    print('🔄 Manually updating user state: $userId');
+    if (ProductionConfig.enableDebugLogs) {
+      debugPrint('🔄 Manually updating user state: $userId');
+    }
     _currentUserId = userId;
     _updateAppState();
-    print('✅ User state updated successfully');
+    if (ProductionConfig.enableDebugLogs) {
+      debugPrint('✅ User state updated successfully');
+    }
   }
 
   /// Get current app state
@@ -309,6 +342,7 @@ class AppStateManager {
 
   /// Dispose all resources
   void dispose() {
+    _authStateDebounceTimer?.cancel();
     _stateController.close();
     _initializationController.close();
     // _firebaseService.dispose(); // FirebaseService doesn't have dispose method
@@ -316,7 +350,9 @@ class AppStateManager {
     _networkService.dispose();
     _errorHandler.dispose();
     _authService.dispose();
-    print('AppStateManager disposed');
+    if (ProductionConfig.enableDebugLogs) {
+      debugPrint('AppStateManager disposed');
+    }
   }
 }
 

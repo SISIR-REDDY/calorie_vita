@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'health_connect_manager.dart';
+import 'package:flutter/foundation.dart';
+import '../config/production_config.dart';
 
 class SetupCheckService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -23,7 +25,7 @@ class SetupCheckService {
 
       return hasPersonalDetails && hasGoals && hasGoogleFit;
     } catch (e) {
-      print('Error checking setup completion: $e');
+      if (kDebugMode) debugPrint('Error checking setup completion: $e');
       return false;
     }
   }
@@ -58,7 +60,7 @@ class SetupCheckService {
 
       return hasName && hasAge && hasGender && hasHeight && hasWeight;
     } catch (e) {
-      print('Error checking personal details: $e');
+      if (kDebugMode) debugPrint('Error checking personal details: $e');
       return false;
     }
   }
@@ -86,7 +88,7 @@ class SetupCheckService {
 
       return hasCalorieGoal && hasWeightGoal;
     } catch (e) {
-      print('Error checking goals: $e');
+      if (kDebugMode) debugPrint('Error checking goals: $e');
       return false;
     }
   }
@@ -97,7 +99,7 @@ class SetupCheckService {
       final healthConnectManager = HealthConnectManager();
       return healthConnectManager.isConnected;
     } catch (e) {
-      print('Error checking Health Connect connection: $e');
+      if (kDebugMode) debugPrint('Error checking Health Connect connection: $e');
       return false;
     }
   }
@@ -133,7 +135,7 @@ class SetupCheckService {
         'missingItems': missingItems,
       };
     } catch (e) {
-      print('Error getting setup status: $e');
+      if (kDebugMode) debugPrint('Error getting setup status: $e');
       return {
         'isComplete': false,
         'hasPersonalDetails': false,
@@ -144,3 +146,4 @@ class SetupCheckService {
     }
   }
 }
+

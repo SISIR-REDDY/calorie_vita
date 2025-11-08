@@ -1,6 +1,8 @@
 import 'dart:async';
 import '../models/food_history_entry.dart';
 import '../services/food_history_service.dart';
+import 'package:flutter/foundation.dart';
+import '../config/production_config.dart';
 
 /// Service that provides today's food data (calories and macro nutrients)
 /// Uses the same data source as TodaysFoodScreen
@@ -31,10 +33,10 @@ class TodaysFoodDataService {
       final existingEntries = await FoodHistoryService.getTodaysFoodEntries();
       if (existingEntries.isNotEmpty) {
         calculateAndUpdateData(existingEntries);
-        print('✅ TodaysFoodDataService: Loaded ${existingEntries.length} existing entries immediately');
+        if (kDebugMode) debugPrint('✅ TodaysFoodDataService: Loaded ${existingEntries.length} existing entries immediately');
       }
     } catch (e) {
-      print('❌ Error loading existing food entries: $e');
+      if (kDebugMode) debugPrint('❌ Error loading existing food entries: $e');
     }
     
     // Listen to today's food entries stream (same as TodaysFoodScreen)
@@ -44,7 +46,7 @@ class TodaysFoodDataService {
         calculateAndUpdateData(entries);
       },
       onError: (error) {
-        print('❌ TodaysFoodDataService: Error in food entries stream: $error');
+        if (kDebugMode) debugPrint('❌ TodaysFoodDataService: Error in food entries stream: $error');
       },
     );
   }
@@ -64,9 +66,9 @@ class TodaysFoodDataService {
     };
 
     // Debug logging
-    print('🍎 TodaysFoodDataService: ${entries.length} food entries');
-    print('   Calories: $consumedCalories');
-    print('   Protein: ${macroNutrients['protein']}g, Carbs: ${macroNutrients['carbs']}g, Fat: ${macroNutrients['fat']}g');
+    if (kDebugMode) debugPrint('🍎 TodaysFoodDataService: ${entries.length} food entries');
+    if (kDebugMode) debugPrint('   Calories: $consumedCalories');
+    if (kDebugMode) debugPrint('   Protein: ${macroNutrients['protein']}g, Carbs: ${macroNutrients['carbs']}g, Fat: ${macroNutrients['fat']}g');
 
     // Update cache immediately
     _cachedConsumedCalories = consumedCalories;
@@ -80,7 +82,7 @@ class TodaysFoodDataService {
       _macroNutrientsController.add(macroNutrients);
     }
     
-    print('⚡ TodaysFoodDataService: Streams updated immediately');
+    if (kDebugMode) debugPrint('⚡ TodaysFoodDataService: Streams updated immediately');
   }
 
   /// ULTRA FAST: Update with pre-calculated values (no calculations needed)
@@ -97,7 +99,7 @@ class TodaysFoodDataService {
       _macroNutrientsController.add(macroNutrients);
     }
     
-    print('🚀 TodaysFoodDataService: ULTRA FAST update - Calories: $consumedCalories');
+    if (kDebugMode) debugPrint('🚀 TodaysFoodDataService: ULTRA FAST update - Calories: $consumedCalories');
   }
 
   /// Get cached consumed calories (for immediate UI updates)
@@ -117,3 +119,4 @@ class TodaysFoodDataService {
     _macroNutrientsController.close();
   }
 }
+

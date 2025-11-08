@@ -1,8 +1,15 @@
+import 'package:flutter/foundation.dart';
+
 /// Production configuration with enhanced security and performance settings
 class ProductionConfig {
   // Environment detection
   static const bool isProduction = bool.fromEnvironment('PRODUCTION', defaultValue: false);
   static const bool isDebug = bool.fromEnvironment('DEBUG', defaultValue: true);
+  
+  // Logging control - disable all logs in production except errors
+  static bool get enableDebugLogs => kDebugMode && isDebug;
+  static bool get enableInfoLogs => kDebugMode || isDebug;
+  static bool get enablePerformanceLogs => kDebugMode || isDebug;
   
   // Note: API keys are now managed securely through Firebase Remote Config
   // Use AIConfig.apiKey to access the secure API key

@@ -407,14 +407,14 @@ class DailySummaryService {
             deletedCount++;
           }
         } catch (e) {
-          print('Error processing summary document ${doc.id}: $e');
+          if (kDebugMode) debugPrint('Error processing summary document ${doc.id}: $e');
           // Continue with other documents
         }
       }
 
       if (deletedCount > 0) {
         await batch.commit();
-        print('✅ Cleaned up $deletedCount old dailySummary documents (older than 7 days)');
+        if (kDebugMode) debugPrint('✅ Cleaned up $deletedCount old dailySummary documents (older than 7 days)');
       }
     } catch (e) {
       _errorHandler.handleDataError('cleanup_old_daily_summary', e);
@@ -555,3 +555,4 @@ class DailySummaryService {
     _progressController.close();
   }
 }
+

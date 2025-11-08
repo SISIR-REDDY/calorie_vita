@@ -7,6 +7,8 @@ import '../services/app_state_service.dart';
 import '../services/auth_service.dart';
 import '../models/user_goals.dart';
 import '../models/user_preferences.dart';
+import 'package:flutter/foundation.dart';
+import '../config/production_config.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback? onCompleted;
@@ -790,7 +792,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             child: Builder(
               builder: (context) {
                 final canProceed = _canProceed();
-                print('Button state - Step: $_currentStep, Can proceed: $canProceed');
+                if (kDebugMode) debugPrint('Button state - Step: $_currentStep, Can proceed: $canProceed');
                 return ElevatedButton(
                   onPressed: canProceed ? _nextStep : null,
                   style: ElevatedButton.styleFrom(
@@ -835,26 +837,26 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             _selectedGender != null &&
             _heightController.text.isNotEmpty &&
             _weightController.text.isNotEmpty;
-        print('Step 0 - Age: ${_ageController.text}, Gender: $_selectedGender, Height: ${_heightController.text}, Weight: ${_weightController.text}, Can proceed: $canProceed');
+        if (kDebugMode) debugPrint('Step 0 - Age: ${_ageController.text}, Gender: $_selectedGender, Height: ${_heightController.text}, Weight: ${_weightController.text}, Can proceed: $canProceed');
         break;
       case 1:
         canProceed = _selectedActivityLevel != null;
-        print('Step 1 - Activity Level: $_selectedActivityLevel, Can proceed: $canProceed');
+        if (kDebugMode) debugPrint('Step 1 - Activity Level: $_selectedActivityLevel, Can proceed: $canProceed');
         break;
       case 2:
         canProceed = _selectedFitnessGoal != null;
-        print('Step 2 - Fitness Goal: $_selectedFitnessGoal, Can proceed: $canProceed');
+        if (kDebugMode) debugPrint('Step 2 - Fitness Goal: $_selectedFitnessGoal, Can proceed: $canProceed');
         break;
       case 3:
         canProceed = _selectedDietPreference != null;
-        print('Step 3 - Diet Preference: $_selectedDietPreference, Can proceed: $canProceed');
+        if (kDebugMode) debugPrint('Step 3 - Diet Preference: $_selectedDietPreference, Can proceed: $canProceed');
         break;
       case 4:
         canProceed = _weightGoalController.text.isNotEmpty &&
             _calorieGoalController.text.isNotEmpty &&
             _stepsGoalController.text.isNotEmpty &&
             _waterGoalController.text.isNotEmpty;
-        print('Step 4 - Weight Goal: ${_weightGoalController.text}, Calorie Goal: ${_calorieGoalController.text}, Steps Goal: ${_stepsGoalController.text}, Water Goal: ${_waterGoalController.text}, Can proceed: $canProceed');
+        if (kDebugMode) debugPrint('Step 4 - Weight Goal: ${_weightGoalController.text}, Calorie Goal: ${_calorieGoalController.text}, Steps Goal: ${_stepsGoalController.text}, Water Goal: ${_waterGoalController.text}, Can proceed: $canProceed');
         break;
       default:
         canProceed = false;
@@ -880,9 +882,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     try {
       final authService = AuthService();
       await authService.signOut();
-      print('✅ Signed out completely when going back from onboarding');
+      if (kDebugMode) debugPrint('✅ Signed out completely when going back from onboarding');
     } catch (e) {
-      print('Error signing out: $e');
+      if (kDebugMode) debugPrint('Error signing out: $e');
     }
     
     // Navigate to welcome screen
@@ -890,14 +892,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   void _nextStep() {
-    print('Next step pressed - Current step: $_currentStep, Can proceed: ${_canProceed()}');
+    if (kDebugMode) debugPrint('Next step pressed - Current step: $_currentStep, Can proceed: ${_canProceed()}');
     if (_currentStep < 4) {
       setState(() {
         _currentStep++;
       });
-      print('Moved to step: $_currentStep');
+      if (kDebugMode) debugPrint('Moved to step: $_currentStep');
     } else {
-      print('Completing onboarding...');
+      if (kDebugMode) debugPrint('Completing onboarding...');
       _completeOnboarding();
     }
   }
@@ -980,11 +982,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       final stepsGoal = int.tryParse(_stepsGoalController.text);
       final waterGoal = int.tryParse(_waterGoalController.text);
       
-      print('Onboarding goals input:');
-      print('Weight goal text: "${_weightGoalController.text}" -> parsed: $weightGoal');
-      print('Calorie goal text: "${_calorieGoalController.text}" -> parsed: $calorieGoal');
-      print('Steps goal text: "${_stepsGoalController.text}" -> parsed: $stepsGoal');
-      print('Water goal text: "${_waterGoalController.text}" -> parsed: $waterGoal');
+      if (kDebugMode) debugPrint('Onboarding goals input:');
+      if (kDebugMode) debugPrint('Weight goal text: "${_weightGoalController.text}" -> parsed: $weightGoal');
+      if (kDebugMode) debugPrint('Calorie goal text: "${_calorieGoalController.text}" -> parsed: $calorieGoal');
+      if (kDebugMode) debugPrint('Steps goal text: "${_stepsGoalController.text}" -> parsed: $stepsGoal');
+      if (kDebugMode) debugPrint('Water goal text: "${_waterGoalController.text}" -> parsed: $waterGoal');
       
       // If goals not provided, calculate defaults based on profile data
       double finalCalorieGoal;
@@ -1050,11 +1052,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       finalStepsGoal = stepsGoal ?? 10000;
       finalWaterGoal = waterGoal ?? 8;
 
-      print('Final calculated goals:');
-      print('Weight goal: $weightGoal');
-      print('Calorie goal: $finalCalorieGoal');
-      print('Steps goal: $finalStepsGoal');
-      print('Water goal: $finalWaterGoal');
+      if (kDebugMode) debugPrint('Final calculated goals:');
+      if (kDebugMode) debugPrint('Weight goal: $weightGoal');
+      if (kDebugMode) debugPrint('Calorie goal: $finalCalorieGoal');
+      if (kDebugMode) debugPrint('Steps goal: $finalStepsGoal');
+      if (kDebugMode) debugPrint('Water goal: $finalWaterGoal');
 
       // Calculate macro goals based on calorie target (standard distribution)
       final macroGoals = {
@@ -1063,7 +1065,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         'fatCalories': (finalCalorieGoal * 0.30).round(), // 30% fat
       };
       
-      print('Macro goals: $macroGoals');
+      if (kDebugMode) debugPrint('Macro goals: $macroGoals');
 
       // Create initial goals with complete structure
       final initialGoals = {
@@ -1079,14 +1081,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       // Save to Firebase
       await _firebaseService.saveUserGoals(userId, UserGoals.fromMap(initialGoals));
       
-      print('Initial goals created for user: $userId');
-      print('Goals data: $initialGoals');
+      if (kDebugMode) debugPrint('Initial goals created for user: $userId');
+      if (kDebugMode) debugPrint('Goals data: $initialGoals');
       
       // Verify the goals were saved correctly by reading them back
       final savedGoals = await _firebaseService.getUserGoals(userId);
-      print('Goals saved and retrieved: ${savedGoals?.toMap()}');
+      if (kDebugMode) debugPrint('Goals saved and retrieved: ${savedGoals?.toMap()}');
     } catch (e) {
-      print('Error creating initial goals: $e');
+      if (kDebugMode) debugPrint('Error creating initial goals: $e');
     }
   }
 
@@ -1114,9 +1116,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       // Save to Firebase
       await _firebaseService.saveUserPreferences(userId, UserPreferences.fromMap(initialPreferences));
       
-      print('Initial preferences created for user: $userId');
+      if (kDebugMode) debugPrint('Initial preferences created for user: $userId');
     } catch (e) {
-      print('Error creating initial preferences: $e');
+      if (kDebugMode) debugPrint('Error creating initial preferences: $e');
     }
   }
 
@@ -1221,3 +1223,4 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     }
   }
 }
+

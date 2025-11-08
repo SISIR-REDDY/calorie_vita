@@ -1,3 +1,8 @@
+library health_backend;
+
+import 'package:flutter/foundation.dart';
+import '../config/production_config.dart';
+
 /// Health Backend - Complete backend architecture for Health Connect integration
 /// 
 /// This library provides a clean architecture implementation for loading
@@ -51,7 +56,6 @@
 ///   },
 /// )
 /// ```
-library health_backend;
 
 // Core - Data Hub (Centralized data store)
 export 'core/health_data_hub.dart';
@@ -74,4 +78,5 @@ export 'repository/health_repository.dart';
 
 // Controller Layer
 export 'controller/health_controller.dart';
+
 

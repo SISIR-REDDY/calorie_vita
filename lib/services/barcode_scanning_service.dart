@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import '../models/nutrition_info.dart';
 import '../config/ai_config.dart';
 import 'network_service.dart';
+import 'package:flutter/foundation.dart';
+import '../config/production_config.dart';
 
 // TimeoutException is available from dart:async
 
@@ -54,9 +56,9 @@ class BarcodeScanningService {
         final indianPackagedString = await rootBundle.loadString('assets/indian_packaged.json');
         _indianPackaged = List<Map<String, dynamic>>.from(jsonDecode(indianPackagedString));
         totalProducts += _indianPackaged!.length;
-        print('✅ Loaded Indian packaged foods dataset: ${_indianPackaged!.length} products');
+        if (kDebugMode) debugPrint('✅ Loaded Indian packaged foods dataset: ${_indianPackaged!.length} products');
       } catch (e) {
-        print('⚠️ Indian packaged foods dataset not available: $e');
+        if (kDebugMode) debugPrint('⚠️ Indian packaged foods dataset not available: $e');
         _indianPackaged = [];
       }
       
@@ -65,9 +67,9 @@ class BarcodeScanningService {
         final indianFoodsString = await rootBundle.loadString('assets/indian_foods.json');
         _indianFoods = List<Map<String, dynamic>>.from(jsonDecode(indianFoodsString));
         totalProducts += _indianFoods!.length;
-        print('✅ Loaded Indian foods dataset: ${_indianFoods!.length} products');
+        if (kDebugMode) debugPrint('✅ Loaded Indian foods dataset: ${_indianFoods!.length} products');
       } catch (e) {
-        print('⚠️ Indian foods dataset not available: $e');
+        if (kDebugMode) debugPrint('⚠️ Indian foods dataset not available: $e');
         _indianFoods = [];
       }
       
@@ -76,21 +78,21 @@ class BarcodeScanningService {
         final comprehensiveString = await rootBundle.loadString('assets/comprehensive_indian_foods.json');
         _comprehensiveIndianFoods = List<Map<String, dynamic>>.from(jsonDecode(comprehensiveString));
         totalProducts += _comprehensiveIndianFoods!.length;
-        print('✅ Loaded comprehensive Indian foods dataset: ${_comprehensiveIndianFoods!.length} products');
+        if (kDebugMode) debugPrint('✅ Loaded comprehensive Indian foods dataset: ${_comprehensiveIndianFoods!.length} products');
       } catch (e) {
-        print('⚠️ Comprehensive Indian foods dataset not available: $e');
+        if (kDebugMode) debugPrint('⚠️ Comprehensive Indian foods dataset not available: $e');
         _comprehensiveIndianFoods = [];
       }
       
       // Add popular products to cache for faster access
       _addPopularProductsToCache();
       
-      print('✅ Barcode scanning service initialized');
-      print('📊 Total local products: $totalProducts');
-      print('📊 Cache size: ${_cache.length} products');
-      print('🌐 Using Open Food Facts for 100k+ Indian products coverage');
+      if (kDebugMode) debugPrint('✅ Barcode scanning service initialized');
+      if (kDebugMode) debugPrint('📊 Total local products: $totalProducts');
+      if (kDebugMode) debugPrint('📊 Cache size: ${_cache.length} products');
+      if (kDebugMode) debugPrint('🌐 Using Open Food Facts for 100k+ Indian products coverage');
     } catch (e) {
-      print('❌ Error initializing barcode scanning service: $e');
+      if (kDebugMode) debugPrint('❌ Error initializing barcode scanning service: $e');
     }
   }
 
@@ -186,7 +188,7 @@ class BarcodeScanningService {
       _cacheTimestamps[barcode] = DateTime.now();
     }
     
-    print('✅ Added ${popularProducts.length} popular products to cache');
+    if (kDebugMode) debugPrint('✅ Added ${popularProducts.length} popular products to cache');
   }
 
   /// Main barcode scanning method - restructured with better fallback chain
@@ -195,20 +197,20 @@ class BarcodeScanningService {
     final cleanBarcode = _cleanBarcode(barcode);
     
     try {
-      print('🔍 === BARCODE SCANNING STARTED ===');
-      print('📱 Barcode: $cleanBarcode (cleaned from: $barcode)');
+      if (kDebugMode) debugPrint('🔍 === BARCODE SCANNING STARTED ===');
+      if (kDebugMode) debugPrint('📱 Barcode: $cleanBarcode (cleaned from: $barcode)');
       
       // Step 1: Check cache first (fastest path)
       final cachedResult = _getCachedResult(cleanBarcode);
       if (cachedResult != null) {
-        print('💾 Cache hit: ${cachedResult.foodName} (${stopwatch.elapsedMilliseconds}ms)');
+        if (kDebugMode) debugPrint('💾 Cache hit: ${cachedResult.foodName} (${stopwatch.elapsedMilliseconds}ms)');
         return cachedResult;
       }
 
       // Step 2: Try parallel lookups from multiple sources (fastest)
       // Open Food Facts has 100k+ Indian products, so we prioritize it
-      print('🚀 Starting parallel lookup from multiple sources...');
-      print('🌐 Using Open Food Facts (100k+ Indian products database)...');
+      if (kDebugMode) debugPrint('🚀 Starting parallel lookup from multiple sources...');
+      if (kDebugMode) debugPrint('🌐 Using Open Food Facts (100k+ Indian products database)...');
       final parallelResults = await Future.wait([
         _tryOpenFoodFactsIndia(cleanBarcode),     // Indian products specifically (100k+ coverage)
         _tryOpenFoodFacts(cleanBarcode),           // Global products
@@ -221,33 +223,33 @@ class BarcodeScanningService {
       final localResult = parallelResults[2];
       final advancedResult = parallelResults[3];
 
-      print('📊 Parallel lookup results:');
-      print('   - Open Food Facts (India): ${offIndiaResult != null ? "${offIndiaResult.foodName} (valid: ${offIndiaResult.isValid})" : "not found"}');
-      print('   - Open Food Facts (Global): ${offResult != null ? "${offResult.foodName} (valid: ${offResult.isValid})" : "not found"}');
-      print('   - Local Dataset: ${localResult != null ? "${localResult.foodName} (valid: ${localResult.isValid})" : "not found"}');
-      print('   - Advanced Search: ${advancedResult != null ? "${advancedResult.foodName} (valid: ${advancedResult.isValid})" : "not found"}');
+      if (kDebugMode) debugPrint('📊 Parallel lookup results:');
+      if (kDebugMode) debugPrint('   - Open Food Facts (India): ${offIndiaResult != null ? "${offIndiaResult.foodName} (valid: ${offIndiaResult.isValid})" : "not found"}');
+      if (kDebugMode) debugPrint('   - Open Food Facts (Global): ${offResult != null ? "${offResult.foodName} (valid: ${offResult.isValid})" : "not found"}');
+      if (kDebugMode) debugPrint('   - Local Dataset: ${localResult != null ? "${localResult.foodName} (valid: ${localResult.isValid})" : "not found"}');
+      if (kDebugMode) debugPrint('   - Advanced Search: ${advancedResult != null ? "${advancedResult.foodName} (valid: ${advancedResult.isValid})" : "not found"}');
 
       // Priority 1: Open Food Facts India (best for Indian products)
       if (offIndiaResult != null && offIndiaResult.isValid && offIndiaResult.calories > 0) {
-        print('✅ SUCCESS: Found in Open Food Facts (India)');
+        if (kDebugMode) debugPrint('✅ SUCCESS: Found in Open Food Facts (India)');
         return _cacheAndReturn(cleanBarcode, offIndiaResult);
       }
 
       // Priority 2: Open Food Facts Global (most complete nutrition data)
       if (offResult != null && offResult.isValid && offResult.calories > 0) {
-        print('✅ SUCCESS: Found in Open Food Facts (Global)');
+        if (kDebugMode) debugPrint('✅ SUCCESS: Found in Open Food Facts (Global)');
         return _cacheAndReturn(cleanBarcode, offResult);
       }
 
       // Priority 3: Advanced search result
       if (advancedResult != null && advancedResult.isValid && advancedResult.calories > 0) {
-        print('✅ SUCCESS: Found via Advanced Search');
+        if (kDebugMode) debugPrint('✅ SUCCESS: Found via Advanced Search');
         return _cacheAndReturn(cleanBarcode, advancedResult);
       }
 
       // Priority 4: Local Indian dataset (fast, reliable for Indian products)
       if (localResult != null && localResult.isValid && localResult.calories > 0) {
-        print('✅ SUCCESS: Found in Local Indian Dataset');
+        if (kDebugMode) debugPrint('✅ SUCCESS: Found in Local Indian Dataset');
         return _cacheAndReturn(cleanBarcode, localResult);
       }
 
@@ -255,16 +257,16 @@ class BarcodeScanningService {
       final productWithName = offIndiaResult ?? offResult;
       if (productWithName != null && productWithName.foodName != 'Unknown Product' && 
           (productWithName.calories == 0 || !productWithName.isValid)) {
-        print('⚠️ Product found but missing nutrition data, trying AI...');
+        if (kDebugMode) debugPrint('⚠️ Product found but missing nutrition data, trying AI...');
         final aiResult = await _tryAIForNutrition(productWithName.foodName, cleanBarcode);
         if (aiResult != null && aiResult.isValid && aiResult.calories > 0) {
-          print('✅ SUCCESS: AI provided nutrition data');
+          if (kDebugMode) debugPrint('✅ SUCCESS: AI provided nutrition data');
           return _cacheAndReturn(cleanBarcode, aiResult);
         }
       }
 
       // Step 4: Try alternative barcode databases (UPCitemdb, GTINsearch)
-      print('🔄 Trying alternative barcode databases...');
+      if (kDebugMode) debugPrint('🔄 Trying alternative barcode databases...');
       final altDatabases = await Future.wait([
         _tryUPCItemDb(cleanBarcode),
         _tryGTINSearch(cleanBarcode),
@@ -275,11 +277,11 @@ class BarcodeScanningService {
 
       // Process UPCitemdb result
       if (upcResult != null && upcResult.foodName != 'Unknown Product') {
-        print('✅ Found product name in UPCitemdb: ${upcResult.foodName}');
+        if (kDebugMode) debugPrint('✅ Found product name in UPCitemdb: ${upcResult.foodName}');
         // Try to get nutrition data for this product
         final nutritionResult = await _getNutritionForProductName(upcResult.foodName, cleanBarcode);
         if (nutritionResult != null && nutritionResult.isValid && nutritionResult.calories > 0) {
-          print('✅ SUCCESS: Got nutrition data for UPCitemdb product');
+          if (kDebugMode) debugPrint('✅ SUCCESS: Got nutrition data for UPCitemdb product');
           return _cacheAndReturn(cleanBarcode, nutritionResult);
         }
         // If no nutrition found, return basic product info
@@ -290,11 +292,11 @@ class BarcodeScanningService {
 
       // Process GTINsearch result
       if (gtinResult != null && gtinResult.foodName != 'Unknown Product') {
-        print('✅ Found product name in GTINsearch: ${gtinResult.foodName}');
+        if (kDebugMode) debugPrint('✅ Found product name in GTINsearch: ${gtinResult.foodName}');
         // Try to get nutrition data for this product
         final nutritionResult = await _getNutritionForProductName(gtinResult.foodName, cleanBarcode);
         if (nutritionResult != null && nutritionResult.isValid && nutritionResult.calories > 0) {
-          print('✅ SUCCESS: Got nutrition data for GTINsearch product');
+          if (kDebugMode) debugPrint('✅ SUCCESS: Got nutrition data for GTINsearch product');
           return _cacheAndReturn(cleanBarcode, nutritionResult);
         }
         // If no nutrition found, return basic product info
@@ -305,21 +307,21 @@ class BarcodeScanningService {
 
       // Step 5: Final fallback - try AI directly with barcode
       if (NetworkService().isOnline && AIConfig.apiKey.isNotEmpty) {
-        print('🤖 Final fallback: Trying AI with barcode...');
+        if (kDebugMode) debugPrint('🤖 Final fallback: Trying AI with barcode...');
         final aiResult = await _tryAIForNutrition('Barcode: $cleanBarcode', cleanBarcode);
         if (aiResult != null && aiResult.isValid && aiResult.calories > 0) {
-          print('✅ SUCCESS: AI provided nutrition data');
+          if (kDebugMode) debugPrint('✅ SUCCESS: AI provided nutrition data');
           return _cacheAndReturn(cleanBarcode, aiResult);
         }
       }
 
-      print('❌ No nutrition data found for barcode: $cleanBarcode');
-      print('⏱️ Total time: ${stopwatch.elapsedMilliseconds}ms');
+      if (kDebugMode) debugPrint('❌ No nutrition data found for barcode: $cleanBarcode');
+      if (kDebugMode) debugPrint('⏱️ Total time: ${stopwatch.elapsedMilliseconds}ms');
       return null;
 
     } catch (e, stackTrace) {
-      print('❌ Error scanning barcode: $e');
-      print('Stack trace: $stackTrace');
+      if (kDebugMode) debugPrint('❌ Error scanning barcode: $e');
+      if (kDebugMode) debugPrint('Stack trace: $stackTrace');
       return null;
     }
   }
@@ -327,10 +329,10 @@ class BarcodeScanningService {
   /// Get nutrition data from product name (used as fallback)
   static Future<NutritionInfo?> getNutritionFromProductName(String productName) async {
     try {
-      print('🔍 Getting nutrition for product name: $productName');
+      if (kDebugMode) debugPrint('🔍 Getting nutrition for product name: $productName');
       return await _getNutritionForProductName(productName, '');
     } catch (e) {
-      print('❌ Error getting nutrition from product name: $e');
+      if (kDebugMode) debugPrint('❌ Error getting nutrition from product name: $e');
       return null;
     }
   }
@@ -352,28 +354,28 @@ class BarcodeScanningService {
 
     // Priority 1: Local dataset (fastest, most reliable for Indian products)
     if (localResult != null && localResult.isValid && localResult.calories > 0) {
-      print('✅ Found in local dataset: ${localResult.foodName}');
+      if (kDebugMode) debugPrint('✅ Found in local dataset: ${localResult.foodName}');
       return localResult;
     }
 
     // Priority 2: Open Food Facts India search (better for Indian products)
     if (offIndiaResult != null && offIndiaResult.isValid && offIndiaResult.calories > 0) {
-      print('✅ Found in Open Food Facts (India): ${offIndiaResult.foodName}');
+      if (kDebugMode) debugPrint('✅ Found in Open Food Facts (India): ${offIndiaResult.foodName}');
       return offIndiaResult;
     }
 
     // Priority 3: Open Food Facts global search
     if (offResult != null && offResult.isValid && offResult.calories > 0) {
-      print('✅ Found in Open Food Facts: ${offResult.foodName}');
+      if (kDebugMode) debugPrint('✅ Found in Open Food Facts: ${offResult.foodName}');
       return offResult;
     }
 
     // Priority 4: Try AI
     if (NetworkService().isOnline && AIConfig.apiKey.isNotEmpty) {
-      print('🤖 Trying AI for product name: $productName');
+      if (kDebugMode) debugPrint('🤖 Trying AI for product name: $productName');
       final aiResult = await _tryAIForNutrition(productName, barcode);
       if (aiResult != null && aiResult.isValid && aiResult.calories > 0) {
-        print('✅ AI provided nutrition data: ${aiResult.foodName}');
+        if (kDebugMode) debugPrint('✅ AI provided nutrition data: ${aiResult.foodName}');
         return aiResult;
       }
     }
@@ -422,7 +424,7 @@ class BarcodeScanningService {
   static Future<NutritionInfo?> _tryOpenFoodFacts(String barcode) async {
     try {
       final url = '$_openFoodFactsBaseUrl/$barcode.json';
-      print('📡 Calling Open Food Facts: $url');
+      if (kDebugMode) debugPrint('📡 Calling Open Food Facts: $url');
       
       final response = await http.get(
         Uri.parse(url),
@@ -433,7 +435,7 @@ class BarcodeScanningService {
       ).timeout(
         const Duration(seconds: 5),
         onTimeout: () {
-          print('⏱️ Open Food Facts timeout');
+          if (kDebugMode) debugPrint('⏱️ Open Food Facts timeout');
           throw TimeoutException('Request timeout', const Duration(seconds: 5));
         },
       );
@@ -446,24 +448,24 @@ class BarcodeScanningService {
           if (product != null) {
             final nutrition = _parseOpenFoodFactsProduct(product);
             if (nutrition != null && nutrition.isValid && nutrition.calories > 0) {
-              print('✅ Open Food Facts: Found ${nutrition.foodName}');
+              if (kDebugMode) debugPrint('✅ Open Food Facts: Found ${nutrition.foodName}');
               return nutrition;
             } else {
-              print('⚠️ Open Food Facts: Product found but invalid nutrition data');
+              if (kDebugMode) debugPrint('⚠️ Open Food Facts: Product found but invalid nutrition data');
               // Return basic product info even if nutrition is incomplete
               return _createBasicProductInfo(product, 'Open Food Facts');
             }
           }
         } else {
-          print('❌ Open Food Facts: Product not found (status: ${data['status']})');
+          if (kDebugMode) debugPrint('❌ Open Food Facts: Product not found (status: ${data['status']})');
         }
       } else {
-        print('❌ Open Food Facts: HTTP error ${response.statusCode}');
+        if (kDebugMode) debugPrint('❌ Open Food Facts: HTTP error ${response.statusCode}');
       }
     } on TimeoutException {
-      print('⏱️ Open Food Facts: Timeout');
+      if (kDebugMode) debugPrint('⏱️ Open Food Facts: Timeout');
     } catch (e) {
-      print('❌ Open Food Facts: Error - $e');
+      if (kDebugMode) debugPrint('❌ Open Food Facts: Error - $e');
     }
     return null;
   }
@@ -473,7 +475,7 @@ class BarcodeScanningService {
     try {
       // First try direct barcode lookup
       final url = '$_openFoodFactsBaseUrl/$barcode.json';
-      print('📡 Calling Open Food Facts (India): $url');
+      if (kDebugMode) debugPrint('📡 Calling Open Food Facts (India): $url');
       
       final response = await http.get(
         Uri.parse(url),
@@ -484,7 +486,7 @@ class BarcodeScanningService {
       ).timeout(
         const Duration(seconds: 5),
         onTimeout: () {
-          print('⏱️ Open Food Facts (India) timeout');
+          if (kDebugMode) debugPrint('⏱️ Open Food Facts (India) timeout');
           throw TimeoutException('Request timeout', const Duration(seconds: 5));
         },
       );
@@ -537,10 +539,10 @@ class BarcodeScanningService {
               if (isIndianProduct || isLikelyIndian || countries == null || countries.isEmpty) {
                 final nutrition = _parseOpenFoodFactsProduct(product);
                 if (nutrition != null && nutrition.isValid && nutrition.calories > 0) {
-                  print('✅ Open Food Facts (India): Found ${nutrition.foodName}');
+                  if (kDebugMode) debugPrint('✅ Open Food Facts (India): Found ${nutrition.foodName}');
                   return nutrition;
                 } else if (nutrition != null) {
-                  print('⚠️ Open Food Facts (India): Product found but invalid nutrition data');
+                  if (kDebugMode) debugPrint('⚠️ Open Food Facts (India): Product found but invalid nutrition data');
                   return _createBasicProductInfo(product, 'Open Food Facts (India)');
                 }
               }
@@ -549,9 +551,9 @@ class BarcodeScanningService {
         }
       }
     } on TimeoutException {
-      print('⏱️ Open Food Facts (India): Timeout');
+      if (kDebugMode) debugPrint('⏱️ Open Food Facts (India): Timeout');
     } catch (e) {
-      print('❌ Open Food Facts (India): Error - $e');
+      if (kDebugMode) debugPrint('❌ Open Food Facts (India): Error - $e');
     }
     return null;
   }
@@ -573,7 +575,7 @@ class BarcodeScanningService {
           final servingSizeGrams = (product['serving_size_grams'] as num).toDouble();
           final totalCalories = (caloriesPer100g * servingSizeGrams) / 100;
           
-          print('✅ Local Dataset: Found ${product['name']}');
+          if (kDebugMode) debugPrint('✅ Local Dataset: Found ${product['name']}');
           
           return NutritionInfo(
             foodName: product['name'] as String,
@@ -592,7 +594,7 @@ class BarcodeScanningService {
         }
       }
     } catch (e) {
-      print('❌ Local Dataset: Error - $e');
+      if (kDebugMode) debugPrint('❌ Local Dataset: Error - $e');
     }
     return null;
   }
@@ -620,7 +622,7 @@ class BarcodeScanningService {
           final servingSizeGrams = (product['serving_size_grams'] as num).toDouble();
           final totalCalories = (caloriesPer100g * servingSizeGrams) / 100;
           
-          print('✅ Local Dataset: Found ${product['name']} by name');
+          if (kDebugMode) debugPrint('✅ Local Dataset: Found ${product['name']} by name');
           
           return NutritionInfo(
             foodName: product['name'] as String,
@@ -639,7 +641,7 @@ class BarcodeScanningService {
         }
       }
     } catch (e) {
-      print('❌ Local Dataset by name: Error - $e');
+      if (kDebugMode) debugPrint('❌ Local Dataset by name: Error - $e');
     }
     return null;
   }
@@ -648,7 +650,7 @@ class BarcodeScanningService {
   static Future<NutritionInfo?> _tryUPCItemDb(String barcode) async {
     try {
       final url = '$_upcItemDbBaseUrl?upc=$barcode';
-      print('📡 Calling UPCitemdb: $url');
+      if (kDebugMode) debugPrint('📡 Calling UPCitemdb: $url');
       
       final response = await http.get(
         Uri.parse(url),
@@ -659,7 +661,7 @@ class BarcodeScanningService {
       ).timeout(
         const Duration(seconds: 5),
         onTimeout: () {
-          print('⏱️ UPCitemdb timeout');
+          if (kDebugMode) debugPrint('⏱️ UPCitemdb timeout');
           throw TimeoutException('Request timeout', const Duration(seconds: 5));
         },
       );
@@ -675,7 +677,7 @@ class BarcodeScanningService {
           final category = item['category'] as String?;
           
           if (title.isNotEmpty && title != 'Unknown Product') {
-            print('✅ UPCitemdb: Found $title');
+            if (kDebugMode) debugPrint('✅ UPCitemdb: Found $title');
             return NutritionInfo(
               foodName: title,
               weightGrams: 100.0,
@@ -694,9 +696,9 @@ class BarcodeScanningService {
         }
       }
     } on TimeoutException {
-      print('⏱️ UPCitemdb: Timeout');
+      if (kDebugMode) debugPrint('⏱️ UPCitemdb: Timeout');
     } catch (e) {
-      print('❌ UPCitemdb: Error - $e');
+      if (kDebugMode) debugPrint('❌ UPCitemdb: Error - $e');
     }
     return null;
   }
@@ -705,7 +707,7 @@ class BarcodeScanningService {
   static Future<NutritionInfo?> _tryGTINSearch(String barcode) async {
     try {
       final url = '$_gtinSearchBaseUrl/$barcode';
-      print('📡 Calling GTINsearch: $url');
+      if (kDebugMode) debugPrint('📡 Calling GTINsearch: $url');
       
       final response = await http.get(
         Uri.parse(url),
@@ -715,7 +717,7 @@ class BarcodeScanningService {
       ).timeout(
         const Duration(seconds: 5),
         onTimeout: () {
-          print('⏱️ GTINsearch timeout');
+          if (kDebugMode) debugPrint('⏱️ GTINsearch timeout');
           throw TimeoutException('Request timeout', const Duration(seconds: 5));
         },
       );
@@ -728,7 +730,7 @@ class BarcodeScanningService {
           final brand = data['brand'] as String?;
           final category = data['category'] as String?;
           
-          print('✅ GTINsearch: Found $name');
+          if (kDebugMode) debugPrint('✅ GTINsearch: Found $name');
           return NutritionInfo(
             foodName: name,
             weightGrams: 100.0,
@@ -746,9 +748,9 @@ class BarcodeScanningService {
         }
       }
     } on TimeoutException {
-      print('⏱️ GTINsearch: Timeout');
+      if (kDebugMode) debugPrint('⏱️ GTINsearch: Timeout');
     } catch (e) {
-      print('❌ GTINsearch: Error - $e');
+      if (kDebugMode) debugPrint('❌ GTINsearch: Error - $e');
     }
     return null;
   }
@@ -760,7 +762,7 @@ class BarcodeScanningService {
       // Search with India filter for better relevance - increased page size for better coverage
       final indiaUrl = '$_openFoodFactsSearchUrl?search_terms=${Uri.encodeComponent(productName)}&search_simple=1&action=process&json=1&countries_tags_en=india&page_size=$_maxSearchResults';
       
-      print('📡 Calling Open Food Facts (India) search: $productName');
+      if (kDebugMode) debugPrint('📡 Calling Open Food Facts (India) search: $productName');
       
       final response = await http.get(
         Uri.parse(indiaUrl),
@@ -785,16 +787,16 @@ class BarcodeScanningService {
             final product = productData as Map<String, dynamic>;
             final nutrition = _parseOpenFoodFactsProduct(product);
             if (nutrition != null && nutrition.isValid && nutrition.calories > 0) {
-              print('✅ Open Food Facts (India) search: Found ${nutrition.foodName}');
+              if (kDebugMode) debugPrint('✅ Open Food Facts (India) search: Found ${nutrition.foodName}');
               return nutrition;
             }
           }
         }
       }
     } on TimeoutException {
-      print('⏱️ Open Food Facts (India) search: Timeout');
+      if (kDebugMode) debugPrint('⏱️ Open Food Facts (India) search: Timeout');
     } catch (e) {
-      print('❌ Open Food Facts (India) search: Error - $e');
+      if (kDebugMode) debugPrint('❌ Open Food Facts (India) search: Error - $e');
     }
     return null;
   }
@@ -816,7 +818,7 @@ class BarcodeScanningService {
 
       for (final strategyUrl in searchStrategies) {
         try {
-          print('📡 Advanced search: Trying strategy...');
+          if (kDebugMode) debugPrint('📡 Advanced search: Trying strategy...');
           final response = await http.get(
             Uri.parse(strategyUrl),
             headers: {
@@ -844,7 +846,7 @@ class BarcodeScanningService {
                 if (productCode == barcode) {
                   final nutrition = _parseOpenFoodFactsProduct(product);
                   if (nutrition != null && nutrition.isValid && nutrition.calories > 0) {
-                    print('✅ Advanced search: Found exact match ${nutrition.foodName}');
+                    if (kDebugMode) debugPrint('✅ Advanced search: Found exact match ${nutrition.foodName}');
                     return nutrition;
                   }
                 }
@@ -854,7 +856,7 @@ class BarcodeScanningService {
                 if (packagingCodes != null && packagingCodes.contains(barcode)) {
                   final nutrition = _parseOpenFoodFactsProduct(product);
                   if (nutrition != null && nutrition.isValid && nutrition.calories > 0) {
-                    print('✅ Advanced search: Found match via packaging codes ${nutrition.foodName}');
+                    if (kDebugMode) debugPrint('✅ Advanced search: Found match via packaging codes ${nutrition.foodName}');
                     return nutrition;
                   }
                 }
@@ -880,7 +882,7 @@ class BarcodeScanningService {
                   }
                   
                   if (isIndian || countriesTags == null || countriesTags.isEmpty) {
-                    print('✅ Advanced search: Found Indian product ${nutrition.foodName}');
+                    if (kDebugMode) debugPrint('✅ Advanced search: Found Indian product ${nutrition.foodName}');
                     return nutrition;
                   }
                 }
@@ -896,7 +898,7 @@ class BarcodeScanningService {
         }
       }
     } catch (e) {
-      print('❌ Advanced search: Error - $e');
+      if (kDebugMode) debugPrint('❌ Advanced search: Error - $e');
     }
     return null;
   }
@@ -908,7 +910,7 @@ class BarcodeScanningService {
       // Global search without country filter - increased page size for better coverage
       final globalUrl = '$_openFoodFactsSearchUrl?search_terms=${Uri.encodeComponent(productName)}&search_simple=1&action=process&json=1&page_size=$_maxSearchResults';
       
-      print('📡 Calling Open Food Facts (Global) search: $productName');
+      if (kDebugMode) debugPrint('📡 Calling Open Food Facts (Global) search: $productName');
       
       final response = await http.get(
         Uri.parse(globalUrl),
@@ -933,16 +935,16 @@ class BarcodeScanningService {
             final product = productData as Map<String, dynamic>;
             final nutrition = _parseOpenFoodFactsProduct(product);
             if (nutrition != null && nutrition.isValid && nutrition.calories > 0) {
-              print('✅ Open Food Facts (Global) search: Found ${nutrition.foodName}');
+              if (kDebugMode) debugPrint('✅ Open Food Facts (Global) search: Found ${nutrition.foodName}');
               return nutrition;
             }
           }
         }
       }
     } on TimeoutException {
-      print('⏱️ Open Food Facts (Global) search: Timeout');
+      if (kDebugMode) debugPrint('⏱️ Open Food Facts (Global) search: Timeout');
     } catch (e) {
-      print('❌ Open Food Facts (Global) search: Error - $e');
+      if (kDebugMode) debugPrint('❌ Open Food Facts (Global) search: Error - $e');
     }
     return null;
   }
@@ -951,16 +953,16 @@ class BarcodeScanningService {
   static Future<NutritionInfo?> _tryAIForNutrition(String productName, String barcode) async {
     try {
       if (!NetworkService().isOnline) {
-        print('❌ AI: Network offline');
+        if (kDebugMode) debugPrint('❌ AI: Network offline');
         return null;
       }
 
       if (AIConfig.apiKey.isEmpty) {
-        print('❌ AI: API key not configured');
+        if (kDebugMode) debugPrint('❌ AI: API key not configured');
         return null;
       }
 
-      print('🤖 Calling AI for: $productName');
+      if (kDebugMode) debugPrint('🤖 Calling AI for: $productName');
       
       final response = await http.post(
         Uri.parse(AIConfig.baseUrl),
@@ -1013,7 +1015,7 @@ Be accurate - wrong nutrition data can mislead users!''',
       ).timeout(
         const Duration(seconds: 10),
         onTimeout: () {
-          print('⏱️ AI: Timeout');
+          if (kDebugMode) debugPrint('⏱️ AI: Timeout');
           throw TimeoutException('Request timeout', const Duration(seconds: 10));
         },
       );
@@ -1040,7 +1042,7 @@ Be accurate - wrong nutrition data can mislead users!''',
             final sugar = _parseMacro(parsed['sugar']);
             
             if (calories != null && calories > 0) {
-              print('✅ AI: Provided nutrition data for ${parsed['food']}');
+              if (kDebugMode) debugPrint('✅ AI: Provided nutrition data for ${parsed['food']}');
               return NutritionInfo(
                 foodName: (parsed['food'] ?? productName).toString(),
                 weightGrams: 100.0,
@@ -1058,15 +1060,15 @@ Be accurate - wrong nutrition data can mislead users!''',
             }
           }
         } catch (e) {
-          print('❌ AI: Failed to parse JSON response - $e');
+          if (kDebugMode) debugPrint('❌ AI: Failed to parse JSON response - $e');
         }
       } else {
-        print('❌ AI: HTTP error ${response.statusCode}');
+        if (kDebugMode) debugPrint('❌ AI: HTTP error ${response.statusCode}');
       }
     } on TimeoutException {
-      print('⏱️ AI: Timeout');
+      if (kDebugMode) debugPrint('⏱️ AI: Timeout');
     } catch (e) {
-      print('❌ AI: Error - $e');
+      if (kDebugMode) debugPrint('❌ AI: Error - $e');
     }
     return null;
   }
@@ -1165,14 +1167,14 @@ Be accurate - wrong nutrition data can mislead users!''',
       
       // Validate data
       if (finalCalories == 0 && finalProtein == 0 && finalCarbs == 0 && finalFat == 0) {
-        print('⚠️ Open Food Facts: No nutrition data available');
+        if (kDebugMode) debugPrint('⚠️ Open Food Facts: No nutrition data available');
         return null;
       }
       
       // If calories are missing but macros exist, calculate calories
       if (finalCalories == 0 && (finalProtein > 0 || finalCarbs > 0 || finalFat > 0)) {
         finalCalories = (finalProtein * 4) + (finalCarbs * 4) + (finalFat * 9);
-        print('🔧 Calculated calories from macros: $finalCalories kcal');
+        if (kDebugMode) debugPrint('🔧 Calculated calories from macros: $finalCalories kcal');
       }
       
       // Create display name
@@ -1186,9 +1188,9 @@ Be accurate - wrong nutrition data can mislead users!''',
         displayName = '$displayName ($sizeInfo)';
       }
       
-      print('✅ Parsed Open Food Facts: $displayName');
-      print('   Size: ${finalWeight}g, Calories: ${finalCalories.toStringAsFixed(0)} kcal');
-      print('   Macros: P${finalProtein.toStringAsFixed(1)}g C${finalCarbs.toStringAsFixed(1)}g F${finalFat.toStringAsFixed(1)}g');
+      if (kDebugMode) debugPrint('✅ Parsed Open Food Facts: $displayName');
+      if (kDebugMode) debugPrint('   Size: ${finalWeight}g, Calories: ${finalCalories.toStringAsFixed(0)} kcal');
+      if (kDebugMode) debugPrint('   Macros: P${finalProtein.toStringAsFixed(1)}g C${finalCarbs.toStringAsFixed(1)}g F${finalFat.toStringAsFixed(1)}g');
       
       return NutritionInfo(
         foodName: displayName,
@@ -1205,7 +1207,7 @@ Be accurate - wrong nutrition data can mislead users!''',
         notes: 'Size: ${finalWeight}g',
       );
     } catch (e) {
-      print('❌ Error parsing Open Food Facts product: $e');
+      if (kDebugMode) debugPrint('❌ Error parsing Open Food Facts product: $e');
       return null;
     }
   }
@@ -1570,7 +1572,7 @@ Be accurate - wrong nutrition data can mislead users!''',
   static void clearCache() {
     _cache.clear();
     _cacheTimestamps.clear();
-    print('🧹 Barcode cache cleared');
+    if (kDebugMode) debugPrint('🧹 Barcode cache cleared');
   }
 
   /// Get cache statistics
@@ -1581,3 +1583,4 @@ Be accurate - wrong nutrition data can mislead users!''',
     };
   }
 }
+

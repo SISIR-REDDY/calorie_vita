@@ -127,7 +127,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   List<Task> _tasks = [];
   bool _isTasksLoading = true;
   bool _hasUserTasks = false;
-  bool _hasLoggedNoGoogleFitData = false; // Track if "No Google Fit data" has been logged
+  // Removed _hasLoggedNoGoogleFitData - logging reduced for performance
   bool _hasLoggedGoalsRefreshDuplicate = false; // Track if goals refresh duplicate has been logged
   bool _hasLoggedStreakTimeout = false; // Track if streak timeout has been logged
 
@@ -210,7 +210,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         setState(() {
           _dailySummary = _dailySummary!.copyWith(caloriesConsumed: cachedCalories);
         });
-        print('⚡ Home: Loaded cached calories on screen change: $cachedCalories');
+        if (kDebugMode) debugPrint('⚡ Home: Loaded cached calories on screen change: $cachedCalories');
       }
     }
     
@@ -269,14 +269,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           }
         });
         if (cachedCalories > 0) {
-          print('⚡ Home: INSTANT cached data loaded - Calories: $cachedCalories');
+          if (kDebugMode) debugPrint('⚡ Home: INSTANT cached data loaded - Calories: $cachedCalories');
         }
       }
       
       // Initialize service in background (non-blocking)
       // This will reload data from Firestore and update streams
       _todaysFoodDataService.initialize().then((_) {
-        print('✅ Home: Food data service initialized');
+        if (kDebugMode) debugPrint('✅ Home: Food data service initialized');
         // After initialization, ensure cached data is still displayed
         final updatedCalories = _todaysFoodDataService.getCachedConsumedCalories();
         if (updatedCalories > 0 && mounted && _dailySummary != null) {
@@ -287,7 +287,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           });
         }
       }).catchError((e) {
-        print('❌ Home: Food data service init error: $e');
+        if (kDebugMode) debugPrint('❌ Home: Food data service init error: $e');
       });
       
       // Listen to consumed calories stream (same data as TodaysFoodScreen)
@@ -311,7 +311,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 setState(() {
                   _dailySummary = _dailySummary!.copyWith(caloriesConsumed: calories);
                 });
-                print('✅ Home: Calories updated from TodaysFoodDataService: $calories (current: $currentCalories)');
               } else {
                 // Create daily summary if it doesn't exist
                 setState(() {
@@ -327,13 +326,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   );
                 });
               }
-            } else {
-              print('🚫 Home: Skipped calories update (new: $calories, current: $currentCalories) - preserving current value');
             }
           });
         },
         onError: (error) {
-          print('❌ Home: Error in consumed calories stream: $error');
+          if (kDebugMode) debugPrint('❌ Home: Error in consumed calories stream: $error');
         },
       );
 
@@ -352,9 +349,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         });
       });
 
-      print('✅ Today\'s food data service initialized');
+      if (kDebugMode) debugPrint('✅ Today\'s food data service initialized');
     } catch (e) {
-      print('❌ Error initializing today\'s food data service: $e');
+      if (kDebugMode) debugPrint('❌ Error initializing today\'s food data service: $e');
     }
   }
 
@@ -374,17 +371,15 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   Future<void> _preloadGoogleFitData() async {
     try {
       await _healthConnectManager.initialize();
-      print('✅ Home screen: Google Fit data preloaded');
+      if (kDebugMode) debugPrint('✅ Home screen: Google Fit data preloaded');
     } catch (e) {
-      print('❌ Home screen: Google Fit data preload failed: $e');
+      if (kDebugMode) debugPrint('❌ Home screen: Google Fit data preload failed: $e');
     }
   }
 
   /// Load instant data from global cache to prevent UI lag
   void _loadInstantDataFromCache() {
     try {
-      print('⚡ Home: Loading instant data from global cache...');
-      
       // Load tasks instantly to prevent buffering
       _loadTasksDataImmediate();
       
@@ -395,10 +390,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       // Note: Caching removed for simplification
       
       // Note: Caching logic removed for simplification
-      
-      print('✅ Home: Instant data loading completed');
     } catch (e) {
-      print('❌ Home: Instant data loading failed: $e');
+      if (kDebugMode) debugPrint('❌ Home: Instant data loading failed: $e');
     }
   }
 
@@ -408,8 +401,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Initialize Google Fit services in proper order
   Future<void> _initializeGoogleFitServices() async {
     try {
-      print('🚀 Home: Initializing Google Fit services...');
-      
       // Step 1: Initialize unified manager first
       await _initializeUnifiedGoogleFit();
       
@@ -417,10 +408,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       await _preloadGoogleFitData();
       
       // Sync mixin removed - using optimized manager
-      
-      print('✅ Home: Google Fit services initialized successfully');
     } catch (e) {
-      print('❌ Home: Google Fit services initialization failed: $e');
+      if (kDebugMode) debugPrint('❌ Home: Google Fit services initialization failed: $e');
     }
   }
 
@@ -436,16 +425,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Initialize optimized Google Fit manager
   Future<void> _initializeUnifiedGoogleFit() async {
     try {
-      print('🚀 Home: Starting optimized Google Fit initialization...');
       await _healthConnectManager.initialize();
-      
-      // Check connection status
-      final isConnected = _healthConnectManager.isConnected;
-      print('🔍 Home: Google Fit connection status: $isConnected');
       
       // INSTANT: Load current data immediately (0ms delay) from cache
       final currentData = _healthConnectManager.getCurrentData();
-      print('📊 Home: Current Google Fit data: $currentData');
       
       if (currentData != null && mounted) {
         // Update UI immediately for instant display
@@ -460,18 +443,12 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         });
         
         _updateDailySummaryWithGoogleFitData();
-        print('⚡ Home: INSTANT Google Fit data loaded');
-        print('   Steps: ${currentData.steps}');
-        print('   Calories: ${currentData.caloriesBurned}');
-        print('   _googleFitCaloriesBurned set to: $_googleFitCaloriesBurned');
       }
       
       // Set up listeners for real-time updates
       _setupGoogleFitListeners();
-      
-      print('✅ Optimized Google Fit manager initialized');
     } catch (e) {
-      print('❌ Optimized Google Fit initialization failed: $e');
+      if (kDebugMode) debugPrint('❌ Optimized Google Fit initialization failed: $e');
     }
   }
 
@@ -557,7 +534,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       _isTasksLoading = false;
       _hasUserTasks = _taskService.hasUserTasks();
     });
-    print('📋 Tasks refreshed: ${_tasks.length} tasks');
+    if (kDebugMode) debugPrint('📋 Tasks refreshed: ${_tasks.length} tasks');
   }
 
   @override
@@ -711,7 +688,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           _activityLevel = _calculateActivityLevel(currentData.steps);
           _isGoogleFitConnected = _healthConnectManager.isConnected;
         });
-        print('✅ Home: Loaded Google Fit data immediately - Steps: ${currentData.steps}, Calories: ${currentData.caloriesBurned}');
       } else {
         setState(() {
           _googleFitSteps = 0;
@@ -721,14 +697,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           _activityLevel = 'Unknown';
           _isGoogleFitConnected = false;
         });
-        // Reduced logging - only log once, not on every check
-        if (kDebugMode && !_hasLoggedNoGoogleFitData) {
-          debugPrint('⚠️ Home: No Google Fit data available');
-          _hasLoggedNoGoogleFitData = true;
-        }
       }
     } catch (e) {
-      print('❌ Home: Error loading Google Fit data: $e');
+      if (kDebugMode) debugPrint('❌ Home: Error loading Google Fit data: $e');
     }
   }
 
@@ -750,7 +721,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           date: DateTime.now(),
         );
         if (cachedCalories > 0) {
-          print('✅ Home: Loaded cached calories: $cachedCalories');
+          if (kDebugMode) debugPrint('✅ Home: Loaded cached calories: $cachedCalories');
         }
       } else {
         // If summary exists, try to update with cached calories if it's 0
@@ -759,7 +730,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           setState(() {
             _dailySummary = _dailySummary!.copyWith(caloriesConsumed: cachedCalories);
           });
-          print('✅ Home: Updated calories from cache: $cachedCalories');
+          if (kDebugMode) debugPrint('✅ Home: Updated calories from cache: $cachedCalories');
         }
       }
 
@@ -795,11 +766,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               _dailySummary = _dailySummary!.copyWith(caloriesConsumed: consumedCalories);
             }
           });
-          print('✅ Loaded consumed calories from food history (fallback): $consumedCalories');
+          if (kDebugMode) debugPrint('✅ Loaded consumed calories from food history (fallback): $consumedCalories');
         }
       }
     } catch (e) {
-      print('❌ Error loading consumed calories from food history: $e');
+      if (kDebugMode) debugPrint('❌ Error loading consumed calories from food history: $e');
     }
   }
 
@@ -836,9 +807,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         });
       }
       
-      print('✅ Loaded macro nutrients from food history: Protein: ${totalProtein.toStringAsFixed(1)}g, Carbs: ${totalCarbs.toStringAsFixed(1)}g, Fat: ${totalFat.toStringAsFixed(1)}g');
+      if (kDebugMode) debugPrint('✅ Loaded macro nutrients from food history: Protein: ${totalProtein.toStringAsFixed(1)}g, Carbs: ${totalCarbs.toStringAsFixed(1)}g, Fat: ${totalFat.toStringAsFixed(1)}g');
     } catch (e) {
-      print('❌ Error loading macro nutrients from food history: $e');
+      if (kDebugMode) debugPrint('❌ Error loading macro nutrients from food history: $e');
     }
   }
 
@@ -851,9 +822,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           _todaysFoodEntries = entries;
         });
       }
-      print('✅ Loaded ${entries.length} food entries for UI');
+      if (kDebugMode) debugPrint('✅ Loaded ${entries.length} food entries for UI');
     } catch (e) {
-      print('❌ Error loading today\'s food entries: $e');
+      if (kDebugMode) debugPrint('❌ Error loading today\'s food entries: $e');
     }
   }
 
@@ -915,7 +886,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         await _fastDataRefreshService.forceRefresh().timeout(
           const Duration(seconds: 2),
           onTimeout: () {
-            print('⚠️ Food data refresh timeout');
+            if (kDebugMode) debugPrint('⚠️ Food data refresh timeout');
           },
         );
         _lastFoodDataRefresh = now;
@@ -929,13 +900,13 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       ]).timeout(
         const Duration(seconds: 3),
         onTimeout: () {
-          print('⚠️ Food data loading timeout');
+          if (kDebugMode) debugPrint('⚠️ Food data loading timeout');
           return <void>[];
         },
       );
       
     } catch (e) {
-      print('❌ Error refreshing food data: $e');
+      if (kDebugMode) debugPrint('❌ Error refreshing food data: $e');
     } finally {
       _isRefreshingFoodData = false;
     }
@@ -995,7 +966,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   /// Initialize Google Fit - DEPRECATED  
   @Deprecated('Use _initializeUnifiedGoogleFit instead')
   Future<void> _initializeGoogleFit() async {
-    print('⚠️ _initializeGoogleFit is deprecated - use OptimizedGoogleFitManager');
+    if (kDebugMode) debugPrint('⚠️ _initializeGoogleFit is deprecated - use OptimizedGoogleFitManager');
     // Old implementation removed - use OptimizedGoogleFitManager instead
   }
 
@@ -1004,9 +975,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     try {
       // GoogleFitCacheService removed for simplification
 
-      print('Google Fit cache service initialized with real-time updates');
+      if (kDebugMode) debugPrint('Google Fit cache service initialized with real-time updates');
     } catch (e) {
-      print('Error initializing Google Fit cache service: $e');
+      if (kDebugMode) debugPrint('Error initializing Google Fit cache service: $e');
     }
   }
 
@@ -1054,9 +1025,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         // }
       // });
 
-      print('✅ Optimized Google Fit cache service initialized with instant data loading');
+      if (kDebugMode) debugPrint('✅ Optimized Google Fit cache service initialized with instant data loading');
     } catch (e) {
-      print('❌ Error initializing optimized Google Fit cache service: $e');
+      if (kDebugMode) debugPrint('❌ Error initializing optimized Google Fit cache service: $e');
     }
   }
 
@@ -1067,14 +1038,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   @Deprecated('Use unified manager instead')
   Future<void> _loadGoogleFitDataAsync() async {
     // This is now handled by the unified manager
-    print('⚠️ Legacy Google Fit data loading called - using unified manager instead');
+    if (kDebugMode) debugPrint('⚠️ Legacy Google Fit data loading called - using unified manager instead');
   }
 
   /// Load Google Fit data using optimized service - now handled by unified manager
   @Deprecated('Use unified manager instead')
   Future<void> _loadGoogleFitDataOptimized() async {
     // This is now handled by the unified manager
-    print('⚠️ Legacy optimized Google Fit data loading called - using unified manager instead');
+    if (kDebugMode) debugPrint('⚠️ Legacy optimized Google Fit data loading called - using unified manager instead');
   }
 
   /// Load Google Fit data and update UI (optimized with caching)
@@ -1104,13 +1075,13 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           await _updateDailySummaryWithGoogleFitData();
         }
 
-        print('✅ Google Fit data loaded: Steps=${workoutData.steps}, Calories=${workoutData.caloriesBurned}');
+        if (kDebugMode) debugPrint('✅ Google Fit data loaded: Steps=${workoutData.steps}, Calories=${workoutData.caloriesBurned}');
       } else {
         // Fallback to individual calls if optimized service fails
         await _loadGoogleFitDataFallback();
       }
     } catch (e) {
-      print('❌ Error loading Google Fit data: $e');
+      if (kDebugMode) debugPrint('❌ Error loading Google Fit data: $e');
       // Try fallback method
       await _loadGoogleFitDataFallback();
     } finally {
@@ -1147,10 +1118,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         await _updateDailySummaryWithGoogleFitData();
       }
 
-      print(
+      if (kDebugMode) debugPrint(
           'Google Fit data loaded (fallback): Steps=$steps, Calories=$calories, Workouts=$_googleFitWorkoutSessions');
     } catch (e) {
-      print('Fallback Google Fit loading failed: $e');
+      if (kDebugMode) debugPrint('Fallback Google Fit loading failed: $e');
       if (mounted) {
         setState(() {
           _googleFitSteps = 0;
@@ -1204,7 +1175,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         });
       }
     } catch (e) {
-      print('❌ Error updating daily summary with Google Fit data: $e');
+      if (kDebugMode) debugPrint('❌ Error updating daily summary with Google Fit data: $e');
     }
   }
 
@@ -1235,7 +1206,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         }
       }
     } catch (e) {
-      print('Error connecting to Google Fit: $e');
+      if (kDebugMode) debugPrint('Error connecting to Google Fit: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1255,7 +1226,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         await _testGoogleFitConnection().timeout(
           const Duration(seconds: 3),
           onTimeout: () {
-            print('⚠️ Google Fit connection timeout');
+            if (kDebugMode) debugPrint('⚠️ Google Fit connection timeout');
           },
         );
       }
@@ -1265,7 +1236,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         final data = await _healthConnectManager.forceRefresh().timeout(
           const Duration(seconds: 5),
           onTimeout: () {
-            print('⚠️ Google Fit data refresh timeout');
+            if (kDebugMode) debugPrint('⚠️ Google Fit data refresh timeout');
             return null;
           },
         );
@@ -1285,7 +1256,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         }
       }
     } catch (e) {
-      print('❌ Error refreshing Google Fit data: $e');
+      if (kDebugMode) debugPrint('❌ Error refreshing Google Fit data: $e');
     }
   }
 
@@ -1345,11 +1316,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _googleFitDataSubscription?.cancel();
     _googleFitDataSubscription = _healthConnectManager.dataStream.listen((data) {
       if (mounted && data != null) {
-        print('📥 Home: Received data from HealthConnectManager stream');
-        print('   Steps: ${data.steps}');
-        print('   Calories: ${data.caloriesBurned}');
-        print('   Workouts: ${data.workoutSessions}');
-        
         setState(() {
           _googleFitSteps = data.steps ?? 0;
           _googleFitCaloriesBurned = data.caloriesBurned ?? 0.0;
@@ -1359,10 +1325,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           _lastSyncTime = DateTime.now();
         });
         
-        print('✅ Home: UI state updated - _googleFitCaloriesBurned = $_googleFitCaloriesBurned');
-        
         _updateDailySummaryWithGoogleFitData();
-        print('⚡ Home: Real-time Google Fit update - Steps: ${data.steps}, Calories: ${data.caloriesBurned}');
       }
     });
     
@@ -1373,7 +1336,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         setState(() {
           _isGoogleFitConnected = isConnected;
         });
-        print('🔗 Home: Google Fit connection changed: $isConnected');
       }
     });
     
@@ -1386,8 +1348,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         });
       }
     });
-    
-    print('✅ Home: Google Fit listeners set up');
   }
 
   /// Set up real-time data listeners from AppStateService
@@ -4337,9 +4297,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             _isTasksLoading = false;
             _hasUserTasks = _taskService.hasUserTasks();
           });
-          print('📋 Task added immediately: ${task.title}, total tasks: ${_tasks.length}');
-          print('📋 Current _tasks in UI: ${_tasks.map((t) => '${t.id}:${t.title}').join(", ")}');
-          print('📋 _hasUserTasks: $_hasUserTasks');
+          if (kDebugMode) debugPrint('📋 Task added immediately: ${task.title}, total tasks: ${_tasks.length}');
+          if (kDebugMode) debugPrint('📋 Current _tasks in UI: ${_tasks.map((t) => '${t.id}:${t.title}').join(", ")}');
+          if (kDebugMode) debugPrint('📋 _hasUserTasks: $_hasUserTasks');
         }
         
         // Show success message INSTANTLY (no delays)
@@ -4383,29 +4343,29 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   void _toggleTaskCompletion(String taskId) {
     try {
-      print('🔄 Toggling task completion for ID: $taskId');
-      print('🔄 Available tasks: ${_tasks.map((t) => '${t.id}:${t.title}').toList()}');
+      if (kDebugMode) debugPrint('🔄 Toggling task completion for ID: $taskId');
+      if (kDebugMode) debugPrint('🔄 Available tasks: ${_tasks.map((t) => '${t.id}:${t.title}').toList()}');
       
       // Find task before toggling for snackbar message
       final task = _tasks.firstWhere((task) => task.id == taskId);
       final wasCompleted = task.isCompleted;
-      print('🔄 Found task: ${task.title}, was completed: $wasCompleted');
+      if (kDebugMode) debugPrint('🔄 Found task: ${task.title}, was completed: $wasCompleted');
       
       // Try to toggle with the current task ID first
       bool success = _taskService.toggleTaskCompletion(taskId);
-      print('🔄 Toggle result with original ID: $success');
+      if (kDebugMode) debugPrint('🔄 Toggle result with original ID: $success');
       
       // If that fails, try to find the task by title and toggle it
       if (!success) {
-        print('🔄 Original ID failed, trying to find task by title: ${task.title}');
+        if (kDebugMode) debugPrint('🔄 Original ID failed, trying to find task by title: ${task.title}');
         final serviceTasks = _taskService.getCurrentTasks();
         final matchingTask = serviceTasks.firstWhere(
           (t) => t.title == task.title,
           orElse: () => throw Exception('Task not found'),
         );
-        print('🔄 Found matching task with ID: ${matchingTask.id}');
+        if (kDebugMode) debugPrint('🔄 Found matching task with ID: ${matchingTask.id}');
         success = _taskService.toggleTaskCompletion(matchingTask.id);
-        print('🔄 Toggle result with matching ID: $success');
+        if (kDebugMode) debugPrint('🔄 Toggle result with matching ID: $success');
       }
       
       if (success) {
@@ -4422,9 +4382,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         
         // FORCE immediate UI update - bypass stream completely
         _refreshTasks();
-        print('🔄 UI refreshed after toggle');
+        if (kDebugMode) debugPrint('🔄 UI refreshed after toggle');
       } else {
-        print('🔄 Toggle failed');
+        if (kDebugMode) debugPrint('🔄 Toggle failed');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Failed to update task'),
@@ -4436,7 +4396,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         );
       }
     } catch (e) {
-      print('❌ Error toggling task: $e');
+      if (kDebugMode) debugPrint('❌ Error toggling task: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error updating task: $e'),
@@ -4451,26 +4411,26 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   void _deleteTask(String taskId) {
     try {
-      print('🗑️ Deleting task with ID: $taskId');
+      if (kDebugMode) debugPrint('🗑️ Deleting task with ID: $taskId');
       
       // Find task before deleting for fallback
       final task = _tasks.firstWhere((task) => task.id == taskId);
       
       // Try to delete with the current task ID first
       bool success = _taskService.deleteTask(taskId);
-      print('🗑️ Delete result with original ID: $success');
+      if (kDebugMode) debugPrint('🗑️ Delete result with original ID: $success');
       
       // If that fails, try to find the task by title and delete it
       if (!success) {
-        print('🗑️ Original ID failed, trying to find task by title: ${task.title}');
+        if (kDebugMode) debugPrint('🗑️ Original ID failed, trying to find task by title: ${task.title}');
         final serviceTasks = _taskService.getCurrentTasks();
         final matchingTask = serviceTasks.firstWhere(
           (t) => t.title == task.title,
           orElse: () => throw Exception('Task not found'),
         );
-        print('🗑️ Found matching task with ID: ${matchingTask.id}');
+        if (kDebugMode) debugPrint('🗑️ Found matching task with ID: ${matchingTask.id}');
         success = _taskService.deleteTask(matchingTask.id);
-        print('🗑️ Delete result with matching ID: $success');
+        if (kDebugMode) debugPrint('🗑️ Delete result with matching ID: $success');
       }
       
       if (success) {
@@ -4499,7 +4459,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         );
       }
     } catch (e) {
-      print('❌ Error deleting task: $e');
+      if (kDebugMode) debugPrint('❌ Error deleting task: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error deleting task: $e'),
@@ -4916,3 +4876,4 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
 
 }
+

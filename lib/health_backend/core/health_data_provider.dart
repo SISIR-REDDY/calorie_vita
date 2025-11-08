@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import 'health_data_hub.dart';
+import 'package:flutter/foundation.dart';
+import '../../config/production_config.dart';
 
 /// Provider wrapper for HealthDataHub
 /// 
@@ -67,7 +69,7 @@ class _HealthDataProviderState extends State<HealthDataProvider> {
     try {
       await _hub.initialize(autoRefresh: widget.autoRefresh);
     } catch (e) {
-      print('Failed to initialize HealthDataHub: $e');
+      if (kDebugMode) debugPrint('Failed to initialize HealthDataHub: $e');
     }
   }
 
@@ -106,4 +108,5 @@ extension HealthDataHubContext on BuildContext {
   /// ```
   HealthDataHub get watchHealthHub => Provider.of<HealthDataHub>(this);
 }
+
 

@@ -18,6 +18,8 @@ import 'services/health_connect_manager.dart';
 import 'services/firebase_service.dart';
 import 'services/daily_reset_service.dart';
 import 'services/logger_service.dart';
+import 'package:flutter/foundation.dart';
+import '../config/production_config.dart';
 
 class MainApp extends StatefulWidget {
   final bool firebaseInitialized;
@@ -45,7 +47,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   }
 
   void _initializeAppImmediately() {
-    print('Starting immediate app initialization...');
+    if (kDebugMode) debugPrint('Starting immediate app initialization...');
 
     // Initialize app state manager in background (non-blocking)
     _initializeAppStateManager();
@@ -59,7 +61,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
 
   void _initializeAppStateManager() async {
     try {
-      print('Initializing AppStateManager in background...');
+      if (kDebugMode) debugPrint('Initializing AppStateManager in background...');
 
       // Initialize the centralized app state manager
       await _appStateManager.initialize();
@@ -67,7 +69,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
       // Listen to app state changes
       _appStateSubscription?.cancel();
       _appStateSubscription = _appStateManager.stateStream.listen((state) {
-        print(
+        if (kDebugMode) debugPrint(
             'AppStateManager state change: userId=${state.currentUserId}, initialized=${state.isInitialized}');
         if (mounted) {
           setState(() {
@@ -76,46 +78,46 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
         }
       });
 
-      print('✅ AppStateManager initialization completed');
+      if (kDebugMode) debugPrint('✅ AppStateManager initialization completed');
     } catch (e) {
-      print('❌ AppStateManager initialization error: $e');
+      if (kDebugMode) debugPrint('❌ AppStateManager initialization error: $e');
     }
   }
 
   void _initializeHealthConnectManager() async {
     try {
-      print('Initializing GlobalGoogleFitManager in background...');
+      if (kDebugMode) debugPrint('Initializing GlobalGoogleFitManager in background...');
 
       // Initialize Google Fit manager for global sync
       await _healthConnectManager.initialize();
 
-      print('✅ GlobalGoogleFitManager initialization completed');
+      if (kDebugMode) debugPrint('✅ GlobalGoogleFitManager initialization completed');
     } catch (e) {
-      print('❌ GlobalGoogleFitManager initialization error: $e');
+      if (kDebugMode) debugPrint('❌ GlobalGoogleFitManager initialization error: $e');
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    print('App lifecycle state changed: $state');
+    if (kDebugMode) debugPrint('App lifecycle state changed: $state');
     
     switch (state) {
       case AppLifecycleState.resumed:
-        print('🔄 App resumed - Ensuring Google Fit sync...');
+        if (kDebugMode) debugPrint('🔄 App resumed - Ensuring Google Fit sync...');
         _healthConnectManager.forceRefresh();
         break;
       case AppLifecycleState.paused:
-        print('⏸️ App paused - Google Fit will continue in background');
+        if (kDebugMode) debugPrint('⏸️ App paused - Google Fit will continue in background');
         break;
       case AppLifecycleState.detached:
-        print('🔌 App detached - Note: Google Fit manager is singleton, not disposing');
+        if (kDebugMode) debugPrint('🔌 App detached - Note: Google Fit manager is singleton, not disposing');
         // Don't dispose singleton managers here - they may be used elsewhere
         break;
       case AppLifecycleState.inactive:
-        print('⏸️ App inactive - Google Fit sync paused');
+        if (kDebugMode) debugPrint('⏸️ App inactive - Google Fit sync paused');
         break;
       case AppLifecycleState.hidden:
-        print('👁️ App hidden - Google Fit sync continues');
+        if (kDebugMode) debugPrint('👁️ App hidden - Google Fit sync continues');
         break;
     }
   }
@@ -291,7 +293,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
         }
       }
     } catch (e) {
-      print('Error checking onboarding status: $e');
+      if (kDebugMode) debugPrint('Error checking onboarding status: $e');
       if (mounted) {
         setState(() {
           _onboardingCompleted = false;
@@ -308,11 +310,11 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
 
 
   void _onTabSelected(int index) {
-    print('Tab selected: $index'); // Debug log
+    if (kDebugMode) debugPrint('Tab selected: $index'); // Debug log
 
     // Trigger Google Fit sync whenever a screen is opened
     _healthConnectManager.forceRefresh().catchError((e) {
-      print('Failed to ensure Google Fit sync on screen change: $e');
+      if (kDebugMode) debugPrint('Failed to ensure Google Fit sync on screen change: $e');
       return null;
     });
 
@@ -328,10 +330,10 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
       // Settings screen
       setState(() => _currentIndex = 4);
     } else if (index >= 0 && index < _screens.length && index != 2) {
-      print('Setting current index to: $index'); // Debug log
+      if (kDebugMode) debugPrint('Setting current index to: $index'); // Debug log
       setState(() => _currentIndex = index);
     } else {
-      print(
+      if (kDebugMode) debugPrint(
           'Invalid index: $index, screens length: ${_screens.length}'); // Debug log
     }
   }
@@ -521,4 +523,5 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
     );
   }
 }
+
 

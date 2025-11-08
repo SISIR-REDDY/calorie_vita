@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import '../config/ai_config.dart';
 import 'logger_service.dart';
 import 'image_processing_service.dart';
+import 'package:flutter/foundation.dart';
+import '../config/production_config.dart';
 
 /// AI Service for OpenRouter API integration
 /// Handles all AI functionality including chat, analytics, recommendations, and image analysis
@@ -37,7 +39,7 @@ class AIService {
         if (_responseCache.containsKey(cacheKey) && _cacheTimestamps.containsKey(cacheKey)) {
           final cacheTime = _cacheTimestamps[cacheKey]!;
           if (DateTime.now().difference(cacheTime) < _cacheExpiry) {
-            print('⚡ AI Service: Using cached response');
+            if (kDebugMode) debugPrint('⚡ AI Service: Using cached response');
             return _responseCache[cacheKey]!;
           } else {
             // Remove expired cache
@@ -781,7 +783,7 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
     bool isAnalyticsRequest = false,
   }) async {
     // Validate API key
-    print('🔑 Using model: $model | API Key length: ${_apiKey.length}');
+    if (kDebugMode) debugPrint('🔑 Using model: $model | API Key length: ${_apiKey.length}');
     if (_apiKey.isEmpty) {
       throw Exception('OpenRouter API key not configured');
     }
@@ -833,7 +835,7 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
             ? const Duration(seconds: 10)  // Faster timeout for chat (10s)
             : const Duration(seconds: 15), // Standard timeout for other requests
         onTimeout: () {
-          print('⏱️ AI request timeout');
+          if (kDebugMode) debugPrint('⏱️ AI request timeout');
           throw TimeoutException('AI request timeout');
         },
       );
@@ -842,19 +844,19 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
         return jsonDecode(response.body) as Map<String, dynamic>;
       } else if (response.statusCode == 402) {
         // Credit limit exceeded
-        print('❌ API Error 402: Credits exceeded');
+        if (kDebugMode) debugPrint('❌ API Error 402: Credits exceeded');
         throw Exception('AI_CREDITS_EXCEEDED');
       } else if (response.statusCode == 429) {
         // Rate limit exceeded
-        print('❌ API Error 429: Rate limit');
+        if (kDebugMode) debugPrint('❌ API Error 429: Rate limit');
         throw Exception('AI_RATE_LIMIT');
       } else {
-        print('❌ API Error ${response.statusCode}: ${response.body}');
+        if (kDebugMode) debugPrint('❌ API Error ${response.statusCode}: ${response.body}');
         throw Exception(
             'API request failed with status ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      print('❌ Request Exception: $e');
+      if (kDebugMode) debugPrint('❌ Request Exception: $e');
       if (e.toString().contains('AI_CREDITS_EXCEEDED') || 
           e.toString().contains('AI_RATE_LIMIT')) {
         rethrow;
@@ -1169,3 +1171,4 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
     };
   }
 }
+

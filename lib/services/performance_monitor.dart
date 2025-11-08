@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import '../config/production_config.dart';
 
 /// Performance monitoring service to track app performance and identify bottlenecks
 class PerformanceMonitor {
@@ -60,9 +61,9 @@ class PerformanceMonitor {
         'connectivity': _connectivityType,
       });
 
-      print('PerformanceMonitor initialized');
+      if (kDebugMode) debugPrint('PerformanceMonitor initialized');
     } catch (e) {
-      print('Error initializing PerformanceMonitor: $e');
+      if (kDebugMode) debugPrint('Error initializing PerformanceMonitor: $e');
     }
   }
 
@@ -75,7 +76,7 @@ class PerformanceMonitor {
   Duration stopTimer(String operationName) {
     final timer = _timers.remove(operationName);
     if (timer == null) {
-      print('Warning: Timer for $operationName was not started');
+      if (kDebugMode) debugPrint('Warning: Timer for $operationName was not started');
       return Duration.zero;
     }
 
@@ -155,7 +156,7 @@ class PerformanceMonitor {
     }
 
     if (kDebugMode) {
-      print('Performance Event: $eventType - $data');
+      if (kDebugMode) debugPrint('Performance Event: $eventType - $data');
     }
   }
 
@@ -291,7 +292,7 @@ class PerformanceMonitor {
     _operationTimes.clear();
     _operationCounts.clear();
     _events.clear();
-    print('Performance data cleared');
+    if (kDebugMode) debugPrint('Performance data cleared');
   }
 
   /// Export performance data for analysis
@@ -330,3 +331,4 @@ class PerformanceEvent {
     };
   }
 }
+

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../config/production_config.dart';
 import 'logger_service.dart';
 
 /// Firestore-based configuration service as alternative to Remote Config
@@ -40,8 +41,8 @@ class FirestoreConfigService {
       // Verify API key is loaded from Firebase
       if (!_config.containsKey('openrouter_api_key') || _config['openrouter_api_key'] == null || (_config['openrouter_api_key'] as String).isEmpty) {
         _logger.warning('API key not found in Firestore - AI features will not work');
-        print('⚠️ WARNING: API key is missing from Firebase');
-        print('📌 The app requires the API key to be set in Firestore at: app_config/ai_settings/openrouter_api_key');
+        if (kDebugMode) debugPrint('⚠️ WARNING: API key is missing from Firebase');
+        if (kDebugMode) debugPrint('📌 The app requires the API key to be set in Firestore at: app_config/ai_settings/openrouter_api_key');
       }
     } catch (e) {
       _logger.error('Error initializing Firestore config', {'error': e.toString()});
@@ -53,7 +54,7 @@ class FirestoreConfigService {
   /// Load configuration from Firestore
   Future<void> _loadConfig() async {
     try {
-      print('🔍 Loading AI configuration from Firestore: app_config/ai_settings');
+      if (kDebugMode) debugPrint('🔍 Loading AI configuration from Firestore: app_config/ai_settings');
       final doc = await _firestore
           .collection('app_config')
           .doc('ai_settings')
@@ -65,7 +66,7 @@ class FirestoreConfigService {
         _logger.info('Loaded config from Firestore');
         // Reduced logging - only log once per load, not on every refresh
         if (kDebugMode) {
-          print('✅ Config loaded from Firestore');
+          if (kDebugMode) debugPrint('✅ Config loaded from Firestore');
         }
         
         // Log API key status for verification - SAFE: Only log length, never preview
@@ -75,42 +76,42 @@ class FirestoreConfigService {
             // SECURITY: Never log API key previews in production
             // Reduced logging - only log API key status once per session
             if (kDebugMode && !_hasLoggedApiKey) {
-              print('🔑 API Key loaded: ${apiKey.length} chars from Firestore');
+              if (kDebugMode) debugPrint('🔑 API Key loaded: ${apiKey.length} chars from Firestore');
               _hasLoggedApiKey = true;
             }
           } else {
-            print('❌ API key is EMPTY in Firestore document');
-            print('   ⚠️ AI features will NOT work - configure openrouter_api_key in Firebase');
+            if (kDebugMode) debugPrint('❌ API key is EMPTY in Firestore document');
+            if (kDebugMode) debugPrint('   ⚠️ AI features will NOT work - configure openrouter_api_key in Firebase');
           }
         } else {
-          print('❌ API key not found in Firestore document');
-          print('   ⚠️ AI features will NOT work - add openrouter_api_key field to Firebase');
+          if (kDebugMode) debugPrint('❌ API key not found in Firestore document');
+          if (kDebugMode) debugPrint('   ⚠️ AI features will NOT work - add openrouter_api_key field to Firebase');
         }
         
         // Log vision model for verification
         if (_config.containsKey('vision_model')) {
-          print('👁️ Vision model: ${_config['vision_model']}');
+          if (kDebugMode) debugPrint('👁️ Vision model: ${_config['vision_model']}');
         }
         
         if (_config.containsKey('enable_image_analysis')) {
-          print('🖼️ Image analysis enabled: ${_config['enable_image_analysis']}');
+          if (kDebugMode) debugPrint('🖼️ Image analysis enabled: ${_config['enable_image_analysis']}');
         }
       } else {
         _logger.warning('No config found in Firestore - API key required from Firebase');
-        print('❌ No config document found at app_config/ai_settings in Firestore');
-        print('⚠️ API key MUST be configured in Firebase - no fallback available');
-        print('📌 Create Firestore document at: app_config/ai_settings');
-        print('📌 Add field: openrouter_api_key (String) with your API key');
-        print('📌 The app will NOT work without the API key in Firebase');
+        if (kDebugMode) debugPrint('❌ No config document found at app_config/ai_settings in Firestore');
+        if (kDebugMode) debugPrint('⚠️ API key MUST be configured in Firebase - no fallback available');
+        if (kDebugMode) debugPrint('📌 Create Firestore document at: app_config/ai_settings');
+        if (kDebugMode) debugPrint('📌 Add field: openrouter_api_key (String) with your API key');
+        if (kDebugMode) debugPrint('📌 The app will NOT work without the API key in Firebase');
         _setDefaultConfigWithoutAPIKey();
       }
     } catch (e) {
       _logger.error('Error loading config from Firestore', {'error': e.toString()});
-      print('❌ Error loading config from Firestore: $e');
-      print('⚠️ API key MUST be configured in Firebase - no fallback available');
-      print('📌 Ensure Firestore is accessible and create document at: app_config/ai_settings');
-      print('📌 Add field: openrouter_api_key (String) with your API key');
-      print('📌 The app will NOT work without the API key in Firebase');
+      if (kDebugMode) debugPrint('❌ Error loading config from Firestore: $e');
+      if (kDebugMode) debugPrint('⚠️ API key MUST be configured in Firebase - no fallback available');
+      if (kDebugMode) debugPrint('📌 Ensure Firestore is accessible and create document at: app_config/ai_settings');
+      if (kDebugMode) debugPrint('📌 Add field: openrouter_api_key (String) with your API key');
+      if (kDebugMode) debugPrint('📌 The app will NOT work without the API key in Firebase');
       _setDefaultConfigWithoutAPIKey();
     }
   }
@@ -119,7 +120,7 @@ class FirestoreConfigService {
   /// NOTE: API key MUST come from Firebase - no fallback in code
   /// The API key should be stored in Firestore at app_config/ai_settings/openrouter_api_key
   void _setDefaultConfigWithoutAPIKey() {
-    print('📝 Setting default configuration (WITHOUT API key - must come from Firebase)');
+    if (kDebugMode) debugPrint('📝 Setting default configuration (WITHOUT API key - must come from Firebase)');
     _config = {
       // IMPORTANT: API key is NOT included here - it MUST come from Firebase
       // If Firestore is not configured or fails, the API key will be empty
@@ -154,10 +155,10 @@ class FirestoreConfigService {
     // Log that API key is missing and must come from Firebase
     final apiKey = _config['openrouter_api_key'] as String;
     if (apiKey.isEmpty) {
-      print('❌ API Key is EMPTY - must be configured in Firebase');
-      print('   ⚠️ AI features will NOT work without the API key');
-      print('   📌 Configure in Firestore: app_config/ai_settings/openrouter_api_key');
-      print('   📌 Add field: openrouter_api_key (String) with your API key value');
+      if (kDebugMode) debugPrint('❌ API Key is EMPTY - must be configured in Firebase');
+      if (kDebugMode) debugPrint('   ⚠️ AI features will NOT work without the API key');
+      if (kDebugMode) debugPrint('   📌 Configure in Firestore: app_config/ai_settings/openrouter_api_key');
+      if (kDebugMode) debugPrint('   📌 Add field: openrouter_api_key (String) with your API key value');
     }
   }
 
@@ -167,7 +168,7 @@ class FirestoreConfigService {
     if (_lastRefreshTime != null) {
       final timeSinceLastRefresh = DateTime.now().difference(_lastRefreshTime!);
       if (timeSinceLastRefresh < _refreshDebounce) {
-        print('⏭️ Config refresh skipped (debounced - last refresh was ${timeSinceLastRefresh.inSeconds}s ago)');
+        if (kDebugMode) debugPrint('⏭️ Config refresh skipped (debounced - last refresh was ${timeSinceLastRefresh.inSeconds}s ago)');
         return;
       }
     }
@@ -264,3 +265,4 @@ class FirestoreConfigService {
     return config;
   }
 }
+

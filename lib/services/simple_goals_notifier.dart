@@ -1,4 +1,6 @@
 import '../models/user_goals.dart';
+import 'package:flutter/foundation.dart';
+import '../config/production_config.dart';
 
 /// Simple goals notifier for immediate UI updates
 class SimpleGoalsNotifier {
@@ -15,7 +17,7 @@ class SimpleGoalsNotifier {
   // Update goals and notify
   void updateGoals(UserGoals goals) {
     _currentGoals = goals;
-    print('SimpleGoalsNotifier: Goals updated to ${goals.toMap()}');
+    if (kDebugMode) debugPrint('SimpleGoalsNotifier: Goals updated to ${goals.toMap()}');
   }
 
   // Get goals with defaults
@@ -28,3 +30,4 @@ class SimpleGoalsNotifier {
         );
   }
 }
+

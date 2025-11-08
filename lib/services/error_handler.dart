@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import '../config/production_config.dart';
 
 /// Comprehensive error handling service
 class ErrorHandler {
@@ -48,7 +49,7 @@ class ErrorHandler {
     };
 
     _isInitialized = true;
-    print('ErrorHandler initialized');
+    if (kDebugMode) debugPrint('ErrorHandler initialized');
   }
 
   /// Handle an error
@@ -60,7 +61,7 @@ class ErrorHandler {
     Map<String, dynamic>? additionalData,
   }) {
     if (!_isInitialized) {
-      print('ErrorHandler not initialized, cannot handle error: $message');
+      if (kDebugMode) debugPrint('ErrorHandler not initialized, cannot handle error: $message');
       return;
     }
 
@@ -83,9 +84,9 @@ class ErrorHandler {
 
     // Log to console in debug mode
     if (kDebugMode) {
-      print('🚨 Error [${type.name}]: $message');
+      if (kDebugMode) debugPrint('🚨 Error [${type.name}]: $message');
       if (stackTrace != null) {
-        print('Stack trace: $stackTrace');
+        if (kDebugMode) debugPrint('Stack trace: $stackTrace');
       }
     }
 
@@ -124,7 +125,7 @@ class ErrorHandler {
         },
       );
     } catch (e) {
-      print('Failed to report error to Firebase: $e');
+      if (kDebugMode) debugPrint('Failed to report error to Firebase: $e');
     }
   }
 
@@ -234,13 +235,13 @@ class ErrorHandler {
   /// Clear all errors
   void clearErrors() {
     _errors.clear();
-    print('All errors cleared');
+    if (kDebugMode) debugPrint('All errors cleared');
   }
 
   /// Clear errors by type
   void clearErrorsByType(ErrorType type) {
     _errors.removeWhere((error) => error.type == type);
-    print('Errors of type ${type.name} cleared');
+    if (kDebugMode) debugPrint('Errors of type ${type.name} cleared');
   }
 
   /// Check if there are critical errors
@@ -337,3 +338,4 @@ class ErrorEvent {
     return 'ErrorEvent(type: ${type.name}, message: $message, timestamp: $timestamp)';
   }
 }
+

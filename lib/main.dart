@@ -94,12 +94,12 @@ void main() async {
       final apiKey = AIConfig.apiKey;
       if (kDebugMode) {
         if (apiKey.isNotEmpty) {
-          print('🔑 API Key Status: ${apiKey.length} characters loaded');
-          print('   📍 Check FirestoreConfigService logs above to see if it came from Firebase or code');
+          if (kDebugMode) debugPrint('🔑 API Key Status: ${apiKey.length} characters loaded');
+          if (kDebugMode) debugPrint('   📍 Check FirestoreConfigService logs above to see if it came from Firebase or code');
         } else {
-          print('⚠️ API Key is EMPTY - will load after user authentication');
-          print('   📌 Security: Config requires authentication (see firestore.rules)');
-          print('   📌 Config will be loaded automatically when user logs in');
+          if (kDebugMode) debugPrint('⚠️ API Key is EMPTY - will load after user authentication');
+          if (kDebugMode) debugPrint('   📌 Security: Config requires authentication (see firestore.rules)');
+          if (kDebugMode) debugPrint('   📌 Config will be loaded automatically when user logs in');
         }
       }
       
@@ -116,10 +116,10 @@ void main() async {
       // It will be loaded automatically after authentication
       if (e.toString().contains('permission') || e.toString().contains('Permission')) {
         logger.info('Config load requires authentication - will load after user login');
-        print('ℹ️ Config requires authentication - will load after user login');
+        if (kDebugMode) debugPrint('ℹ️ Config requires authentication - will load after user login');
       } else {
         logger.warning('Secure configuration initialization error', {'error': e.toString()});
-        print('⚠️ Config initialization error: $e (may be due to missing auth)');
+        if (kDebugMode) debugPrint('⚠️ Config initialization error: $e (may be due to missing auth)');
       }
     });
 
@@ -134,7 +134,7 @@ void main() async {
   } catch (e) {
     // If Firebase is already initialized, that's fine
     if (e.toString().contains('duplicate-app')) {
-      print('Firebase already initialized, continuing...');
+      if (kDebugMode) debugPrint('Firebase already initialized, continuing...');
       firebaseInitialized = true;
       // Re-initialize error handler in background (non-blocking)
       Future(() {
@@ -183,9 +183,10 @@ Future<void> _initializeFirebaseServices() async {
     // Initialize Analytics
     await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
 
-    print('Firebase services initialized successfully');
+    if (kDebugMode) debugPrint('Firebase services initialized successfully');
   } catch (e) {
-    print('Error initializing Firebase services: $e');
+    if (kDebugMode) debugPrint('Error initializing Firebase services: $e');
     rethrow;
   }
 }
+

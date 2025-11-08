@@ -4,6 +4,7 @@ import '../models/food_history_entry.dart';
 import '../services/food_history_service.dart';
 import '../services/daily_summary_service.dart';
 import '../services/todays_food_data_service.dart';
+import '../config/production_config.dart';
 
 /// Service for fast data refresh and real-time updates
 class FastDataRefreshService {
@@ -228,12 +229,12 @@ class FastDataRefreshService {
       // ULTRA FAST: Firestore save in background (completely non-blocking)
       FoodHistoryService.addFoodEntry(entry).then((success) {
         if (success) {
-          print('✅ Food entry saved to Firestore: ${entry.foodName}');
+          if (kDebugMode) debugPrint('✅ Food entry saved to Firestore: ${entry.foodName}');
         } else {
-          print('❌ Failed to save food entry to Firestore');
+          if (kDebugMode) debugPrint('❌ Failed to save food entry to Firestore');
         }
       }).catchError((e) {
-        print('❌ Error saving to Firestore: $e');
+        if (kDebugMode) debugPrint('❌ Error saving to Firestore: $e');
       });
       
       return true; // Return immediately for instant UI response
@@ -270,3 +271,4 @@ class FastDataRefreshService {
     _macroBreakdownController.close();
   }
 }
+

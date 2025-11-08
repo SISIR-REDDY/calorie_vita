@@ -9,6 +9,8 @@ import '../services/chat_history_manager.dart';
 import '../ui/app_colors.dart';
 import '../mixins/google_fit_sync_mixin.dart';
 import '../models/daily_summary.dart';
+import 'package:flutter/foundation.dart';
+import '../config/production_config.dart';
 
 class Message {
   final String sender;
@@ -139,7 +141,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
         ...syncData,
       };
     }
-    print(
+    if (kDebugMode) debugPrint(
         'Trainer screen: Updated with Google Fit data - Steps: ${syncData['steps']}');
   }
 
@@ -164,10 +166,10 @@ class _AITrainerScreenState extends State<AITrainerScreen>
           };
         });
         
-        print('Trainer screen: Updated with consumed calories - ${summary.caloriesConsumed} kcal');
+        if (kDebugMode) debugPrint('Trainer screen: Updated with consumed calories - ${summary.caloriesConsumed} kcal');
       });
     } catch (e) {
-      print('Error loading today\'s fitness data: $e');
+      if (kDebugMode) debugPrint('Error loading today\'s fitness data: $e');
     }
   }
 
@@ -175,7 +177,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
   @override
   void onGoogleFitConnectionChanged(bool isConnected) {
     super.onGoogleFitConnectionChanged(isConnected);
-    print(
+    if (kDebugMode) debugPrint(
         'Trainer screen: Google Fit connection changed - Connected: $isConnected');
   }
 
@@ -192,7 +194,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     if (currentSessionId != null && messages.length > 1) {
       // Fire and forget - don't await in dispose
       _saveCurrentSessionSilently().catchError((e) {
-        print('Error saving session on dispose: $e');
+        if (kDebugMode) debugPrint('Error saving session on dispose: $e');
       });
     }
     super.dispose();
@@ -228,7 +230,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
         }
       }
     } catch (e) {
-      print('Error loading user profile: $e');
+      if (kDebugMode) debugPrint('Error loading user profile: $e');
     }
   }
 
@@ -250,7 +252,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
         try {
           _currentModalState!(() {});
         } catch (e) {
-          print('Error updating modal state: $e');
+          if (kDebugMode) debugPrint('Error updating modal state: $e');
           _currentModalState = null;
         }
       }
@@ -286,7 +288,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
                 : DateTime.now(),
           );
         } catch (e) {
-          print('Error converting chat data: $e');
+          if (kDebugMode) debugPrint('Error converting chat data: $e');
           return null;
         }
       }).where((session) => session != null).cast<ChatSession>().toList();
@@ -304,15 +306,15 @@ class _AITrainerScreenState extends State<AITrainerScreen>
           try {
             _currentModalState!(() {});
           } catch (e) {
-            print('Error updating modal state: $e');
+            if (kDebugMode) debugPrint('Error updating modal state: $e');
             _currentModalState = null;
           }
         }
       }
 
-      print('Chat history loaded: ${sessions.length} sessions');
+      if (kDebugMode) debugPrint('Chat history loaded: ${sessions.length} sessions');
     } catch (e) {
-      print('Error loading chat history: $e');
+      if (kDebugMode) debugPrint('Error loading chat history: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -323,7 +325,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
           try {
             _currentModalState!(() {});
           } catch (e) {
-            print('Error updating modal state: $e');
+            if (kDebugMode) debugPrint('Error updating modal state: $e');
             _currentModalState = null;
           }
         }
@@ -333,7 +335,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
 
   /// Force reload chat history (useful after login/logout)
   Future<void> _forceReloadChatHistory() async {
-    print('Force reloading chat history...');
+    if (kDebugMode) debugPrint('Force reloading chat history...');
     // Cache clearing removed - unused field
     await _loadChatHistory(forceRefresh: true);
   }
@@ -342,7 +344,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
   Future<void> _checkUserAndReloadHistory() async {
     final currentUser = _auth.currentUser;
     if (currentUser != null && currentUser.uid != _lastLoadedUserId) {
-      print('User changed, reloading chat history for: ${currentUser.uid}');
+      if (kDebugMode) debugPrint('User changed, reloading chat history for: ${currentUser.uid}');
       _lastLoadedUserId = currentUser.uid;
       // Only reload if we don't have any current sessions
       if (chatSessions.isEmpty) {
@@ -399,10 +401,10 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       // Use ChatHistoryManager for consistent storage
       try {
         await _chatHistoryManager.saveChatSession(session.toMap());
-        print('✅ Chat session saved successfully: $sessionId');
+        if (kDebugMode) debugPrint('✅ Chat session saved successfully: $sessionId');
       } catch (e, stackTrace) {
-        print('❌ Error saving chat session to Firebase: $e');
-        print('Stack trace: $stackTrace');
+        if (kDebugMode) debugPrint('❌ Error saving chat session to Firebase: $e');
+        if (kDebugMode) debugPrint('Stack trace: $stackTrace');
         // Show error message to user
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -426,7 +428,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
         try {
           _currentModalState!(() {});
         } catch (e) {
-          print('Error updating modal state: $e');
+          if (kDebugMode) debugPrint('Error updating modal state: $e');
           _currentModalState = null; // Clear invalid reference
         }
       }
@@ -435,7 +437,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       _cleanupOldSessions();
 
     } catch (e) {
-      print('Error preparing chat session: $e');
+      if (kDebugMode) debugPrint('Error preparing chat session: $e');
       // Error already shown above if it was a Firebase error
     }
   }
@@ -489,7 +491,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
         try {
           _currentModalState!(() {});
         } catch (e) {
-          print('Error updating modal state: $e');
+          if (kDebugMode) debugPrint('Error updating modal state: $e');
           _currentModalState = null; // Clear invalid reference
         }
       }
@@ -497,7 +499,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       // Cleanup old sessions in background (non-blocking)
       _cleanupOldSessions();
     } catch (e) {
-      print('Error preparing chat session: $e');
+      if (kDebugMode) debugPrint('Error preparing chat session: $e');
       // Show error message to user
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -543,7 +545,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
         await batch.commit();
       }
     } catch (e) {
-      print('Error cleaning up old sessions: $e');
+      if (kDebugMode) debugPrint('Error cleaning up old sessions: $e');
     }
   }
 
@@ -636,7 +638,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
         await _saveCurrentSession();
       }
     } catch (e) {
-      print('Error saving session after message: $e');
+      if (kDebugMode) debugPrint('Error saving session after message: $e');
       // Don't show error to user as this is background operation
     }
   }
@@ -646,7 +648,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     if (currentSessionId != null && messages.length > 1) {
       // Fire and forget - don't await in synchronous method
       _saveCurrentSessionSilently().catchError((e) {
-        print('Error saving session before new chat: $e');
+        if (kDebugMode) debugPrint('Error saving session before new chat: $e');
       });
     }
 
@@ -1214,7 +1216,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       // Force refresh chat history after deletion to clear all caches
       _loadChatHistory(forceRefresh: true);
     }).catchError((e) {
-      print('Error deleting session: $e');
+      if (kDebugMode) debugPrint('Error deleting session: $e');
     });
   }
 
@@ -1251,7 +1253,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
       // Force refresh chat history after clearing to clear all caches
       _loadChatHistory(forceRefresh: true);
     }).catchError((e) {
-      print('Error clearing all sessions: $e');
+      if (kDebugMode) debugPrint('Error clearing all sessions: $e');
       // Don't show error to user since UI already updated optimistically
     });
   }
@@ -1451,3 +1453,4 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     );
   }
 }
+

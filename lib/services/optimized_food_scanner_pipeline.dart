@@ -77,9 +77,9 @@ class OptimizedFoodScannerPipeline {
     try {
       await BarcodeScanningService.initialize();
       _initialized = true;
-      print('✅ Optimized food scanner pipeline initialized');
+      if (kDebugMode) debugPrint('✅ Optimized food scanner pipeline initialized');
     } catch (e) {
-      print('❌ Error initializing optimized pipeline: $e');
+      if (kDebugMode) debugPrint('❌ Error initializing optimized pipeline: $e');
     }
   }
 
@@ -92,45 +92,45 @@ class OptimizedFoodScannerPipeline {
     final stopwatch = Stopwatch()..start();
     
     try {
-      print('🖼️ Processing food image...');
+      if (kDebugMode) debugPrint('🖼️ Processing food image...');
       if (!_initialized) {
-        print('⚙️ Initializing pipeline...');
+        if (kDebugMode) debugPrint('⚙️ Initializing pipeline...');
         await initialize();
       }
       
       // CRITICAL: Ensure AIConfig is initialized and API key is loaded
-      print('🔍 Verifying AI configuration...');
+      if (kDebugMode) debugPrint('🔍 Verifying AI configuration...');
       if (AIConfig.apiKey.isEmpty) {
-        print('⚠️ API key is empty - attempting to initialize AIConfig...');
+        if (kDebugMode) debugPrint('⚠️ API key is empty - attempting to initialize AIConfig...');
         try {
           await AIConfig.initialize();
           await Future.delayed(const Duration(milliseconds: 200)); // Reduced wait for Firestore to load
           await AIConfig.refresh(); // Force refresh
         } catch (e) {
-          print('❌ Failed to initialize AIConfig: $e');
+          if (kDebugMode) debugPrint('❌ Failed to initialize AIConfig: $e');
         }
         
         // Check again after initialization
         if (AIConfig.apiKey.isEmpty) {
-          print('❌ API key is still empty after initialization attempt');
-          print('   This means Firestore config may not be loaded or API key is missing');
+          if (kDebugMode) debugPrint('❌ API key is still empty after initialization attempt');
+          if (kDebugMode) debugPrint('   This means Firestore config may not be loaded or API key is missing');
           return FoodScannerResult(
             success: false,
             error: 'AI service is not configured. Please check your settings or add food manually.',
           );
         } else {
-          print('✅ API key loaded after initialization: ${AIConfig.apiKey.length} characters');
+          if (kDebugMode) debugPrint('✅ API key loaded after initialization: ${AIConfig.apiKey.length} characters');
         }
       } else {
-        print('✅ API key is present: ${AIConfig.apiKey.length} characters');
+        if (kDebugMode) debugPrint('✅ API key is present: ${AIConfig.apiKey.length} characters');
       }
       
       // Verify vision model is configured
-      print('👁️ Vision model: ${AIConfig.visionModel}');
-      print('👁️ Image analysis enabled: ${AIConfig.enableImageAnalysis}');
+      if (kDebugMode) debugPrint('👁️ Vision model: ${AIConfig.visionModel}');
+      if (kDebugMode) debugPrint('👁️ Image analysis enabled: ${AIConfig.enableImageAnalysis}');
       
       if (!AIConfig.enableImageAnalysis) {
-        print('❌ Image analysis is disabled in configuration');
+        if (kDebugMode) debugPrint('❌ Image analysis is disabled in configuration');
         return FoodScannerResult(
           success: false,
           error: 'Image analysis is disabled. Please enable it in settings or add food manually.',
@@ -139,21 +139,21 @@ class OptimizedFoodScannerPipeline {
 
       // Generate cache key from image (fast - just use file path hash)
       final cacheKey = await _generateCacheKey(imageFile);
-      print('🔑 Cache key: $cacheKey');
+      if (kDebugMode) debugPrint('🔑 Cache key: $cacheKey');
       
       // Check cache first (fast path)
       if (_resultCache.containsKey(cacheKey) && 
           _cacheTimestamps.containsKey(cacheKey)) {
         final cacheTime = _cacheTimestamps[cacheKey]!;
         if (DateTime.now().difference(cacheTime) < _cacheExpiry) {
-          print('🚀 Returning cached result (${stopwatch.elapsedMilliseconds}ms)');
+          if (kDebugMode) debugPrint('🚀 Returning cached result (${stopwatch.elapsedMilliseconds}ms)');
           stopwatch.stop();
           return _createFoodScannerResultFromJson(_resultCache[cacheKey]);
         } else {
-          print('⏰ Cache expired, processing fresh...');
+          if (kDebugMode) debugPrint('⏰ Cache expired, processing fresh...');
         }
       } else {
-        print('📝 No cache found, processing fresh image...');
+        if (kDebugMode) debugPrint('📝 No cache found, processing fresh image...');
       }
 
       // Skip image optimization for speed - process directly
@@ -161,13 +161,13 @@ class OptimizedFoodScannerPipeline {
       // final optimizedImage = await _optimizeImageForProcessing(imageFile);
       
       // Use fast snap-to-calorie pipeline directly
-      print('🤖 Starting fast AI vision pipeline...');
+      if (kDebugMode) debugPrint('🤖 Starting fast AI vision pipeline...');
       final result = await _processWithFastPipeline(
         imageFile, // Use original file directly
         userProfile: userProfile,
         userGoals: userGoals,
       );
-      print('✅ Fast pipeline completed: success=${result.success}');
+      if (kDebugMode) debugPrint('✅ Fast pipeline completed: success=${result.success}');
 
       // Validate and fix result if needed
       if (result.success && result.nutritionInfo != null) {
@@ -176,7 +176,7 @@ class OptimizedFoodScannerPipeline {
       // Validate nutrition data - be more lenient
       if (nutrition.calories == 0) {
         // Only fix if calories are truly 0 (not just low)
-        print('⚠️ Calories are 0, attempting to fix from macros...');
+        if (kDebugMode) debugPrint('⚠️ Calories are 0, attempting to fix from macros...');
         
         // Try to estimate calories from macros
         if (nutrition.protein > 0 || nutrition.carbs > 0 || nutrition.fat > 0) {
@@ -184,7 +184,7 @@ class OptimizedFoodScannerPipeline {
                                    (nutrition.carbs * 4) + 
                                    (nutrition.fat * 9);
           if (estimatedCalories > 0) {
-            print('🔧 Fixed calories from macros: $estimatedCalories kcal');
+            if (kDebugMode) debugPrint('🔧 Fixed calories from macros: $estimatedCalories kcal');
             final fixedResult = FoodScannerResult(
               success: true,
               recognitionResult: result.recognitionResult,
@@ -206,7 +206,7 @@ class OptimizedFoodScannerPipeline {
         }
         
         // If we can't fix it, return error
-        print('❌ Cannot fix: no calories and no macros available');
+        if (kDebugMode) debugPrint('❌ Cannot fix: no calories and no macros available');
         stopwatch.stop();
         return FoodScannerResult(
           success: false,
@@ -224,10 +224,10 @@ class OptimizedFoodScannerPipeline {
           final percentDiff = (difference / nutrition.calories) * 100;
           
           if (percentDiff > 30) {
-            print('⚠️ Large calorie mismatch: ${percentDiff.toStringAsFixed(1)}%');
-            print('   Reported: ${nutrition.calories} kcal');
-            print('   Calculated: ${calculatedCalories.toStringAsFixed(0)} kcal');
-            print('   Keeping reported values - may be correct for this food type');
+            if (kDebugMode) debugPrint('⚠️ Large calorie mismatch: ${percentDiff.toStringAsFixed(1)}%');
+            if (kDebugMode) debugPrint('   Reported: ${nutrition.calories} kcal');
+            if (kDebugMode) debugPrint('   Calculated: ${calculatedCalories.toStringAsFixed(0)} kcal');
+            if (kDebugMode) debugPrint('   Keeping reported values - may be correct for this food type');
           }
         }
       }
@@ -240,12 +240,12 @@ class OptimizedFoodScannerPipeline {
       }
 
       stopwatch.stop();
-      print('⏱️ Processing completed in ${stopwatch.elapsedMilliseconds}ms');
+      if (kDebugMode) debugPrint('⏱️ Processing completed in ${stopwatch.elapsedMilliseconds}ms');
       
       return result;
     } catch (e) {
       stopwatch.stop();
-      print('❌ Error in optimized pipeline: $e (${stopwatch.elapsedMilliseconds}ms)');
+      if (kDebugMode) debugPrint('❌ Error in optimized pipeline: $e (${stopwatch.elapsedMilliseconds}ms)');
       return FoodScannerResult(
         success: false,
         error: 'Processing failed: $e',
@@ -262,17 +262,17 @@ class OptimizedFoodScannerPipeline {
     final stopwatch = Stopwatch()..start();
     
     try {
-      print('🔍 Processing barcode scan...');
+      if (kDebugMode) debugPrint('🔍 Processing barcode scan...');
       if (!_initialized) {
-        print('⚙️ Initializing pipeline...');
+        if (kDebugMode) debugPrint('⚙️ Initializing pipeline...');
         await initialize();
       }
 
       // Clean barcode
       final cleanBarcode = barcode.replaceAll(RegExp(r'[^0-9]'), '');
-      print('🧹 Cleaned barcode: $cleanBarcode (original: $barcode)');
+      if (kDebugMode) debugPrint('🧹 Cleaned barcode: $cleanBarcode (original: $barcode)');
       if (cleanBarcode.length < 8) {
-        print('❌ Invalid barcode length: ${cleanBarcode.length}');
+        if (kDebugMode) debugPrint('❌ Invalid barcode length: ${cleanBarcode.length}');
         return FoodScannerResult(
           success: false,
           error: 'Invalid barcode format. Please scan a valid barcode.',
@@ -284,36 +284,36 @@ class OptimizedFoodScannerPipeline {
           _cacheTimestamps.containsKey(cleanBarcode)) {
         final cacheTime = _cacheTimestamps[cleanBarcode]!;
         if (DateTime.now().difference(cacheTime) < _cacheExpiry) {
-          print('🚀 Returning cached barcode result (${stopwatch.elapsedMilliseconds}ms)');
+          if (kDebugMode) debugPrint('🚀 Returning cached barcode result (${stopwatch.elapsedMilliseconds}ms)');
           final cached = _createFoodScannerResultFromJson(_resultCache[cleanBarcode]);
           // Validate cached result
           if (cached.nutritionInfo != null && cached.nutritionInfo!.isValid) {
             return cached;
           } else {
-            print('⚠️ Cached result invalid, processing fresh...');
+            if (kDebugMode) debugPrint('⚠️ Cached result invalid, processing fresh...');
           }
         } else {
-          print('⏰ Cache expired, processing fresh...');
+          if (kDebugMode) debugPrint('⏰ Cache expired, processing fresh...');
         }
       } else {
-        print('📝 No cache found, processing fresh barcode...');
+        if (kDebugMode) debugPrint('📝 No cache found, processing fresh barcode...');
       }
 
       // Use optimized barcode scanning
-      print('🔍 Starting optimized barcode scanning...');
+      if (kDebugMode) debugPrint('🔍 Starting optimized barcode scanning...');
       var nutritionInfo = await _scanBarcodeOptimized(cleanBarcode);
       
       // Don't validate/fix here - BarcodeScanningService already did that
       // Just check if data is valid
       if (nutritionInfo != null) {
-        print('📊 Barcode scan result:');
-        print('   Product: ${nutritionInfo.foodName}');
-        print('   Calories: ${nutritionInfo.calories}, Protein: ${nutritionInfo.protein}g, Carbs: ${nutritionInfo.carbs}g, Fat: ${nutritionInfo.fat}g');
-        print('   Weight: ${nutritionInfo.weightGrams}g, Source: ${nutritionInfo.source}');
+        if (kDebugMode) debugPrint('📊 Barcode scan result:');
+        if (kDebugMode) debugPrint('   Product: ${nutritionInfo.foodName}');
+        if (kDebugMode) debugPrint('   Calories: ${nutritionInfo.calories}, Protein: ${nutritionInfo.protein}g, Carbs: ${nutritionInfo.carbs}g, Fat: ${nutritionInfo.fat}g');
+        if (kDebugMode) debugPrint('   Weight: ${nutritionInfo.weightGrams}g, Source: ${nutritionInfo.source}');
         
         // Only check validity - don't modify data that's already been validated
         if (!nutritionInfo.isValid) {
-          print('⚠️ Invalid nutrition data from barcode scan');
+          if (kDebugMode) debugPrint('⚠️ Invalid nutrition data from barcode scan');
         }
       }
       
@@ -334,11 +334,11 @@ class OptimizedFoodScannerPipeline {
         final caloriesPerGram = finalNutritionInfo.calories / finalNutritionInfo.weightGrams;
         // Check if calories per gram is reasonable (typically 0.5-10 kcal/g)
         if (caloriesPerGram > 10) {
-          print('⚠️ Warning: Very high calories per gram (${caloriesPerGram.toStringAsFixed(2)} kcal/g)');
-          print('   Product: ${finalNutritionInfo.foodName}, Source: ${finalNutritionInfo.source}');
-          print('   Keeping values as-is - may be correct for this product type');
+          if (kDebugMode) debugPrint('⚠️ Warning: Very high calories per gram (${caloriesPerGram.toStringAsFixed(2)} kcal/g)');
+          if (kDebugMode) debugPrint('   Product: ${finalNutritionInfo.foodName}, Source: ${finalNutritionInfo.source}');
+          if (kDebugMode) debugPrint('   Keeping values as-is - may be correct for this product type');
         } else {
-          print('✅ Nutrition data validated: ${caloriesPerGram.toStringAsFixed(2)} kcal/g (reasonable)');
+          if (kDebugMode) debugPrint('✅ Nutrition data validated: ${caloriesPerGram.toStringAsFixed(2)} kcal/g (reasonable)');
         }
       }
 
@@ -381,15 +381,15 @@ class OptimizedFoodScannerPipeline {
       _cacheTimestamps[cleanBarcode] = DateTime.now();
 
       stopwatch.stop();
-      print('⏱️ Barcode processing completed in ${stopwatch.elapsedMilliseconds}ms');
-      print('✅ Product: ${finalNutritionInfo.foodName}');
-      print('🔥 Calories: ${finalNutritionInfo.calories}');
-      print('📊 Macros: P${finalNutritionInfo.protein}g C${finalNutritionInfo.carbs}g F${finalNutritionInfo.fat}g');
+      if (kDebugMode) debugPrint('⏱️ Barcode processing completed in ${stopwatch.elapsedMilliseconds}ms');
+      if (kDebugMode) debugPrint('✅ Product: ${finalNutritionInfo.foodName}');
+      if (kDebugMode) debugPrint('🔥 Calories: ${finalNutritionInfo.calories}');
+      if (kDebugMode) debugPrint('📊 Macros: P${finalNutritionInfo.protein}g C${finalNutritionInfo.carbs}g F${finalNutritionInfo.fat}g');
       
       return result;
     } catch (e) {
       stopwatch.stop();
-      print('❌ Error in barcode processing: $e (${stopwatch.elapsedMilliseconds}ms)');
+      if (kDebugMode) debugPrint('❌ Error in barcode processing: $e (${stopwatch.elapsedMilliseconds}ms)');
       return FoodScannerResult(
         success: false,
         error: 'Failed to process barcode: ${e.toString()}',
@@ -443,7 +443,7 @@ class OptimizedFoodScannerPipeline {
       double finalCalories = calories;
       if (calories == 0 && (protein > 0 || carbs > 0 || fat > 0)) {
         finalCalories = (protein * 4) + (carbs * 4) + (fat * 9);
-        print('🔧 Calculated calories from macros: $finalCalories kcal');
+        if (kDebugMode) debugPrint('🔧 Calculated calories from macros: $finalCalories kcal');
       }
       
       // ONLY estimate macros if ALL are truly 0 (don't overwrite low values)
@@ -456,7 +456,7 @@ class OptimizedFoodScannerPipeline {
         finalProtein = (finalCalories * 0.20 / 4);
         finalCarbs = (finalCalories * 0.55 / 4);
         finalFat = (finalCalories * 0.25 / 9);
-        print('🔧 Estimated macros from calories (all were 0)');
+        if (kDebugMode) debugPrint('🔧 Estimated macros from calories (all were 0)');
       }
       
       // Use weight from AI, don't default to 150g
@@ -464,7 +464,7 @@ class OptimizedFoodScannerPipeline {
       
       // Don't default calories - if 0 and can't calculate, return error
       if (finalCalories == 0) {
-        print('❌ No calories available - cannot create nutrition info');
+        if (kDebugMode) debugPrint('❌ No calories available - cannot create nutrition info');
         return FoodScannerResult(
           success: false,
           error: 'Could not determine calories for this food item',
@@ -484,9 +484,9 @@ class OptimizedFoodScannerPipeline {
         category: snapResult['category']?.toString(),
       );
       
-      print('✅ AI Vision result: $foodName');
-      print('   Weight: ${finalWeight}g, Calories: ${finalCalories.toStringAsFixed(0)} kcal');
-      print('   Macros: P${finalProtein.toStringAsFixed(1)}g C${finalCarbs.toStringAsFixed(1)}g F${finalFat.toStringAsFixed(1)}g');
+      if (kDebugMode) debugPrint('✅ AI Vision result: $foodName');
+      if (kDebugMode) debugPrint('   Weight: ${finalWeight}g, Calories: ${finalCalories.toStringAsFixed(0)} kcal');
+      if (kDebugMode) debugPrint('   Macros: P${finalProtein.toStringAsFixed(1)}g C${finalCarbs.toStringAsFixed(1)}g F${finalFat.toStringAsFixed(1)}g');
 
       // Validate nutrition info
       if (!nutritionInfo.isValid) {
@@ -530,11 +530,11 @@ class OptimizedFoodScannerPipeline {
   /// Fast snap-to-calorie with offline fallback
   static Future<Map<String, dynamic>> _fastSnapToCalorie(File imageFile) async {
     try {
-      print('📸 Encoding image for AI vision...');
+      if (kDebugMode) debugPrint('📸 Encoding image for AI vision...');
       
       // Validate image file exists and is readable
       if (!await imageFile.exists()) {
-        print('❌ Image file does not exist: ${imageFile.path}');
+        if (kDebugMode) debugPrint('❌ Image file does not exist: ${imageFile.path}');
         return {
           'success': false,
           'error': 'Image file not found. Please try again.',
@@ -545,19 +545,19 @@ class OptimizedFoodScannerPipeline {
       
       // Validate image has content
       if (imageBytes.isEmpty) {
-        print('❌ Image file is empty');
+        if (kDebugMode) debugPrint('❌ Image file is empty');
         return {
           'success': false,
           'error': 'Image file is empty. Please try again.',
         };
       }
       
-      print('✅ Image file loaded: ${(imageBytes.length / 1024).toStringAsFixed(1)}KB');
+      if (kDebugMode) debugPrint('✅ Image file loaded: ${(imageBytes.length / 1024).toStringAsFixed(1)}KB');
       
       // Fast image optimization for faster upload and processing
       List<int> optimizedBytes = imageBytes;
       if (imageBytes.length > 200 * 1024) { // If > 200KB, compress and resize (reduced threshold for faster processing)
-        print('⚡ Optimizing large image for faster processing...');
+        if (kDebugMode) debugPrint('⚡ Optimizing large image for faster processing...');
         try {
           final decodedImage = img.decodeImage(imageBytes);
           if (decodedImage != null) {
@@ -583,7 +583,7 @@ class OptimizedFoodScannerPipeline {
                 height: newHeight,
                 interpolation: img.Interpolation.linear, // Fast interpolation
               );
-              print('   📐 Resized: ${decodedImage.width}x${decodedImage.height} → $newWidth x $newHeight');
+              if (kDebugMode) debugPrint('   📐 Resized: ${decodedImage.width}x${decodedImage.height} → $newWidth x $newHeight');
             }
             
             // Compress with quality 75 (good quality, smaller size, faster upload)
@@ -591,19 +591,19 @@ class OptimizedFoodScannerPipeline {
             final originalSizeKB = (imageBytes.length / 1024);
             final optimizedSizeKB = (optimizedBytes.length / 1024);
             final reduction = ((1 - optimizedSizeKB / originalSizeKB) * 100);
-            print('   ✅ Optimized: ${originalSizeKB.toStringAsFixed(1)}KB → ${optimizedSizeKB.toStringAsFixed(1)}KB (${reduction.toStringAsFixed(1)}% reduction)');
+            if (kDebugMode) debugPrint('   ✅ Optimized: ${originalSizeKB.toStringAsFixed(1)}KB → ${optimizedSizeKB.toStringAsFixed(1)}KB (${reduction.toStringAsFixed(1)}% reduction)');
           }
         } catch (e) {
-          print('   ⚠️ Image optimization failed, using original: $e');
+          if (kDebugMode) debugPrint('   ⚠️ Image optimization failed, using original: $e');
           optimizedBytes = imageBytes; // Fallback to original
         }
       } else {
-        print('   ✅ Image size is acceptable, using as-is');
+        if (kDebugMode) debugPrint('   ✅ Image size is acceptable, using as-is');
       }
       
       // Validate image is not too small (might be corrupted)
       if (imageBytes.length < 100) {
-        print('❌ Image file is too small (${imageBytes.length} bytes) - likely corrupted');
+        if (kDebugMode) debugPrint('❌ Image file is too small (${imageBytes.length} bytes) - likely corrupted');
         return {
           'success': false,
           'error': 'Image file appears corrupted. Please try again.',
@@ -612,7 +612,7 @@ class OptimizedFoodScannerPipeline {
       
       final base64Image = base64Encode(optimizedBytes);
       final base64SizeKB = base64Image.length / 1024;
-      print('✅ Image encoded: ${(optimizedBytes.length / 1024).toStringAsFixed(1)}KB → base64 length: ${base64SizeKB.toStringAsFixed(1)}KB');
+      if (kDebugMode) debugPrint('✅ Image encoded: ${(optimizedBytes.length / 1024).toStringAsFixed(1)}KB → base64 length: ${base64SizeKB.toStringAsFixed(1)}KB');
       
       // Calculate adaptive timeout based on image size
       // Small images (< 500KB): Fast timeout (25s total, 20s primary)
@@ -627,32 +627,32 @@ class OptimizedFoodScannerPipeline {
         totalTimeoutSeconds = 25;
         primaryTimeoutSeconds = 20;
         fallbackTimeoutSeconds = 25;
-        print('⚡ Small image detected - using fast timeouts (${totalTimeoutSeconds}s total)');
+        if (kDebugMode) debugPrint('⚡ Small image detected - using fast timeouts (${totalTimeoutSeconds}s total)');
       } else if (base64SizeKB < 1000) {
         // Medium images - moderate timeout
         totalTimeoutSeconds = 35;
         primaryTimeoutSeconds = 25;
         fallbackTimeoutSeconds = 30;
-        print('⚖️ Medium image detected - using moderate timeouts (${totalTimeoutSeconds}s total)');
+        if (kDebugMode) debugPrint('⚖️ Medium image detected - using moderate timeouts (${totalTimeoutSeconds}s total)');
       } else {
         // Large images - longer timeout for safety
         totalTimeoutSeconds = 50;
         primaryTimeoutSeconds = 35;
         fallbackTimeoutSeconds = 40;
-        print('⚠️ Large image detected (${base64SizeKB.toStringAsFixed(1)}KB) - using extended timeouts (${totalTimeoutSeconds}s total)');
-        print('   Consider optimizing image size for faster processing');
+        if (kDebugMode) debugPrint('⚠️ Large image detected (${base64SizeKB.toStringAsFixed(1)}KB) - using extended timeouts (${totalTimeoutSeconds}s total)');
+        if (kDebugMode) debugPrint('   Consider optimizing image size for faster processing');
       }
       
       // Validate base64 encoding
       if (base64Image.isEmpty) {
-        print('❌ Base64 encoding failed - image is empty');
+        if (kDebugMode) debugPrint('❌ Base64 encoding failed - image is empty');
         return {
           'success': false,
           'error': 'Failed to encode image. Please try again.',
         };
       }
       
-      print('✅ Image validation passed - ready for AI vision');
+      if (kDebugMode) debugPrint('✅ Image validation passed - ready for AI vision');
 
       // Enhanced prompt - trained to identify food even with other objects present
       // EXTENSIVE GLOBAL CUISINE KNOWLEDGE (Indian, Italian, Chinese, Mexican, Thai, Japanese, Mediterranean, American, etc.)
@@ -904,10 +904,10 @@ You can identify and analyze virtually ANY food item, not limited to the example
 Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY and FAST responses. Use your comprehensive knowledge of THOUSANDS of dishes from global cuisines (Indian, Italian, Chinese, Mexican, Thai, Japanese, Mediterranean, American, French, Korean, Middle Eastern, African, South American, European, Asian, etc.) to provide CORRECT nutrition analysis for ALL types of foods. The examples are references - your knowledge extends far beyond them. Everything else is irrelevant.
 ''';
 
-      print('📡 Calling OpenRouter AI Vision API...');
-      print('   Model: ${AIConfig.visionModel}');
-      print('   API Key present: ${AIConfig.apiKey.isNotEmpty}');
-      print('   Base URL: ${AIConfig.baseUrl}');
+      if (kDebugMode) debugPrint('📡 Calling OpenRouter AI Vision API...');
+      if (kDebugMode) debugPrint('   Model: ${AIConfig.visionModel}');
+      if (kDebugMode) debugPrint('   API Key present: ${AIConfig.apiKey.isNotEmpty}');
+      if (kDebugMode) debugPrint('   Base URL: ${AIConfig.baseUrl}');
       
       // Pass adaptive timeout values to the API call
       final response = await _callOpenRouterVisionFast(
@@ -918,23 +918,23 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
       ).timeout(
         Duration(seconds: totalTimeoutSeconds),
         onTimeout: () {
-          print('⏱️ AI vision API call timed out after $totalTimeoutSeconds seconds (all models exhausted)');
+          if (kDebugMode) debugPrint('⏱️ AI vision API call timed out after $totalTimeoutSeconds seconds (all models exhausted)');
           return null;
         },
       );
       
       if (response == null || response.isEmpty) {
-        print('❌ AI vision API call returned null or empty response');
-        print('   This could mean:');
-        print('   1. API key is missing or invalid');
-        print('   2. Network connection failed');
-        print('   3. API request timed out');
-        print('   4. All vision models failed');
-        print('🔄 Falling back to offline food recognition...');
+        if (kDebugMode) debugPrint('❌ AI vision API call returned null or empty response');
+        if (kDebugMode) debugPrint('   This could mean:');
+        if (kDebugMode) debugPrint('   1. API key is missing or invalid');
+        if (kDebugMode) debugPrint('   2. Network connection failed');
+        if (kDebugMode) debugPrint('   3. API request timed out');
+        if (kDebugMode) debugPrint('   4. All vision models failed');
+        if (kDebugMode) debugPrint('🔄 Falling back to offline food recognition...');
         final offlineResult = await _offlineFoodRecognition(imageFile);
         return offlineResult;
       }
-      print('✅ Received response from AI vision API (length: ${response.length})');
+      if (kDebugMode) debugPrint('✅ Received response from AI vision API (length: ${response.length})');
 
       try {
         // Clean the response to extract JSON
@@ -952,20 +952,20 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
             lowerResponse.contains("unable to") ||
             lowerResponse.contains("i don't") ||
             lowerResponse.contains("i cannot")) {
-          print('⚠️ AI returned error message instead of JSON');
-          print('   Response preview: ${cleanedResponse.substring(0, cleanedResponse.length > 200 ? 200 : cleanedResponse.length)}...');
-          print('   Full response length: ${cleanedResponse.length}');
+          if (kDebugMode) debugPrint('⚠️ AI returned error message instead of JSON');
+          if (kDebugMode) debugPrint('   Response preview: ${cleanedResponse.substring(0, cleanedResponse.length > 200 ? 200 : cleanedResponse.length)}...');
+          if (kDebugMode) debugPrint('   Full response length: ${cleanedResponse.length}');
           
           // Try to extract JSON even if there's an error message
           final jsonMatch = RegExp(r'\{[\s\S]*\}', dotAll: true).firstMatch(cleanedResponse);
           if (jsonMatch != null) {
-            print('   ✅ Found JSON in response despite error message, attempting to parse...');
+            if (kDebugMode) debugPrint('   ✅ Found JSON in response despite error message, attempting to parse...');
             try {
               final extractedJson = jsonMatch.group(0)!.trim();
               final parsedResult = jsonDecode(extractedJson) as Map<String, dynamic>;
               final isFood = parsedResult['isFood'] as bool? ?? true;
               if (isFood) {
-                print('   ✅ JSON parsed successfully, isFood=true');
+                if (kDebugMode) debugPrint('   ✅ JSON parsed successfully, isFood=true');
                 cleanedResponse = extractedJson;
                 // Continue with normal parsing below
               } else {
@@ -976,11 +976,11 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
                 };
               }
             } catch (e) {
-              print('   ❌ Failed to parse extracted JSON: $e');
-              print('🔄 Attempting to extract nutrition data directly from AI response...');
+              if (kDebugMode) debugPrint('   ❌ Failed to parse extracted JSON: $e');
+              if (kDebugMode) debugPrint('🔄 Attempting to extract nutrition data directly from AI response...');
               final directExtraction = _extractNutritionFromText(response, cleanedResponse);
               if (directExtraction != null && directExtraction['success'] == true) {
-                print('✅ Successfully extracted nutrition data from AI response text');
+                if (kDebugMode) debugPrint('✅ Successfully extracted nutrition data from AI response text');
                 return directExtraction;
               }
               return {
@@ -989,10 +989,10 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
               };
             }
           } else {
-            print('🔄 Attempting to extract nutrition data directly from AI response...');
+            if (kDebugMode) debugPrint('🔄 Attempting to extract nutrition data directly from AI response...');
             final directExtraction = _extractNutritionFromText(response, cleanedResponse);
             if (directExtraction != null && directExtraction['success'] == true) {
-              print('✅ Successfully extracted nutrition data from AI response text');
+              if (kDebugMode) debugPrint('✅ Successfully extracted nutrition data from AI response text');
               return directExtraction;
             }
             return {
@@ -1053,7 +1053,7 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
             }
             
             if (jsonEnd > jsonStart) {
-              print('   📝 Extracting JSON from response using brace counting...');
+              if (kDebugMode) debugPrint('   📝 Extracting JSON from response using brace counting...');
               cleanedResponse = cleanedResponse.substring(jsonStart, jsonEnd).trim();
             } else {
               // Fallback to regex if brace counting fails
@@ -1066,15 +1066,15 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
                 final openBrackets = regexExtracted.split('[').length - 1;
                 final closeBrackets = regexExtracted.split(']').length - 1;
                 if (openBraces == closeBraces && openBrackets == closeBrackets) {
-                  print('   📝 Extracting JSON from response (regex fallback - validated)...');
+                  if (kDebugMode) debugPrint('   📝 Extracting JSON from response (regex fallback - validated)...');
                   cleanedResponse = regexExtracted;
                 } else {
-                  print('❌ Regex extracted incomplete JSON (braces: $openBraces/$closeBraces, brackets: $openBrackets/$closeBrackets)');
-                  print('   Response preview: ${cleanedResponse.substring(0, cleanedResponse.length > 300 ? 300 : cleanedResponse.length)}');
-                  print('🔄 Attempting to extract nutrition data directly from AI response...');
+                  if (kDebugMode) debugPrint('❌ Regex extracted incomplete JSON (braces: $openBraces/$closeBraces, brackets: $openBrackets/$closeBrackets)');
+                  if (kDebugMode) debugPrint('   Response preview: ${cleanedResponse.substring(0, cleanedResponse.length > 300 ? 300 : cleanedResponse.length)}');
+                  if (kDebugMode) debugPrint('🔄 Attempting to extract nutrition data directly from AI response...');
                   final directExtraction = _extractNutritionFromText(response, cleanedResponse);
                   if (directExtraction != null && directExtraction['success'] == true) {
-                    print('✅ Successfully extracted nutrition data from AI response text');
+                    if (kDebugMode) debugPrint('✅ Successfully extracted nutrition data from AI response text');
                     return directExtraction;
                   }
                   return {
@@ -1083,12 +1083,12 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
                   };
                 }
               } else {
-                print('❌ No JSON found in AI response');
-                print('   Response preview: ${cleanedResponse.substring(0, cleanedResponse.length > 300 ? 300 : cleanedResponse.length)}');
-                print('🔄 Attempting to extract nutrition data directly from AI response...');
+                if (kDebugMode) debugPrint('❌ No JSON found in AI response');
+                if (kDebugMode) debugPrint('   Response preview: ${cleanedResponse.substring(0, cleanedResponse.length > 300 ? 300 : cleanedResponse.length)}');
+                if (kDebugMode) debugPrint('🔄 Attempting to extract nutrition data directly from AI response...');
                 final directExtraction = _extractNutritionFromText(response, cleanedResponse);
                 if (directExtraction != null && directExtraction['success'] == true) {
-                  print('✅ Successfully extracted nutrition data from AI response text');
+                  if (kDebugMode) debugPrint('✅ Successfully extracted nutrition data from AI response text');
                   return directExtraction;
                 }
                 return {
@@ -1098,12 +1098,12 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
               }
             }
           } else {
-            print('❌ No JSON found in AI response');
-            print('   Response preview: ${cleanedResponse.substring(0, cleanedResponse.length > 300 ? 300 : cleanedResponse.length)}');
-            print('🔄 Attempting to extract nutrition data directly from AI response...');
+            if (kDebugMode) debugPrint('❌ No JSON found in AI response');
+            if (kDebugMode) debugPrint('   Response preview: ${cleanedResponse.substring(0, cleanedResponse.length > 300 ? 300 : cleanedResponse.length)}');
+            if (kDebugMode) debugPrint('🔄 Attempting to extract nutrition data directly from AI response...');
             final directExtraction = _extractNutritionFromText(response, cleanedResponse);
             if (directExtraction != null && directExtraction['success'] == true) {
-              print('✅ Successfully extracted nutrition data from AI response text');
+              if (kDebugMode) debugPrint('✅ Successfully extracted nutrition data from AI response text');
               return directExtraction;
             }
             return {
@@ -1113,19 +1113,19 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
           }
         }
         
-        print('   ✅ Final JSON length: ${cleanedResponse.length} characters');
+        if (kDebugMode) debugPrint('   ✅ Final JSON length: ${cleanedResponse.length} characters');
         Map<String, dynamic> result;
         try {
           result = jsonDecode(cleanedResponse) as Map<String, dynamic>;
         } catch (jsonError) {
-          print('❌ JSON parsing failed: $jsonError');
-          print('🔄 Attempting to extract nutrition data directly from AI response...');
+          if (kDebugMode) debugPrint('❌ JSON parsing failed: $jsonError');
+          if (kDebugMode) debugPrint('🔄 Attempting to extract nutrition data directly from AI response...');
           final directExtraction = _extractNutritionFromText(response, cleanedResponse);
           if (directExtraction != null && directExtraction['success'] == true) {
-            print('✅ Successfully extracted nutrition data from AI response text');
+            if (kDebugMode) debugPrint('✅ Successfully extracted nutrition data from AI response text');
             return directExtraction;
           }
-          print('❌ Direct extraction also failed, falling back to offline recognition');
+          if (kDebugMode) debugPrint('❌ Direct extraction also failed, falling back to offline recognition');
           rethrow; // Re-throw to go to outer catch block
         }
         
@@ -1136,8 +1136,8 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
         if (!isFood) {
           // Image is not food - return appropriate message
           final message = result['message'] as String? ?? 'The image does not clearly show food or the food is not clearly visible';
-          print('⚠️ AI detected: Not a food item');
-          print('   Message: $message');
+          if (kDebugMode) debugPrint('⚠️ AI detected: Not a food item');
+          if (kDebugMode) debugPrint('   Message: $message');
           return {
             'success': false,
             'error': message,
@@ -1168,25 +1168,25 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
         // Extract volume estimate if available
         final volumeEstimate = result['volumeEstimate'] as String?;
         
-        print('📊 Parsed AI response (Food detected):');
-        print('   Food: $foodName');
-        print('   Confidence: ${(confidence * 100).toStringAsFixed(1)}%');
+        if (kDebugMode) debugPrint('📊 Parsed AI response (Food detected):');
+        if (kDebugMode) debugPrint('   Food: $foodName');
+        if (kDebugMode) debugPrint('   Confidence: ${(confidence * 100).toStringAsFixed(1)}%');
         if (ingredientsList.isNotEmpty) {
-          print('   Ingredients: ${ingredientsList.join(", ")}');
+          if (kDebugMode) debugPrint('   Ingredients: ${ingredientsList.join(", ")}');
         }
         if (volumeEstimate != null) {
-          print('   Volume estimate: $volumeEstimate');
+          if (kDebugMode) debugPrint('   Volume estimate: $volumeEstimate');
         }
-        print('   Weight: ${weightGrams ?? "missing"}g');
-        print('   Calories: ${calories ?? "missing"}');
-        print('   Protein: ${protein ?? "missing"}g, Carbs: ${carbs ?? "missing"}g, Fat: ${fat ?? "missing"}g');
+        if (kDebugMode) debugPrint('   Weight: ${weightGrams ?? "missing"}g');
+        if (kDebugMode) debugPrint('   Calories: ${calories ?? "missing"}');
+        if (kDebugMode) debugPrint('   Protein: ${protein ?? "missing"}g, Carbs: ${carbs ?? "missing"}g, Fat: ${fat ?? "missing"}g');
         
         // Log if food name suggests multiple items or complex dish
         if (foodName.toLowerCase().contains('with') || 
             foodName.toLowerCase().contains('and') ||
             foodName.toLowerCase().contains('+') ||
             ingredientsList.length > 3) {
-          print('   ℹ️ Complex dish detected - analyzing combined items');
+          if (kDebugMode) debugPrint('   ℹ️ Complex dish detected - analyzing combined items');
         }
         
         // Validate that we have at least calories OR macros
@@ -1194,7 +1194,7 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
             (protein == null || protein == 0) && 
             (carbs == null || carbs == 0) && 
             (fat == null || fat == 0)) {
-          print('❌ AI response missing all nutrition data');
+          if (kDebugMode) debugPrint('❌ AI response missing all nutrition data');
           return {
             'success': false,
             'error': 'AI could not determine nutrition values. Please try again or enter manually.',
@@ -1207,13 +1207,13 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
           final estimatedCalories = (protein * 4) + (carbs * 4) + (fat * 9);
           if (estimatedCalories > 0) {
             finalCalories = estimatedCalories;
-            print('🔧 Calculated calories from macros: $finalCalories kcal');
+            if (kDebugMode) debugPrint('🔧 Calculated calories from macros: $finalCalories kcal');
           }
         }
         
         // If still no calories, return error
         if (finalCalories == 0) {
-          print('❌ No calories available (could not calculate from macros)');
+          if (kDebugMode) debugPrint('❌ No calories available (could not calculate from macros)');
           return {
             'success': false,
             'error': 'Could not determine calories for this food. Please enter manually.',
@@ -1230,13 +1230,13 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
           finalProtein = (finalCalories * 0.20 / 4);
           finalCarbs = (finalCalories * 0.55 / 4);
           finalFat = (finalCalories * 0.25 / 9);
-          print('🔧 Estimated macros from calories (all were 0)');
+          if (kDebugMode) debugPrint('🔧 Estimated macros from calories (all were 0)');
         }
         
         // Use weight from AI, minimal fallback if missing
         final finalWeight = (weightGrams != null && weightGrams > 0) ? weightGrams : 100.0;
         if (weightGrams == null || weightGrams <= 0) {
-          print('⚠️ No weight provided by AI - using 100g as fallback');
+          if (kDebugMode) debugPrint('⚠️ No weight provided by AI - using 100g as fallback');
         }
         
         // Use food name from AI
@@ -1264,25 +1264,25 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
           result['volumeEstimate'] = volumeEstimate;
         }
         
-        print('✅ AI Vision validated: $finalFoodName');
-        print('   Weight: ${finalWeight}g, Calories: ${finalCalories.toStringAsFixed(0)} kcal');
-        print('   Macros: P${finalProtein.toStringAsFixed(1)}g C${finalCarbs.toStringAsFixed(1)}g F${finalFat.toStringAsFixed(1)}g');
+        if (kDebugMode) debugPrint('✅ AI Vision validated: $finalFoodName');
+        if (kDebugMode) debugPrint('   Weight: ${finalWeight}g, Calories: ${finalCalories.toStringAsFixed(0)} kcal');
+        if (kDebugMode) debugPrint('   Macros: P${finalProtein.toStringAsFixed(1)}g C${finalCarbs.toStringAsFixed(1)}g F${finalFat.toStringAsFixed(1)}g');
         
         result['success'] = true;
         result['source'] = 'AI Vision Analysis';
         return result;
       } catch (e, stackTrace) {
-        print('❌ Failed to parse AI response: $e');
-        print('Stack trace: $stackTrace');
-        print('Response was: ${response.length > 300 ? response.substring(0, 300) + "..." : response}');
-        print('🔄 Trying offline food recognition...');
+        if (kDebugMode) debugPrint('❌ Failed to parse AI response: $e');
+        if (kDebugMode) debugPrint('Stack trace: $stackTrace');
+        if (kDebugMode) debugPrint('Response was: ${response.length > 300 ? response.substring(0, 300) + "..." : response}');
+        if (kDebugMode) debugPrint('🔄 Trying offline food recognition...');
         final offlineResult = await _offlineFoodRecognition(imageFile);
         return offlineResult;
       }
     } catch (e, stackTrace) {
-      print('❌ Fast snap-to-calorie failed: $e');
-      print('Stack trace: $stackTrace');
-      print('🔄 Trying offline food recognition...');
+      if (kDebugMode) debugPrint('❌ Fast snap-to-calorie failed: $e');
+      if (kDebugMode) debugPrint('Stack trace: $stackTrace');
+      if (kDebugMode) debugPrint('🔄 Trying offline food recognition...');
       final offlineResult = await _offlineFoodRecognition(imageFile);
       return offlineResult;
     }
@@ -1291,7 +1291,7 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
   /// Extract nutrition data directly from AI response text when JSON parsing fails
   static Map<String, dynamic>? _extractNutritionFromText(String originalResponse, String cleanedResponse) {
     try {
-      print('   🔍 Extracting nutrition data from text using pattern matching...');
+      if (kDebugMode) debugPrint('   🔍 Extracting nutrition data from text using pattern matching...');
       
       // Use the original response for better pattern matching (contains full text)
       final text = originalResponse.toLowerCase();
@@ -1430,7 +1430,7 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
       
       // Validate that we have at least calories or macros
       if (calories == null && protein == null && carbs == null && fat == null) {
-        print('   ❌ No nutrition data found in text');
+        if (kDebugMode) debugPrint('   ❌ No nutrition data found in text');
         return null;
       }
       
@@ -1438,12 +1438,12 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
       double finalCalories = calories ?? 0.0;
       if (finalCalories == 0 && protein != null && carbs != null && fat != null) {
         finalCalories = (protein * 4) + (carbs * 4) + (fat * 9);
-        print('   🔧 Calculated calories from extracted macros: ${finalCalories.toStringAsFixed(0)} kcal');
+        if (kDebugMode) debugPrint('   🔧 Calculated calories from extracted macros: ${finalCalories.toStringAsFixed(0)} kcal');
       }
       
       // If still no calories, return null
       if (finalCalories == 0) {
-        print('   ❌ No calories available (could not calculate from macros)');
+        if (kDebugMode) debugPrint('   ❌ No calories available (could not calculate from macros)');
         return null;
       }
       
@@ -1463,15 +1463,15 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
         'isFood': true,
       };
       
-      print('   ✅ Extracted nutrition data:');
-      print('      Food: ${result['foodName']}');
-      print('      Calories: ${finalCalories.toStringAsFixed(0)} kcal');
-      print('      Protein: ${result['protein']}g, Carbs: ${result['carbs']}g, Fat: ${result['fat']}g');
-      print('      Weight: ${result['weightGrams']}g');
+      if (kDebugMode) debugPrint('   ✅ Extracted nutrition data:');
+      if (kDebugMode) debugPrint('      Food: ${result['foodName']}');
+      if (kDebugMode) debugPrint('      Calories: ${finalCalories.toStringAsFixed(0)} kcal');
+      if (kDebugMode) debugPrint('      Protein: ${result['protein']}g, Carbs: ${result['carbs']}g, Fat: ${result['fat']}g');
+      if (kDebugMode) debugPrint('      Weight: ${result['weightGrams']}g');
       
       return result;
     } catch (e) {
-      print('   ❌ Error extracting nutrition from text: $e');
+      if (kDebugMode) debugPrint('   ❌ Error extracting nutrition from text: $e');
       return null;
     }
   }
@@ -1479,7 +1479,7 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
   /// Offline food recognition fallback when AI vision fails
   static Future<Map<String, dynamic>> _offlineFoodRecognition(File imageFile) async {
     try {
-      print('📱 Using offline food recognition...');
+      if (kDebugMode) debugPrint('📱 Using offline food recognition...');
       
       // Check if API key is missing
       if (AIConfig.apiKey.isEmpty) {
@@ -1529,7 +1529,7 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
         }
       };
     } catch (e) {
-      print('❌ Offline recognition failed: $e');
+      if (kDebugMode) debugPrint('❌ Offline recognition failed: $e');
       return {
         'success': false,
         'error': 'Unable to analyze food image. Please enter food details manually.',
@@ -1547,11 +1547,11 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
         final String jsonString = await rootBundle.loadString('assets/calorie_data.json');
         final data = jsonDecode(jsonString) as Map<String, dynamic>;
         if (data.isNotEmpty) {
-          print('✅ Loaded offline food database: calorie_data.json');
+          if (kDebugMode) debugPrint('✅ Loaded offline food database: calorie_data.json');
           return data;
         }
       } catch (e) {
-        print('⚠️ calorie_data.json not available, trying alternatives...');
+        if (kDebugMode) debugPrint('⚠️ calorie_data.json not available, trying alternatives...');
       }
       
       // Fallback to comprehensive_indian_foods.json
@@ -1559,11 +1559,11 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
         final String jsonString = await rootBundle.loadString('assets/comprehensive_indian_foods.json');
         final data = jsonDecode(jsonString) as Map<String, dynamic>;
         if (data.isNotEmpty) {
-          print('✅ Loaded offline food database: comprehensive_indian_foods.json');
+          if (kDebugMode) debugPrint('✅ Loaded offline food database: comprehensive_indian_foods.json');
           return data;
         }
       } catch (e) {
-        print('⚠️ comprehensive_indian_foods.json not available, trying alternatives...');
+        if (kDebugMode) debugPrint('⚠️ comprehensive_indian_foods.json not available, trying alternatives...');
       }
       
       // Fallback to indian_foods.json
@@ -1571,18 +1571,18 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
         final String jsonString = await rootBundle.loadString('assets/indian_foods.json');
         final data = jsonDecode(jsonString) as Map<String, dynamic>;
         if (data.isNotEmpty) {
-          print('✅ Loaded offline food database: indian_foods.json');
+          if (kDebugMode) debugPrint('✅ Loaded offline food database: indian_foods.json');
           return data;
         }
       } catch (e) {
-        print('⚠️ indian_foods.json not available');
+        if (kDebugMode) debugPrint('⚠️ indian_foods.json not available');
       }
       
       // Return empty map if no database available
-      print('⚠️ No offline food database available');
+      if (kDebugMode) debugPrint('⚠️ No offline food database available');
       return {};
     } catch (e) {
-      print('❌ Failed to load offline food database: $e');
+      if (kDebugMode) debugPrint('❌ Failed to load offline food database: $e');
       return {};
     }
   }
@@ -1640,7 +1640,7 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
         });
       }
     } catch (e) {
-      print('❌ Error processing offline suggestions: $e');
+      if (kDebugMode) debugPrint('❌ Error processing offline suggestions: $e');
     }
     
     return suggestions;
@@ -1650,23 +1650,23 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
   static Future<NutritionInfo?> _scanBarcodeOptimized(String barcode) async {
     try {
       // Use optimized barcode scanning (includes all fallbacks including AI)
-      print('🔍 Using optimized barcode scanning...');
+      if (kDebugMode) debugPrint('🔍 Using optimized barcode scanning...');
       
       // Use regular scanning which already includes all fallbacks
       var result = await BarcodeScanningService.scanBarcode(barcode);
       
       if (result != null) {
-        print('✅ Barcode scan successful: ${result.foodName}');
-        print('🔥 Calories: ${result.calories}, Protein: ${result.protein}g, Carbs: ${result.carbs}g, Fat: ${result.fat}g');
-        print('📊 Source: ${result.source}');
-        print('✅ Is Valid: ${result.isValid}');
+        if (kDebugMode) debugPrint('✅ Barcode scan successful: ${result.foodName}');
+        if (kDebugMode) debugPrint('🔥 Calories: ${result.calories}, Protein: ${result.protein}g, Carbs: ${result.carbs}g, Fat: ${result.fat}g');
+        if (kDebugMode) debugPrint('📊 Source: ${result.source}');
+        if (kDebugMode) debugPrint('✅ Is Valid: ${result.isValid}');
       } else {
-        print('❌ No nutrition data found for barcode: $barcode');
+        if (kDebugMode) debugPrint('❌ No nutrition data found for barcode: $barcode');
       }
       
       return result;
     } catch (e) {
-      print('❌ Error in optimized barcode scanning: $e');
+      if (kDebugMode) debugPrint('❌ Error in optimized barcode scanning: $e');
       return null;
     }
   }
@@ -1708,34 +1708,34 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
   }) async {
     try {
       if (kDebugMode) {
-        print('🔧 AI Vision Configuration:');
-        print('   - Base URL: ${AIConfig.baseUrl}');
+        if (kDebugMode) debugPrint('🔧 AI Vision Configuration:');
+        if (kDebugMode) debugPrint('   - Base URL: ${AIConfig.baseUrl}');
         // SECURITY: Never log API key previews in production
-        print('   - API Key: ${AIConfig.apiKey.isNotEmpty ? "CONFIGURED (${AIConfig.apiKey.length} chars)" : "MISSING"}');
-        print('   - Primary Model: ${AIConfig.visionModel}');
-        print('   - Fallback Model: ${AIConfig.backupVisionModel}');
-        print('   - Image size: ${(base64Image.length / 1024).toStringAsFixed(1)}KB base64');
+        if (kDebugMode) debugPrint('   - API Key: ${AIConfig.apiKey.isNotEmpty ? "CONFIGURED (${AIConfig.apiKey.length} chars)" : "MISSING"}');
+        if (kDebugMode) debugPrint('   - Primary Model: ${AIConfig.visionModel}');
+        if (kDebugMode) debugPrint('   - Fallback Model: ${AIConfig.backupVisionModel}');
+        if (kDebugMode) debugPrint('   - Image size: ${(base64Image.length / 1024).toStringAsFixed(1)}KB base64');
       }
       
       // Validate configuration FIRST before making any API calls
       if (AIConfig.apiKey.isEmpty) {
-        print('❌ AI vision not configured: missing API key');
-        print('   ⚠️ Check Firebase config at app_config/ai_settings/openrouter_api_key');
-        print('   ⚠️ Make sure AIConfig.initialize() was called');
-        print('   🔄 Attempting to reload configuration...');
+        if (kDebugMode) debugPrint('❌ AI vision not configured: missing API key');
+        if (kDebugMode) debugPrint('   ⚠️ Check Firebase config at app_config/ai_settings/openrouter_api_key');
+        if (kDebugMode) debugPrint('   ⚠️ Make sure AIConfig.initialize() was called');
+        if (kDebugMode) debugPrint('   🔄 Attempting to reload configuration...');
         
         // Try to reload configuration (only once per call to prevent loops)
         try {
           await AIConfig.refresh(); // Refresh has built-in debouncing
           
           if (AIConfig.apiKey.isEmpty) {
-            print('❌ API key still empty after refresh - check Firestore configuration');
+            if (kDebugMode) debugPrint('❌ API key still empty after refresh - check Firestore configuration');
             return null;
           } else {
-            print('✅ API key loaded after refresh: ${AIConfig.apiKey.length} characters');
+            if (kDebugMode) debugPrint('✅ API key loaded after refresh: ${AIConfig.apiKey.length} characters');
           }
         } catch (e) {
-          print('❌ Error refreshing config: $e');
+          if (kDebugMode) debugPrint('❌ Error refreshing config: $e');
           return null;
         }
       }
@@ -1744,7 +1744,7 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
       if (kDebugMode) {
         // Verify API key format (OpenRouter keys start with 'sk-or-v1-')
         if (!AIConfig.apiKey.startsWith('sk-or-v1-') && !AIConfig.apiKey.startsWith('sk-')) {
-          print('⚠️ API key format may be incorrect (should start with sk-or-v1- or sk-)');
+          if (kDebugMode) debugPrint('⚠️ API key format may be incorrect (should start with sk-or-v1- or sk-)');
         }
       }
       
@@ -1753,11 +1753,11 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
       
       // SECURITY: Never log API key previews in production
       if (kDebugMode) {
-        print('🔑 Using API key (length: ${apiKey.length})');
+        if (kDebugMode) debugPrint('🔑 Using API key (length: ${apiKey.length})');
         // Verify API key format (only in debug mode)
         if (!apiKey.startsWith('sk-or-v1-') && !apiKey.startsWith('sk-')) {
-          print('⚠️ WARNING: API key format may be incorrect');
-          print('   Expected: starts with "sk-or-v1-" or "sk-"');
+          if (kDebugMode) debugPrint('⚠️ WARNING: API key format may be incorrect');
+          if (kDebugMode) debugPrint('   Expected: starts with "sk-or-v1-" or "sk-"');
         }
       }
       
@@ -1770,10 +1770,10 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
       
       // SECURITY: Never log Authorization header in production
       if (kDebugMode) {
-        print('📡 Request headers prepared:');
-        print('   - Authorization: Bearer [REDACTED]');
-        print('   - HTTP-Referer: ${AIConfig.appUrl}');
-        print('   - X-Title: ${AIConfig.appName}');
+        if (kDebugMode) debugPrint('📡 Request headers prepared:');
+        if (kDebugMode) debugPrint('   - Authorization: Bearer [REDACTED]');
+        if (kDebugMode) debugPrint('   - HTTP-Referer: ${AIConfig.appUrl}');
+        if (kDebugMode) debugPrint('   - X-Title: ${AIConfig.appName}');
       }
 
       // Try primary model first, fallback only if enabled and budget allows
@@ -1785,7 +1785,7 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
 
       for (int attempt = 0; attempt < models.length; attempt++) {
         final model = models[attempt];
-        print('🤖 Attempting vision analysis with model: $model (attempt ${attempt + 1})');
+        if (kDebugMode) debugPrint('🤖 Attempting vision analysis with model: $model (attempt ${attempt + 1})');
 
         try {
           // Build request body with strong system message to enforce JSON
@@ -1818,28 +1818,28 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
           // Some models might not support this, so we'll handle both cases
           if (model.startsWith('openai/')) {
             body['response_format'] = {'type': 'json_object'};
-            print('   ✅ Added response_format for OpenAI model');
+            if (kDebugMode) debugPrint('   ✅ Added response_format for OpenAI model');
           } else {
-            print('   ⚠️ Model may not support response_format - will rely on prompt');
+            if (kDebugMode) debugPrint('   ⚠️ Model may not support response_format - will rely on prompt');
           }
 
           // Adaptive timeout based on image size (passed from caller)
           // Use shorter timeout for faster model, longer for fallback
           final timeout = Duration(seconds: attempt == 0 ? primaryTimeoutSeconds : fallbackTimeoutSeconds);
           
-          print('📤 Sending request to OpenRouter:');
-          print('   Model: $model');
-          print('   Max tokens: ${AIConfig.visionMaxTokens}');
-          print('   Temperature: ${AIConfig.visionTemperature}');
-          print('   Image size: ${(base64Image.length / 1024).toStringAsFixed(1)}KB base64');
-          print('   Image URL format: data:image/jpeg;base64,[${base64Image.length} chars]');
-          print('   Image URL preview: data:image/jpeg;base64,${base64Image.substring(0, base64Image.length > 50 ? 50 : base64Image.length)}...');
-          print('   Request timeout: ${timeout.inSeconds}s');
-          print('   Has response_format: ${body.containsKey('response_format')}');
+          if (kDebugMode) debugPrint('📤 Sending request to OpenRouter:');
+          if (kDebugMode) debugPrint('   Model: $model');
+          if (kDebugMode) debugPrint('   Max tokens: ${AIConfig.visionMaxTokens}');
+          if (kDebugMode) debugPrint('   Temperature: ${AIConfig.visionTemperature}');
+          if (kDebugMode) debugPrint('   Image size: ${(base64Image.length / 1024).toStringAsFixed(1)}KB base64');
+          if (kDebugMode) debugPrint('   Image URL format: data:image/jpeg;base64,[${base64Image.length} chars]');
+          if (kDebugMode) debugPrint('   Image URL preview: data:image/jpeg;base64,${base64Image.substring(0, base64Image.length > 50 ? 50 : base64Image.length)}...');
+          if (kDebugMode) debugPrint('   Request timeout: ${timeout.inSeconds}s');
+          if (kDebugMode) debugPrint('   Has response_format: ${body.containsKey('response_format')}');
           
           final requestBody = jsonEncode(body);
-          print('   Request body size: ${(requestBody.length / 1024).toStringAsFixed(1)}KB');
-          print('   Request body preview: ${requestBody.substring(0, requestBody.length > 500 ? 500 : requestBody.length)}...');
+          if (kDebugMode) debugPrint('   Request body size: ${(requestBody.length / 1024).toStringAsFixed(1)}KB');
+          if (kDebugMode) debugPrint('   Request body preview: ${requestBody.substring(0, requestBody.length > 500 ? 500 : requestBody.length)}...');
           
           final response = await http.post(
             Uri.parse(AIConfig.baseUrl),
@@ -1848,24 +1848,24 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
           ).timeout(
             timeout,
             onTimeout: () {
-              print('⏱️ Vision API timeout for model: $model (after ${timeout.inSeconds}s)');
+              if (kDebugMode) debugPrint('⏱️ Vision API timeout for model: $model (after ${timeout.inSeconds}s)');
               throw TimeoutException('Vision API timeout', timeout);
             },
           );
           
-          print('📥 Received response from OpenRouter:');
-          print('   Status code: ${response.statusCode}');
-          print('   Response size: ${(response.body.length / 1024).toStringAsFixed(1)}KB');
+          if (kDebugMode) debugPrint('📥 Received response from OpenRouter:');
+          if (kDebugMode) debugPrint('   Status code: ${response.statusCode}');
+          if (kDebugMode) debugPrint('   Response size: ${(response.body.length / 1024).toStringAsFixed(1)}KB');
 
           if (response.statusCode == 200) {
-            print('✅ API request successful (200 OK)');
+            if (kDebugMode) debugPrint('✅ API request successful (200 OK)');
             final data = jsonDecode(response.body) as Map<String, dynamic>;
-            print('   Response keys: ${data.keys.toList()}');
+            if (kDebugMode) debugPrint('   Response keys: ${data.keys.toList()}');
             final content = data['choices']?[0]?['message']?['content'] as String?;
             if (content != null && content.isNotEmpty) {
-              print('✅ Vision analysis successful with model: $model');
-              print('   Response content length: ${content.length} characters');
-              print('   Response preview: ${content.substring(0, content.length > 100 ? 100 : content.length)}...');
+              if (kDebugMode) debugPrint('✅ Vision analysis successful with model: $model');
+              if (kDebugMode) debugPrint('   Response content length: ${content.length} characters');
+              if (kDebugMode) debugPrint('   Response preview: ${content.substring(0, content.length > 100 ? 100 : content.length)}...');
               
               // Always try to extract JSON using proper brace counting (handles newlines/formatting)
               final trimmedContent = content.trim();
@@ -1919,21 +1919,21 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
                 
                 if (jsonEnd > jsonStart) {
                   final extractedJson = trimmedContent.substring(jsonStart, jsonEnd).trim();
-                  print('   ✅ Extracted complete JSON (${extractedJson.length} chars from ${trimmedContent.length} chars)');
+                  if (kDebugMode) debugPrint('   ✅ Extracted complete JSON (${extractedJson.length} chars from ${trimmedContent.length} chars)');
                   return extractedJson;
                 }
               }
               
               // If brace counting failed, check for error message and try regex fallback
-              print('   ⚠️ Could not extract JSON with brace counting, checking for error message...');
+              if (kDebugMode) debugPrint('   ⚠️ Could not extract JSON with brace counting, checking for error message...');
               final lowerContent = content.toLowerCase();
               if (lowerContent.contains("i'm sorry") || 
                   lowerContent.contains("i can't") ||
                   lowerContent.contains("cannot") ||
                   lowerContent.contains("does not depict") ||
                   lowerContent.contains("no food")) {
-                print('   ❌ AI returned error text instead of JSON');
-                print('   Full response: $content');
+                if (kDebugMode) debugPrint('   ❌ AI returned error text instead of JSON');
+                if (kDebugMode) debugPrint('   Full response: $content');
                 // Try to extract JSON if it's mixed with text
                 final jsonMatch = RegExp(r'\{[\s\S]*\}', dotAll: true).firstMatch(content);
                 if (jsonMatch != null) {
@@ -1944,10 +1944,10 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
                   final openBrackets = regexExtracted.split('[').length - 1;
                   final closeBrackets = regexExtracted.split(']').length - 1;
                   if (openBraces == closeBraces && openBrackets == closeBrackets) {
-                    print('   ✅ Found complete JSON in response (regex fallback)');
+                    if (kDebugMode) debugPrint('   ✅ Found complete JSON in response (regex fallback)');
                     return regexExtracted;
                   } else {
-                    print('   ❌ Regex extracted incomplete JSON (braces: $openBraces/$closeBraces, brackets: $openBrackets/$closeBrackets)');
+                    if (kDebugMode) debugPrint('   ❌ Regex extracted incomplete JSON (braces: $openBraces/$closeBraces, brackets: $openBrackets/$closeBrackets)');
                   }
                 }
                 // If no JSON found, continue to next model
@@ -1963,36 +1963,36 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
                   final openBrackets = regexExtracted.split('[').length - 1;
                   final closeBrackets = regexExtracted.split(']').length - 1;
                   if (openBraces == closeBraces && openBrackets == closeBrackets) {
-                    print('   ✅ Found complete JSON in response (regex fallback)');
+                    if (kDebugMode) debugPrint('   ✅ Found complete JSON in response (regex fallback)');
                     return regexExtracted;
                   } else {
-                    print('   ❌ Regex extracted incomplete JSON');
+                    if (kDebugMode) debugPrint('   ❌ Regex extracted incomplete JSON');
                   }
                 }
-                print('   ❌ No valid JSON found in response');
+                if (kDebugMode) debugPrint('   ❌ No valid JSON found in response');
                 continue;
               }
             } else {
-              print('⚠️ Empty response from model: $model');
-              print('   Response data: ${data.toString().substring(0, data.toString().length > 200 ? 200 : data.toString().length)}...');
+              if (kDebugMode) debugPrint('⚠️ Empty response from model: $model');
+              if (kDebugMode) debugPrint('   Response data: ${data.toString().substring(0, data.toString().length > 200 ? 200 : data.toString().length)}...');
               continue; // Try next model
             }
           } else if (response.statusCode == 401) {
-            print('❌ Authentication failed (401 Unauthorized)');
-            print('   This means the API key is invalid, expired, or not authorized for this model');
+            if (kDebugMode) debugPrint('❌ Authentication failed (401 Unauthorized)');
+            if (kDebugMode) debugPrint('   This means the API key is invalid, expired, or not authorized for this model');
             // SECURITY: Never log API key previews in production
             if (kDebugMode) {
-              print('   API key length: ${apiKey.length}');
+              if (kDebugMode) debugPrint('   API key length: ${apiKey.length}');
             }
-            print('   Model attempted: $model');
-            print('   Response body: ${response.body}');
-            print('   Check Firestore config at app_config/ai_settings/openrouter_api_key');
-            print('   Verify API key is valid and has access to vision models');
+            if (kDebugMode) debugPrint('   Model attempted: $model');
+            if (kDebugMode) debugPrint('   Response body: ${response.body}');
+            if (kDebugMode) debugPrint('   Check Firestore config at app_config/ai_settings/openrouter_api_key');
+            if (kDebugMode) debugPrint('   Verify API key is valid and has access to vision models');
             // Don't try other models if auth fails - they'll all fail with same key
             return null;
           } else if (response.statusCode == 429) {
-            print('❌ Rate limit hit for model: $model');
-            print('   Response body: ${response.body}');
+            if (kDebugMode) debugPrint('❌ Rate limit hit for model: $model');
+            if (kDebugMode) debugPrint('   Response body: ${response.body}');
             if (attempt < models.length - 1) {
               // Wait less before trying next model (speed optimization)
               await Future.delayed(const Duration(milliseconds: 150)); // Reduced retry delay for speed
@@ -2001,42 +2001,42 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
               return null; // All models exhausted
             }
           } else {
-            print('❌ API error for model $model: ${response.statusCode}');
+            if (kDebugMode) debugPrint('❌ API error for model $model: ${response.statusCode}');
             try {
               final errorBody = jsonDecode(response.body);
-              print('   Error response: ${errorBody.toString()}');
+              if (kDebugMode) debugPrint('   Error response: ${errorBody.toString()}');
               if (errorBody.containsKey('error')) {
                 final error = errorBody['error'];
                 if (error is Map) {
-                  print('   Error type: ${error['type']}');
-                  print('   Error message: ${error['message']}');
-                  print('   Error code: ${error['code']}');
+                  if (kDebugMode) debugPrint('   Error type: ${error['type']}');
+                  if (kDebugMode) debugPrint('   Error message: ${error['message']}');
+                  if (kDebugMode) debugPrint('   Error code: ${error['code']}');
                 } else {
-                  print('   Error details: $error');
+                  if (kDebugMode) debugPrint('   Error details: $error');
                 }
               }
             } catch (e) {
-              print('   Raw response body: ${response.body}');
-              print('   Failed to parse error: $e');
+              if (kDebugMode) debugPrint('   Raw response body: ${response.body}');
+              if (kDebugMode) debugPrint('   Failed to parse error: $e');
             }
             continue; // Try next model
           }
         } on TimeoutException {
-          print('⏱️ Timeout for model: $model');
-          print('   This may be due to:');
-          print('   1. Large image size taking longer to process');
-          print('   2. Network latency');
-          print('   3. API service being slow');
-          print('   Attempting fallback model...');
+          if (kDebugMode) debugPrint('⏱️ Timeout for model: $model');
+          if (kDebugMode) debugPrint('   This may be due to:');
+          if (kDebugMode) debugPrint('   1. Large image size taking longer to process');
+          if (kDebugMode) debugPrint('   2. Network latency');
+          if (kDebugMode) debugPrint('   3. API service being slow');
+          if (kDebugMode) debugPrint('   Attempting fallback model...');
           if (attempt < models.length - 1) {
             // Wait briefly before trying next model
             await Future.delayed(const Duration(milliseconds: 200)); // Reduced delay before fallback
           }
           continue; // Try next model
         } catch (e, stackTrace) {
-          print('❌ Error with model $model: $e');
-          print('   Error type: ${e.runtimeType}');
-          print('   Stack trace: $stackTrace');
+          if (kDebugMode) debugPrint('❌ Error with model $model: $e');
+          if (kDebugMode) debugPrint('   Error type: ${e.runtimeType}');
+          if (kDebugMode) debugPrint('   Stack trace: $stackTrace');
           if (attempt < models.length - 1) {
             // Wait briefly before trying next model
             await Future.delayed(const Duration(milliseconds: 150)); // Reduced retry delay for speed
@@ -2045,15 +2045,15 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
         }
       }
 
-      print('❌ All vision models failed after ${models.length} attempts');
-      print('   Models attempted: ${models.join(", ")}');
-      print('   API Key present: ${apiKey.isNotEmpty}');
-      print('   Base URL: ${AIConfig.baseUrl}');
+      if (kDebugMode) debugPrint('❌ All vision models failed after ${models.length} attempts');
+      if (kDebugMode) debugPrint('   Models attempted: ${models.join(", ")}');
+      if (kDebugMode) debugPrint('   API Key present: ${apiKey.isNotEmpty}');
+      if (kDebugMode) debugPrint('   Base URL: ${AIConfig.baseUrl}');
       return null;
 
     } catch (e, stackTrace) {
-      print('❌ Fatal error in vision call: $e');
-      print('   Stack trace: $stackTrace');
+      if (kDebugMode) debugPrint('❌ Fatal error in vision call: $e');
+      if (kDebugMode) debugPrint('   Stack trace: $stackTrace');
       return null;
     }
   }
@@ -2092,7 +2092,7 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
   static void clearCache() {
     _resultCache.clear();
     _cacheTimestamps.clear();
-    print('🧹 Cache cleared');
+    if (kDebugMode) debugPrint('🧹 Cache cleared');
   }
 
   /// Get cache statistics
@@ -2112,7 +2112,7 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
     Map<String, dynamic>? userGoals,
   ) async {
     try {
-      print('🤖 Generating AI analysis for: $foodName');
+      if (kDebugMode) debugPrint('🤖 Generating AI analysis for: $foodName');
       
       // Return basic analysis as fallback
       return {
@@ -2121,7 +2121,7 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
         'tips': ['Barcode data provides reliable nutrition information'],
       };
     } catch (e) {
-      print('❌ Error generating AI analysis: $e');
+      if (kDebugMode) debugPrint('❌ Error generating AI analysis: $e');
       // Return basic analysis as fallback
       return {
         'insights': ['Product identified via barcode scan'],
@@ -2133,3 +2133,4 @@ Remember: Your ONLY job is to identify and analyze FOOD items with HIGH ACCURACY
     }
   }
 }
+

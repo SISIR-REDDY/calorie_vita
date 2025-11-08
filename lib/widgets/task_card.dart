@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/task.dart';
 import '../ui/app_colors.dart';
+import 'package:flutter/foundation.dart';
+import '../config/production_config.dart';
 
 /// Professional task card widget for displaying individual tasks
 class TaskCard extends StatefulWidget {
@@ -111,7 +113,7 @@ class _TaskCardState extends State<TaskCard> with SingleTickerProviderStateMixin
   Widget _buildCompletionIndicator() {
     return GestureDetector(
       onTap: () {
-        print('🎯 Circle tapped for task: ${widget.task.title}');
+        if (kDebugMode) debugPrint('🎯 Circle tapped for task: ${widget.task.title}');
         widget.onToggleCompletion();
       },
       behavior: HitTestBehavior.opaque,
@@ -247,7 +249,7 @@ class _TaskCardState extends State<TaskCard> with SingleTickerProviderStateMixin
       children: [
         IconButton(
           onPressed: () {
-            print('🗑️ Delete button tapped for task: ${widget.task.title}');
+            if (kDebugMode) debugPrint('🗑️ Delete button tapped for task: ${widget.task.title}');
             widget.onDelete();
           },
           icon: Icon(
@@ -451,3 +453,4 @@ class ExampleTasksWidget extends StatelessWidget {
     );
   }
 }
+

@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/production_config.dart';
 import '../models/food_entry.dart';
 import '../models/user_goals.dart';
 import '../models/user_preferences.dart';
@@ -118,7 +120,7 @@ class AppStateService {
 
       _isInitialized = true;
     } catch (e) {
-      print('Error initializing AppStateService: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error initializing AppStateService: $e');
       rethrow;
     }
   }
@@ -143,11 +145,11 @@ class AppStateService {
               _updateMacroBreakdown();
               _cacheFoodEntries();
             } catch (e) {
-              print('Error processing food entries snapshot: $e');
+              if (ProductionConfig.enableDebugLogs) debugPrint('Error processing food entries snapshot: $e');
             }
           },
           onError: (error) {
-            print('Food entries listener error: $error');
+            if (ProductionConfig.enableDebugLogs) debugPrint('Food entries listener error: $error');
             // Don't crash - just log the error
           },
         );
@@ -171,11 +173,11 @@ class AppStateService {
               _goalsController.add(_userGoals);
               _cacheUserGoals();
             } catch (e) {
-              print('Error processing goals snapshot: $e');
+              if (ProductionConfig.enableDebugLogs) debugPrint('Error processing goals snapshot: $e');
             }
           },
           onError: (error) {
-            print('Goals listener error: $error');
+            if (ProductionConfig.enableDebugLogs) debugPrint('Goals listener error: $error');
           },
         );
 
@@ -198,11 +200,11 @@ class AppStateService {
               _preferencesController.add(_userPreferences);
               _cacheUserPreferences();
             } catch (e) {
-              print('Error processing preferences snapshot: $e');
+              if (ProductionConfig.enableDebugLogs) debugPrint('Error processing preferences snapshot: $e');
             }
           },
           onError: (error) {
-            print('Preferences listener error: $error');
+            if (ProductionConfig.enableDebugLogs) debugPrint('Preferences listener error: $error');
           },
         );
 
@@ -229,11 +231,11 @@ class AppStateService {
               _achievementsController.add(_achievements);
               _cacheAchievements();
             } catch (e) {
-              print('Error processing achievements snapshot: $e');
+              if (ProductionConfig.enableDebugLogs) debugPrint('Error processing achievements snapshot: $e');
             }
           },
           onError: (error) {
-            print('Achievements listener error: $error');
+            if (ProductionConfig.enableDebugLogs) debugPrint('Achievements listener error: $error');
           },
         );
 
@@ -248,23 +250,23 @@ class AppStateService {
         .listen(
           (snapshot) {
             try {
-              print(
+              if (ProductionConfig.enableDebugLogs) debugPrint(
                   'Profile data snapshot received in AppStateService: ${snapshot.exists}');
               if (snapshot.exists) {
                 _profileData = snapshot.data()!;
-                print('Profile data updated: $_profileData');
+                if (ProductionConfig.enableDebugLogs) debugPrint('Profile data updated: $_profileData');
               } else {
                 _profileData = null;
-                print('Profile data document does not exist');
+                if (ProductionConfig.enableDebugLogs) debugPrint('Profile data document does not exist');
               }
               _profileDataController.add(_profileData);
               _cacheProfileData();
             } catch (e) {
-              print('Error processing profile data snapshot: $e');
+              if (ProductionConfig.enableDebugLogs) debugPrint('Error processing profile data snapshot: $e');
             }
           },
           onError: (error) {
-            print('Profile data listener error: $error');
+            if (ProductionConfig.enableDebugLogs) debugPrint('Profile data listener error: $error');
           },
         );
   }
@@ -346,14 +348,14 @@ class AppStateService {
               Map<String, dynamic>.from(jsonDecode(entryJson)));
           await _firebaseService.saveFoodEntry(_currentUser!.uid, entry);
         } catch (e) {
-          print('Error syncing pending entry: $e');
+          if (ProductionConfig.enableDebugLogs) debugPrint('Error syncing pending entry: $e');
         }
       }
 
       // Clear pending entries after sync
       await prefs.remove('pending_food_entries');
     } catch (e) {
-      print('Error syncing offline data: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error syncing offline data: $e');
     }
   }
 
@@ -372,7 +374,7 @@ class AppStateService {
             _foodEntries.add(FoodEntry.fromJson(Map<String, dynamic>.from(decoded)));
           }
         } catch (e) {
-          print('⚠️ Skipping invalid cached entry: $e');
+          if (ProductionConfig.enableDebugLogs) debugPrint('⚠️ Skipping invalid cached entry: $e');
           // Continue with other entries
         }
       }
@@ -389,7 +391,7 @@ class AppStateService {
           _preferencesController.add(_userPreferences);
         } catch (e) {
           // If JSON parsing fails, try to parse as Map directly
-          print('⚠️ Cached preferences not valid JSON, clearing cache: $e');
+          if (ProductionConfig.enableDebugLogs) debugPrint('⚠️ Cached preferences not valid JSON, clearing cache: $e');
           // Clear invalid cache
           await prefs.remove('cached_preferences');
         }
@@ -408,13 +410,13 @@ class AppStateService {
           _userGoals = UserGoals.fromMap(goalsMap);
           _goalsController.add(_userGoals);
         } catch (e) {
-          print('⚠️ Cached goals not valid JSON, clearing cache: $e');
+          if (ProductionConfig.enableDebugLogs) debugPrint('⚠️ Cached goals not valid JSON, clearing cache: $e');
           // Clear invalid cache
           await prefs.remove('cached_goals');
         }
       }
     } catch (e) {
-      print('Error loading cached data: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error loading cached data: $e');
     }
   }
 
@@ -425,7 +427,7 @@ class AppStateService {
       final entriesJson = _foodEntries.map((entry) => jsonEncode(entry.toJson())).toList();
       await prefs.setStringList('cached_food_entries', entriesJson);
     } catch (e) {
-      print('Error caching food entries: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error caching food entries: $e');
     }
   }
 
@@ -436,7 +438,7 @@ class AppStateService {
       await prefs.setString(
           'cached_preferences', jsonEncode(_userPreferences.toMap()));
     } catch (e) {
-      print('Error caching preferences: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error caching preferences: $e');
     }
   }
 
@@ -455,7 +457,7 @@ class AppStateService {
         await prefs.remove('cached_goals');
       }
     } catch (e) {
-      print('Error caching goals: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error caching goals: $e');
     }
   }
 
@@ -466,7 +468,7 @@ class AppStateService {
       final achievementsJson = _achievements.map((a) => jsonEncode(a.toJson())).toList();
       await prefs.setStringList('cached_achievements', achievementsJson);
     } catch (e) {
-      print('Error caching achievements: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error caching achievements: $e');
     }
   }
 
@@ -477,7 +479,7 @@ class AppStateService {
       await prefs.setString(
           'cached_profile_data', _profileData?.toString() ?? '');
     } catch (e) {
-      print('Error caching profile data: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error caching profile data: $e');
     }
   }
 
@@ -503,7 +505,7 @@ class AppStateService {
       updateDailySummary();
       _updateMacroBreakdown();
     } catch (e) {
-      print('Error saving food entry: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error saving food entry: $e');
       rethrow;
     }
   }
@@ -523,7 +525,7 @@ class AppStateService {
       _preferencesController.add(_userPreferences);
       _cacheUserPreferences();
     } catch (e) {
-      print('Error updating preferences: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error updating preferences: $e');
       rethrow;
     }
   }
@@ -532,44 +534,44 @@ class AppStateService {
   Future<void> updateUserGoals(UserGoals goals) async {
     if (_currentUser == null) return;
 
-    print('=== APPSATE SERVICE UPDATE USER GOALS ===');
-    print('Updating goals: ${goals.toMap()}');
+    if (ProductionConfig.enableDebugLogs) debugPrint('=== APPSATE SERVICE UPDATE USER GOALS ===');
+    if (ProductionConfig.enableDebugLogs) debugPrint('Updating goals: ${goals.toMap()}');
 
     try {
       if (_isOnline) {
         await _firebaseService.saveUserGoals(_currentUser!.uid, goals);
-        print('Goals saved to Firestore successfully');
+        if (ProductionConfig.enableDebugLogs) debugPrint('Goals saved to Firestore successfully');
       }
 
       // Update local state immediately
       _userGoals = goals;
       _goalsController.add(_userGoals);
-      print('Goals broadcasted via stream controller');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Goals broadcasted via stream controller');
       _cacheUserGoals();
       updateDailySummary(); // Recalculate daily summary with new goals
-      print('Daily summary updated with new goals');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Daily summary updated with new goals');
     } catch (e) {
-      print('Error updating goals: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error updating goals: $e');
       rethrow;
     }
-    print('=== END APPSATE SERVICE UPDATE USER GOALS ===');
+    if (ProductionConfig.enableDebugLogs) debugPrint('=== END APPSATE SERVICE UPDATE USER GOALS ===');
   }
 
   /// Force goals update to trigger immediate UI refresh
   void forceGoalsUpdate(UserGoals goals) {
     if (_currentUser == null) return;
 
-    print('=== FORCE GOALS UPDATE ===');
-    print('Forcing goals update: ${goals.toMap()}');
+    if (ProductionConfig.enableDebugLogs) debugPrint('=== FORCE GOALS UPDATE ===');
+    if (ProductionConfig.enableDebugLogs) debugPrint('Forcing goals update: ${goals.toMap()}');
 
     // Update local state immediately
     _userGoals = goals;
     _goalsController.add(_userGoals);
-    print('Goals broadcasted via stream controller');
+    if (ProductionConfig.enableDebugLogs) debugPrint('Goals broadcasted via stream controller');
     _cacheUserGoals();
     updateDailySummary(); // Recalculate daily summary with new goals
-    print('Daily summary updated with new goals');
-    print('=== END FORCE GOALS UPDATE ===');
+    if (ProductionConfig.enableDebugLogs) debugPrint('Daily summary updated with new goals');
+    if (ProductionConfig.enableDebugLogs) debugPrint('=== END FORCE GOALS UPDATE ===');
   }
 
   /// Force update profile data
@@ -577,7 +579,7 @@ class AppStateService {
     _profileData = profileData;
     _profileDataController.add(_profileData);
     _cacheProfileData();
-    print('Profile data force updated: $_profileData');
+    if (ProductionConfig.enableDebugLogs) debugPrint('Profile data force updated: $_profileData');
   }
 
   /// Refresh all user data to ensure UI is up to date
@@ -585,7 +587,7 @@ class AppStateService {
     if (_currentUser == null) return;
 
     try {
-      print('=== REFRESHING USER DATA ===');
+      if (ProductionConfig.enableDebugLogs) debugPrint('=== REFRESHING USER DATA ===');
       
       // Force refresh all data streams
       await _loadCachedData();
@@ -603,10 +605,10 @@ class AppStateService {
       _achievementsController.add(_achievements);
       _profileDataController.add(_profileData);
       
-      print('User data refreshed successfully');
-      print('=== END REFRESHING USER DATA ===');
+      if (ProductionConfig.enableDebugLogs) debugPrint('User data refreshed successfully');
+      if (ProductionConfig.enableDebugLogs) debugPrint('=== END REFRESHING USER DATA ===');
     } catch (e) {
-      print('Error refreshing user data: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error refreshing user data: $e');
     }
   }
 
@@ -625,7 +627,7 @@ class AppStateService {
       updateDailySummary();
       _updateMacroBreakdown();
     } catch (e) {
-      print('Error deleting food entry: $e');
+      if (ProductionConfig.enableDebugLogs) debugPrint('Error deleting food entry: $e');
       rethrow;
     }
   }

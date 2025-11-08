@@ -1,5 +1,7 @@
 import '../config/ai_config.dart';
 import '../services/network_service.dart';
+import 'package:flutter/foundation.dart';
+import '../config/production_config.dart';
 
 /// Utility to check if all features are enabled and configured
 class FeatureStatusChecker {
@@ -169,66 +171,67 @@ class FeatureStatusChecker {
     final status = checkAllFeatures();
     const separator = '============================================================';
     
-    print('\n$separator');
-    print('📊 FEATURE STATUS REPORT');
-    print(separator);
+    if (kDebugMode) debugPrint('\n$separator');
+    if (kDebugMode) debugPrint('📊 FEATURE STATUS REPORT');
+    if (kDebugMode) debugPrint(separator);
     
     // Feature Flags
-    print('\n🔘 FEATURE FLAGS:');
+    if (kDebugMode) debugPrint('\n🔘 FEATURE FLAGS:');
     final flags = status['feature_flags'] as Map<String, dynamic>;
     flags.forEach((key, value) {
       final icon = value == true ? '✅' : '❌';
-      print('   $icon ${key}: $value');
+      if (kDebugMode) debugPrint('   $icon ${key}: $value');
     });
     
     // API Keys
-    print('\n🔑 API KEYS:');
+    if (kDebugMode) debugPrint('\n🔑 API KEYS:');
     final apiKeys = status['api_keys'] as Map<String, dynamic>;
-    print('   ${apiKeys['api_key_configured'] == true ? "✅" : "❌"} OpenRouter API Key: ${apiKeys['api_key_preview']}');
+    if (kDebugMode) debugPrint('   ${apiKeys['api_key_configured'] == true ? "✅" : "❌"} OpenRouter API Key: ${apiKeys['api_key_preview']}');
     
     // AI Configuration
-    print('\n🤖 AI CONFIGURATION:');
+    if (kDebugMode) debugPrint('\n🤖 AI CONFIGURATION:');
     final aiConfig = status['ai_config'] as Map<String, dynamic>;
-    print('   ✅ Primary Model: ${aiConfig['vision_model']}');
-    print('   ✅ Fallback Model: ${aiConfig['backup_vision_model']}');
-    print('   ✅ Chat Model: ${aiConfig['chat_model']}');
-    print('   ${aiConfig['vision_fallback_enabled'] == true ? "✅" : "❌"} Vision Fallback: ${aiConfig['vision_fallback_enabled']}');
+    if (kDebugMode) debugPrint('   ✅ Primary Model: ${aiConfig['vision_model']}');
+    if (kDebugMode) debugPrint('   ✅ Fallback Model: ${aiConfig['backup_vision_model']}');
+    if (kDebugMode) debugPrint('   ✅ Chat Model: ${aiConfig['chat_model']}');
+    if (kDebugMode) debugPrint('   ${aiConfig['vision_fallback_enabled'] == true ? "✅" : "❌"} Vision Fallback: ${aiConfig['vision_fallback_enabled']}');
     
     // Barcode Scanning
-    print('\n📱 BARCODE SCANNING:');
+    if (kDebugMode) debugPrint('\n📱 BARCODE SCANNING:');
     final barcode = status['barcode_scanning'] as Map<String, dynamic>;
-    print('   ✅ Status: Enabled');
-    print('   ✅ Databases:');
+    if (kDebugMode) debugPrint('   ✅ Status: Enabled');
+    if (kDebugMode) debugPrint('   ✅ Databases:');
     final databases = barcode['databases'] as Map<String, dynamic>;
     databases.forEach((key, value) {
-      print('      - $key: ${value == true ? "✅ Available" : "❌ Unavailable"}');
+      if (kDebugMode) debugPrint('      - $key: ${value == true ? "✅ Available" : "❌ Unavailable"}');
     });
     
     // Image Analysis
-    print('\n📸 IMAGE ANALYSIS:');
+    if (kDebugMode) debugPrint('\n📸 IMAGE ANALYSIS:');
     final imageAnalysis = status['image_analysis'] as Map<String, dynamic>;
-    print('   ${imageAnalysis['enabled'] == true ? "✅" : "❌"} Enabled: ${imageAnalysis['enabled']}');
-    print('   ${imageAnalysis['api_key_configured'] == true ? "✅" : "❌"} API Key: ${imageAnalysis['api_key_configured']}');
-    print('   ✅ Vision Model: ${imageAnalysis['vision_model']}');
-    print('   ✅ Status: ${imageAnalysis['status']}');
+    if (kDebugMode) debugPrint('   ${imageAnalysis['enabled'] == true ? "✅" : "❌"} Enabled: ${imageAnalysis['enabled']}');
+    if (kDebugMode) debugPrint('   ${imageAnalysis['api_key_configured'] == true ? "✅" : "❌"} API Key: ${imageAnalysis['api_key_configured']}');
+    if (kDebugMode) debugPrint('   ✅ Vision Model: ${imageAnalysis['vision_model']}');
+    if (kDebugMode) debugPrint('   ✅ Status: ${imageAnalysis['status']}');
     
     // Network
-    print('\n🌐 NETWORK:');
+    if (kDebugMode) debugPrint('\n🌐 NETWORK:');
     final network = status['network'] as Map<String, dynamic>;
-    print('   ${network['is_online'] == true ? "✅" : "⚠️"} Status: ${network['status']}');
+    if (kDebugMode) debugPrint('   ${network['is_online'] == true ? "✅" : "⚠️"} Status: ${network['status']}');
     
     // Overall Status
-    print('\n📈 OVERALL STATUS:');
+    if (kDebugMode) debugPrint('\n📈 OVERALL STATUS:');
     final overall = status['overall'] as Map<String, dynamic>;
     overall.forEach((key, value) {
       if (key != 'overall_status') {
         final icon = value == true ? '✅' : '❌';
-        print('   $icon ${key.replaceAll('_', ' ').toUpperCase()}: $value');
+        if (kDebugMode) debugPrint('   $icon ${key.replaceAll('_', ' ').toUpperCase()}: $value');
       }
     });
-    print('\n   ${overall['overall_status']}');
+    if (kDebugMode) debugPrint('\n   ${overall['overall_status']}');
     
-    print('\n$separator\n');
+    if (kDebugMode) debugPrint('\n$separator\n');
   }
 }
+
 

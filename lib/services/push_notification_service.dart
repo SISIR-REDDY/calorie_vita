@@ -133,13 +133,17 @@ class PushNotificationService {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        // Use set with merge to create document if it doesn't exist
+        // Save to the profile/userData subcollection structure
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
-            .update({
+            .collection('profile')
+            .doc('userData')
+            .set({
           'fcmToken': token,
           'lastTokenUpdate': FieldValue.serverTimestamp(),
-        });
+        }, SetOptions(merge: true));
         
         _logger.info('FCM token saved to user profile');
       }

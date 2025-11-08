@@ -53,29 +53,35 @@ class LoggerService {
   
   /// Log info message
   void info(String message, [Map<String, dynamic>? data]) {
-    _log(LogLevel.info, message, data);
+    if (ProductionConfig.enableInfoLogs) {
+      _log(LogLevel.info, message, data);
+    }
   }
   
   /// Log warning message
   void warning(String message, [Map<String, dynamic>? data]) {
-    _log(LogLevel.warning, message, data);
+    if (ProductionConfig.enableInfoLogs) {
+      _log(LogLevel.warning, message, data);
+    }
   }
   
-  /// Log error message
+  /// Log error message (always log errors)
   void error(String message, [Map<String, dynamic>? data, StackTrace? stackTrace]) {
     _log(LogLevel.error, message, data, stackTrace);
   }
   
   /// Log debug message (only in debug mode)
   void debug(String message, [Map<String, dynamic>? data]) {
-    if (kDebugMode || ProductionConfig.isDebug) {
+    if (ProductionConfig.enableDebugLogs) {
       _log(LogLevel.debug, message, data);
     }
   }
   
   /// Log performance metrics
   void performance(String operation, Duration duration, [Map<String, dynamic>? data]) {
-    _log(LogLevel.performance, 'Performance: $operation took ${duration.inMilliseconds}ms', data);
+    if (ProductionConfig.enablePerformanceLogs) {
+      _log(LogLevel.performance, 'Performance: $operation took ${duration.inMilliseconds}ms', data);
+    }
   }
   
   /// Start timing an operation
@@ -187,8 +193,8 @@ class LoggerService {
       }
     }
     
-    // Print to console in debug mode
-    if (kDebugMode) {
+    // Print to console only in debug mode (disabled in production)
+    if (ProductionConfig.enableDebugLogs || level == LogLevel.error) {
       print('${level.emoji} [${level.name.toUpperCase()}] $message');
       if (data != null && data.isNotEmpty) {
         print('  Data: $data');

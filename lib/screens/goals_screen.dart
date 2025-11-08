@@ -11,6 +11,7 @@ import '../services/analytics_service.dart';
 import '../services/goals_event_bus.dart';
 import '../services/global_goals_manager.dart';
 import '../services/simple_goals_notifier.dart';
+import '../config/production_config.dart';
 
 class GoalsScreen extends StatefulWidget {
   const GoalsScreen({super.key});
@@ -1011,3 +1012,4 @@ class _GoalsScreenState extends State<GoalsScreen>
     appStateService.forceGoalsUpdate(goals);
   }
 }
+

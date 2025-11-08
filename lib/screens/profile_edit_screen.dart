@@ -7,6 +7,8 @@ import '../services/real_time_input_service.dart';
 import '../services/app_state_service.dart';
 import '../widgets/setup_warning_popup.dart';
 import '../services/setup_check_service.dart';
+import 'package:flutter/foundation.dart';
+import '../config/production_config.dart';
 
 /// Comprehensive Profile Editing Screen for Calorie Vita App
 /// Features: Personal info, fitness goals, preferences, profile photo
@@ -296,7 +298,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
       // Update AppStateService to trigger real-time updates
       _appStateService.forceProfileDataUpdate(userData);
-      print('Profile data updated in AppStateService: $userData');
+      if (kDebugMode) debugPrint('Profile data updated in AppStateService: $userData');
 
       // Update Firebase Auth display name if name is provided
       if (_user != null && _nameController.text.trim().isNotEmpty) {
@@ -346,10 +348,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       
       if (isComplete) {
         await SetupWarningService.markSetupComplete();
-        print('Setup marked as complete!');
+        if (kDebugMode) debugPrint('Setup marked as complete!');
       }
     } catch (e) {
-      print('Error checking setup completion: $e');
+      if (kDebugMode) debugPrint('Error checking setup completion: $e');
     }
   }
 
@@ -933,3 +935,4 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     );
   }
 }
+
