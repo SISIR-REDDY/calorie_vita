@@ -53,12 +53,12 @@ class HealthConnectPlugin : MethodChannel.MethodCallHandler {
                 val client = HealthConnectClient.getOrCreate(ctx)
                 healthConnectClient = client
 
-                // Define required permissions for Health Connect
+                // Define required permissions for Health Connect - Both calorie types for smart fallback
                 val permissions = setOf(
                     androidx.health.connect.client.permission.HealthPermission.getReadPermission(StepsRecord::class),
                     androidx.health.connect.client.permission.HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
-                    androidx.health.connect.client.permission.HealthPermission.getReadPermission(ExerciseSessionRecord::class),
-                    androidx.health.connect.client.permission.HealthPermission.getReadPermission(HeartRateRecord::class)
+                    androidx.health.connect.client.permission.HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
+                    androidx.health.connect.client.permission.HealthPermission.getReadPermission(ExerciseSessionRecord::class)
                 )
 
                 // Check if permissions are already granted
@@ -127,16 +127,33 @@ class HealthConnectPlugin : MethodChannel.MethodCallHandler {
                 val startOfDay = today.atStartOfDay(ZoneId.systemDefault())
                 val endOfDay = today.atTime(23, 59, 59).atZone(ZoneId.systemDefault())
 
-                val request = AggregateRequest(
+                // Try active calories first, fallback to total if not available
+                val activeRequest = AggregateRequest(
                     metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
                     timeRangeFilter = TimeRangeFilter.between(
                         startOfDay.toInstant(),
                         endOfDay.toInstant()
                     )
                 )
-
-                val response = client.aggregate(request)
-                val calories = (response[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL] as? Double) ?: 0.0
+                val activeResponse = client.aggregate(activeRequest)
+                val activeCaloriesRaw = (activeResponse[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL] as? androidx.health.connect.client.units.Energy)
+                val activeCalories = activeCaloriesRaw?.inKilocalories ?: 0.0
+                
+                // Fallback to total calories if active is 0
+                val calories = if (activeCalories > 0.0) {
+                    activeCalories
+                } else {
+                    val totalRequest = AggregateRequest(
+                        metrics = setOf(TotalCaloriesBurnedRecord.ENERGY_TOTAL),
+                        timeRangeFilter = TimeRangeFilter.between(
+                            startOfDay.toInstant(),
+                            endOfDay.toInstant()
+                        )
+                    )
+                    val totalResponse = client.aggregate(totalRequest)
+                    val totalCaloriesRaw = (totalResponse[TotalCaloriesBurnedRecord.ENERGY_TOTAL] as? androidx.health.connect.client.units.Energy)
+                    totalCaloriesRaw?.inKilocalories ?: 0.0
+                }
 
                 withContext(Dispatchers.Main) {
                     result.success(calories)
@@ -217,17 +234,47 @@ class HealthConnectPlugin : MethodChannel.MethodCallHandler {
                 val stepsResponse = client.aggregate(stepsRequest)
                 val steps = (stepsResponse[StepsRecord.COUNT_TOTAL] as? Long)?.toInt() ?: 0
 
-                // Get calories
-                val caloriesRequest = AggregateRequest(
+                // Get calories - Try active first, fallback to total if active is empty
+                // Google Fit often writes to TotalCaloriesBurnedRecord but displays active calories in UI
+                
+                // Try active calories first
+                val activeRequest = AggregateRequest(
                     metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
                     timeRangeFilter = TimeRangeFilter.between(
                         startOfDay.toInstant(),
                         endOfDay.toInstant()
                     )
                 )
-                val caloriesResponse = client.aggregate(caloriesRequest)
-                val calories = (caloriesResponse[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL] as? Double) ?: 0.0
-                android.util.Log.d("HealthConnect", "📊 Native: Fetched calories from Health Connect: $calories kcal")
+                val activeResponse = client.aggregate(activeRequest)
+                val activeCaloriesRaw = (activeResponse[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL] as? androidx.health.connect.client.units.Energy)
+                val activeCalories = activeCaloriesRaw?.inKilocalories ?: 0.0
+                
+                android.util.Log.d("HealthConnect", "📊 Native: Active calories: $activeCalories kcal")
+                
+                // If active calories is 0, try total calories as fallback
+                val calories = if (activeCalories > 0.0) {
+                    android.util.Log.d("HealthConnect", "✅ Native: Using active calories (exercise only)")
+                    activeCalories
+                } else {
+                    // Fallback to total calories
+                    val totalRequest = AggregateRequest(
+                        metrics = setOf(TotalCaloriesBurnedRecord.ENERGY_TOTAL),
+                        timeRangeFilter = TimeRangeFilter.between(
+                            startOfDay.toInstant(),
+                            endOfDay.toInstant()
+                        )
+                    )
+                    val totalResponse = client.aggregate(totalRequest)
+                    val totalCaloriesRaw = (totalResponse[TotalCaloriesBurnedRecord.ENERGY_TOTAL] as? androidx.health.connect.client.units.Energy)
+                    val totalCalories = totalCaloriesRaw?.inKilocalories ?: 0.0
+                    
+                    android.util.Log.d("HealthConnect", "📊 Native: Total calories: $totalCalories kcal")
+                    android.util.Log.d("HealthConnect", "💡 Native: Active calories not available, using total calories")
+                    
+                    totalCalories
+                }
+                
+                android.util.Log.d("HealthConnect", "✅ Native: Final calories value: $calories kcal")
 
                 // Get workouts
                 val workoutRequest = ReadRecordsRequest(

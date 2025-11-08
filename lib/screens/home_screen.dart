@@ -1389,46 +1389,32 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       
       // Only update if data actually changed
       if (_dailySummary?.toMap() != summary?.toMap()) {
-        setState(() {
-          // Preserve consumed calories from TodaysFoodDataService if it's already set
-          // This prevents AppStateService from overwriting with 0
-          final currentConsumedCalories = _dailySummary?.caloriesConsumed ?? 0;
-          final newConsumedCalories = summary?.caloriesConsumed ?? 0;
-          
-          // CRITICAL: Check cached data from TodaysFoodDataService if current is 0
-          // This prevents zero-value flash when switching screens
-          final cachedCalories = _todaysFoodDataService.getCachedConsumedCalories();
-          final caloriesToUse = cachedCalories > 0 ? cachedCalories : currentConsumedCalories;
-          
-          // Only use AppStateService calories if:
-          // 1. We don't have current calories (0 or null), AND
-          // 2. We don't have cached calories, AND
-          // 3. The new value is greater than 0 (real data)
-          // This prevents overwriting real data with 0
-          if (summary != null) {
-            if (caloriesToUse > 0) {
-              // Always preserve calories from TodaysFoodDataService (cached or current)
-              _dailySummary = summary.copyWith(caloriesConsumed: caloriesToUse);
-            } else if (currentConsumedCalories == 0 && newConsumedCalories > 0) {
-              // Use AppStateService value only if we have no current/cached value but new value is valid
-              _dailySummary = summary;
-            } else if (currentConsumedCalories > 0) {
-              // Preserve current calories from TodaysFoodDataService
-              _dailySummary = summary.copyWith(caloriesConsumed: currentConsumedCalories);
-            } else {
-              // Default case - use summary as is (but don't overwrite if we have cached data)
-              if (cachedCalories == 0) {
-                _dailySummary = summary;
-              } else {
-                // Keep current summary if we have cached data
-                _dailySummary = _dailySummary ?? summary;
-              }
-            }
-          } else {
-            // If summary is null, keep current summary
-            // Don't set to null
-          }
-        });
+        // CRITICAL FIX: Check consumed calories BEFORE setState to prevent flickering
+        final currentConsumedCalories = _dailySummary?.caloriesConsumed ?? 0;
+        final newConsumedCalories = summary?.caloriesConsumed ?? 0;
+        final cachedCalories = _todaysFoodDataService.getCachedConsumedCalories();
+        
+        // Determine which calories value to use (priority: cached > current > new)
+        int caloriesToUse;
+        if (cachedCalories > 0) {
+          // Always use cached calories from TodaysFoodDataService (highest priority)
+          caloriesToUse = cachedCalories;
+        } else if (currentConsumedCalories > 0) {
+          // Preserve current calories if no cache but we have data
+          caloriesToUse = currentConsumedCalories;
+        } else {
+          // Only use new calories if we have no cached or current data
+          caloriesToUse = newConsumedCalories;
+        }
+        
+        // Only update if the new summary is valid
+        if (summary != null) {
+          setState(() {
+            // ALWAYS preserve consumed calories from TodaysFoodDataService
+            // This prevents AppStateService from causing flickering with 0 values
+            _dailySummary = summary.copyWith(caloriesConsumed: caloriesToUse);
+          });
+        }
         
         // OPTIMIZED: Removed automatic streak refresh here to prevent excessive API calls
         // Streaks are refreshed periodically (every 5 min) and after user actions

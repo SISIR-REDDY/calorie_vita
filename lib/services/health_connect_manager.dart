@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/google_fit_data.dart';
+import 'bmr_calculator.dart';
 
 /// Health Connect Manager - Direct interface to Health Connect API
 /// 
@@ -41,6 +44,13 @@ class HealthConnectManager {
   final StreamController<GoogleFitData?> _dataController = StreamController<GoogleFitData?>.broadcast();
   final StreamController<bool> _connectionController = StreamController<bool>.broadcast();
   final StreamController<bool> _loadingController = StreamController<bool>.broadcast();
+
+  // User profile data for BMR calculation (cached for performance)
+  double? _userWeight;
+  double? _userHeight;
+  int? _userAge;
+  String? _userGender;
+  DateTime? _profileLastFetched;
 
   // Public streams
   Stream<GoogleFitData?> get dataStream => _dataController.stream;
@@ -129,7 +139,7 @@ class HealthConnectManager {
         print('   2. Search for "Health Connect"');
         print('   3. Tap "App permissions"');
         print('   4. Find "CalorieVita"');
-        print('   5. Enable: Steps, Calories, Exercise, Heart Rate');
+        print('   5. Enable: Steps, Active calories burned, Total calories burned, Exercise');
         print('   6. Restart this app');
         _connectionController.add(false);
       }
@@ -205,9 +215,104 @@ class HealthConnectManager {
     }
   }
 
+  /// Load user profile data for BMR calculation (cached for performance)
+  Future<void> _loadUserProfile() async {
+    try {
+      // Only fetch if cache is old (> 1 hour) or doesn't exist
+      if (_profileLastFetched != null && 
+          DateTime.now().difference(_profileLastFetched!) < const Duration(hours: 1)) {
+        return; // Use cached profile
+      }
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        print('⚠️ HealthConnectManager: No user logged in');
+        return;
+      }
+
+      // Read from correct location: users/{uid}/profile/userData
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('profile')
+          .doc('userData')
+          .get();
+
+      if (!doc.exists) {
+        print('⚠️ HealthConnectManager: No profile data found at users/${user.uid}/profile/userData');
+        return;
+      }
+
+      final data = doc.data()!;
+      _userWeight = (data['weight'] as num?)?.toDouble();
+      _userHeight = (data['height'] as num?)?.toDouble();
+      _userAge = data['age'] as int?;
+      _userGender = data['gender'] as String?;
+      _profileLastFetched = DateTime.now();
+
+      print('✅ HealthConnectManager: User profile loaded for BMR calculation');
+      print('   Weight: $_userWeight kg, Height: $_userHeight cm, Age: $_userAge, Gender: $_userGender');
+    } catch (e) {
+      print('⚠️ HealthConnectManager: Failed to load user profile: $e');
+    }
+  }
+
+  /// Calculate active calories DIRECTLY from activity data (like Cal AI does)
+  /// This is more accurate than trying to parse total calories
+  double _calculateActiveCalories(int steps, int workoutSessions, double? workoutDuration) {
+    print('🔍 DEBUG: Calculating active calories from activity data');
+    print('   Steps: $steps, Workouts: $workoutSessions, Duration: ${workoutDuration ?? 0} mins');
+    
+    double totalActive = 0.0;
+    
+    // 1. Calories from STEPS (most accurate for walking/running)
+    final stepsCalories = _estimateCaloriesFromSteps(steps);
+    totalActive += stepsCalories;
+    print('   📊 Steps calories: ${stepsCalories.toStringAsFixed(1)} kcal');
+    
+    // 2. Calories from WORKOUTS (if any)
+    if (workoutSessions > 0 && workoutDuration != null && workoutDuration > 0) {
+      // Average workout burns 5-10 kcal/min depending on intensity
+      // Use 7 kcal/min as moderate intensity
+      final workoutCalories = workoutDuration * 7.0;
+      totalActive += workoutCalories;
+      print('   🏋️ Workout calories: ${workoutCalories.toStringAsFixed(1)} kcal');
+    }
+    
+    // 3. Add baseline activity calories for the day (phone movements, standing, etc.)
+    // Google Fit typically adds 50-100 kcal for general daily movements
+    final now = DateTime.now();
+    final hoursElapsed = now.hour + now.minute / 60.0;
+    
+    // Scale baseline by time of day: 100 kcal over 24 hours = ~4 kcal/hour
+    final baselineCalories = (hoursElapsed / 24.0) * 100.0;
+    totalActive += baselineCalories;
+    print('   🕒 Baseline activity (${hoursElapsed.toStringAsFixed(1)}h): ${baselineCalories.toStringAsFixed(1)} kcal');
+    
+    print('✅ Total active calories: ${totalActive.toStringAsFixed(1)} kcal');
+    
+    return totalActive;
+  }
+
+  /// Estimate calories burned from steps
+  /// Average: 0.04-0.05 kcal per step, adjusted by weight
+  double _estimateCaloriesFromSteps(int steps) {
+    if (steps <= 0) return 0.0;
+    
+    // Base rate: 0.045 kcal per step for 70kg person
+    // Adjust by user's weight if available
+    final weightFactor = _userWeight != null ? (_userWeight! / 70.0) : 1.0;
+    final caloriesPerStep = 0.045 * weightFactor;
+    
+    return steps * caloriesPerStep;
+  }
+
   /// Fetch today's data from Health Connect native API
   Future<GoogleFitData?> _fetchTodayData() async {
     try {
+      // Load user profile for weight-adjusted calorie calculations
+      await _loadUserProfile();
+
       final result = await _channel.invokeMethod<Map<dynamic, dynamic>>('getTodayData');
       
       if (result == null) {
@@ -215,15 +320,35 @@ class HealthConnectManager {
         return null;
       }
 
+      // Get raw data from Health Connect
+      final steps = result['steps'] as int? ?? 0;
+      final workoutSessions = result['workoutSessions'] as int? ?? 0;
+      final workoutDuration = (result['workoutDuration'] as num?)?.toDouble();
+      
+      // Calculate active calories DIRECTLY from activity data (more accurate)
+      final activeCalories = _calculateActiveCalories(steps, workoutSessions, workoutDuration);
+      
       final data = GoogleFitData(
         date: DateTime.now(),
-        steps: result['steps'] as int?,
-        caloriesBurned: (result['caloriesBurned'] as num?)?.toDouble(),
-        workoutSessions: result['workoutSessions'] as int?,
-        workoutDuration: (result['workoutDuration'] as num?)?.toDouble(),
+        steps: steps,
+        caloriesBurned: activeCalories, // Active calories from steps + workouts + baseline
+        workoutSessions: workoutSessions,
+        workoutDuration: workoutDuration,
       );
       
-      print('📊 HealthConnectManager: Received data from native - Steps: ${data.steps}, Calories: ${data.caloriesBurned}, Workouts: ${data.workoutSessions}');
+      print('📊 HealthConnectManager: Received data from native');
+      print('   Steps: ${data.steps}');
+      print('   Calories (active): ${data.caloriesBurned?.toStringAsFixed(1)}');
+      print('   Workouts: ${data.workoutSessions}');
+      
+      if (data.caloriesBurned == null || data.caloriesBurned == 0.0) {
+        print('⚠️ WARNING: Active calories are ${data.caloriesBurned ?? 'null'}!');
+        print('💡 Possible reasons:');
+        print('   1. Haven\'t done any activity yet today');
+        print('   2. Total calories = basal calories (no active movement)');
+      } else {
+        print('✅ Active calories calculated: ${data.caloriesBurned?.toStringAsFixed(1)} kcal');
+      }
       
       return data;
     } catch (e) {
@@ -264,6 +389,17 @@ class HealthConnectManager {
     return _cachedData;
   }
 
+  /// Clear profile cache (call when user profile changes)
+  void clearProfileCache() {
+    _userWeight = null;
+    _userHeight = null;
+    _userAge = null;
+    _userGender = null;
+    _profileLastFetched = null;
+    BMRCalculator.clearCache();
+    print('🔄 HealthConnectManager: Profile cache cleared');
+  }
+
   /// Sign out (clear Health Connect data)
   Future<void> signOut() async {
     try {
@@ -277,6 +413,9 @@ class HealthConnectManager {
       _cachedData = null;
       _cacheTime = null;
       
+      // Clear profile cache
+      clearProfileCache();
+      
       // Notify listeners
       _connectionController.add(false);
       _dataController.add(null);
@@ -289,6 +428,7 @@ class HealthConnectManager {
       _hasPermissions = false;
       _cachedData = null;
       _cacheTime = null;
+      clearProfileCache();
     }
   }
 
