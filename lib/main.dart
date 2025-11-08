@@ -15,6 +15,7 @@ import 'services/push_notification_service.dart';
 import 'config/production_config.dart';
 import 'config/ai_config.dart';
 import 'utils/feature_status_checker.dart';
+import 'health_backend/health_backend.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -161,7 +162,14 @@ void main() async {
     'firebase_initialized': firebaseInitialized,
   });
 
-  runApp(MainApp(firebaseInitialized: firebaseInitialized));
+  // Wrap app with HealthDataProvider for centralized health data access
+  runApp(
+    HealthDataProvider(
+      autoInitialize: true,
+      autoRefresh: true,
+      child: MainApp(firebaseInitialized: firebaseInitialized),
+    ),
+  );
 }
 
 /// Initialize Firebase services

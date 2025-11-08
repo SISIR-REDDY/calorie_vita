@@ -449,7 +449,10 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         });
         
         _updateDailySummaryWithGoogleFitData();
-        print('⚡ Home: INSTANT Google Fit data loaded - Steps: ${currentData.steps}, Calories: ${currentData.caloriesBurned}');
+        print('⚡ Home: INSTANT Google Fit data loaded');
+        print('   Steps: ${currentData.steps}');
+        print('   Calories: ${currentData.caloriesBurned}');
+        print('   _googleFitCaloriesBurned set to: $_googleFitCaloriesBurned');
       }
       
       // Set up listeners for real-time updates
@@ -1331,6 +1334,11 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _googleFitDataSubscription?.cancel();
     _googleFitDataSubscription = _healthConnectManager.dataStream.listen((data) {
       if (mounted && data != null) {
+        print('📥 Home: Received data from HealthConnectManager stream');
+        print('   Steps: ${data.steps}');
+        print('   Calories: ${data.caloriesBurned}');
+        print('   Workouts: ${data.workoutSessions}');
+        
         setState(() {
           _googleFitSteps = data.steps ?? 0;
           _googleFitCaloriesBurned = data.caloriesBurned ?? 0.0;
@@ -1339,6 +1347,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           _activityLevel = _calculateActivityLevel(data.steps);
           _lastSyncTime = DateTime.now();
         });
+        
+        print('✅ Home: UI state updated - _googleFitCaloriesBurned = $_googleFitCaloriesBurned');
         
         _updateDailySummaryWithGoogleFitData();
         print('⚡ Home: Real-time Google Fit update - Steps: ${data.steps}, Calories: ${data.caloriesBurned}');

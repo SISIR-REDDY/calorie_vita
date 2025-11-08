@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'optimized_google_fit_manager.dart';
+import 'health_connect_manager.dart';
 import 'logger_service.dart';
 
 /// Firebase authentication service
@@ -262,10 +262,10 @@ class AuthService {
       // Stop token validation timer
       _stopTokenValidationTimer();
       
-      // Disconnect Google Fit (with timeout to prevent hanging)
-      _logger.info('Disconnecting Google Fit services');
-      final googleFitManager = OptimizedGoogleFitManager();
-      await googleFitManager.signOut().timeout(const Duration(seconds: 10));
+      // Disconnect Health Connect (with timeout to prevent hanging)
+      _logger.info('Disconnecting Health Connect services');
+      final healthConnectManager = HealthConnectManager();
+      await healthConnectManager.signOut().timeout(const Duration(seconds: 10));
       
       // Sign out from Firebase
       _logger.info('Signing out from Firebase');

@@ -2,7 +2,17 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import '../models/google_fit_data.dart';
 
-/// Health Connect Manager - Replacement for Google Fit
+/// Health Connect Manager - Direct interface to Health Connect API
+/// 
+/// Architecture: Google Fit → Health Connect → This Manager → UI
+/// 
+/// Benefits:
+/// - NO OAuth 2.0 verification required
+/// - NO restricted scopes
+/// - NO Google approval needed
+/// - Uses Android permissions only
+/// - Works with Google Fit, Samsung Health, and other apps
+/// 
 /// Features:
 /// - Auto-permission request on first launch
 /// - Caching to avoid unnecessary API calls
@@ -21,7 +31,7 @@ class HealthConnectManager {
   // State management
   bool _isInitialized = false;
   bool _isAvailable = false;
-  bool _isAuthenticated = false;
+  bool _hasPermissions = false;
   bool _isSyncing = false;
   GoogleFitData? _cachedData;
   DateTime? _cacheTime;
@@ -40,12 +50,12 @@ class HealthConnectManager {
   // Public getters
   bool get isInitialized => _isInitialized;
   bool get isAvailable => _isAvailable;
-  bool get isConnected => _isAuthenticated && _isAvailable;
+  bool get isConnected => _hasPermissions && _isAvailable;
   GoogleFitData? get currentData => _cachedData;
   bool get hasValidCache => _cachedData != null && _cacheTime != null && 
       DateTime.now().difference(_cacheTime!) < _cacheValidDuration;
 
-  /// Initialize the manager
+  /// Initialize the manager (uses Health Connect native API)
   Future<void> initialize() async {
     if (_isInitialized) {
       print('⚡ HealthConnectManager: Already initialized');
@@ -53,38 +63,44 @@ class HealthConnectManager {
     }
 
     try {
-      print('🚀 HealthConnectManager: Initializing...');
+      print('🚀 HealthConnectManager: Initializing with Health Connect API...');
       
       // Check if Health Connect is available
       final available = await _channel.invokeMethod<bool>('checkAvailability') ?? false;
       _isAvailable = available;
 
       if (!_isAvailable) {
-        print('⚠️ HealthConnectManager: Health Connect not available');
+        print('⚠️ HealthConnectManager: Health Connect not available on this device');
+        print('💡 User needs to install Health Connect from Play Store');
         _isInitialized = true;
         _connectionController.add(false);
         return;
       }
 
-      // Request permissions (auto-opens on first launch)
+      print('✅ HealthConnectManager: Health Connect is available');
+
+      // Check/request permissions
       await requestPermissions();
 
-      if (_isAuthenticated) {
-        print('✅ HealthConnectManager: Authenticated');
+      if (_hasPermissions) {
+        print('✅ HealthConnectManager: Permissions granted - ready to fetch data');
         
         // Load data immediately
         await _syncData(force: true);
         
         // Start background sync
         _startBackgroundSync();
+        
+        _connectionController.add(true);
       } else {
-        print('⚠️ HealthConnectManager: Not authenticated');
+        print('⚠️ HealthConnectManager: Permissions not granted');
+        print('💡 User needs to grant permissions in Health Connect settings');
+        _connectionController.add(false);
       }
 
       _isInitialized = true;
-      _connectionController.add(_isAuthenticated);
       
-      print('✅ HealthConnectManager: Initialization complete');
+      print('✅ HealthConnectManager: Initialization complete (using Health Connect API)');
     } catch (e) {
       print('❌ HealthConnectManager: Initialization failed: $e');
       _isInitialized = false;
@@ -93,34 +109,53 @@ class HealthConnectManager {
     }
   }
 
-  /// Request permissions (auto-opens dialog on first launch)
+  /// Request permissions from Health Connect
   Future<bool> requestPermissions() async {
     try {
-      print('🔐 HealthConnectManager: Checking permissions...');
+      print('🔐 HealthConnectManager: Checking Health Connect permissions...');
       
-      // Check if permissions are already granted
+      // Check permissions through native Android
       final result = await _channel.invokeMethod<bool>('requestPermissions');
-      _isAuthenticated = result ?? false;
+      _hasPermissions = result ?? false;
       
-      if (_isAuthenticated) {
-        print('✅ HealthConnectManager: Permissions already granted');
+      if (_hasPermissions) {
+        print('✅ HealthConnectManager: Health Connect permissions granted');
         _connectionController.add(true);
       } else {
-        print('⚠️ HealthConnectManager: Permissions not granted (will be requested on first launch)');
-        // Permissions will be auto-requested by MainActivity on first launch
+        print('⚠️ HealthConnectManager: Health Connect permissions not granted');
+        print('💡 IMPORTANT: Health Connect requires manual permission grant!');
+        print('   📱 On your phone:');
+        print('   1. Open Settings');
+        print('   2. Search for "Health Connect"');
+        print('   3. Tap "App permissions"');
+        print('   4. Find "CalorieVita"');
+        print('   5. Enable: Steps, Calories, Exercise, Heart Rate');
+        print('   6. Restart this app');
         _connectionController.add(false);
       }
       
-      return _isAuthenticated;
+      return _hasPermissions;
     } catch (e) {
       print('❌ HealthConnectManager: Permission check failed: $e');
-      _isAuthenticated = false;
+      _hasPermissions = false;
       _connectionController.add(false);
       return false;
     }
   }
+  
+  /// Open Health Connect settings (if available)
+  Future<void> openHealthConnectSettings() async {
+    try {
+      print('📱 HealthConnectManager: Opening Health Connect settings...');
+      // Note: This requires adding an intent handler in native code
+      // For now, just log instructions
+      print('💡 Please manually open: Settings → Health Connect → App permissions → CalorieVita');
+    } catch (e) {
+      print('❌ Failed to open Health Connect settings: $e');
+    }
+  }
 
-  /// Sync data with caching
+  /// Sync data from Health Connect with caching
   Future<GoogleFitData?> _syncData({bool force = false}) async {
     // Return cached data if valid and not forced
     if (!force && hasValidCache) {
@@ -134,8 +169,8 @@ class HealthConnectManager {
       return _cachedData;
     }
 
-    if (!_isAuthenticated || !_isAvailable) {
-      print('⚠️ HealthConnectManager: Not authenticated or not available');
+    if (!_hasPermissions || !_isAvailable) {
+      print('⚠️ HealthConnectManager: Cannot sync - no permissions or Health Connect not available');
       return null;
     }
 
@@ -143,7 +178,7 @@ class HealthConnectManager {
     _loadingController.add(true);
 
     try {
-      print('🔄 HealthConnectManager: Fetching fresh data...');
+      print('🔄 HealthConnectManager: Fetching data from Health Connect...');
       
       final data = await _fetchTodayData();
       
@@ -154,7 +189,10 @@ class HealthConnectManager {
         // Notify listeners
         _dataController.add(data);
         
-        print('✅ HealthConnectManager: Data synced - Steps: ${data.steps}, Calories: ${data.caloriesBurned}');
+        print('✅ HealthConnectManager: Data synced from Health Connect - Steps: ${data.steps}, Calories: ${data.caloriesBurned}');
+        print('📊 Data source: Health Connect → Google Fit/Samsung Health');
+      } else {
+        print('⚠️ HealthConnectManager: No data available from Health Connect');
       }
       
       return data;
@@ -167,24 +205,29 @@ class HealthConnectManager {
     }
   }
 
-  /// Fetch today's data in a single batch call
+  /// Fetch today's data from Health Connect native API
   Future<GoogleFitData?> _fetchTodayData() async {
     try {
       final result = await _channel.invokeMethod<Map<dynamic, dynamic>>('getTodayData');
       
       if (result == null) {
+        print('⚠️ HealthConnectManager: getTodayData returned null');
         return null;
       }
 
-      return GoogleFitData(
+      final data = GoogleFitData(
         date: DateTime.now(),
         steps: result['steps'] as int?,
         caloriesBurned: (result['caloriesBurned'] as num?)?.toDouble(),
         workoutSessions: result['workoutSessions'] as int?,
         workoutDuration: (result['workoutDuration'] as num?)?.toDouble(),
       );
+      
+      print('📊 HealthConnectManager: Received data from native - Steps: ${data.steps}, Calories: ${data.caloriesBurned}, Workouts: ${data.workoutSessions}');
+      
+      return data;
     } catch (e) {
-      print('❌ HealthConnectManager: Fetch failed: $e');
+      print('❌ HealthConnectManager: Fetch from Health Connect failed: $e');
       return null;
     }
   }
@@ -193,35 +236,35 @@ class HealthConnectManager {
   void _startBackgroundSync() {
     _syncTimer?.cancel();
     _syncTimer = Timer.periodic(_syncInterval, (timer) {
-      if (_isAuthenticated && _isAvailable) {
+      if (_hasPermissions && _isAvailable) {
         _syncData(force: false); // Use cache if valid
       }
     });
     print('🔄 HealthConnectManager: Background sync started ($_syncInterval)');
   }
 
-  /// Force refresh (public method)
+  /// Force refresh from Health Connect (public method)
   Future<GoogleFitData?> forceRefresh() async {
-    print('🔄 HealthConnectManager: Force refresh requested');
+    print('🔄 HealthConnectManager: Force refresh requested from Health Connect');
     return await _syncData(force: true);
   }
 
   /// Get current data immediately (cached)
   GoogleFitData? getCurrentData() {
     if (hasValidCache) {
-      print('⚡ HealthConnectManager: Returning cached data instantly');
+      print('⚡ HealthConnectManager: Returning cached Health Connect data');
       return _cachedData;
     }
     
     // Trigger background sync if cache is stale
-    if (_isAuthenticated && _isAvailable && !_isSyncing) {
+    if (_hasPermissions && _isAvailable && !_isSyncing) {
       _syncData(force: false);
     }
     
     return _cachedData;
   }
 
-  /// Sign out
+  /// Sign out (clear Health Connect data)
   Future<void> signOut() async {
     try {
       print('🔌 HealthConnectManager: Signing out...');
@@ -230,7 +273,7 @@ class HealthConnectManager {
       _syncTimer?.cancel();
       
       // Clear state
-      _isAuthenticated = false;
+      _hasPermissions = false;
       _cachedData = null;
       _cacheTime = null;
       
@@ -243,7 +286,7 @@ class HealthConnectManager {
       print('❌ HealthConnectManager: Sign out failed: $e');
       
       // Force reset
-      _isAuthenticated = false;
+      _hasPermissions = false;
       _cachedData = null;
       _cacheTime = null;
     }
@@ -260,4 +303,3 @@ class HealthConnectManager {
     print('🗑️ HealthConnectManager: Disposed');
   }
 }
-

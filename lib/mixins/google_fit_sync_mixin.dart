@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../services/optimized_google_fit_manager.dart';
+import '../services/health_connect_manager.dart';
 import '../models/google_fit_data.dart';
 
-/// Mixin to add automatic Google Fit sync to any screen
+/// Mixin to add automatic Health Connect sync to any screen
 mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
-  final OptimizedGoogleFitManager _googleFitManager = OptimizedGoogleFitManager();
+  final HealthConnectManager _googleFitManager = HealthConnectManager();
 
   // Override these in your widget to handle Google Fit data
   void onGoogleFitDataUpdate(Map<String, dynamic> syncData) {
@@ -104,9 +104,9 @@ mixin GoogleFitSyncMixin<T extends StatefulWidget> on State<T> {
   /// Check if Google Fit is connected
   bool get isGoogleFitConnected => _googleFitManager.isConnected;
 
-  /// Connect to Google Fit
+  /// Connect to Health Connect
   Future<bool> connectToGoogleFit() async {
-    return await _googleFitManager.authenticate();
+    return await _googleFitManager.requestPermissions();
   }
 
   /// Helper to convert sync data to GoogleFitData model

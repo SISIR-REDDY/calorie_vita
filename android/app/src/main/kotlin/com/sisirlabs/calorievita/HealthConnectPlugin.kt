@@ -53,16 +53,28 @@ class HealthConnectPlugin : MethodChannel.MethodCallHandler {
                 val client = HealthConnectClient.getOrCreate(ctx)
                 healthConnectClient = client
 
-                // For SDK 1.1.0-alpha07, permissions are handled differently
-                // Check if we can access data (which requires permissions)
-                try {
-                    // Try to get granted permissions - if this works, permissions are likely granted
-                    val granted = client.permissionController.getGrantedPermissions()
-                    // If we can get granted permissions, assume we have access
-                    result.success(granted.isNotEmpty())
-                } catch (e: Exception) {
-                    // If we can't check permissions, return false
-                    // User will need to grant permissions manually through Health Connect app
+                // Define required permissions for Health Connect
+                val permissions = setOf(
+                    androidx.health.connect.client.permission.HealthPermission.getReadPermission(StepsRecord::class),
+                    androidx.health.connect.client.permission.HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
+                    androidx.health.connect.client.permission.HealthPermission.getReadPermission(ExerciseSessionRecord::class),
+                    androidx.health.connect.client.permission.HealthPermission.getReadPermission(HeartRateRecord::class)
+                )
+
+                // Check if permissions are already granted
+                val granted = client.permissionController.getGrantedPermissions()
+                
+                if (granted.containsAll(permissions)) {
+                    // All permissions already granted
+                    result.success(true)
+                } else {
+                    // Some permissions missing - need to request them
+                    // Note: Health Connect SDK 1.1.0-alpha07 requires users to grant permissions
+                    // through the Health Connect app settings manually
+                    // The app cannot programmatically request permissions like regular Android permissions
+                    
+                    // Return false to indicate permissions not granted
+                    // Flutter code should guide user to Health Connect settings
                     result.success(false)
                 }
             } catch (e: Exception) {
@@ -215,6 +227,7 @@ class HealthConnectPlugin : MethodChannel.MethodCallHandler {
                 )
                 val caloriesResponse = client.aggregate(caloriesRequest)
                 val calories = (caloriesResponse[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL] as? Double) ?: 0.0
+                android.util.Log.d("HealthConnect", "📊 Native: Fetched calories from Health Connect: $calories kcal")
 
                 // Get workouts
                 val workoutRequest = ReadRecordsRequest(
@@ -241,6 +254,8 @@ class HealthConnectPlugin : MethodChannel.MethodCallHandler {
                     "workoutSessions" to sessions,
                     "workoutDuration" to totalDuration
                 )
+
+                android.util.Log.d("HealthConnect", "✅ Native: Returning data - Steps: $steps, Calories: $calories, Workouts: $sessions, Duration: $totalDuration mins")
 
                 withContext(Dispatchers.Main) {
                     result.success(data)

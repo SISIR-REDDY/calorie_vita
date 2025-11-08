@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'optimized_google_fit_manager.dart';
+import 'health_connect_manager.dart';
 
 class SetupCheckService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -91,13 +91,13 @@ class SetupCheckService {
     }
   }
 
-  /// Check if Google Fit is connected
+  /// Check if Health Connect is connected
   static Future<bool> _hasGoogleFitConnected() async {
     try {
-      final googleFitManager = OptimizedGoogleFitManager();
-      return googleFitManager.isConnected;
+      final healthConnectManager = HealthConnectManager();
+      return healthConnectManager.isConnected;
     } catch (e) {
-      print('Error checking Google Fit connection: $e');
+      print('Error checking Health Connect connection: $e');
       return false;
     }
   }
