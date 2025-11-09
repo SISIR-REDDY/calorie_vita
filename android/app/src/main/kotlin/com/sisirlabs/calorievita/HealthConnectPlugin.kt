@@ -342,47 +342,69 @@ class HealthConnectPlugin : MethodChannel.MethodCallHandler {
             val ctx = context ?: return result.error("NO_CONTEXT", "Context not set", null)
             
             val healthConnectPackage = "com.google.android.apps.healthdata"
-            val packageManager = ctx.packageManager
             
-            // Try multiple methods to open Health Connect app directly
-            // Method 1: Launch Health Connect app directly via package name (BEST - opens the app itself)
+            // IMPORTANT: Health Connect is a special system app
+            // It doesn't have a launcher activity, so we need to use specific intents
+            
+            // Method 1: Use Health Connect SDK's official permission management intent (NO package set - let system resolve)
             try {
-                val launchIntent = packageManager.getLaunchIntentForPackage(healthConnectPackage)
-                if (launchIntent != null) {
-                    launchIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                    ctx.startActivity(launchIntent)
-                    android.util.Log.d("HealthConnect", "✅ Method 1: Launched Health Connect app directly")
+                android.util.Log.d("HealthConnect", "Trying Method 1: Official Health Connect permissions intent")
+                val intent = android.content.Intent("androidx.health.ACTION_MANAGE_HEALTH_PERMISSIONS")
+                // Don't set package - let Android resolve to Health Connect app
+                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                
+                val packageManager = ctx.packageManager
+                val resolvedActivity = intent.resolveActivity(packageManager)
+                android.util.Log.d("HealthConnect", "Method 1: Resolved activity: $resolvedActivity")
+                
+                if (resolvedActivity != null) {
+                    ctx.startActivity(intent)
+                    android.util.Log.d("HealthConnect", "✅ Method 1 SUCCESS: Opened Health Connect permissions")
+                    
+                    // Show toast to guide user
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        android.widget.Toast.makeText(
+                            ctx,
+                            "Grant permissions in Health Connect",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }, 800)
+                    
                     result.success(true)
                     return
                 }
             } catch (e: Exception) {
-                android.util.Log.w("HealthConnect", "Method 1 failed: ${e.message}")
+                android.util.Log.w("HealthConnect", "Method 1 FAILED: ${e.message}")
             }
             
-            // Method 2: Direct Health Connect permissions screen (opens app to permissions page)
+            // Method 2: Try Health Connect app home via explicit component
             try {
-                val intent = android.content.Intent("androidx.health.ACTION_MANAGE_HEALTH_PERMISSIONS")
-                intent.putExtra("android.provider.extra.HEALTH_PERMISSIONS_PACKAGE_NAME", ctx.packageName)
-                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                ctx.startActivity(intent)
-                android.util.Log.d("HealthConnect", "✅ Method 2: Opened Health Connect permissions screen")
-                result.success(true)
-                return
-            } catch (e: Exception) {
-                android.util.Log.w("HealthConnect", "Method 2 failed: ${e.message}")
-            }
-            
-            // Method 3: Open Health Connect via explicit intent action
-            try {
+                android.util.Log.d("HealthConnect", "Trying Method 2: Explicit Health Connect home activity")
                 val intent = android.content.Intent()
-                intent.setClassName(healthConnectPackage, "$healthConnectPackage.HomeActivity")
+                intent.setClassName(healthConnectPackage, "com.google.android.apps.healthdata.home.HomeActivity")
                 intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                 ctx.startActivity(intent)
-                android.util.Log.d("HealthConnect", "✅ Method 3: Opened Health Connect via HomeActivity")
+                android.util.Log.d("HealthConnect", "✅ Method 2 SUCCESS: Opened Health Connect home")
                 result.success(true)
                 return
             } catch (e: Exception) {
-                android.util.Log.w("HealthConnect", "Method 3 failed: ${e.message}")
+                android.util.Log.w("HealthConnect", "Method 2 FAILED: ${e.message}")
+            }
+            
+            // Method 3: Try launching via package manager's launch intent
+            try {
+                android.util.Log.d("HealthConnect", "Trying Method 3: Package manager launch intent")
+                val packageManager = ctx.packageManager
+                val launchIntent = packageManager.getLaunchIntentForPackage(healthConnectPackage)
+                if (launchIntent != null) {
+                    launchIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    ctx.startActivity(launchIntent)
+                    android.util.Log.d("HealthConnect", "✅ Method 3 SUCCESS: Launched via package manager")
+                    result.success(true)
+                    return
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("HealthConnect", "Method 3 FAILED: ${e.message}")
             }
             
             // Method 4: Open Play Store to install/update Health Connect
