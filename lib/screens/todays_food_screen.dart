@@ -4,7 +4,6 @@ import '../ui/app_colors.dart';
 import '../models/food_history_entry.dart';
 import '../services/food_history_service.dart';
 import 'food_history_detail_screen.dart';
-import 'camera_screen.dart';
 
 /// Today's Food screen showing all food items consumed today
 class TodaysFoodScreen extends StatefulWidget {
@@ -174,26 +173,12 @@ class _TodaysFoodScreenState extends State<TodaysFoodScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Start your healthy journey by\nscanning or adding food items',
+            'Start your healthy journey by\nadding food items',
             style: GoogleFonts.inter(
               fontSize: 14,
               color: Colors.grey[600],
             ),
             textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton.icon(
-            onPressed: () => _navigateToCamera(),
-            icon: const Icon(Icons.camera_alt),
-            label: const Text('Scan Food'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
           ),
         ],
       ),
@@ -539,14 +524,6 @@ class _TodaysFoodScreenState extends State<TodaysFoodScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => FoodHistoryDetailScreen(entry: entry),
-      ),
-    );
-  }
-
-  void _navigateToCamera() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const CameraScreen(),
       ),
     );
   }

@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import '../ui/app_colors.dart';
 import '../services/app_state_service.dart';
 import '../services/real_time_input_service.dart';
@@ -378,25 +379,156 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// Share app functionality
-  void _shareApp() {
-    // TODO: Implement share functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Share functionality will be implemented'),
-        duration: Duration(seconds: 2),
-      ),
-    );
+  Future<void> _shareApp() async {
+    try {
+      const String appName = 'CalorieVita';
+      const String appDescription = 'Track your calories with AI-powered food scanning!';
+      const String playStoreUrl = 'https://play.google.com/store/apps/details?id=com.sisirlabs.calorievita';
+      
+      const String shareMessage = '''
+🍏 $appName - Smart Calorie Tracker
+
+$appDescription
+
+✨ Features:
+• AI-powered food scanning
+• Calorie tracking & nutrition insights
+• Google Fit integration
+• Personalized goals & recommendations
+
+Download now: $playStoreUrl
+
+#CalorieVita #HealthyLiving #FitnessApp
+''';
+
+      final result = await Share.share(
+        shareMessage,
+        subject: 'Check out $appName!',
+      );
+
+      if (result.status == ShareResultStatus.success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Thanks for sharing CalorieVita!',
+                  style: GoogleFonts.poppins(),
+                ),
+              ],
+            ),
+            backgroundColor: kSuccessColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('Error sharing app: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Failed to share app',
+                    style: GoogleFonts.poppins(),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: kErrorColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    }
   }
 
   /// Rate app functionality
-  void _rateApp() {
-    // TODO: Implement rate app functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Rate app functionality will be implemented'),
-        duration: Duration(seconds: 2),
-      ),
-    );
+  Future<void> _rateApp() async {
+    try {
+      const String packageName = 'com.sisirlabs.calorievita';
+      final Uri playStoreUri = Uri.parse(
+        'https://play.google.com/store/apps/details?id=$packageName',
+      );
+      
+      // Try to open Play Store app first (market:// scheme)
+      final Uri marketUri = Uri.parse('market://details?id=$packageName');
+      
+      if (await canLaunchUrl(marketUri)) {
+        await launchUrl(
+          marketUri,
+          mode: LaunchMode.externalApplication,
+        );
+      } else if (await canLaunchUrl(playStoreUri)) {
+        // Fallback to web version of Play Store
+        await launchUrl(
+          playStoreUri,
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        throw Exception('Could not launch Play Store');
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.star, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Thank you for rating CalorieVita! ⭐',
+                  style: GoogleFonts.poppins(),
+                ),
+              ],
+            ),
+            backgroundColor: kSuccessColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('Error opening Play Store: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Could not open Play Store. Please search for "CalorieVita" manually.',
+                    style: GoogleFonts.poppins(fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: kErrorColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
   }
 
   /// Contact us functionality
