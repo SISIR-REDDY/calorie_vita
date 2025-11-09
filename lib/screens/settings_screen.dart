@@ -1244,8 +1244,37 @@ Download now: $playStoreUrl
           ElevatedButton.icon(
             onPressed: () async {
               Navigator.of(context).pop();
-              // Open Health Connect settings (will redirect to Play Store)
-              await _healthConnectManager.openHealthConnectSettings();
+              // Open Play Store to install Health Connect
+              final Uri playStoreUri = Uri.parse(
+                'https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata',
+              );
+              final Uri marketUri = Uri.parse(
+                'market://details?id=com.google.android.apps.healthdata',
+              );
+              
+              try {
+                // Try to open Play Store app first
+                if (await canLaunchUrl(marketUri)) {
+                  await launchUrl(marketUri, mode: LaunchMode.externalApplication);
+                } else if (await canLaunchUrl(playStoreUri)) {
+                  // Fallback to web version
+                  await launchUrl(playStoreUri, mode: LaunchMode.externalApplication);
+                } else {
+                  throw Exception('Could not open Play Store');
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Could not open Play Store. Please search for "Health Connect" manually.',
+                        style: GoogleFonts.poppins(),
+                      ),
+                      backgroundColor: kErrorColor,
+                    ),
+                  );
+                }
+              }
             },
             icon: const Icon(Icons.download),
             label: Text(
