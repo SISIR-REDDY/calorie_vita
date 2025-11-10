@@ -273,46 +273,131 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         }
       }
       
-      // Initialize service in background (non-blocking)
-      // This will reload data from Firestore and update streams
-      _todaysFoodDataService.initialize().then((_) {
-        if (kDebugMode) debugPrint('✅ Home: Food data service initialized');
-        // After initialization, ensure cached data is still displayed
-        final updatedCalories = _todaysFoodDataService.getCachedConsumedCalories();
-        if (updatedCalories > 0 && mounted && _dailySummary != null) {
-          setState(() {
-            if (_dailySummary!.caloriesConsumed == 0 || updatedCalories > _dailySummary!.caloriesConsumed) {
-              _dailySummary = _dailySummary!.copyWith(caloriesConsumed: updatedCalories);
+      // FAST PATH: Load today's entries directly for instant accuracy
+      try {
+        final instantEntries = await FoodHistoryService.getTodaysFoodEntries();
+        if (instantEntries.isNotEmpty && mounted) {
+          final instantCalories = instantEntries.fold<int>(
+              0, (total, entry) => total + entry.calories.round());
+
+          if (instantCalories > (_dailySummary?.caloriesConsumed ?? 0)) {
+            final instantMacros = {
+              'protein': instantEntries.fold<double>(0,
+                  (total, entry) => total + entry.protein),
+              'carbs': instantEntries.fold<double>(
+                  0, (total, entry) => total + entry.carbs),
+              'fat': instantEntries.fold<double>(
+                  0, (total, entry) => total + entry.fat),
+              'fiber': instantEntries.fold<double>(
+                  0, (total, entry) => total + entry.fiber),
+              'sugar': instantEntries.fold<double>(
+                  0, (total, entry) => total + entry.sugar),
+            };
+
+            // Update service cache BEFORE UI so downstream listeners see real data
+            _todaysFoodDataService.updateWithPreCalculatedValues(
+              instantCalories,
+              instantMacros.map((key, value) => MapEntry(key, value.toDouble())),
+            );
+
+            setState(() {
+              if (_dailySummary != null) {
+                _dailySummary =
+                    _dailySummary!.copyWith(caloriesConsumed: instantCalories);
+              } else {
+                _dailySummary = DailySummary(
+                  caloriesConsumed: instantCalories,
+                  caloriesBurned: 0,
+                  caloriesGoal: 2000,
+                  steps: 0,
+                  stepsGoal: 10000,
+                  waterGlasses: 0,
+                  waterGlassesGoal: 8,
+                  date: DateTime.now(),
+                );
+              }
+
+              _macroBreakdown = MacroBreakdown(
+                protein: instantMacros['protein'] ?? 0.0,
+                carbs: instantMacros['carbs'] ?? 0.0,
+                fat: instantMacros['fat'] ?? 0.0,
+                fiber: instantMacros['fiber'] ?? 0.0,
+                sugar: instantMacros['sugar'] ?? 0.0,
+              );
+            });
+
+            if (kDebugMode) {
+              debugPrint('⚡ Home: Instant entries loaded - Calories: $instantCalories');
             }
-          });
+          }
         }
-      }).catchError((e) {
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('❌ Home: Instant entries load error: $e');
+        }
+      }
+
+      // Initialize service (await to ensure caches are fresh)
+      try {
+        await _todaysFoodDataService.initialize();
+        if (kDebugMode) debugPrint('✅ Home: Food data service initialized');
+      } catch (e) {
         if (kDebugMode) debugPrint('❌ Home: Food data service init error: $e');
-      });
+      }
+
+      // After initialization, ensure cached data is still displayed
+      final updatedCalories = _todaysFoodDataService.getCachedConsumedCalories();
+      if (updatedCalories > 0 && mounted && _dailySummary != null) {
+        setState(() {
+          if (_dailySummary!.caloriesConsumed == 0 ||
+              updatedCalories > _dailySummary!.caloriesConsumed) {
+            _dailySummary =
+                _dailySummary!.copyWith(caloriesConsumed: updatedCalories);
+          }
+        });
+      }
       
       // Listen to consumed calories stream (same data as TodaysFoodScreen)
       _todaysFoodCaloriesSubscription?.cancel(); // Cancel existing subscription first
       _todaysFoodCaloriesSubscription = _todaysFoodDataService.consumedCaloriesStream.listen(
-        (calories) {
-          _debounceUIUpdate(() {
+        (calories) async {
+          _debounceUIUpdate(() async {
             if (!mounted) return;
-            // Respect manual override for the current session
             if (_manualCaloriesConsumedOverride != null) return;
-            
-            // CRITICAL FIX: Prevent flickering by never overwriting with 0 if we have valid data
             final currentCalories = _dailySummary?.caloriesConsumed ?? 0;
-            
-            // Only update if:
-            // 1. New calories are greater than 0, OR
-            // 2. Current calories are 0 (initial load)
-            // This prevents stream from overwriting valid data with 0
-            if (calories > 0 || currentCalories == 0) {
+            final cachedCalories = _todaysFoodDataService.getCachedConsumedCalories();
+
+            // PATCH: Only allow UI to be updated to 0 calories if ALL possible sources say 0 at the same time.
+            if (calories == 0) {
+              final firestoreEntries = await FoodHistoryService.getTodaysFoodEntries();
+              final firestoreHasEntries = firestoreEntries.isNotEmpty;
+
+              if (
+                currentCalories == 0 &&
+                cachedCalories == 0 &&
+                !firestoreHasEntries
+              ) {
+                if (_dailySummary != null) {
+                  setState(() {
+                    _dailySummary = _dailySummary!.copyWith(caloriesConsumed: 0);
+                  });
+                  if (kDebugMode) debugPrint('🟢 Home: Set calories to 0 - all sources confirm empty.');
+                }
+              } else {
+                if (kDebugMode) debugPrint(
+                  '🛡️ Home: Refused calories=0 update. currentCalories=$currentCalories, cachedCalories=$cachedCalories, firestoreHasEntries=$firestoreHasEntries');
+              }
+              return;
+            }
+
+            // Nonzero cal update - always allow
+            if (calories > 0) {
               if (_dailySummary != null) {
                 setState(() {
                   _dailySummary = _dailySummary!.copyWith(caloriesConsumed: calories);
                 });
+                if (kDebugMode) debugPrint('🟩 Home: Updated calories to nonzero value $calories from stream/listener.');
               } else {
-                // Create daily summary if it doesn't exist
                 setState(() {
                   _dailySummary = DailySummary(
                     caloriesConsumed: calories,
@@ -325,6 +410,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     date: DateTime.now(),
                   );
                 });
+                if (kDebugMode) debugPrint('🟩 Home: Created daily summary with calories $calories from stream/listener.');
               }
             }
           });
@@ -1357,39 +1443,41 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     _dailySummarySubscription =
         _appStateService.dailySummaryStream.listen((summary) async {
       if (!mounted) return;
-      
       // Only update if data actually changed
-      if (_dailySummary?.toMap() != summary?.toMap()) {
-        // CRITICAL FIX: Check consumed calories BEFORE setState to prevent flickering
-        final currentConsumedCalories = _dailySummary?.caloriesConsumed ?? 0;
-        final newConsumedCalories = summary?.caloriesConsumed ?? 0;
-        final cachedCalories = _todaysFoodDataService.getCachedConsumedCalories();
-        
-        // Determine which calories value to use (priority: cached > current > new)
-        int caloriesToUse;
-        if (cachedCalories > 0) {
-          // Always use cached calories from TodaysFoodDataService (highest priority)
-          caloriesToUse = cachedCalories;
-        } else if (currentConsumedCalories > 0) {
-          // Preserve current calories if no cache but we have data
-          caloriesToUse = currentConsumedCalories;
+      if (_dailySummary?.toMap() == summary?.toMap()) return;
+
+      final currentConsumedCalories = _dailySummary?.caloriesConsumed ?? 0;
+      final newConsumedCalories = summary?.caloriesConsumed ?? 0;
+      final cachedCalories = _todaysFoodDataService.getCachedConsumedCalories();
+
+      // Only allow UI to update to 0 if ALL sources agree
+      if (newConsumedCalories == 0) {
+        final firestoreEntries = await FoodHistoryService.getTodaysFoodEntries();
+        final firestoreHasEntries = firestoreEntries.isNotEmpty;
+        if (
+          currentConsumedCalories == 0 &&
+          cachedCalories == 0 &&
+          !firestoreHasEntries
+        ) {
+          if (summary != null) {
+            setState(() {
+              _dailySummary = summary.copyWith(caloriesConsumed: 0);
+            });
+            if (kDebugMode) debugPrint('🟢 AppStateService: Set calories to 0 - all sources confirm empty.');
+          }
         } else {
-          // Only use new calories if we have no cached or current data
-          caloriesToUse = newConsumedCalories;
+          if (kDebugMode) debugPrint(
+            '🛡️ AppStateService: Refused calories=0 update. currentCalories=$currentConsumedCalories, cachedCalories=$cachedCalories, firestoreHasEntries=$firestoreHasEntries');
         }
-        
-        // Only update if the new summary is valid
-        if (summary != null) {
-          setState(() {
-            // ALWAYS preserve consumed calories from TodaysFoodDataService
-            // This prevents AppStateService from causing flickering with 0 values
-            _dailySummary = summary.copyWith(caloriesConsumed: caloriesToUse);
-          });
-        }
-        
-        // OPTIMIZED: Removed automatic streak refresh here to prevent excessive API calls
-        // Streaks are refreshed periodically (every 5 min) and after user actions
-        // This prevents refreshing on every stream update
+        return;
+      }
+
+      // Accept nonzero value
+      if (summary != null) {
+        setState(() {
+          _dailySummary = summary.copyWith(caloriesConsumed: newConsumedCalories);
+        });
+        if (kDebugMode) debugPrint('🟩 AppStateService: Updated to nonzero ($newConsumedCalories) from stream.');
       }
     });
 
@@ -4848,6 +4936,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     }
   }
 
+
+
   /// Navigate to food detail screen
   void _navigateToFoodDetail(FoodHistoryEntry entry) async {
     final result = await Navigator.of(context).push(
@@ -4872,8 +4962,4 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
   }
 
 
-
-
-
 }
-

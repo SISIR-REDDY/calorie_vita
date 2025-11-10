@@ -70,7 +70,7 @@
 <body>
   <div class="container">
     <h1>Privacy Policy</h1>
-    <p class="last-updated">Last updated: December 2024</p>
+    <p class="last-updated">Last updated: November 9, 2025</p>
 
     <div class="section">
       <h2>1. Information We Collect</h2>
@@ -120,10 +120,12 @@
       </ul>
       <p><strong>AI-Powered Personalization:</strong></p>
       <ul>
-        <li>Utilize OpenRouter AI services to provide intelligent nutrition analysis and recommendations</li>
-        <li>Generate personalized meal suggestions based on your dietary preferences and health goals</li>
-        <li>Provide AI-driven coaching insights and behavioral pattern analysis</li>
-        <li>Improve accuracy of food recognition and nutritional estimation algorithms</li>
+        <li>Utilize OpenRouter AI services (third-party AI provider) to process food images and provide intelligent nutrition analysis</li>
+        <li>Send food photos to OpenRouter API for automated food recognition and calorie estimation</li>
+        <li>Generate personalized meal suggestions and nutrition recommendations based on your dietary preferences and health goals</li>
+        <li>Provide AI-driven coaching insights through "Trainer Sisir" chatbot feature</li>
+        <li>Improve accuracy of food recognition and nutritional estimation algorithms using machine learning</li>
+        <li><strong>Important:</strong> Food images sent to OpenRouter are processed for recognition only and are not stored permanently by the AI service</li>
       </ul>
       <p><strong>Communication and Support:</strong></p>
       <ul>
@@ -156,14 +158,46 @@
       <p>We do not sell, rent, or trade your personal information to third parties for their marketing purposes. We may share your information only in the following limited circumstances:</p>
       <p><strong>Essential Service Providers (Data Processors):</strong></p>
       <ul>
-        <li>Cloud Infrastructure: Firebase (Google Cloud Platform) for secure data storage and synchronization</li>
-        <li>AI Services: OpenRouter API for intelligent food recognition and nutrition analysis</li>
-        <li>Analytics Platforms: Firebase Analytics and Google Analytics for app performance monitoring</li>
-        <li>Authentication Services: Firebase Authentication and Google Sign-In for secure account access</li>
-        <li>Crash Reporting: Firebase Crashlytics for error detection and app stability</li>
-        <li>Push Notifications: Firebase Cloud Messaging for delivering timely alerts and reminders</li>
+        <li><strong>Firebase (Google Cloud Platform):</strong> Secure cloud storage, data synchronization, user authentication, analytics, crashlytics, and push notifications
+          <ul>
+            <li>Data stored: User profiles, food logs, health data, authentication tokens</li>
+            <li>Purpose: Core app functionality and data synchronization across devices</li>
+            <li>Location: United States (with global CDN for performance)</li>
+            <li>Compliance: GDPR, SOC 2, ISO 27001 certified</li>
+          </ul>
+        </li>
+        <li><strong>OpenRouter API (AI Service Provider):</strong> Artificial intelligence for food recognition and nutrition analysis
+          <ul>
+            <li>Data sent: Food photos, text queries to AI trainer</li>
+            <li>Purpose: Automated food identification, calorie estimation, nutrition recommendations</li>
+            <li>Processing: Images processed in real-time and not permanently stored by OpenRouter</li>
+            <li>Privacy: OpenRouter's privacy policy applies to data processing by their service</li>
+          </ul>
+        </li>
+        <li><strong>Google Fit API:</strong> Health and fitness data integration (optional, requires user consent)
+          <ul>
+            <li>Data accessed: Steps, calories burned, activity duration, exercise data</li>
+            <li>Purpose: Sync fitness data to provide comprehensive health tracking</li>
+            <li>Control: You can disconnect Google Fit integration at any time</li>
+          </ul>
+        </li>
+        <li><strong>Google Sign-In:</strong> Third-party authentication service
+          <ul>
+            <li>Data received: Email address, name, profile photo (from your Google account)</li>
+            <li>Purpose: Simplified login and account creation</li>
+            <li>Privacy: Google's privacy policy applies to authentication data</li>
+          </ul>
+        </li>
       </ul>
-      <p>All service providers are contractually obligated to process data only on our instructions, implement appropriate security measures, delete or return data upon termination, and comply with applicable data protection laws.</p>
+      <p><strong>Data Processing Agreements:</strong> All service providers are either bound by contractual data processing agreements or have established privacy frameworks (like Google's Data Processing Terms). They are obligated to:</p>
+      <ul>
+        <li>Process data only according to our instructions and for specified purposes</li>
+        <li>Implement appropriate technical and organizational security measures</li>
+        <li>Not use your data for their own purposes (except as required by law)</li>
+        <li>Comply with applicable data protection laws (GDPR, CCPA, etc.)</li>
+        <li>Delete or return data upon termination of services</li>
+      </ul>
+      <p><strong>Your Control:</strong> You can opt out of certain third-party integrations (like Google Fit) at any time through app settings. Core functionality requiring Firebase and OpenRouter cannot be disabled as they are essential for the app to function.</p>
       <p><strong>Legal and Regulatory Compliance:</strong></p>
       <ul>
         <li>Compliance with legal obligations, court orders, subpoenas, or regulatory requests</li>
@@ -258,20 +292,51 @@
     </div>
 
     <div class="section">
-      <h2>6. Children's Privacy</h2>
-      <p>Our services are not intended for children under 13 years of age. We do not knowingly collect personal information from children under 13.</p>
-      <p>If you are a parent or guardian and believe your child has provided us with personal information, please contact us immediately.</p>
-      <p><strong>For users between 13-18:</strong></p>
+      <h2>6. Data Retention and Deletion</h2>
+      <p><strong>How Long We Keep Your Data:</strong></p>
       <ul>
-        <li>Parental consent may be required</li>
-        <li>Limited data collection and sharing</li>
-        <li>Enhanced privacy protections</li>
-        <li>Special safeguards for minors</li>
+        <li><strong>Account Data:</strong> Retained as long as your account is active</li>
+        <li><strong>Health & Fitness Data:</strong> Retained indefinitely to maintain your history, unless you request deletion</li>
+        <li><strong>Analytics Data:</strong> Aggregated analytics retained for 26 months (Firebase default)</li>
+        <li><strong>Crash Logs:</strong> Retained for 90 days for debugging purposes</li>
+        <li><strong>Backup Data:</strong> Deleted 30 days after account deletion</li>
+      </ul>
+      <p><strong>Your Right to Delete Data:</strong></p>
+      <ul>
+        <li>You can delete your account at any time through app settings</li>
+        <li>Upon account deletion, we will permanently delete your personal data within 30 days</li>
+        <li>Some data may be retained for legal compliance (e.g., transaction records, fraud prevention) for up to 7 years</li>
+        <li>Anonymized and aggregated data may be retained for analytics and research purposes</li>
+        <li>Backup copies will be deleted within 30 days following our backup retention schedule</li>
+      </ul>
+      <p><strong>To Request Data Deletion:</strong></p>
+      <ul>
+        <li>Delete your account through the app (Settings → Account → Delete Account)</li>
+        <li>Or email us at calorievita@gmail.com with subject "Data Deletion Request"</li>
+        <li>We will confirm deletion within 72 hours and complete the process within 30 days</li>
       </ul>
     </div>
 
     <div class="section">
-      <h2>7. International Data Transfers</h2>
+      <h2>7. Children's Privacy</h2>
+      <p><strong>Age Requirement:</strong> Our services are intended for users aged 18 years and older. We do not knowingly collect personal information from individuals under 18.</p>
+      <p><strong>If You Are Under 18:</strong></p>
+      <ul>
+        <li>Do not create an account or use the app without parental consent</li>
+        <li>Parental or guardian supervision is required</li>
+        <li>We may delete accounts if we discover the user is under 18 without proper consent</li>
+      </ul>
+      <p><strong>For Parents and Guardians:</strong></p>
+      <ul>
+        <li>If you believe your child under 18 has provided us with personal information, please contact us immediately at calorievita@gmail.com</li>
+        <li>We will promptly investigate and delete any information collected from minors</li>
+        <li>You have the right to request access to or deletion of your child's data</li>
+      </ul>
+      <p><strong>Important Note:</strong> Health and nutrition tracking apps may not be appropriate for minors without professional guidance. We recommend consulting with a healthcare provider before allowing minors to use calorie tracking applications.</p>
+    </div>
+
+    <div class="section">
+      <h2>8. International Data Transfers</h2>
       <p>Your information may be transferred to and processed in countries other than your own.</p>
       <p><strong>Data Processing Locations:</strong></p>
       <ul>
@@ -289,7 +354,7 @@
     </div>
 
     <div class="section">
-      <h2>8. Changes to This Policy</h2>
+      <h2>9. Changes to This Policy</h2>
       <p>We may update this Privacy Policy from time to time to reflect changes in our practices or applicable laws.</p>
       <p><strong>Notification of Changes:</strong></p>
       <ul>
@@ -308,7 +373,7 @@
     </div>
 
     <div class="section">
-      <h2>9. Contact Information and Data Protection</h2>
+      <h2>10. Contact Information and Data Protection</h2>
       <p>For questions, concerns, or requests regarding this Privacy Policy or our data processing practices, please contact us:</p>
       <div class="contact-info">
         <p><strong>Email:</strong> calorievita@gmail.com</p>

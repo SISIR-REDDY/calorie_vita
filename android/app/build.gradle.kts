@@ -50,7 +50,13 @@ android {
         // Optimize for size: Only include arm64-v8a (all modern devices since API 26+ support this)
         // This reduces bundle size by ~15-20 MB by excluding armeabi-v7a
         ndk {
+            abiFilters.clear()
             abiFilters.add("arm64-v8a")
+        }
+        
+        // Additional size optimizations
+        vectorDrawables {
+            useSupportLibrary = true
         }
     }
     
@@ -75,21 +81,38 @@ android {
     }
 
     // Bundle configuration - optimize for size
-    // Note: App Bundles include all architectures but Play Store splits them automatically
-    // The bundle size shows all architectures, but users only download their device's architecture
     bundle {
         language {
-            // Disable language splits to reduce bundle size
+            // Disable language splits
             enableSplit = false
         }
         density {
-            // Disable density splits to reduce bundle size
+            // Disable density splits
             enableSplit = false
         }
         abi {
-            // Enable ABI splits - Play Store will generate separate APKs per architecture
-            // This doesn't reduce bundle size, but reduces download size for users
+            // Enable ABI splits for Play Store distribution
             enableSplit = true
+        }
+    }
+    
+    // Packaging options to reduce size
+    packaging {
+        resources {
+            excludes += listOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/license.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/notice.txt",
+                "META-INF/ASL2.0",
+                "META-INF/*.kotlin_module",
+                "kotlin/**",
+                "**.kotlin_metadata",
+                "**.kotlin_builtins"
+            )
         }
     }
     

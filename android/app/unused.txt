@@ -5242,7 +5242,6 @@ androidx.core.math.MathUtils:
     private void <init>()
     public static int addExact(int,int)
     public static long addExact(long,long)
-    public static float clamp(float,float,float)
     public static long clamp(long,long,long)
     public static int decrementExact(int)
     public static long decrementExact(long)
@@ -9982,7 +9981,6 @@ androidx.health.connect.client.HealthConnectClient$Companion:
     public static synthetic void getHealthConnectSettingsAction$annotations()
     public final androidx.health.connect.client.HealthConnectClient getOrCreate(android.content.Context)
     public final int getSdkStatus(android.content.Context)
-    public static synthetic int getSdkStatus$default(androidx.health.connect.client.HealthConnectClient$Companion,android.content.Context,java.lang.String,int,java.lang.Object)
     static synthetic boolean isPackageInstalled$default(androidx.health.connect.client.HealthConnectClient$Companion,android.content.pm.PackageManager,java.lang.String,int,int,java.lang.Object)
 androidx.health.connect.client.HealthConnectClient:
     public static final int DEFAULT_PROVIDER_MIN_VERSION_CODE
@@ -26078,6 +26076,88 @@ com.sisirlabs.calorievita.R$string:
     private void <init>()
 com.sisirlabs.calorievita.R$style:
     private void <init>()
+com.tekartik.sqflite.Constant:
+    static final java.lang.String CMD_GET
+    static final java.lang.String ERROR_BAD_PARAM
+    static final java.lang.String ERROR_DATABASE_CLOSED
+    static final java.lang.String ERROR_OPEN_FAILED
+    static final java.lang.String MEMORY_DATABASE_PATH
+    public static final java.lang.String METHOD_ANDROID_SET_LOCALE
+    public static final java.lang.String METHOD_BATCH
+    public static final java.lang.String METHOD_CLOSE_DATABASE
+    public static final java.lang.String METHOD_DATABASE_EXISTS
+    public static final java.lang.String METHOD_DEBUG
+    public static final java.lang.String METHOD_DEBUG_MODE
+    public static final java.lang.String METHOD_DELETE_DATABASE
+    public static final java.lang.String METHOD_EXECUTE
+    public static final java.lang.String METHOD_GET_DATABASES_PATH
+    public static final java.lang.String METHOD_GET_PLATFORM_VERSION
+    public static final java.lang.String METHOD_INSERT
+    public static final java.lang.String METHOD_OPEN_DATABASE
+    public static final java.lang.String METHOD_OPTIONS
+    public static final java.lang.String METHOD_QUERY
+    public static final java.lang.String METHOD_QUERY_CURSOR_NEXT
+    public static final java.lang.String METHOD_UPDATE
+    public static final java.lang.String PARAM_CANCEL
+    static final java.lang.String PARAM_CMD
+    public static final java.lang.String PARAM_COLUMNS
+    public static final java.lang.String PARAM_CONTINUE_OR_ERROR
+    public static final java.lang.String PARAM_CURSOR_ID
+    public static final java.lang.String PARAM_CURSOR_PAGE_SIZE
+    public static final java.lang.String PARAM_ERROR
+    public static final java.lang.String PARAM_ERROR_CODE
+    public static final java.lang.String PARAM_ERROR_DATA
+    public static final java.lang.String PARAM_ERROR_MESSAGE
+    static final java.lang.String PARAM_ID
+    public static final java.lang.String PARAM_IN_TRANSACTION_CHANGE
+    static final java.lang.String PARAM_LOCALE
+    static final java.lang.String PARAM_LOG_LEVEL
+    public static final java.lang.String PARAM_METHOD
+    public static final java.lang.String PARAM_NO_RESULT
+    static final java.lang.String PARAM_OPERATIONS
+    static final java.lang.String PARAM_PATH
+    static final java.lang.String PARAM_READ_ONLY
+    public static final java.lang.String PARAM_RECOVERED
+    public static final java.lang.String PARAM_RECOVERED_IN_TRANSACTION
+    public static final java.lang.String PARAM_RESULT
+    public static final java.lang.String PARAM_ROWS
+    static final java.lang.String PARAM_SINGLE_INSTANCE
+    public static final java.lang.String PARAM_SQL
+    public static final java.lang.String PARAM_SQL_ARGUMENTS
+    static final java.lang.String PARAM_THREAD_COUNT
+    static final java.lang.String PARAM_THREAD_PRIORITY
+    public static final java.lang.String PARAM_TRANSACTION_ID
+    public static final java.lang.String PLUGIN_KEY
+    static final java.lang.String SQLITE_ERROR
+    public static final java.lang.String TAG
+    public static final int TRANSACTION_ID_FORCE
+    public void <init>()
+com.tekartik.sqflite.Database:
+    static final boolean WAL_ENABLED_BY_DEFAULT
+    private static final java.lang.String WAL_ENABLED_META_NAME
+    public boolean enableWriteAheadLogging()
+com.tekartik.sqflite.LogLevel:
+    static final int none
+    static final int sql
+    static final int verbose
+    public void <init>()
+com.tekartik.sqflite.SqflitePlugin:
+    public void <init>(android.content.Context)
+    private static java.util.Map fixMap(java.util.Map)
+    private android.content.Context getContext()
+    private static java.lang.String toString(java.lang.Object)
+com.tekartik.sqflite.Utils:
+    public void <init>()
+com.tekartik.sqflite.dev.Debug:
+    public void <init>()
+    public static void devLog(java.lang.String,java.lang.String)
+com.tekartik.sqflite.operation.BaseReadOperation:
+    protected abstract com.tekartik.sqflite.operation.OperationResult getOperationResult()
+com.tekartik.sqflite.operation.Operation:
+    public abstract boolean getContinueOnError()
+com.tekartik.sqflite.operation.OperationRunnable
+com.tekartik.sqflite.operation.SqlErrorInfo:
+    public void <init>()
 dev.fluttercommunity.plus.connectivity.Connectivity:
     static final java.lang.String CONNECTIVITY_BLUETOOTH
     static final java.lang.String CONNECTIVITY_ETHERNET
@@ -26090,6 +26170,13 @@ dev.fluttercommunity.plus.connectivity.ConnectivityBroadcastReceiver:
     public static final java.lang.String CONNECTIVITY_ACTION
 dev.fluttercommunity.plus.packageinfo.PackageInfoPlugin:
     private static final java.lang.String CHANNEL_NAME
+dev.fluttercommunity.plus.share.R$xml:
+    private void <init>()
+dev.fluttercommunity.plus.share.SharePlusPlugin:
+    private static final java.lang.String CHANNEL
+dev.fluttercommunity.plus.share.ShareSuccessManager:
+    public static final int ACTIVITY_CODE
+    public static final java.lang.String RESULT_UNAVAILABLE
 dev.steenbakker.mobile_scanner.MobileScanner:
     public final androidx.camera.core.ImageAnalysis$Analyzer getCaptureOutput()
     public static synthetic void getCaptureOutput$annotations()
@@ -30841,10 +30928,14 @@ kotlin.io.CloseableKt:
     private static final java.lang.Object use(java.io.Closeable,kotlin.jvm.functions.Function1)
 kotlin.io.ConsoleKt
 kotlin.io.ConstantsKt
-kotlin.io.ExceptionsKt
-kotlin.io.FileAlreadyExistsException
+kotlin.io.FileAlreadyExistsException:
+    public synthetic void <init>(java.io.File,java.io.File,java.lang.String,int,kotlin.jvm.internal.DefaultConstructorMarker)
 kotlin.io.FilePathComponents
-kotlin.io.FileSystemException
+kotlin.io.FileSystemException:
+    public synthetic void <init>(java.io.File,java.io.File,java.lang.String,int,kotlin.jvm.internal.DefaultConstructorMarker)
+    public final java.io.File getFile()
+    public final java.io.File getOther()
+    public final java.lang.String getReason()
 kotlin.io.FileTreeWalk$DirectoryState
 kotlin.io.FileTreeWalk$FileTreeWalkIterator$BottomUpDirectoryState
 kotlin.io.FileTreeWalk$FileTreeWalkIterator$SingleFileState
@@ -30909,8 +31000,6 @@ kotlin.io.FilesKt__UtilsKt:
     public static final boolean copyRecursively(java.io.File,java.io.File,boolean,kotlin.jvm.functions.Function2)
     public static synthetic boolean copyRecursively$default(java.io.File,java.io.File,boolean,kotlin.jvm.functions.Function2,int,java.lang.Object)
     private static final kotlin.Unit copyRecursively$lambda$4$FilesKt__UtilsKt(kotlin.jvm.functions.Function2,java.io.File,java.io.IOException)
-    public static final java.io.File copyTo(java.io.File,java.io.File,boolean,int)
-    public static synthetic java.io.File copyTo$default(java.io.File,java.io.File,boolean,int,int,java.lang.Object)
     public static final java.io.File createTempDir(java.lang.String,java.lang.String,java.io.File)
     public static synthetic java.io.File createTempDir$default(java.lang.String,java.lang.String,java.io.File,int,java.lang.Object)
     public static final java.io.File createTempFile(java.lang.String,java.lang.String,java.io.File)
@@ -30937,7 +31026,6 @@ kotlin.io.FilesKt__UtilsKt:
 kotlin.io.LineReader
 kotlin.io.LinesSequence$iterator$1
 kotlin.io.LinesSequence
-kotlin.io.NoSuchFileException
 kotlin.io.OnErrorAction
 kotlin.io.ReadAfterEOFException
 kotlin.io.SerializableKt
@@ -41217,7 +41305,6 @@ androidx.health.connect.client.HealthConnectClient$Companion:
     public static final java.lang.String ACTION_HEALTH_CONNECT_MANAGE_DATA
     public static final java.lang.String ACTION_HEALTH_CONNECT_SETTINGS
     public static androidx.health.connect.client.HealthConnectClient getOrCreate()
-    public static int getSdkStatus()
     public static boolean hasBindableService$connect_client_release()
     public static boolean isPackageInstalled()
     public static boolean isProfileInAndroidU()
@@ -47455,6 +47542,101 @@ com.sisirlabs.calorievita.HealthConnectPlugin:
     public static void openHealthConnectSettings()
     public static void requestPermissions()
     public static void setContext()
+com.tekartik.sqflite.Database$1:
+    public final synthetic com.tekartik.sqflite.Database this$0
+com.tekartik.sqflite.Database:
+    public static void batch()
+    public static void close()
+    public static void closeCursor()
+    public static boolean doExecute()
+    public static boolean doQueryCursorNext()
+    public final synchronized void enterOrLeaveInTransaction()
+    public static void execute()
+    public static android.database.sqlite.SQLiteDatabase getReadableDatabase()
+    public static java.lang.String getThreadLogTag()
+    public static android.database.sqlite.SQLiteDatabase getWritableDatabase()
+    public static void insert()
+    public static void lambda$execute$3()
+    public static synthetic void lambda$insert$4()
+    public static synthetic void lambda$query$0()
+    public static void lambda$queryCursorNext$2()
+    public static synthetic void lambda$update$5()
+    public static void openReadOnly()
+    public static void query()
+    public static void queryCursorNext()
+    public static void runQueuedOperations()
+    public static void update()
+com.tekartik.sqflite.DatabaseDelegate
+com.tekartik.sqflite.DatabaseTask:
+    public static boolean isInTransaction()
+com.tekartik.sqflite.DatabaseWorker:
+    public static boolean isLastTaskInTransaction()
+    public static void lambda$postTask$0()
+    public final java.lang.Integer lastTaskDatabaseId()
+    public static void postTask()
+    public final synchronized void quit()
+    public static void work()
+com.tekartik.sqflite.DatabaseWorkerPool$1:
+    public final synthetic com.tekartik.sqflite.DatabaseWorkerPool this$0
+    public static int getDatabaseId()
+    public static boolean isInTransaction()
+com.tekartik.sqflite.DatabaseWorkerPoolImpl:
+    public static com.tekartik.sqflite.DatabaseWorker createWorker()
+    public static void lambda$start$0()
+    public final synchronized void onWorkerIdle()
+com.tekartik.sqflite.SingleDatabaseWorkerPoolImpl:
+    public final java.lang.String name
+com.tekartik.sqflite.SqflitePlugin:
+    public static void closeDatabase()
+    public static com.tekartik.sqflite.Database getDatabase()
+    public static void onAttachedToEngine()
+    public static void onBatchCall()
+    public static void onCloseDatabaseCall()
+    public static void onDatabaseExistsCall()
+    public static void onDebugCall()
+    public static void onDebugModeCall()
+    public static void onDeleteDatabaseCall()
+    public static void onExecuteCall()
+    public static void onGetDatabasesPathCall()
+    public static void onInsertCall()
+    public static void onOpenDatabaseCall()
+    public static void onOptionsCall()
+    public static void onQueryCall()
+    public static void onQueryCursorNextCall()
+    public static void onSetLocaleCall()
+    public static void onUpdateCall()
+com.tekartik.sqflite.SqlCommand:
+    public static void bindTo()
+    public static java.util.List getRawSqlArguments()
+    public static java.lang.String getSql()
+    public static java.lang.Object[] getSqlArguments()
+    public static java.lang.Object[] getSqlArguments$1()
+com.tekartik.sqflite.dev.Debug
+com.tekartik.sqflite.operation.BaseOperation:
+    public abstract java.lang.Boolean getBoolean()
+    public abstract boolean getContinueOnError()
+    public final java.lang.Boolean getInTransactionChange()
+    public final java.lang.String getSql()
+    public final java.util.List getSqlArguments()
+    public final com.tekartik.sqflite.SqlCommand getSqlCommand()
+    public final java.lang.Integer getTransactionId()
+    public abstract boolean hasNullTransactionId()
+com.tekartik.sqflite.operation.BaseReadOperation
+com.tekartik.sqflite.operation.BatchOperation$BatchOperationResult:
+    public final synthetic com.tekartik.sqflite.operation.BatchOperation this$0
+com.tekartik.sqflite.operation.BatchOperation:
+    public static java.util.Map getOperationError()
+    public static java.util.Map getOperationSuccessResult()
+    public final void handleError(io.flutter.plugin.common.MethodChannel$Result)
+com.tekartik.sqflite.operation.Operation:
+    public abstract java.lang.Boolean getInTransactionChange()
+    public abstract com.tekartik.sqflite.SqlCommand getSqlCommand()
+    public abstract java.lang.Integer getTransactionId()
+    public abstract boolean hasNullTransactionId()
+com.tekartik.sqflite.operation.QueuedOperation:
+    public final com.tekartik.sqflite.operation.Operation operation
+    public static void run()
+com.tekartik.sqflite.operation.SqlErrorInfo
 dev.fluttercommunity.plus.connectivity.Connectivity:
     public final java.util.ArrayList getCapabilitiesFromNetwork(android.net.Network)
     public static android.net.ConnectivityManager getConnectivityManager()
@@ -47484,6 +47666,37 @@ dev.fluttercommunity.plus.packageinfo.PackageInfoPlugin:
     public static java.lang.String bytesToHex()
     public static java.lang.String getInstallerPackageName()
     public static long getLongVersionCode()
+dev.fluttercommunity.plus.share.MethodCallHandler:
+    public static void expectMapArguments()
+    public static void success()
+dev.fluttercommunity.plus.share.Share:
+    public static synthetic int $r8$lambda$q8ZY7S5LB7HcZ7fp3XGqag51_8A()
+    public static void clearShareCacheFolder()
+    public static java.io.File copyToShareCacheFolder()
+    public static boolean fileIsInShareCache()
+    public final int getImmutabilityIntentFlags()
+    public static java.lang.String getProviderAuthority()
+    public static java.util.ArrayList getUrisForPaths()
+    public static final int immutabilityIntentFlags_delegate$lambda$1()
+    public static java.lang.String reduceMimeTypes()
+    public static void setActivity()
+dev.fluttercommunity.plus.share.SharePlusPendingIntent$Companion
+dev.fluttercommunity.plus.share.SharePlusPendingIntent:
+    public static final dev.fluttercommunity.plus.share.SharePlusPendingIntent$Companion Companion
+    static void <clinit>()
+dev.fluttercommunity.plus.share.SharePlusPlugin$Companion
+dev.fluttercommunity.plus.share.SharePlusPlugin:
+    public static final dev.fluttercommunity.plus.share.SharePlusPlugin$Companion Companion
+    static void <clinit>()
+dev.fluttercommunity.plus.share.ShareSuccessManager$Companion
+dev.fluttercommunity.plus.share.ShareSuccessManager:
+    public static final dev.fluttercommunity.plus.share.ShareSuccessManager$Companion Companion
+    public final android.content.Context context
+    static void <clinit>()
+    public static void clear()
+    public final void returnResult(java.lang.String)
+    public static void setCallback()
+    public static void unavailable()
 dev.steenbakker.mobile_scanner.BarcodeHandler:
     public final io.flutter.plugin.common.EventChannel eventChannel
 dev.steenbakker.mobile_scanner.MobileScanner:
@@ -47556,6 +47769,14 @@ io.flutter.embedding.engine.deferredcomponents.PlayStoreDeferredComponentManager
 io.flutter.embedding.engine.renderer.FlutterRenderer:
     static void <clinit>()
 io.flutter.embedding.engine.systemchannels.SettingsChannel$ConfigurationQueue$SentConfiguration:
+    static void <clinit>()
+io.flutter.plugins.camera.CameraApiImpl:
+    static void <clinit>()
+io.flutter.plugins.camera.CameraRegionUtils:
+    static void <clinit>()
+io.flutter.plugins.camera.DartMessenger:
+    static void <clinit>()
+io.flutter.plugins.camera.VideoRenderer:
     static void <clinit>()
 io.flutter.plugins.firebase.auth.FlutterFirebaseTotpSecret:
     static void <clinit>()
@@ -49300,6 +49521,13 @@ kotlin.internal.jdk7.JDK7PlatformImplementations
 kotlin.internal.jdk8.JDK8PlatformImplementations$ReflectSdkVersion:
     public static final kotlin.internal.jdk8.JDK8PlatformImplementations$ReflectSdkVersion INSTANCE
 kotlin.internal.jdk8.JDK8PlatformImplementations
+kotlin.io.ByteStreamsKt:
+    public static synthetic void copyTo$default(java.io.InputStream,java.io.ByteArrayOutputStream)
+kotlin.io.ExceptionsKt
+kotlin.io.FileSystemException:
+    public final java.io.File file
+    public final java.io.File other
+    public final java.lang.String reason
 kotlin.io.FilesKt
 kotlin.io.FilesKt__FilePathComponentsKt
 kotlin.io.FilesKt__FileReadWriteKt
