@@ -7,6 +7,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/gemini_food_service.dart';
 import '../services/food_database_service.dart';
 import '../models/food_scan_result.dart';
+import '../ui/app_colors.dart';
+import '../ui/theme_aware_colors.dart';
 import 'food_confirmation_screen.dart';
 
 /// Screen for scanning food with camera and AI recognition

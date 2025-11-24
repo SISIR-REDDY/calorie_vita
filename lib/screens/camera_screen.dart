@@ -16,6 +16,7 @@ import '../models/food_recognition_result.dart';
 import '../widgets/food_result_card.dart';
 import '../widgets/manual_food_entry_dialog.dart';
 import '../ui/app_colors.dart';
+import '../ui/theme_aware_colors.dart';
 import '../services/food_history_service.dart';
 // Unused import removed
 import '../config/production_config.dart';
@@ -628,13 +629,17 @@ class _CameraScreenState extends State<CameraScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: kAppBackground,
+      backgroundColor: isDark ? kDarkAppBackground : kAppBackground,
       appBar: _buildPremiumAppBar(),
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [kAppBackground, kSurfaceLight],
+            colors: isDark 
+                ? [kDarkAppBackground, kDarkSurfaceLight]
+                : [kAppBackground, kSurfaceLight],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -649,9 +654,14 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   PreferredSizeWidget _buildPremiumAppBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? kDarkSurfaceLight : Colors.white,
       elevation: 0,
+      iconTheme: IconThemeData(
+        color: isDark ? kDarkTextPrimary : kTextDark,
+      ),
       title: Row(
         children: [
           Container(
@@ -671,7 +681,7 @@ class _CameraScreenState extends State<CameraScreen> {
             'Food Scanner',
             style: GoogleFonts.poppins(
               fontWeight: FontWeight.bold,
-              color: kTextDark,
+              color: isDark ? kDarkTextPrimary : kTextDark,
               fontSize: 18,
             ),
           ),
@@ -786,6 +796,8 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Widget _buildLoadingState() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 40),
       child: Column(
@@ -793,9 +805,9 @@ class _CameraScreenState extends State<CameraScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? kDarkSurfaceLight : Colors.white,
               borderRadius: BorderRadius.circular(20),
-              boxShadow: kCardShadow,
+              boxShadow: isDark ? kDarkCardShadow : kCardShadow,
             ),
             child: Column(
               children: [
@@ -809,7 +821,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: kTextDark,
+                    color: isDark ? kDarkTextPrimary : kTextDark,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -817,7 +829,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   'This may take a few seconds',
                   style: GoogleFonts.poppins(
                     fontSize: 14,
-                    color: kTextSecondary,
+                    color: isDark ? kDarkTextSecondary : kTextSecondary,
                   ),
                 ),
               ],
@@ -861,22 +873,32 @@ class _CameraScreenState extends State<CameraScreen> {
                     size: 32,
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'AI Service Temporarily Unavailable',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: kTextDark,
-                    ),
+                  Builder(
+                    builder: (context) {
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      return Text(
+                        'AI Service Temporarily Unavailable',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? kDarkTextPrimary : kTextDark,
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'You can still add food manually while we restore AI services.',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: kTextSecondary,
-                    ),
-                    textAlign: TextAlign.center,
+                  Builder(
+                    builder: (context) {
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      return Text(
+                        'You can still add food manually while we restore AI services.',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          color: isDark ? kDarkTextSecondary : kTextSecondary,
+                        ),
+                        textAlign: TextAlign.center,
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
@@ -1001,18 +1023,21 @@ class _CameraScreenState extends State<CameraScreen> {
         child: Column(
           children: [
             // Product info card
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [kAccentBlue, kAccentBlue.withOpacity(0.8)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: kCardShadow,
-              ),
+            Builder(
+              builder: (context) {
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [kAccentBlue, kAccentBlue.withOpacity(0.8)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: isDark ? kDarkCardShadow : kCardShadow,
+                  ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1061,6 +1086,8 @@ class _CameraScreenState extends State<CameraScreen> {
                   ),
                 ],
               ),
+                );
+              },
             ),
             
             const SizedBox(height: 16),
@@ -1153,12 +1180,15 @@ class _CameraScreenState extends State<CameraScreen> {
       child: Column(
         children: [
           // Enhanced Food Result Card
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: kCardShadow,
-            ),
+          Builder(
+            builder: (context) {
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              return Container(
+                decoration: BoxDecoration(
+                  color: isDark ? kDarkSurfaceLight : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: isDark ? kDarkCardShadow : kCardShadow,
+                ),
             child: Column(
               children: [
                 // Header with confidence indicator
@@ -1258,13 +1288,18 @@ class _CameraScreenState extends State<CameraScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              'Calories',
-                              style: GoogleFonts.poppins(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: kTextDark,
-                              ),
+                            Builder(
+                              builder: (context) {
+                                final isDark = Theme.of(context).brightness == Brightness.dark;
+                                return Text(
+                                  'Calories',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? kDarkTextPrimary : kTextDark,
+                                  ),
+                                );
+                              },
                             ),
                             Text(
                               nutrition.formattedCalories,
@@ -1354,7 +1389,9 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
               ],
             ),
-          ),
+                );
+              },
+            ),
         ],
       ),
     );
@@ -1405,23 +1442,33 @@ class _CameraScreenState extends State<CameraScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                Text(
-                  'Scan Your Food',
-                  style: GoogleFonts.poppins(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: kTextDark,
-                  ),
+                Builder(
+                  builder: (context) {
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
+                    return Text(
+                      'Scan Your Food',
+                      style: GoogleFonts.poppins(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? kDarkTextPrimary : kTextDark,
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'Take a photo or scan a barcode to get\nnutritional information instantly',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    color: kTextSecondary,
-                    height: 1.5,
-                  ),
-                  textAlign: TextAlign.center,
+                Builder(
+                  builder: (context) {
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
+                    return Text(
+                      'Take a photo or scan a barcode to get\nnutritional information instantly',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        color: isDark ? kDarkTextSecondary : kTextSecondary,
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    );
+                  },
                 ),
               ],
             ),
@@ -1569,6 +1616,7 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Widget _buildFoodDescription(Map<String, dynamic> snapResult, NutritionInfo nutrition) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final ingredients = snapResult['ingredients'] as List?;
     final volumeEstimate = snapResult['volumeEstimate'] as String?;
     final category = snapResult['category'] as String?;
@@ -1606,9 +1654,15 @@ class _CameraScreenState extends State<CameraScreen> {
     return Container(
       padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 12 : 16),
       decoration: BoxDecoration(
-        color: kAccentBlue.withOpacity(0.05),
+        color: isDark 
+            ? kAccentBlue.withOpacity(0.15)
+            : kAccentBlue.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kAccentBlue.withOpacity(0.2)),
+        border: Border.all(
+          color: isDark 
+              ? kAccentBlue.withOpacity(0.4)
+              : kAccentBlue.withOpacity(0.2),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1627,7 +1681,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: kTextDark,
+                    color: isDark ? kDarkTextPrimary : kTextDark,
                   ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
@@ -1650,13 +1704,18 @@ class _CameraScreenState extends State<CameraScreen> {
                   ),
                 ),
                 Expanded(
-                  child: Text(
-                    part,
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      color: kTextSecondary,
-                      height: 1.4,
-                    ),
+                  child: Builder(
+                    builder: (context) {
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      return Text(
+                        part,
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          color: isDark ? kDarkTextSecondary : kTextSecondary,
+                          height: 1.4,
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -1668,6 +1727,7 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Widget _buildAIAnalysis(Map<String, dynamic> aiAnalysis) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final insights = aiAnalysis['insights'] as List<dynamic>? ?? [];
     final recommendations = aiAnalysis['recommendations'] as List<dynamic>? ?? [];
     final tips = aiAnalysis['tips'] as List<dynamic>? ?? [];
@@ -1675,21 +1735,23 @@ class _CameraScreenState extends State<CameraScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: kSurfaceLight,
+        color: isDark ? kDarkSurfaceDark : kSurfaceLight,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kBorderColor),
+        border: Border.all(
+          color: isDark ? kDarkBorderColor : kBorderColor,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'AI Analysis',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: kTextDark,
+            Text(
+              'AI Analysis',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? kDarkTextPrimary : kTextDark,
+              ),
             ),
-          ),
           const SizedBox(height: 12),
           
           if (insights.isNotEmpty) ...[
@@ -1718,27 +1780,37 @@ class _CameraScreenState extends State<CameraScreen> {
           children: [
             Icon(icon, size: 16, color: kAccentBlue),
             const SizedBox(width: 8),
-            Text(
-              title,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: kTextDark,
-              ),
+            Builder(
+              builder: (context) {
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                return Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? kDarkTextPrimary : kTextDark,
+                  ),
+                );
+              },
             ),
           ],
         ),
         const SizedBox(height: 8),
         ...items.map((item) => Padding(
           padding: const EdgeInsets.only(left: 24, bottom: 4),
-          child: Text(
-            '• ${item.toString()}',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: kTextSecondary,
-            ),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 3,
+          child: Builder(
+            builder: (context) {
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              return Text(
+                '• ${item.toString()}',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  color: isDark ? kDarkTextSecondary : kTextSecondary,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 3,
+              );
+            },
           ),
         )),
       ],
@@ -1746,13 +1818,15 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Widget _buildPortionSelector() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 20),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? kDarkSurfaceLight : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: kCardShadow,
+        boxShadow: isDark ? kDarkCardShadow : kCardShadow,
       ),
       child: Column(
         children: [
@@ -1761,7 +1835,7 @@ class _CameraScreenState extends State<CameraScreen> {
             style: GoogleFonts.poppins(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: kTextDark,
+              color: isDark ? kDarkTextPrimary : kTextDark,
             ),
           ),
           const SizedBox(height: 16),
@@ -1827,7 +1901,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   child: Text(
                     'Cancel',
                     style: GoogleFonts.poppins(
-                      color: kTextDark,
+                      color: isDark ? kDarkTextPrimary : kTextDark,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
