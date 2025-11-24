@@ -4692,7 +4692,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     );
   }
 
-  /// Build food history section (simplified without streams to prevent flickering)
+  /// Build food history section (simplified - detailed view in Today's Food screen)
   Widget _buildFoodHistorySection() {
     return SliverToBoxAdapter(
       child: Container(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../ui/app_colors.dart';
+import '../ui/theme_aware_colors.dart';
 import '../models/food_history_entry.dart';
 import '../services/food_history_service.dart';
 import 'food_history_detail_screen.dart';
@@ -187,154 +188,151 @@ class _TodaysFoodScreenState extends State<TodaysFoodScreen> {
 
   Widget _buildSummaryCard() {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            AppColors.primaryColor.withOpacity(0.1),
-            AppColors.primaryColor.withOpacity(0.05),
-          ],
+          colors: context.isDarkMode
+              ? [
+                  kPrimaryColor.withValues(alpha: 0.15),
+                  kPrimaryColor.withValues(alpha: 0.05),
+                ]
+              : [
+                  AppColors.primaryColor.withOpacity(0.1),
+                  AppColors.primaryColor.withOpacity(0.05),
+                ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: AppColors.primaryColor.withOpacity(0.2),
           width: 1,
         ),
+        boxShadow: context.isDarkMode ? kDarkCardShadow : kCardShadow,
       ),
       child: Column(
         children: [
-          // Header
+          // Compact Header with Calories
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primaryColor.withOpacity(0.2),
+                      AppColors.primaryColor.withOpacity(0.1),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
-                  Icons.dashboard,
+                  Icons.local_fire_department_rounded,
                   color: AppColors.primaryColor,
-                  size: 24,
+                  size: 20,
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Daily Summary',
-                      style: GoogleFonts.inter(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).textTheme.bodyLarge?.color,
-                      ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Total Calories',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: context.textSecondary,
                     ),
-                    Text(
-                      '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: Colors.grey[600],
+                  ),
+                  const SizedBox(height: 2),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '$_totalCalories',
+                            style: GoogleFonts.inter(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primaryColor,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              'kcal',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: context.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
+                ],
               ),
             ],
           ),
           
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
           
-          // Calories
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Total Calories',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$_totalCalories kcal',
-                      style: GoogleFonts.inter(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primaryColor,
-                      ),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.local_fire_department,
-                    color: AppColors.primaryColor,
-                    size: 24,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Macros
+          // Compact Macros Row
           Row(
             children: [
               Expanded(
-                child: _buildMacroCard('Protein', '${_totalProtein.toStringAsFixed(1)}g', Colors.green),
+                child: _buildCompactMacroCard(
+                  'Protein',
+                  _totalProtein,
+                  kInfoColor,
+                  Icons.egg_rounded,
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
-                child: _buildMacroCard('Carbs', '${_totalCarbs.toStringAsFixed(1)}g', Colors.orange),
+                child: _buildCompactMacroCard(
+                  'Carbs',
+                  _totalCarbs,
+                  kAccentColor,
+                  Icons.bakery_dining_rounded,
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
-                child: _buildMacroCard('Fat', '${_totalFat.toStringAsFixed(1)}g', Colors.red),
+                child: _buildCompactMacroCard(
+                  'Fat',
+                  _totalFat,
+                  kWarningColor,
+                  Icons.water_drop_rounded,
+                ),
               ),
             ],
           ),
           
           if (_totalFiber > 0 || _totalSugar > 0) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             Row(
               children: [
                 if (_totalFiber > 0) ...[
                   Expanded(
-                    child: _buildMacroCard('Fiber', '${_totalFiber.toStringAsFixed(1)}g', Colors.purple),
+                    child: _buildCompactMacroCard(
+                      'Fiber',
+                      _totalFiber,
+                      kAccentPurple,
+                      Icons.eco_rounded,
+                    ),
                   ),
-                  if (_totalSugar > 0) const SizedBox(width: 12),
+                  if (_totalSugar > 0) const SizedBox(width: 8),
                 ],
                 if (_totalSugar > 0)
                   Expanded(
-                    child: _buildMacroCard('Sugar', '${_totalSugar.toStringAsFixed(1)}g', Colors.pink),
+                    child: _buildCompactMacroCard(
+                      'Sugar',
+                      _totalSugar,
+                      kErrorColor,
+                      Icons.cookie_rounded,
+                    ),
                   ),
               ],
             ),
@@ -379,9 +377,69 @@ class _TodaysFoodScreenState extends State<TodaysFoodScreen> {
     );
   }
 
+  Widget _buildCompactMacroCard(String label, double value, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withOpacity(0.12),
+            color.withOpacity(0.06),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: color.withOpacity(0.25),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                value.toStringAsFixed(1),
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: context.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 2),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  'g',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: context.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              color: context.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFoodList(List<FoodHistoryEntry> entries) {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       itemCount: entries.length,
       itemBuilder: (context, index) {
         final entry = entries[index];
@@ -392,121 +450,268 @@ class _TodaysFoodScreenState extends State<TodaysFoodScreen> {
 
   Widget _buildFoodItem(FoodHistoryEntry entry) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _navigateToFoodDetail(entry),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(16),
+              color: context.isDarkMode ? kDarkSurfaceLight : kSurfaceColor,
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: Theme.of(context).dividerColor.withOpacity(0.1),
+                color: context.isDarkMode
+                    ? kDarkBorderColor.withOpacity(0.2)
+                    : kBorderColor,
                 width: 1,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              boxShadow: context.isDarkMode ? kDarkCardShadow : kCardShadow,
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Food icon
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        _getFoodIconColor(entry).withOpacity(0.2),
-                        _getFoodIconColor(entry).withOpacity(0.1),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    _getFoodIcon(entry),
-                    color: _getFoodIconColor(entry),
-                    size: 24,
-                  ),
-                ),
-                
-                const SizedBox(width: 16),
-                
-                // Food details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        entry.foodName,
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                // Compact Header Row
+                Row(
+                  children: [
+                    // Food Icon - Smaller
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            _getFoodIconColor(entry).withOpacity(0.2),
+                            _getFoodIconColor(entry).withOpacity(0.1),
+                          ],
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      const SizedBox(height: 4),
-                      Row(
+                      child: Icon(
+                        _getFoodIcon(entry),
+                        color: _getFoodIconColor(entry),
+                        size: 22,
+                      ),
+                    ),
+                    
+                    const SizedBox(width: 12),
+                    
+                    // Food Name and Info
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.access_time,
-                            size: 12,
-                            color: Colors.grey[600],
-                          ),
-                          const SizedBox(width: 4),
                           Text(
-                            _formatTime(entry.timestamp),
+                            entry.displayName,
                             style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: Colors.grey[600],
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: context.textPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              // Category Badge - Smaller
+                              if (entry.category != null && entry.category!.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: kPrimaryColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  child: Text(
+                                    entry.category!,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w600,
+                                      color: kPrimaryColor,
+                                    ),
+                                  ),
+                                ),
+                              if (entry.category != null && entry.category!.isNotEmpty)
+                                const SizedBox(width: 4),
+                              // Source Badge - Icon only
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: _getSourceColor(entry.source).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      _getSourceIconData(entry.source),
+                                      size: 10,
+                                      color: _getSourceColor(entry.source),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Calories Badge - Compact
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            kPrimaryColor.withValues(alpha: 0.15),
+                            kPrimaryColor.withValues(alpha: 0.08),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: kPrimaryColor.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            entry.calories.toStringAsFixed(0),
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: kPrimaryColor,
+                            ),
+                          ),
+                          Text(
+                            'kcal',
+                            style: GoogleFonts.inter(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                              color: context.textSecondary,
                             ),
                           ),
                         ],
                       ),
+                    ),
+                    
+                    const SizedBox(width: 8),
+                    
+                    // Clickable indicator arrow
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: context.textSecondary.withOpacity(0.6),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 10),
+                
+                // Compact Macros Row
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: context.isDarkMode
+                        ? kDarkSurfaceDark
+                        : kSurfaceLight,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildCompactMacroChip('P', entry.protein, kInfoColor, Icons.egg_rounded),
+                      Container(
+                        width: 1,
+                        height: 20,
+                        color: context.isDarkMode
+                            ? kDarkDividerColor
+                            : kDividerColor,
+                      ),
+                      _buildCompactMacroChip('C', entry.carbs, kAccentColor, Icons.bakery_dining_rounded),
+                      Container(
+                        width: 1,
+                        height: 20,
+                        color: context.isDarkMode
+                            ? kDarkDividerColor
+                            : kDividerColor,
+                      ),
+                      _buildCompactMacroChip('F', entry.fat, kWarningColor, Icons.opacity_rounded),
                     ],
                   ),
                 ),
                 
-                // Calories
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '${entry.calories.toStringAsFixed(0)} kcal',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primaryColor,
+                const SizedBox(height: 8),
+                
+                // Compact Footer Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Portion Size
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.scale_rounded,
+                          size: 12,
+                          color: context.textSecondary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${entry.weightGrams.toStringAsFixed(0)}g',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: context.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ),
-                
-                const SizedBox(width: 8),
-                
-                // Arrow
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: Colors.grey[400],
+                    // Time
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.access_time_rounded,
+                          size: 12,
+                          color: context.textSecondary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          entry.formattedTimestamp,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: context.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Build compact macro chip for food entry
+  Widget _buildCompactMacroChip(String label, double value, Color color, IconData icon) {
+    return Expanded(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            '${value.toStringAsFixed(1)}g',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: context.textPrimary,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -542,48 +747,107 @@ class _TodaysFoodScreenState extends State<TodaysFoodScreen> {
   }
 
   IconData _getFoodIcon(FoodHistoryEntry entry) {
-    // You can customize this based on food category or type
-    if (entry.foodName.toLowerCase().contains('milk') || 
-        entry.foodName.toLowerCase().contains('shake')) {
-      return Icons.local_drink;
-    } else if (entry.foodName.toLowerCase().contains('fruit')) {
-      return Icons.apple;
-    } else if (entry.foodName.toLowerCase().contains('vegetable')) {
-      return Icons.eco;
-    } else if (entry.foodName.toLowerCase().contains('meat') || 
-               entry.foodName.toLowerCase().contains('chicken')) {
-      return Icons.restaurant;
+    final category = entry.category?.toLowerCase();
+    final foodName = entry.foodName.toLowerCase();
+    
+    // Check food name first for better accuracy
+    if (foodName.contains('apple') || foodName.contains('banana') || foodName.contains('orange')) {
+      return Icons.apple_rounded;
+    } else if (foodName.contains('chicken') || foodName.contains('meat') || foodName.contains('beef')) {
+      return Icons.set_meal_rounded;
+    } else if (foodName.contains('rice') || foodName.contains('bread') || foodName.contains('pasta')) {
+      return Icons.bakery_dining_rounded;
+    } else if (foodName.contains('milk') || foodName.contains('cheese') || foodName.contains('yogurt')) {
+      return Icons.lunch_dining_rounded;
+    } else if (foodName.contains('salad') || foodName.contains('vegetable')) {
+      return Icons.eco_rounded;
+    } else if (foodName.contains('drink') || foodName.contains('juice') || foodName.contains('coffee')) {
+      return Icons.local_drink_rounded;
+    } else if (foodName.contains('snack') || foodName.contains('chip') || foodName.contains('cookie')) {
+      return Icons.cookie_rounded;
+    }
+    
+    // Fallback to category
+    if (category == null) return Icons.restaurant_rounded;
+    
+    if (category.contains('fruit')) {
+      return Icons.apple_rounded;
+    } else if (category.contains('vegetable') || category.contains('salad')) {
+      return Icons.eco_rounded;
+    } else if (category.contains('meat') || category.contains('chicken') || category.contains('beef')) {
+      return Icons.set_meal_rounded;
+    } else if (category.contains('dairy') || category.contains('milk') || category.contains('cheese')) {
+      return Icons.lunch_dining_rounded;
+    } else if (category.contains('bread') || category.contains('grain') || category.contains('rice')) {
+      return Icons.bakery_dining_rounded;
+    } else if (category.contains('drink') || category.contains('beverage')) {
+      return Icons.local_drink_rounded;
+    } else if (category.contains('snack') || category.contains('chip')) {
+      return Icons.cookie_rounded;
     } else {
-      return Icons.restaurant_menu;
+      return Icons.restaurant_menu_rounded;
     }
   }
 
   Color _getFoodIconColor(FoodHistoryEntry entry) {
-    if (entry.foodName.toLowerCase().contains('milk') || 
-        entry.foodName.toLowerCase().contains('shake')) {
-      return Colors.blue;
-    } else if (entry.foodName.toLowerCase().contains('fruit')) {
-      return Colors.green;
-    } else if (entry.foodName.toLowerCase().contains('vegetable')) {
-      return Colors.lightGreen;
-    } else if (entry.foodName.toLowerCase().contains('meat') || 
-               entry.foodName.toLowerCase().contains('chicken')) {
-      return Colors.red;
+    final category = entry.category?.toLowerCase();
+    if (category == null) return kPrimaryColor;
+    
+    if (category.contains('fruit') || category.contains('apple') || category.contains('banana')) {
+      return kErrorColor; // Red for fruits
+    } else if (category.contains('vegetable') || category.contains('salad')) {
+      return kSuccessColor; // Green for vegetables
+    } else if (category.contains('meat') || category.contains('chicken') || category.contains('beef')) {
+      return kAccentColor; // Orange/Amber for meat
+    } else if (category.contains('dairy') || category.contains('milk') || category.contains('cheese')) {
+      return kInfoColor; // Blue for dairy
+    } else if (category.contains('bread') || category.contains('grain') || category.contains('rice')) {
+      return kAccentColor; // Orange/Amber for grains
+    } else if (category.contains('drink') || category.contains('beverage')) {
+      return kInfoColor; // Blue for drinks
+    } else if (category.contains('snack') || category.contains('chip')) {
+      return kAccentPurple; // Purple for snacks
     } else {
-      return AppColors.primaryColor;
+      return kPrimaryColor;
     }
   }
 
   Color _getSourceColor(String source) {
     switch (source) {
       case 'camera_scan':
-        return Colors.blue;
+        return kInfoColor; // Blue for camera
       case 'barcode_scan':
-        return Colors.green;
+        return kSuccessColor; // Green for barcode
       case 'manual_entry':
-        return Colors.orange;
+        return kAccentColor; // Orange/Amber for manual
       default:
-        return Colors.grey;
+        return kPrimaryColor;
+    }
+  }
+
+  String _getSourceIcon(String source) {
+    switch (source) {
+      case 'camera_scan':
+        return '📷';
+      case 'barcode_scan':
+        return '📱';
+      case 'manual_entry':
+        return '✏️';
+      default:
+        return '❓';
+    }
+  }
+
+  IconData _getSourceIconData(String source) {
+    switch (source) {
+      case 'camera_scan':
+        return Icons.camera_alt_rounded;
+      case 'barcode_scan':
+        return Icons.qr_code_scanner_rounded;
+      case 'manual_entry':
+        return Icons.edit_rounded;
+      default:
+        return Icons.help_outline_rounded;
     }
   }
 
