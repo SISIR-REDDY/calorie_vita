@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'screens/home_screen.dart';
 import 'screens/analytics_screen.dart';
@@ -18,6 +19,7 @@ import 'services/health_connect_manager.dart';
 import 'services/firebase_service.dart';
 import 'services/daily_reset_service.dart';
 import 'services/logger_service.dart';
+import 'services/theme_service.dart';
 import 'package:flutter/foundation.dart';
 import '../config/production_config.dart';
 
@@ -33,6 +35,7 @@ class MainApp extends StatefulWidget {
 class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   final AppStateManager _appStateManager = AppStateManager();
   final HealthConnectManager _healthConnectManager = HealthConnectManager();
+  final ThemeService _themeService = ThemeService();
   static final LoggerService _logger = LoggerService();
   StreamSubscription<AppState>? _appStateSubscription;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
@@ -44,6 +47,9 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
 
     // Immediate initialization - no waiting
     _initializeAppImmediately();
+    
+    // Initialize theme service
+    _initializeTheme();
   }
 
   void _initializeAppImmediately() {
@@ -57,6 +63,42 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
     
     // Initialize daily reset service
     DailyResetService.initialize();
+  }
+
+  void _initializeTheme() async {
+    try {
+      await _themeService.initialize();
+      
+      // Listen to theme changes and update status bar
+      _themeService.addListener(() {
+        if (mounted) {
+          setState(() {
+            // Update status bar style based on theme
+            _updateStatusBar();
+          });
+        }
+      });
+      
+      // Set initial status bar style
+      _updateStatusBar();
+      
+      if (kDebugMode) debugPrint('✅ Theme service initialized. Dark mode: ${_themeService.isDarkMode}');
+    } catch (e) {
+      if (kDebugMode) debugPrint('❌ Theme service initialization error: $e');
+    }
+  }
+
+  void _updateStatusBar() {
+    // Update status bar color based on theme
+    SystemChrome.setSystemUIOverlayStyle(
+      SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: _themeService.isDarkMode ? Brightness.light : Brightness.dark,
+        statusBarBrightness: _themeService.isDarkMode ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor: _themeService.isDarkMode ? kDarkSurfaceLight : kSurfaceColor,
+        systemNavigationBarIconBrightness: _themeService.isDarkMode ? Brightness.light : Brightness.dark,
+      ),
+    );
   }
 
   void _initializeAppStateManager() async {
@@ -166,8 +208,9 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   }
 
   Widget _buildLoadingScreen() {
+    final isDark = _themeService.isDarkMode;
     return Scaffold(
-      backgroundColor: kAppBackground,
+      backgroundColor: isDark ? kDarkAppBackground : kAppBackground,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -187,7 +230,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
               'Loading...',
               style: GoogleFonts.inter(
                 fontSize: 16,
-                color: kTextSecondary,
+                color: isDark ? kDarkTextSecondary : kTextSecondary,
               ),
             ),
           ],
@@ -199,30 +242,37 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: _navigatorKey,
-      debugShowCheckedModeBanner: false,
-      title: 'Calorie Vita',
-      theme: AppTheme.lightTheme,
-      home: RewardNotificationWidget(
-        child: _buildHomeScreen(),
-      ),
-      routes: {
-        '/welcome': (context) => const WelcomeScreen(),
-        '/home': (context) => const MainNavigation(),
-        '/admin-notifications': (context) => const AdminNotificationScreen(),
-      },
-      onGenerateRoute: (settings) {
-        if (settings.name == '/welcome') {
-          return MaterialPageRoute(
-            builder: (context) => const WelcomeScreen(),
-          );
-        }
-        return null;
-      },
-      onUnknownRoute: (settings) {
-        return MaterialPageRoute(
-          builder: (context) => const WelcomeScreen(),
+    return AnimatedBuilder(
+      animation: _themeService,
+      builder: (context, _) {
+        return MaterialApp(
+          navigatorKey: _navigatorKey,
+          debugShowCheckedModeBanner: false,
+          title: 'Calorie Vita',
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: _themeService.themeMode,
+          home: RewardNotificationWidget(
+            child: _buildHomeScreen(),
+          ),
+          routes: {
+            '/welcome': (context) => const WelcomeScreen(),
+            '/home': (context) => const MainNavigation(),
+            '/admin-notifications': (context) => const AdminNotificationScreen(),
+          },
+          onGenerateRoute: (settings) {
+            if (settings.name == '/welcome') {
+              return MaterialPageRoute(
+                builder: (context) => const WelcomeScreen(),
+              );
+            }
+            return null;
+          },
+          onUnknownRoute: (settings) {
+            return MaterialPageRoute(
+              builder: (context) => const WelcomeScreen(),
+            );
+          },
         );
       },
     );

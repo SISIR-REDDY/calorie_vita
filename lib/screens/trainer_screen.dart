@@ -7,6 +7,7 @@ import '../services/ai_service.dart';
 import '../services/firebase_service.dart';
 import '../services/chat_history_manager.dart';
 import '../ui/app_colors.dart';
+import '../ui/theme_aware_colors.dart';
 import '../mixins/google_fit_sync_mixin.dart';
 import '../models/daily_summary.dart';
 import 'package:flutter/foundation.dart';
@@ -90,7 +91,6 @@ class _AITrainerScreenState extends State<AITrainerScreen>
   final FirebaseService _firebaseService = FirebaseService();
   final ChatHistoryManager _chatHistoryManager = ChatHistoryManager();
 
-  bool isDark = false;
   bool isLoading = false;
   bool isPremium = true; // Set to true for demo purposes
   bool isLoadingHistory = false;
@@ -697,10 +697,11 @@ class _AITrainerScreenState extends State<AITrainerScreen>
   }
 
   Widget _buildHistoryBottomSheet([StateSetter? setModalState]) {
+    final isDark = context.isDarkMode;
     return Container(
       height: MediaQuery.of(context).size.height * 0.7,
       decoration: BoxDecoration(
-        color: isDark ? Colors.grey[900] : Colors.white,
+        color: isDark ? kDarkSurfaceLight : kSurfaceColor,
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
@@ -732,7 +733,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : kTextDark,
+                    color: context.textPrimary,
                   ),
                 ),
                 const Spacer(),
@@ -928,7 +929,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : kTextDark,
+                color: context.textPrimary,
               ),
             ),
             const SizedBox(height: 12),
@@ -968,15 +969,16 @@ class _AITrainerScreenState extends State<AITrainerScreen>
   }
 
   Widget _buildSessionCard(ChatSession session, [StateSetter? setModalState]) {
+    final isDark = context.isDarkMode;
     final isCurrentSession = currentSessionId == session.id;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isDark ? Colors.grey[800] : Colors.grey[50],
+        color: isDark ? kDarkSurfaceDark : kSurfaceLight,
         borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isCurrentSession ? kAccentBlue : Colors.grey.withValues(alpha: 0.3),
+            color: isCurrentSession ? kAccentBlue : (isDark ? kDarkBorderColor : kBorderColor),
             width: isCurrentSession ? 2 : 1,
         ),
         boxShadow: [
@@ -1004,7 +1006,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
           session.title,
           style: TextStyle(
             fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : kTextDark,
+            color: context.textPrimary,
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -1088,19 +1090,20 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return AlertDialog(
-          backgroundColor: isDark ? Colors.grey[800] : Colors.white,
+          backgroundColor: isDark ? kDarkSurfaceLight : kSurfaceColor,
           title: Text(
             'Delete Chat',
             style: TextStyle(
-              color: isDark ? Colors.white : kTextDark,
+              color: context.textPrimary,
               fontWeight: FontWeight.bold,
             ),
           ),
           content: Text(
             'Are you sure you want to delete "${session.title}"? This action cannot be undone.',
             style: TextStyle(
-              color: isDark ? Colors.grey[300] : Colors.grey[700],
+              color: context.textSecondary,
             ),
           ),
           actions: [
@@ -1131,19 +1134,20 @@ class _AITrainerScreenState extends State<AITrainerScreen>
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return AlertDialog(
-          backgroundColor: isDark ? Colors.grey[800] : Colors.white,
+          backgroundColor: isDark ? kDarkSurfaceLight : kSurfaceColor,
           title: Text(
             'Clear All Chats',
             style: TextStyle(
-              color: isDark ? Colors.white : kTextDark,
+              color: context.textPrimary,
               fontWeight: FontWeight.bold,
             ),
           ),
           content: Text(
             'Are you sure you want to delete all chat history? This action cannot be undone.',
             style: TextStyle(
-              color: isDark ? Colors.grey[300] : Colors.grey[700],
+              color: context.textSecondary,
             ),
           ),
           actions: [
@@ -1260,117 +1264,117 @@ class _AITrainerScreenState extends State<AITrainerScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = isDark ? ThemeData.dark() : ThemeData.light();
-    return Theme(
-      data: theme,
-      child: Scaffold(
-        backgroundColor: isDark ? Colors.grey[900] : kSoftWhite,
-        appBar: AppBar(
-          backgroundColor: isDark ? Colors.grey[900] : kSoftWhite,
-          elevation: 0,
-          title: Row(
-            children: [
-              Image.asset(
-                'calorie_logo.png',
-                width: 48,
-                height: 48,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(width: 12),
-              Text('Trainer Sisir',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : kTextDark)),
-            ],
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.chat, color: kAccentBlue),
-              tooltip: 'Chat History',
-              onPressed: _showChatHistory,
-            ),
-          ],
-        ),
-        body: Column(
+    final isDark = context.isDarkMode;
+    return Scaffold(
+      backgroundColor: context.backgroundColor,
+      appBar: AppBar(
+        backgroundColor: context.surfaceColor,
+        elevation: 0,
+        title: Row(
           children: [
-            Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                itemCount: messages.length + (isLoading ? 1 : 0),
-                itemBuilder: (context, i) {
-                  if (i == messages.length && isLoading) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: SizedBox(
-                            width: 32,
-                            height: 32,
-                            child: CircularProgressIndicator(strokeWidth: 2)),
-                      ),
-                    );
-                  }
-                  final msg = messages[i];
-                  return _buildEnhancedChatBubble(msg);
-                },
-              ),
+            Image.asset(
+              'calorie_logo.png',
+              width: 48,
+              height: 48,
+              fit: BoxFit.contain,
             ),
-            Container(
-              decoration: BoxDecoration(
-                color: isDark ? Colors.grey[850] : Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      minLines: 1,
-                      maxLines: 4,
-                      decoration: InputDecoration(
-                        hintText: 'Ask Trainer Sisir... ',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(18),
-                          borderSide: BorderSide.none,
-                        ),
-                        filled: true,
-                        fillColor: isDark
-                            ? Colors.grey[800]
-                            : kAccentBlue.withValues(alpha: 0.08),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
-                      ),
-                      onSubmitted: (_) async => await _sendMessage(),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  CircleAvatar(
-                    backgroundColor: kAccentBlue,
-                    child: IconButton(
-                      icon: const Icon(Icons.send, color: Colors.white),
-                      onPressed: _sendMessage,
-                      tooltip: 'Send',
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            const SizedBox(width: 12),
+            Text('Trainer Sisir',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: context.textPrimary)),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.chat, color: kAccentBlue),
+            tooltip: 'Chat History',
+            onPressed: _showChatHistory,
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              controller: _scrollController,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+              itemCount: messages.length + (isLoading ? 1 : 0),
+              itemBuilder: (context, i) {
+                if (i == messages.length && isLoading) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(strokeWidth: 2)),
+                    ),
+                  );
+                }
+                final msg = messages[i];
+                return _buildEnhancedChatBubble(msg);
+              },
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: context.surfaceColor,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    minLines: 1,
+                    maxLines: 4,
+                    style: TextStyle(color: context.textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'Ask Trainer Sisir... ',
+                      hintStyle: TextStyle(color: context.textTertiary),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(18),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: isDark
+                          ? kDarkSurfaceDark
+                          : kAccentBlue.withValues(alpha: 0.08),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                    ),
+                    onSubmitted: (_) async => await _sendMessage(),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                CircleAvatar(
+                  backgroundColor: kAccentBlue,
+                  child: IconButton(
+                    icon: const Icon(Icons.send, color: Colors.white),
+                    onPressed: _sendMessage,
+                    tooltip: 'Send',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildEnhancedChatBubble(Message msg) {
+    final isDark = context.isDarkMode;
     final isUser = msg.sender == 'user';
 
     return Container(
@@ -1395,8 +1399,8 @@ class _AITrainerScreenState extends State<AITrainerScreen>
                       )
                     : LinearGradient(
                         colors: [
-                          isDark ? Colors.grey[800]! : Colors.white,
-                          isDark ? Colors.grey[700]! : Colors.grey[50]!,
+                          isDark ? kDarkSurfaceLight : kSurfaceColor,
+                          isDark ? kDarkSurfaceDark : kSurfaceLight,
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -1409,7 +1413,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
+                    color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -1417,7 +1421,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
                 border: Border.all(
                   color: isUser
                       ? kAccentBlue.withValues(alpha: 0.3)
-                      : Colors.grey.withValues(alpha: 0.2),
+                      : (isDark ? kDarkBorderColor : kBorderColor),
                   width: 1,
                 ),
               ),
@@ -1429,7 +1433,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
                     style: TextStyle(
                       color: isUser
                           ? Colors.white
-                          : (isDark ? Colors.white : kTextDark),
+                          : context.textPrimary,
                       fontSize: 15,
                       height: 1.4,
                     ),
@@ -1440,7 +1444,7 @@ class _AITrainerScreenState extends State<AITrainerScreen>
                     style: TextStyle(
                       color: isUser
                           ? Colors.white.withValues(alpha: 0.7)
-                          : Colors.grey[500],
+                          : context.textTertiary,
                       fontSize: 11,
                     ),
                   ),

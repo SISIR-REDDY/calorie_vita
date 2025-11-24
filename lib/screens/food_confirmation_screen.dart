@@ -622,7 +622,7 @@ class _FoodConfirmationScreenState extends State<FoodConfirmationScreen> {
               ],
             ),
           );
-        }).toList(),
+        }),
       ],
     );
   }

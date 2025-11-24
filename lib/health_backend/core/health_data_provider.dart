@@ -44,11 +44,11 @@ class HealthDataProvider extends StatefulWidget {
   final bool autoRefresh;
 
   const HealthDataProvider({
-    Key? key,
+    super.key,
     required this.child,
     this.autoInitialize = true,
     this.autoRefresh = true,
-  }) : super(key: key);
+  });
 
   @override
   State<HealthDataProvider> createState() => _HealthDataProviderState();

@@ -1,6 +1,7 @@
 /// Fast BMR (Basal Metabolic Rate) Calculator
 /// Calculates calories burned at rest to estimate active calories
 /// Uses Mifflin-St Jeor Equation (most accurate formula)
+library;
 
 class BMRCalculator {
   // Cached values for performance

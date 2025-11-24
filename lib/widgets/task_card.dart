@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/task.dart';
 import '../ui/app_colors.dart';
+import '../ui/theme_aware_colors.dart';
 import 'package:flutter/foundation.dart';
 import '../config/production_config.dart';
 
@@ -74,21 +75,15 @@ class _TaskCardState extends State<TaskCard> with SingleTickerProviderStateMixin
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: context.surfaceColor,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: widget.task.isCompleted 
                   ? Colors.green.withValues(alpha: 0.3)
-                  : Colors.grey.withValues(alpha: 0.1),
+                  : Colors.grey.withValues(alpha: context.isDarkMode ? 0.3 : 0.1),
               width: widget.task.isCompleted ? 2 : 1,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            boxShadow: context.cardShadow,
           ),
           child: Padding(
             padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 12 : 16),
@@ -148,7 +143,7 @@ class _TaskCardState extends State<TaskCard> with SingleTickerProviderStateMixin
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: Colors.grey.withValues(alpha: 0.1),
+        color: Colors.grey.withValues(alpha: context.isDarkMode ? 0.2 : 0.1),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Center(
@@ -176,7 +171,7 @@ class _TaskCardState extends State<TaskCard> with SingleTickerProviderStateMixin
                       : FontWeight.w700,
                   color: widget.task.isCompleted 
                       ? Colors.grey[500]
-                      : Colors.black,
+                      : context.textPrimary,
                   decoration: widget.task.isCompleted 
                       ? TextDecoration.lineThrough
                       : null,
@@ -197,7 +192,7 @@ class _TaskCardState extends State<TaskCard> with SingleTickerProviderStateMixin
               fontSize: 14,
               color: widget.task.isCompleted 
                   ? Colors.grey[400]
-                  : Colors.grey[700],
+                  : context.textSecondary,
               decoration: widget.task.isCompleted 
                   ? TextDecoration.lineThrough
                   : null,
@@ -215,7 +210,7 @@ class _TaskCardState extends State<TaskCard> with SingleTickerProviderStateMixin
               _formatDate(widget.task.createdAt),
               style: GoogleFonts.poppins(
                 fontSize: 12,
-                color: Colors.black.withValues(alpha: 0.5),
+                color: context.textSecondary,
               ),
             ),
             if (widget.task.isOverdue) ...[
@@ -318,7 +313,7 @@ class EmptyTasksWidget extends StatelessWidget {
             style: GoogleFonts.poppins(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.black,
+              color: context.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
@@ -327,7 +322,7 @@ class EmptyTasksWidget extends StatelessWidget {
             textAlign: TextAlign.center,
             style: GoogleFonts.poppins(
               fontSize: 14,
-              color: Colors.black.withValues(alpha: 0.7),
+              color: context.textSecondary,
             ),
           ),
           const SizedBox(height: 24),
@@ -403,7 +398,7 @@ class ExampleTasksWidget extends StatelessWidget {
             'Here are some example tasks to get you started:',
             style: GoogleFonts.poppins(
               fontSize: 14,
-              color: Colors.black.withValues(alpha: 0.7),
+              color: context.textSecondary,
             ),
           ),
           const SizedBox(height: 16),
@@ -421,7 +416,7 @@ class ExampleTasksWidget extends StatelessWidget {
                     taskData['title'],
                     style: GoogleFonts.poppins(
                       fontSize: 14,
-                      color: Colors.black.withValues(alpha: 0.8),
+                      color: context.textPrimary,
                     ),
                   ),
                 ),

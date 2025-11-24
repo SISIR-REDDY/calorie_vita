@@ -12,6 +12,7 @@ import '../services/real_time_input_service.dart';
 import '../services/health_connect_manager.dart';
 import '../services/auth_service.dart';
 import '../services/logger_service.dart';
+import '../services/theme_service.dart';
 import '../widgets/setup_warning_popup.dart';
 import '../services/setup_check_service.dart';
 
@@ -37,6 +38,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final AppStateService _appStateService = AppStateService();
   final RealTimeInputService _realTimeInputService = RealTimeInputService();
   final HealthConnectManager _healthConnectManager = HealthConnectManager();
+  final ThemeService _themeService = ThemeService();
   static final LoggerService _logger = LoggerService();
 
   // User data
@@ -833,8 +835,10 @@ Download now: $playStoreUrl
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: kAppBackground,
+      backgroundColor: isDark ? kDarkAppBackground : kAppBackground,
       appBar: AppBar(
         title: Row(
           children: [
@@ -857,12 +861,12 @@ Download now: $playStoreUrl
               'Settings',
               style: GoogleFonts.poppins(
                 fontWeight: FontWeight.bold,
-                color: kTextDark,
+                color: isDark ? kDarkTextPrimary : kTextDark,
               ),
             ),
           ],
         ),
-        backgroundColor: kSurfaceColor,
+        backgroundColor: isDark ? kDarkSurfaceLight : kSurfaceColor,
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -876,6 +880,10 @@ Download now: $playStoreUrl
 
             // Google Health Connection Section
             _buildGoogleHealthCard(),
+            const SizedBox(height: 12),
+
+            // Dark Mode Toggle Section
+            _buildDarkModeCard(),
             const SizedBox(height: 12),
 
             const SizedBox(height: 12),
@@ -968,9 +976,12 @@ Download now: $playStoreUrl
     required VoidCallback onTap,
     Widget? trailing,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: isDark ? kDarkSurfaceLight : kSurfaceColor,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
@@ -984,7 +995,7 @@ Download now: $playStoreUrl
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withOpacity(isDark ? 0.2 : 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: color, size: 24),
@@ -1002,7 +1013,7 @@ Download now: $playStoreUrl
                       style: GoogleFonts.poppins(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: kTextDark,
+                        color: isDark ? kDarkTextPrimary : kTextDark,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1010,7 +1021,7 @@ Download now: $playStoreUrl
                       subtitle,
                       style: GoogleFonts.poppins(
                         fontSize: 12,
-                        color: kTextSecondary,
+                        color: isDark ? kDarkTextSecondary : kTextSecondary,
                       ),
                     ),
                   ],
@@ -1021,8 +1032,8 @@ Download now: $playStoreUrl
               if (trailing != null)
                 trailing
               else
-                const Icon(Icons.arrow_forward_ios,
-                    size: 16, color: kTextSecondary),
+                Icon(Icons.arrow_forward_ios,
+                    size: 16, color: isDark ? kDarkTextSecondary : kTextSecondary),
             ],
           ),
         ),
@@ -1147,9 +1158,9 @@ Download now: $playStoreUrl
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white),
-                const SizedBox(width: 12),
+              children: const [
+                Icon(Icons.error_outline, color: Colors.white),
+                SizedBox(width: 12),
                 Expanded(
                   child: Text('Connection error. Please try again.'),
                 ),
@@ -1593,9 +1604,12 @@ Download now: $playStoreUrl
 
   /// Build Google Health Connection card
   Widget _buildGoogleHealthCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: isDark ? kDarkSurfaceLight : kSurfaceColor,
       child: InkWell(
         onTap: _isGoogleFitConnected
             ? _disconnectFromGoogleFit
@@ -1613,7 +1627,7 @@ Download now: $playStoreUrl
                   shape: BoxShape.circle,
                   color: _isGoogleFitConnected
                       ? Colors.white
-                      : Colors.grey[50],
+                      : (isDark ? kDarkSurfaceDark : Colors.grey[50]),
                   boxShadow: [
                     BoxShadow(
                       color: _isGoogleFitConnected
@@ -1666,7 +1680,7 @@ Download now: $playStoreUrl
                       style: GoogleFonts.poppins(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: kTextDark,
+                        color: isDark ? kDarkTextPrimary : kTextDark,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1678,7 +1692,7 @@ Download now: $playStoreUrl
                         fontSize: 12,
                         color: _isGoogleFitConnected
                             ? kSuccessColor
-                            : kTextSecondary,
+                            : (isDark ? kDarkTextSecondary : kTextSecondary),
                       ),
                     ),
                   ],
@@ -1697,6 +1711,83 @@ Download now: $playStoreUrl
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Build Dark Mode toggle card
+  Widget _buildDarkModeCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: isDark ? kDarkSurfaceLight : kSurfaceColor,
+      child: Container(
+        padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
+        child: Row(
+          children: [
+            // Dark Mode Icon
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDark 
+                    ? kAccentPurple.withValues(alpha: 0.2)
+                    : kAccentPurple.withValues(alpha: 0.1),
+              ),
+              child: Icon(
+                isDark ? Icons.dark_mode : Icons.light_mode,
+                color: kAccentPurple,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Dark Mode',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? kDarkTextPrimary : kTextDark,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isDark 
+                        ? 'Switch to light theme'
+                        : 'Switch to dark theme',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: isDark ? kDarkTextSecondary : kTextSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Toggle Switch
+            Switch(
+              value: isDark,
+              onChanged: (value) async {
+                await _themeService.setDarkMode(value);
+                if (mounted) {
+                  setState(() {});
+                }
+              },
+              activeColor: kAccentPurple,
+              activeTrackColor: kAccentPurple.withValues(alpha: 0.5),
+              inactiveThumbColor: Colors.grey[400],
+              inactiveTrackColor: Colors.grey[300],
+            ),
+          ],
         ),
       ),
     );
@@ -1771,6 +1862,7 @@ Download now: $playStoreUrl
 
   /// Build profile card with user info and edit button
   Widget _buildProfileCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     // Get the current user directly from Firebase Auth for real-time updates
     final currentUser = FirebaseAuth.instance.currentUser;
     final displayName = currentUser?.displayName;
@@ -1778,6 +1870,7 @@ Download now: $playStoreUrl
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: isDark ? kDarkSurfaceLight : kSurfaceColor,
       child: Padding(
         padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 16 : 20),
         child: Row(
@@ -1820,7 +1913,7 @@ Download now: $playStoreUrl
                     style: GoogleFonts.poppins(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: kTextDark,
+                      color: isDark ? kDarkTextPrimary : kTextDark,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1828,7 +1921,7 @@ Download now: $playStoreUrl
                     currentUser?.email ?? _userEmail ?? 'user@example.com',
                     style: GoogleFonts.poppins(
                       fontSize: 14,
-                      color: kTextSecondary,
+                      color: isDark ? kDarkTextSecondary : kTextSecondary,
                     ),
                   ),
                 ],
@@ -1849,9 +1942,12 @@ Download now: $playStoreUrl
 
   /// Build logout card with red styling
   Widget _buildLogoutCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: isDark ? kDarkSurfaceLight : kSurfaceColor,
       child: ListTile(
         leading: const Icon(Icons.logout, color: kErrorColor),
         title: Text(

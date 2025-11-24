@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/simple_streak_system.dart';
 import '../models/reward_system.dart';
 import '../ui/app_colors.dart';
+import '../ui/theme_aware_colors.dart';
 import '../ui/responsive_utils.dart';
 import '../ui/responsive_widgets.dart';
 
@@ -84,7 +85,7 @@ class ProfileWidgets {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.surfaceColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isAchievedToday
@@ -92,13 +93,7 @@ class ProfileWidgets {
               : goalColor.withValues(alpha: 0.3),
           width: 1.5,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: goalColor.withValues(alpha: 0.15),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: context.cardShadow,
       ),
       child: Row(
         children: [
@@ -127,7 +122,7 @@ class ProfileWidgets {
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: context.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -369,7 +364,7 @@ class ProfileWidgets {
                       '${userProgress.currentStreak} day streak',
                       style: GoogleFonts.poppins(
                         fontSize: 12,
-                        color: kTextSecondary,
+                        color: context.textSecondary,
                       ),
                     ),
                   ],
@@ -380,7 +375,7 @@ class ProfileWidgets {
                   '${userProgress.daysToNextLevel} days to next level',
                   style: GoogleFonts.poppins(
                     fontSize: 12,
-                    color: kTextSecondary,
+                    color: context.textSecondary,
                   ),
                 ),
             ],

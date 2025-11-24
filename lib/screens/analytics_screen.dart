@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../ui/app_colors.dart';
+import '../ui/theme_aware_colors.dart';
 import '../ui/responsive_utils.dart';
 // Unused import removed
 import '../ui/dynamic_columns.dart';
@@ -1402,7 +1403,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kSurfaceLight,
+      backgroundColor: context.backgroundColor,
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
@@ -1449,19 +1450,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
   /// Build loading state
   Widget _buildLoadingState() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(
+          const CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
             'Loading analytics...',
             style: TextStyle(
               fontSize: 16,
-              color: kTextSecondary,
+              color: context.textSecondary,
             ),
           ),
         ],
@@ -1475,20 +1476,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   Widget _buildLoadingSummaryCard(String title, String unit) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: kSurfaceColor,
-        borderRadius: BorderRadius.all(Radius.circular(16)),
-        boxShadow: kCardShadow,
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+        boxShadow: context.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: kTextSecondary,
+              color: context.textSecondary,
             ),
           ),
           const SizedBox(height: 8),
@@ -1579,7 +1580,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       expandedHeight: 80,
       floating: false,
       pinned: true,
-      backgroundColor: kSurfaceColor,
+      backgroundColor: context.surfaceColor,
       elevation: 0,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
@@ -1602,7 +1603,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                     fit: BoxFit.contain,
                   ),
                   const SizedBox(width: 16),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -1612,14 +1613,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                            color: context.isDarkMode ? kDarkTextPrimary : Colors.white,
                           ),
                         ),
                         Text(
                           'Track your health journey',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.white,
+                            color: context.isDarkMode ? kDarkTextPrimary : Colors.white,
                           ),
                         ),
                       ],
@@ -1673,9 +1674,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                 ),
                               )
-                            : const Icon(
+                            : Icon(
                                 Icons.refresh,
-                                color: Colors.white,
+                                color: context.isDarkMode ? kDarkTextPrimary : Colors.white,
                                 size: 20,
                               ),
                         tooltip: _isRefreshing ? 'Refreshing...' : 'Refresh data',
@@ -1695,9 +1696,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: kSurfaceColor,
+        color: context.surfaceColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: kCardShadow,
+        boxShadow: context.cardShadow,
       ),
       child: Row(
         children: _periods.map((period) {
@@ -1718,7 +1719,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: isSelected ? Colors.white : kTextSecondary,
+                    color: isSelected ? Colors.white : context.textSecondary,
                   ),
                 ),
               ),
@@ -2015,10 +2016,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     if (currentWeight == null || weightGoal == null) {
       return Container(
         padding: const EdgeInsets.all(20),
-        decoration: const BoxDecoration(
-          color: kSurfaceColor,
-          borderRadius: BorderRadius.all(Radius.circular(20)),
-          boxShadow: kCardShadow,
+        decoration: BoxDecoration(
+          color: context.surfaceColor,
+          borderRadius: const BorderRadius.all(Radius.circular(20)),
+          boxShadow: context.cardShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2038,12 +2039,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Text(
+                Text(
                   'Weight Progress',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
+                    color: context.textPrimary,
                   ),
                 ),
               ],
@@ -2198,10 +2199,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(
-        color: kSurfaceColor,
-        borderRadius: BorderRadius.all(Radius.circular(20)),
-        boxShadow: kCardShadow,
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
+        borderRadius: const BorderRadius.all(Radius.circular(20)),
+        boxShadow: context.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2221,13 +2222,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                 ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Weight Progress',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
+                    color: context.textPrimary,
                   ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
@@ -2285,7 +2286,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       child: _buildWeightDisplay(
                         'Current',
                         '${currentWeight.toStringAsFixed(1)} kg',
-                        kTextPrimary,
+                        context.textPrimary,
                         Icons.person,
                       ),
                     ),
@@ -2617,10 +2618,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       IconData icon, Color color, String change, Color changeColor) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: kSurfaceColor,
-        borderRadius: BorderRadius.all(Radius.circular(16)),
-        boxShadow: kCardShadow,
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+        boxShadow: context.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2675,10 +2676,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           const SizedBox(height: 4),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: kTextSecondary,
+              color: context.textSecondary,
             ),
             overflow: TextOverflow.ellipsis,
           ),
@@ -2695,23 +2696,23 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(
-        color: kSurfaceColor,
-        borderRadius: BorderRadius.all(Radius.circular(20)),
-        boxShadow: kCardShadow,
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
+        borderRadius: const BorderRadius.all(Radius.circular(20)),
+        boxShadow: context.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Macronutrient Breakdown',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
+                    color: context.textPrimary,
                   ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
@@ -2807,10 +2808,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           ),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: kTextPrimary,
+              color: context.textPrimary,
             ),
           ),
           Text(
@@ -2863,10 +2864,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           // Label
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: kTextPrimary,
+              color: context.textPrimary,
             ),
           ),
           // Progress percentage
@@ -3079,10 +3080,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       // Show message if either height or weight is missing
       return Container(
         padding: const EdgeInsets.all(16),
-        decoration: const BoxDecoration(
-          color: kSurfaceColor,
-          borderRadius: BorderRadius.all(Radius.circular(16)),
-          boxShadow: kCardShadow,
+        decoration: BoxDecoration(
+          color: context.surfaceColor,
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
+          boxShadow: context.cardShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -3102,12 +3103,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Text(
+                Text(
                   'BMI Analytics',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
+                    color: context.textPrimary,
                   ),
                 ),
               ],
@@ -3117,9 +3118,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               hasHeight 
                   ? 'Weight data unavailable. Please update your profile in settings.'
                   : 'Height data unavailable. Please update your profile in settings.',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: kTextSecondary,
+                color: context.textSecondary,
               ),
             ),
           ],
@@ -3140,10 +3141,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: kSurfaceColor,
-        borderRadius: BorderRadius.all(Radius.circular(16)),
-        boxShadow: kCardShadow,
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+        boxShadow: context.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3163,12 +3164,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                 ),
               ),
               const SizedBox(width: 10),
-              const Text(
+              Text(
                 'BMI Analytics',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: kTextPrimary,
+                  color: context.textPrimary,
                 ),
               ),
             ],
@@ -3181,15 +3182,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  bmiColor.withValues(alpha: 0.1),
-                  bmiColor.withValues(alpha: 0.05)
+                  bmiColor.withValues(alpha: context.isDarkMode ? 0.2 : 0.1),
+                  bmiColor.withValues(alpha: context.isDarkMode ? 0.1 : 0.05)
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: bmiColor.withValues(alpha: 0.2),
+                color: bmiColor.withValues(alpha: context.isDarkMode ? 0.3 : 0.2),
                 width: 1,
               ),
             ),
@@ -3199,12 +3200,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Current BMI',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
-                          color: kTextSecondary,
+                          color: context.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -3230,10 +3231,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       if (hasHeight && hasWeight) ...[
                         Text(
                           'Height: ${(_userHeight! * 100).round()} cm | Weight: ${_userWeight!.round()} kg',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: kTextSecondary,
+                            color: context.textSecondary,
                           ),
                         ),
                       ] else ...[
@@ -3267,8 +3268,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: kInfoColor.withValues(alpha: 0.1),
+              color: kInfoColor.withValues(alpha: context.isDarkMode ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: kInfoColor.withValues(alpha: context.isDarkMode ? 0.3 : 0.2),
+                width: 1,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -3306,8 +3311,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: kSuccessColor.withValues(alpha: 0.1),
+              color: kSuccessColor.withValues(alpha: context.isDarkMode ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: kSuccessColor.withValues(alpha: context.isDarkMode ? 0.3 : 0.2),
+                width: 1,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -3333,9 +3342,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                 const SizedBox(height: 8),
                 Text(
                   _getBMIRecommendation(bmi),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: kTextSecondary,
+                    color: context.textSecondary,
                     height: 1.4,
                   ),
                 ),
@@ -3363,17 +3372,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           const SizedBox(width: 8),
           Text(
             category,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: kTextPrimary,
+              color: context.textPrimary,
             ),
           ),
           const Spacer(),
           Text(
             range,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: kTextSecondary,
+              color: context.textSecondary,
             ),
           ),
         ],
@@ -3425,10 +3434,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   Widget _buildAIInsights() {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(
-        color: kSurfaceColor,
-        borderRadius: BorderRadius.all(Radius.circular(20)),
-        boxShadow: kCardShadow,
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
+        borderRadius: const BorderRadius.all(Radius.circular(20)),
+        boxShadow: context.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3448,13 +3457,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                 ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'AI-Generated Insights',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
+                    color: context.textPrimary,
                   ),
                 ),
               ),
@@ -3599,10 +3608,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   Widget _buildPersonalizedRecommendations() {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(
-        color: kSurfaceColor,
-        borderRadius: BorderRadius.all(Radius.circular(20)),
-        boxShadow: kCardShadow,
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
+        borderRadius: const BorderRadius.all(Radius.circular(20)),
+        boxShadow: context.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3622,13 +3631,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                 ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Personalized Recommendations',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
+                    color: context.textPrimary,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -3708,7 +3717,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   description,
                   style: TextStyle(
                     fontSize: descFontSize,
-                    color: kTextSecondary,
+                    color: context.textSecondary,
                     height: 1.3,
                   ),
                   overflow: TextOverflow.ellipsis,

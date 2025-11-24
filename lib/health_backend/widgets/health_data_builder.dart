@@ -30,13 +30,13 @@ class HealthDataBuilder extends StatelessWidget {
   final Widget Function()? noData;
 
   const HealthDataBuilder({
-    Key? key,
+    super.key,
     required this.hub,
     required this.builder,
     this.loading,
     this.error,
     this.noData,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -99,12 +99,12 @@ class HealthDataStreamBuilder extends StatelessWidget {
   final Widget Function(String error)? error;
 
   const HealthDataStreamBuilder({
-    Key? key,
+    super.key,
     required this.hub,
     required this.builder,
     this.loading,
     this.error,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -144,11 +144,11 @@ class StepsDisplay extends StatelessWidget {
   final String? label;
 
   const StepsDisplay({
-    Key? key,
+    super.key,
     required this.hub,
     this.style,
     this.label,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -179,12 +179,12 @@ class CaloriesDisplay extends StatelessWidget {
   final int decimalPlaces;
 
   const CaloriesDisplay({
-    Key? key,
+    super.key,
     required this.hub,
     this.style,
     this.label,
     this.decimalPlaces = 1,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -214,11 +214,11 @@ class WorkoutCountDisplay extends StatelessWidget {
   final String? label;
 
   const WorkoutCountDisplay({
-    Key? key,
+    super.key,
     required this.hub,
     this.style,
     this.label,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

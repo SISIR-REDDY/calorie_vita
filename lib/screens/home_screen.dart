@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../ui/app_colors.dart';
+import '../ui/theme_aware_colors.dart';
 import '../ui/responsive_utils.dart';
 import '../ui/responsive_widgets.dart';
 import '../ui/dynamic_columns.dart';
@@ -1832,7 +1833,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             isConsumed ? 'Edit Calories Consumed' : 'Edit Calories Burned',
             style: GoogleFonts.poppins(
               fontWeight: FontWeight.bold,
-              color: kTextDark,
+              color: context.textPrimary,
             ),
           ),
           content: Column(
@@ -1843,7 +1844,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     ? 'How many calories did you consume today?'
                     : 'How many calories did you burn today?',
                 style: GoogleFonts.poppins(
-                  color: kTextSecondary,
+                  color: context.textSecondary,
                 ),
               ),
               const SizedBox(height: 16),
@@ -1871,7 +1872,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               child: Text(
                 'Cancel',
                 style: GoogleFonts.poppins(
-                  color: kTextSecondary,
+                  color: context.textSecondary,
                 ),
               ),
             ),
@@ -2684,7 +2685,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               style: GoogleFonts.poppins(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
+                color: context.textPrimary,
               ),
             ),
             const SizedBox(height: 16),
@@ -2809,25 +2810,46 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Colors.blue[50]!,
-              Colors.blue[100]!,
-            ],
+            colors: context.isDarkMode
+                ? [
+                    kPrimaryColor.withValues(alpha: 0.25),
+                    kAccentBlue.withValues(alpha: 0.2),
+                    kPrimaryColor.withValues(alpha: 0.15),
+                  ]
+                : [
+                    Colors.blue[50]!,
+                    Colors.blue[100]!,
+                  ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: Colors.blue[200]!,
-            width: 1,
+            color: context.isDarkMode
+                ? kPrimaryColor.withValues(alpha: 0.4)
+                : Colors.blue[200]!,
+            width: 1.5,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.blue.withValues(alpha: 0.1),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
+          boxShadow: context.isDarkMode
+              ? [
+                  BoxShadow(
+                    color: kPrimaryColor.withValues(alpha: 0.4),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                  BoxShadow(
+                    color: kAccentBlue.withValues(alpha: 0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.blue.withValues(alpha: 0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2839,14 +2861,17 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [Colors.blue[600]!, Colors.blue[700]!],
+                      colors: context.isDarkMode
+                          ? [kPrimaryColor, kAccentBlue]
+                          : [Colors.blue[600]!, Colors.blue[700]!],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.blue.withValues(alpha: 0.3),
+                        color: (context.isDarkMode ? kPrimaryColor : Colors.blue)
+                            .withValues(alpha: 0.4),
                         blurRadius: 8,
                         offset: const Offset(0, 4),
                       ),
@@ -2868,7 +2893,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                         style: GoogleFonts.poppins(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
+                          color: context.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -2876,10 +2901,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                         'Track your daily progress',
                         style: GoogleFonts.poppins(
                           fontSize: 14,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.7),
+                          color: context.textSecondary,
                         ),
                       ),
                     ],
@@ -2957,23 +2979,28 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            color.withValues(alpha: 0.1),
-            color.withValues(alpha: 0.05),
-          ],
+          colors: context.isDarkMode
+              ? [
+                  color.withValues(alpha: 0.25),
+                  color.withValues(alpha: 0.15),
+                ]
+              : [
+                  color.withValues(alpha: 0.1),
+                  color.withValues(alpha: 0.05),
+                ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: color.withValues(alpha: 0.2),
-          width: 1,
+          color: color.withValues(alpha: context.isDarkMode ? 0.4 : 0.2),
+          width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: 0.1),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            color: color.withValues(alpha: context.isDarkMode ? 0.3 : 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -3008,7 +3035,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: context.isDarkMode ? Colors.white : context.textPrimary,
                   ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
@@ -3033,10 +3060,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             description,
             style: GoogleFonts.poppins(
               fontSize: 11,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.7),
+              color: context.isDarkMode
+                  ? Colors.white.withValues(alpha: 0.8)
+                  : context.textSecondary,
             ),
             textAlign: TextAlign.left,
           ),
@@ -3085,23 +3111,28 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            color.withValues(alpha: 0.1),
-            color.withValues(alpha: 0.05),
-          ],
+          colors: context.isDarkMode
+              ? [
+                  color.withValues(alpha: 0.25),
+                  color.withValues(alpha: 0.15),
+                ]
+              : [
+                  color.withValues(alpha: 0.1),
+                  color.withValues(alpha: 0.05),
+                ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: color.withValues(alpha: 0.2),
-          width: 1,
+          color: color.withValues(alpha: context.isDarkMode ? 0.4 : 0.2),
+          width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: 0.1),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            color: color.withValues(alpha: context.isDarkMode ? 0.3 : 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -3136,7 +3167,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: context.isDarkMode ? Colors.white : context.textPrimary,
                   ),
                   textAlign: TextAlign.left,
                 ),
@@ -3163,10 +3194,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   ),
                   style: GoogleFonts.poppins(
                     fontSize: 11,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.7),
+                    color: context.isDarkMode
+                        ? Colors.white.withValues(alpha: 0.8)
+                        : context.textSecondary,
                   ),
                   textAlign: TextAlign.left,
                 ),
@@ -3207,7 +3237,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 style: GoogleFonts.poppins(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
+                  color: context.textPrimary,
                 ),
               );
             },
@@ -3248,7 +3278,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             color: kPrimaryColor.withValues(alpha: 0.2),
             width: 1,
           ),
-          boxShadow: kCardShadow,
+          boxShadow: context.cardShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -3270,7 +3300,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     style: GoogleFonts.poppins(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
+                      color: context.textPrimary,
                     ),
                   ),
                 ),
@@ -3330,7 +3360,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: context.isDarkMode
+                    ? kDarkSurfaceDark.withValues(alpha: 0.5)
+                    : Colors.white.withValues(alpha: 0.7),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: kPrimaryColor.withValues(alpha: 0.1),
@@ -3358,7 +3390,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                           style: GoogleFonts.poppins(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: Theme.of(context).colorScheme.onSurface,
+                            color: context.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -3366,10 +3398,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                           _getDailyProgressMessage(),
                           style: GoogleFonts.poppins(
                             fontSize: 12,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.7),
+                            color: context.textSecondary,
                           ),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 2,
@@ -3419,7 +3448,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
       height: MediaQuery.of(context).size.width < 360 ? 160 : 180,
       padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 14 : 18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.surfaceColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isCompleted
@@ -3457,7 +3486,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: context.textPrimary,
                   ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
@@ -3502,10 +3531,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 style: GoogleFonts.poppins(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.7),
+                  color: context.textSecondary,
                   height: 1.2,
                 ),
                 overflow: TextOverflow.ellipsis,
@@ -3561,9 +3587,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
         margin: const EdgeInsets.symmetric(horizontal: 20),
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
+          color: context.surfaceColor,
           borderRadius: BorderRadius.circular(24),
-          boxShadow: kCardShadow,
+          boxShadow: context.cardShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -3585,7 +3611,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   style: GoogleFonts.poppins(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    color: context.textPrimary,
                   ),
                 ),
                 const Spacer(),
@@ -3627,14 +3653,17 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
             // Today's Tasks
             if (_isTasksLoading)
-              const Center(
+              Center(
                 child: Padding(
-                  padding: EdgeInsets.all(32),
+                  padding: const EdgeInsets.all(32),
                   child: Column(
                     children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text('Loading tasks...'),
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Loading tasks...',
+                        style: TextStyle(color: context.textPrimary),
+                      ),
                     ],
                   ),
                 ),
@@ -3730,7 +3759,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 'Daily Goal Streaks',
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface,
+                color: context.textPrimary,
               ),
             ],
           ),
@@ -3764,19 +3793,19 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
-      backgroundColor: kAppBackground,
+      backgroundColor: context.backgroundColor,
       appBar: AppBar(
         title: Text(
           'Profile & Progress',
           style: GoogleFonts.poppins(
             fontWeight: FontWeight.bold,
-            color: kTextDark,
+            color: context.textPrimary,
           ),
         ),
-        backgroundColor: kAppBackground,
+        backgroundColor: context.backgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: kTextDark),
+          icon: Icon(Icons.arrow_back, color: context.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -3846,7 +3875,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     style: GoogleFonts.poppins(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: kTextDark,
+                      color: context.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -3856,7 +3885,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                     user?.email ?? 'user@example.com',
                     style: GoogleFonts.poppins(
                       fontSize: 14,
-                      color: kTextSecondary,
+                      color: context.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -3957,7 +3986,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             style: GoogleFonts.poppins(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: kTextDark,
+              color: context.textPrimary,
             ),
           ),
           const SizedBox(height: 2),
@@ -3970,7 +3999,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             style: GoogleFonts.poppins(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: kTextSecondary,
+              color: context.textSecondary,
             ),
             textAlign: TextAlign.center,
           ),
@@ -4006,7 +4035,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             style: GoogleFonts.poppins(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: kTextSecondary,
+              color: context.textSecondary,
             ),
             textAlign: TextAlign.center,
           ),
@@ -4019,15 +4048,9 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: context.surfaceColor,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        boxShadow: context.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -4050,7 +4073,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   style: GoogleFonts.poppins(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: context.textPrimary,
                   ),
                 ),
               ),
@@ -4104,7 +4127,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                           style: GoogleFonts.poppins(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: kTextSecondary,
+                            color: context.textSecondary,
                           ),
                         ),
                       ),
@@ -4149,8 +4172,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
 
   Widget _buildBeautifulCalendarDay(
       int day, bool isToday, bool hasStreak, bool hasReward) {
-    Color backgroundColor = Theme.of(context).colorScheme.surface;
-    Color textColor = kTextSecondary;
+    Color backgroundColor = context.surfaceColor;
+    Color textColor = context.textSecondary;
     Color borderColor = Colors.transparent;
     Widget? indicator;
 
@@ -4238,7 +4261,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           style: GoogleFonts.poppins(
             fontSize: 11,
             fontWeight: FontWeight.w500,
-            color: kTextSecondary,
+            color: context.textSecondary,
           ),
         ),
       ],
@@ -4274,7 +4297,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               child: Text(
                 'Cancel',
                 style: GoogleFonts.poppins(
-                  color: kTextSecondary,
+                  color: context.textSecondary,
                 ),
               ),
             ),
@@ -4593,7 +4616,7 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: Text('Cancel',
-                  style: GoogleFonts.poppins(color: kTextSecondary)),
+                  style: GoogleFonts.poppins(color: context.textSecondary)),
             ),
             ElevatedButton(
               onPressed: () {
@@ -4682,16 +4705,21 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    AppColors.primaryColor.withOpacity(0.1),
-                    AppColors.secondaryColor.withOpacity(0.05),
-                  ],
+                  colors: context.isDarkMode
+                      ? [
+                          kPrimaryColor.withValues(alpha: 0.15),
+                          kPrimaryColor.withValues(alpha: 0.05),
+                        ]
+                      : [
+                          AppColors.primaryColor.withOpacity(0.1),
+                          AppColors.secondaryColor.withOpacity(0.05),
+                        ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: AppColors.primaryColor.withOpacity(0.2),
+                  color: kPrimaryColor.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
@@ -4703,12 +4731,12 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryColor.withOpacity(0.1),
+                          color: kPrimaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
                           Icons.restaurant_menu,
-                          color: AppColors.primaryColor,
+                          color: kPrimaryColor,
                           size: 20,
                         ),
                       ),
@@ -4721,14 +4749,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                             style: GoogleFonts.inter(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
-                              color: Theme.of(context).textTheme.bodyLarge?.color,
+                              color: context.textPrimary,
                             ),
                           ),
                           Text(
                             'Tap to view all food entries',
                             style: GoogleFonts.inter(
                               fontSize: 12,
-                              color: Theme.of(context).textTheme.bodyMedium?.color,
+                              color: context.textSecondary,
                             ),
                           ),
                         ],
@@ -4737,14 +4765,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   ),
                   Container(
                     decoration: BoxDecoration(
-                      color: AppColors.primaryColor.withOpacity(0.1),
+                      color: kPrimaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: IconButton(
                       onPressed: () => _showAllFoodHistory(),
                       icon: const Icon(
                         Icons.arrow_forward_ios,
-                        color: AppColors.primaryColor,
+                        color: kPrimaryColor,
                         size: 16,
                       ),
                     ),
