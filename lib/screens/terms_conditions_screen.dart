@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../ui/app_colors.dart';
+import '../ui/theme_aware_colors.dart';
 
 /// Terms & Conditions Screen for Calorie Vita App
 /// Comprehensive terms and conditions with actual content
@@ -9,17 +10,25 @@ class TermsConditionsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: kAppBackground,
+      backgroundColor: isDark ? kDarkAppBackground : kAppBackground,
       appBar: AppBar(
         title: Text(
           'Terms & Conditions',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            color: isDark ? kDarkTextPrimary : kTextDark,
+          ),
         ),
-        backgroundColor: kSurfaceColor,
+        backgroundColor: isDark ? kDarkSurfaceLight : kSurfaceColor,
         elevation: 0,
+        iconTheme: IconThemeData(
+          color: isDark ? kDarkTextPrimary : kTextDark,
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: kTextDark),
+          icon: Icon(Icons.arrow_back, color: isDark ? kDarkTextPrimary : kTextDark),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -56,7 +65,7 @@ class TermsConditionsScreen extends StatelessWidget {
                     style: GoogleFonts.poppins(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: kTextDark,
+                      color: isDark ? kDarkTextPrimary : kTextDark,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -64,7 +73,7 @@ class TermsConditionsScreen extends StatelessWidget {
                     'Last updated: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
                     style: GoogleFonts.poppins(
                       fontSize: 14,
-                      color: kTextSecondary,
+                      color: isDark ? kDarkTextSecondary : kTextSecondary,
                     ),
                   ),
                 ],
@@ -74,6 +83,7 @@ class TermsConditionsScreen extends StatelessWidget {
 
             // Content
             _buildSection(
+              context: context,
               title: '1. Acceptance of Terms',
               content: '''
 By downloading, installing, or using the Calorie Vita mobile application ("App"), you agree to be bound by these Terms and Conditions ("Terms").
@@ -93,6 +103,7 @@ Updates to Terms:
             ),
 
             _buildSection(
+              context: context,
               title: '2. Description of Service',
               content: '''
 Calorie Vita is a comprehensive health and wellness mobile application designed to assist users with nutritional tracking and fitness goal management.
@@ -125,6 +136,7 @@ The Service is provided on an "as-is" and "as-available" basis. We reserve the r
             ),
 
             _buildSection(
+              context: context,
               title: '3. User Accounts and Registration',
               content: '''
 To access certain features, you must create an account with accurate information.
@@ -150,6 +162,7 @@ Account Termination:
             ),
 
             _buildSection(
+              context: context,
               title: '4. Acceptable Use Policy',
               content: '''
 You agree to use the App only for lawful purposes and in accordance with these Terms.
@@ -173,6 +186,7 @@ Prohibited Uses:
             ),
 
             _buildSection(
+              context: context,
               title: '5. Health and Medical Disclaimer',
               content: '''
 IMPORTANT MEDICAL DISCLAIMER: Calorie Vita is a nutritional tracking and wellness tool and is NOT a medical device, healthcare provider, or substitute for professional medical advice, diagnosis, or treatment.
@@ -205,6 +219,7 @@ User Responsibility and Acknowledgment:
             ),
 
             _buildSection(
+              context: context,
               title: '6. Intellectual Property Rights',
               content: '''
 The App and its content are protected by intellectual property laws.
@@ -230,6 +245,7 @@ Restrictions:
             ),
 
             _buildSection(
+              context: context,
               title: '7. Privacy and Data Protection',
               content: '''
 Your privacy is important to us. Please review our Privacy Policy for detailed information.
@@ -255,6 +271,7 @@ Data Sharing:
             ),
 
             _buildSection(
+              context: context,
               title: '8. Subscription and Payment Terms',
               content: '''
 Some features may require a paid subscription.
@@ -280,6 +297,7 @@ Cancellation:
             ),
 
             _buildSection(
+              context: context,
               title: '9. Disclaimers and Limitations',
               content: '''
 THE APP IS PROVIDED "AS IS" WITHOUT WARRANTIES OF ANY KIND.
@@ -305,6 +323,7 @@ Accuracy of Information:
             ),
 
             _buildSection(
+              context: context,
               title: '10. Indemnification',
               content: '''
 You agree to indemnify and hold us harmless from certain claims.
@@ -324,6 +343,7 @@ Our Rights:
             ),
 
             _buildSection(
+              context: context,
               title: '11. Termination',
               content: '''
 Either party may terminate this agreement at any time.
@@ -349,6 +369,7 @@ Effect of Termination:
             ),
 
             _buildSection(
+              context: context,
               title: '12. Governing Law and Dispute Resolution',
               content: '''
 These Terms shall be governed by and construed in accordance with applicable laws and regulations.
@@ -386,6 +407,7 @@ Exceptions:
             ),
 
             _buildSection(
+              context: context,
               title: '13. Contact Information',
               content: '''
 For questions, concerns, or inquiries regarding these Terms and Conditions or our services, please contact us:
@@ -417,7 +439,9 @@ Note: Response times may vary during holidays or periods of high volume. We appr
     );
   }
 
-  Widget _buildSection({required String title, required String content}) {
+  Widget _buildSection({required BuildContext context, required String title, required String content}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       child: Column(
@@ -428,22 +452,26 @@ Note: Response times may vary during holidays or periods of high volume. We appr
             style: GoogleFonts.poppins(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: kTextDark,
+              color: isDark ? kDarkTextPrimary : kTextDark,
             ),
           ),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? kDarkSurfaceLight : Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: kTextSecondary.withOpacity(0.2)),
+              border: Border.all(
+                color: isDark 
+                    ? kDarkBorderColor.withOpacity(0.3) 
+                    : kTextSecondary.withOpacity(0.2),
+              ),
             ),
             child: Text(
               content,
               style: GoogleFonts.poppins(
                 fontSize: 14,
-                color: kTextDark,
+                color: isDark ? kDarkTextPrimary : kTextDark,
                 height: 1.6,
               ),
             ),

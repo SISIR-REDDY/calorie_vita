@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../ui/app_colors.dart';
+import '../ui/theme_aware_colors.dart';
 import '../services/real_time_input_service.dart';
 import '../services/app_state_service.dart';
 import '../widgets/setup_warning_popup.dart';
@@ -320,9 +321,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   /// Show error snackbar
   void _showErrorSnackBar(String message) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(
+          message,
+          style: GoogleFonts.poppins(color: Colors.white),
+        ),
         backgroundColor: kErrorColor,
         duration: const Duration(seconds: 3),
       ),
@@ -331,9 +336,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   /// Show success snackbar
   void _showSuccessSnackBar(String message) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(
+          message,
+          style: GoogleFonts.poppins(color: Colors.white),
+        ),
         backgroundColor: kAccentGreen,
         duration: const Duration(seconds: 2),
       ),
@@ -375,12 +384,18 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   /// Show profession selection dialog
   void _showProfessionDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: isDark ? kDarkSurfaceLight : Colors.white,
         title: Text(
           'Select Profession',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            color: isDark ? kDarkTextPrimary : kTextDark,
+          ),
         ),
         content: SizedBox(
           width: double.maxFinite,
@@ -392,9 +407,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               return ListTile(
                 title: Text(
                   profession,
-                  style: GoogleFonts.poppins(),
+                  style: GoogleFonts.poppins(
+                    color: isDark ? kDarkTextPrimary : kTextDark,
+                  ),
                 ),
                 selected: _selectedProfession == profession,
+                selectedTileColor: isDark 
+                    ? kDarkSurfaceDark.withOpacity(0.5) 
+                    : kAccentBlue.withOpacity(0.1),
                 onTap: () {
                   setState(() {
                     _selectedProfession = profession;
@@ -415,7 +435,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Cancel',
-              style: GoogleFonts.poppins(color: kTextSecondary),
+              style: GoogleFonts.poppins(
+                color: isDark ? kDarkTextSecondary : kTextSecondary,
+              ),
             ),
           ),
         ],
@@ -425,13 +447,19 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   /// Show hobbies selection dialog
   void _showHobbiesDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? kDarkSurfaceLight : Colors.white,
           title: Text(
             'Select Hobbies & Interests',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+              color: isDark ? kDarkTextPrimary : kTextDark,
+            ),
           ),
           content: SizedBox(
             width: double.maxFinite,
@@ -447,9 +475,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                       return CheckboxListTile(
                         title: Text(
                           hobby,
-                          style: GoogleFonts.poppins(),
+                          style: GoogleFonts.poppins(
+                            color: isDark ? kDarkTextPrimary : kTextDark,
+                          ),
                         ),
                         value: isSelected,
+                        activeColor: kAccentBlue,
+                        checkColor: Colors.white,
                         onChanged: (value) {
                           setDialogState(() {
                             if (value == true) {
@@ -467,11 +499,42 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: _hobbiesController,
+                    style: GoogleFonts.poppins(
+                      color: isDark ? kDarkTextPrimary : kTextDark,
+                    ),
                     decoration: InputDecoration(
                       labelText: 'Enter custom hobbies',
                       hintText: 'e.g., Rock climbing, Chess, etc.',
+                      labelStyle: GoogleFonts.poppins(
+                        color: isDark ? kDarkTextSecondary : kTextSecondary,
+                      ),
+                      hintStyle: GoogleFonts.poppins(
+                        color: isDark ? kDarkTextTertiary : kTextTertiary,
+                      ),
+                      filled: true,
+                      fillColor: isDark ? kDarkSurfaceDark : Colors.white,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                          color: isDark 
+                              ? kDarkBorderColor.withOpacity(0.5) 
+                              : kTextSecondary.withOpacity(0.3),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                          color: isDark 
+                              ? kDarkBorderColor.withOpacity(0.5) 
+                              : kTextSecondary.withOpacity(0.3),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(
+                          color: kAccentBlue, 
+                          width: 2,
+                        ),
                       ),
                     ),
                     maxLines: 2,
@@ -485,7 +548,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               onPressed: () => Navigator.pop(context),
               child: Text(
                 'Cancel',
-                style: GoogleFonts.poppins(color: kTextSecondary),
+                style: GoogleFonts.poppins(
+                  color: isDark ? kDarkTextSecondary : kTextSecondary,
+                ),
               ),
             ),
             TextButton(
@@ -517,17 +582,25 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: kAppBackground,
+      backgroundColor: isDark ? kDarkAppBackground : kAppBackground,
       appBar: AppBar(
         title: Text(
           'Edit Profile',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            color: isDark ? kDarkTextPrimary : kTextDark,
+          ),
         ),
-        backgroundColor: kSurfaceColor,
+        backgroundColor: isDark ? kDarkSurfaceLight : kSurfaceColor,
         elevation: 0,
+        iconTheme: IconThemeData(
+          color: isDark ? kDarkTextPrimary : kTextDark,
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: kTextDark),
+          icon: Icon(Icons.arrow_back, color: isDark ? kDarkTextPrimary : kTextDark),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
@@ -672,14 +745,19 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                         ),
                         if (_selectedActivityLevel != null) ...[
                           const SizedBox(height: 8),
-                          Text(
-                            _getActivityLevelDescription(
-                                _selectedActivityLevel!),
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              color: kTextSecondary,
-                              fontStyle: FontStyle.italic,
-                            ),
+                          Builder(
+                            builder: (context) {
+                              final isDark = Theme.of(context).brightness == Brightness.dark;
+                              return Text(
+                                _getActivityLevelDescription(
+                                    _selectedActivityLevel!),
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: isDark ? kDarkTextSecondary : kTextSecondary,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              );
+                            },
                           ),
                         ],
                         const SizedBox(height: 16),
@@ -775,8 +853,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     required String title,
     required List<Widget> children,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Card(
       elevation: 4,
+      color: isDark ? kDarkSurfaceLight : kSurfaceColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -788,7 +869,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               style: GoogleFonts.poppins(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: kTextDark,
+                color: isDark ? kDarkTextPrimary : kTextDark,
               ),
             ),
             const SizedBox(height: 16),
@@ -810,31 +891,51 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     bool enabled = true,
     String? Function(String?)? validator,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
       enabled: enabled,
       validator: validator,
-      style: GoogleFonts.poppins(),
+      style: GoogleFonts.poppins(
+        color: isDark ? kDarkTextPrimary : kTextDark,
+      ),
       decoration: InputDecoration(
         labelText: label,
         hintText: hintText,
+        labelStyle: GoogleFonts.poppins(
+          color: isDark ? kDarkTextSecondary : kTextSecondary,
+        ),
+        hintStyle: GoogleFonts.poppins(
+          color: isDark ? kDarkTextTertiary : kTextTertiary,
+        ),
         prefixIcon: Icon(icon, color: kAccentBlue),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: kTextSecondary.withOpacity(0.3)),
+          borderSide: BorderSide(
+            color: isDark 
+                ? kDarkBorderColor.withOpacity(0.5) 
+                : kTextSecondary.withOpacity(0.3),
+          ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: kTextSecondary.withOpacity(0.3)),
+          borderSide: BorderSide(
+            color: isDark 
+                ? kDarkBorderColor.withOpacity(0.5) 
+                : kTextSecondary.withOpacity(0.3),
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: kAccentBlue, width: 2),
         ),
         filled: true,
-        fillColor: enabled ? Colors.white : kTextSecondary.withOpacity(0.1),
+        fillColor: enabled 
+            ? (isDark ? kDarkSurfaceDark : Colors.white)
+            : (isDark ? kDarkSurfaceDark.withOpacity(0.5) : kTextSecondary.withOpacity(0.1)),
       ),
     );
   }
@@ -847,33 +948,52 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     required List<String> items,
     required void Function(String?) onChanged,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return DropdownButtonFormField<String>(
       initialValue: value,
       isExpanded: true,
+      dropdownColor: isDark ? kDarkSurfaceLight : Colors.white,
+      style: GoogleFonts.poppins(
+        color: isDark ? kDarkTextPrimary : kTextDark,
+      ),
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: GoogleFonts.poppins(
+          color: isDark ? kDarkTextSecondary : kTextSecondary,
+        ),
         prefixIcon: Icon(icon, color: kAccentBlue),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: kTextSecondary.withOpacity(0.3)),
+          borderSide: BorderSide(
+            color: isDark 
+                ? kDarkBorderColor.withOpacity(0.5) 
+                : kTextSecondary.withOpacity(0.3),
+          ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: kTextSecondary.withOpacity(0.3)),
+          borderSide: BorderSide(
+            color: isDark 
+                ? kDarkBorderColor.withOpacity(0.5) 
+                : kTextSecondary.withOpacity(0.3),
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: kAccentBlue, width: 2),
         ),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: isDark ? kDarkSurfaceDark : Colors.white,
       ),
       items: items.map((String item) {
         return DropdownMenuItem<String>(
           value: item,
           child: Text(
             item,
-            style: GoogleFonts.poppins(),
+            style: GoogleFonts.poppins(
+              color: isDark ? kDarkTextPrimary : kTextDark,
+            ),
             overflow: TextOverflow.ellipsis,
             maxLines: 2,
           ),
@@ -890,14 +1010,20 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     required String value,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          border: Border.all(color: kTextSecondary.withOpacity(0.3)),
+          border: Border.all(
+            color: isDark 
+                ? kDarkBorderColor.withOpacity(0.5) 
+                : kTextSecondary.withOpacity(0.3),
+          ),
           borderRadius: BorderRadius.circular(12),
-          color: Colors.white,
+          color: isDark ? kDarkSurfaceDark : Colors.white,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -911,7 +1037,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     label,
                     style: GoogleFonts.poppins(
                       fontSize: 12,
-                      color: kTextSecondary,
+                      color: isDark ? kDarkTextSecondary : kTextSecondary,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -923,7 +1049,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               value,
               style: GoogleFonts.poppins(
                 fontSize: 14,
-                color: kTextDark,
+                color: isDark ? kDarkTextPrimary : kTextDark,
                 fontWeight: FontWeight.w500,
               ),
               overflow: TextOverflow.ellipsis,

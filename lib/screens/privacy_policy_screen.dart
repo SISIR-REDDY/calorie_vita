@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../ui/app_colors.dart';
+import '../ui/theme_aware_colors.dart';
 
 /// Privacy Policy Screen for Calorie Vita App
 /// Comprehensive privacy policy with actual content
@@ -9,17 +10,25 @@ class PrivacyPolicyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: kAppBackground,
+      backgroundColor: isDark ? kDarkAppBackground : kAppBackground,
       appBar: AppBar(
         title: Text(
           'Privacy Policy',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            color: isDark ? kDarkTextPrimary : kTextDark,
+          ),
         ),
-        backgroundColor: kSurfaceColor,
+        backgroundColor: isDark ? kDarkSurfaceLight : kSurfaceColor,
         elevation: 0,
+        iconTheme: IconThemeData(
+          color: isDark ? kDarkTextPrimary : kTextDark,
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: kTextDark),
+          icon: Icon(Icons.arrow_back, color: isDark ? kDarkTextPrimary : kTextDark),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -56,7 +65,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                     style: GoogleFonts.poppins(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: kTextDark,
+                      color: isDark ? kDarkTextPrimary : kTextDark,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -64,7 +73,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                     'Last updated: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
                     style: GoogleFonts.poppins(
                       fontSize: 14,
-                      color: kTextSecondary,
+                      color: isDark ? kDarkTextSecondary : kTextSecondary,
                     ),
                   ),
                 ],
@@ -74,6 +83,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
 
             // Content
             _buildSection(
+              context: context,
               title: '1. Information We Collect',
               content: '''
 We collect various types of information in connection with your use of the Calorie Vita application to provide, improve, and personalize our services.
@@ -106,6 +116,7 @@ Third-Party Integration Data:
             ),
 
             _buildSection(
+              context: context,
               title: '2. How We Use Your Information',
               content: '''
 We process your personal information for the following legitimate purposes, in accordance with applicable data protection laws:
@@ -148,6 +159,7 @@ Security and Compliance:
             ),
 
             _buildSection(
+              context: context,
               title: '3. Information Sharing and Disclosure',
               content: '''
 We do not sell, rent, or trade your personal information to third parties for their marketing purposes. We may share your information only in the following limited circumstances:
@@ -194,6 +206,7 @@ Aggregated and Anonymized Data:
             ),
 
             _buildSection(
+              context: context,
               title: '4. Data Security and Protection',
               content: '''
 We implement comprehensive security measures designed to protect your personal information from unauthorized access, disclosure, alteration, and destruction.
@@ -238,6 +251,7 @@ Important Notice: While we implement robust security measures, no method of elec
             ),
 
             _buildSection(
+              context: context,
               title: '5. Your Rights and Choices',
               content: '''
 You have certain rights regarding your personal information:
@@ -263,6 +277,7 @@ Data Portability:
             ),
 
             _buildSection(
+              context: context,
               title: '6. Children\'s Privacy',
               content: '''
 Our services are not intended for children under 13 years of age. We do not knowingly collect personal information from children under 13.
@@ -278,6 +293,7 @@ For users between 13-18:
             ),
 
             _buildSection(
+              context: context,
               title: '7. International Data Transfers',
               content: '''
 Your information may be transferred to and processed in countries other than your own.
@@ -296,6 +312,7 @@ Protection Measures:
             ),
 
             _buildSection(
+              context: context,
               title: '8. Changes to This Policy',
               content: '''
 We may update this Privacy Policy from time to time to reflect changes in our practices or applicable laws.
@@ -315,6 +332,7 @@ Your Rights:
             ),
 
             _buildSection(
+              context: context,
               title: '9. Contact Information and Data Protection',
               content: '''
 For questions, concerns, or requests regarding this Privacy Policy or our data processing practices, please contact us:
@@ -359,7 +377,9 @@ Important Note: To protect your privacy and security, we will verify your identi
     );
   }
 
-  Widget _buildSection({required String title, required String content}) {
+  Widget _buildSection({required BuildContext context, required String title, required String content}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       child: Column(
@@ -370,22 +390,26 @@ Important Note: To protect your privacy and security, we will verify your identi
             style: GoogleFonts.poppins(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: kTextDark,
+              color: isDark ? kDarkTextPrimary : kTextDark,
             ),
           ),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? kDarkSurfaceLight : Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: kTextSecondary.withOpacity(0.2)),
+              border: Border.all(
+                color: isDark 
+                    ? kDarkBorderColor.withOpacity(0.3) 
+                    : kTextSecondary.withOpacity(0.2),
+              ),
             ),
             child: Text(
               content,
               style: GoogleFonts.poppins(
                 fontSize: 14,
-                color: kTextDark,
+                color: isDark ? kDarkTextPrimary : kTextDark,
                 height: 1.6,
               ),
             ),

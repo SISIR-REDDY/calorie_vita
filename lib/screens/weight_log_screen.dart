@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../ui/app_colors.dart';
+import '../ui/theme_aware_colors.dart';
 import '../models/weight_log.dart';
 import '../services/weight_log_service.dart';
 
@@ -43,15 +44,21 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
       _selectedDate = DateTime.now();
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? kDarkSurfaceLight : Colors.white,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text(
             weightLog != null ? 'Edit Weight' : 'Log Weight',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+              color: isDark ? kDarkTextPrimary : kTextDark,
+            ),
           ),
           content: SingleChildScrollView(
             child: Column(
@@ -61,12 +68,33 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                 TextField(
                   controller: _weightController,
                   keyboardType: TextInputType.number,
+                  style: GoogleFonts.poppins(
+                    color: isDark ? kDarkTextPrimary : kTextDark,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Weight (kg)',
+                    labelStyle: GoogleFonts.poppins(
+                      color: isDark ? kDarkTextSecondary : kTextSecondary,
+                    ),
                     prefixIcon:
                         const Icon(Icons.monitor_weight, color: kAccentBlue),
+                    filled: true,
+                    fillColor: isDark ? kDarkSurfaceDark : Colors.white,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: isDark 
+                            ? kDarkBorderColor.withOpacity(0.5) 
+                            : kTextSecondary.withOpacity(0.3),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: isDark 
+                            ? kDarkBorderColor.withOpacity(0.5) 
+                            : kTextSecondary.withOpacity(0.3),
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -95,7 +123,12 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
+                      color: isDark ? kDarkSurfaceDark : Colors.white,
+                      border: Border.all(
+                        color: isDark 
+                            ? kDarkBorderColor.withOpacity(0.5) 
+                            : Colors.grey.shade300,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -104,7 +137,9 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                         const SizedBox(width: 12),
                         Text(
                           DateFormat('MMM dd, yyyy').format(_selectedDate),
-                          style: GoogleFonts.poppins(),
+                          style: GoogleFonts.poppins(
+                            color: isDark ? kDarkTextPrimary : kTextDark,
+                          ),
                         ),
                       ],
                     ),
@@ -115,11 +150,32 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                 // Notes input
                 TextField(
                   controller: _notesController,
+                  style: GoogleFonts.poppins(
+                    color: isDark ? kDarkTextPrimary : kTextDark,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Notes (optional)',
+                    labelStyle: GoogleFonts.poppins(
+                      color: isDark ? kDarkTextSecondary : kTextSecondary,
+                    ),
                     prefixIcon: const Icon(Icons.note, color: kAccentBlue),
+                    filled: true,
+                    fillColor: isDark ? kDarkSurfaceDark : Colors.white,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: isDark 
+                            ? kDarkBorderColor.withOpacity(0.5) 
+                            : kTextSecondary.withOpacity(0.3),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: isDark 
+                            ? kDarkBorderColor.withOpacity(0.5) 
+                            : kTextSecondary.withOpacity(0.3),
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -137,7 +193,9 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
               onPressed: () => Navigator.pop(context, false),
               child: Text(
                 'Cancel',
-                style: GoogleFonts.poppins(color: kTextSecondary),
+                style: GoogleFonts.poppins(
+                  color: isDark ? kDarkTextSecondary : kTextSecondary,
+                ),
               ),
             ),
             ElevatedButton(
@@ -146,8 +204,11 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                 if (weight == null || weight <= 0) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please enter a valid weight'),
+                      SnackBar(
+                        content: Text(
+                          'Please enter a valid weight',
+                          style: GoogleFonts.poppins(color: Colors.white),
+                        ),
                         backgroundColor: kErrorColor,
                       ),
                     );
@@ -179,16 +240,19 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
 
                   if (mounted) {
                     Navigator.pop(context, true);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(weightLog != null
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          weightLog != null
                               ? 'Weight updated!'
-                              : 'Weight logged!'),
-                          backgroundColor: kAccentGreen,
+                              : 'Weight logged!',
+                          style: GoogleFonts.poppins(color: Colors.white),
                         ),
-                      );
-                    }
+                        backgroundColor: kAccentGreen,
+                      ),
+                    );
+                  }
                   }
                 } catch (e) {
                   if (mounted) {
@@ -238,23 +302,33 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
 
   /// Delete weight log entry
   void _deleteWeightLog(WeightLog weightLog) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: isDark ? kDarkSurfaceLight : Colors.white,
         title: Text(
           'Delete Weight Entry',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            color: isDark ? kDarkTextPrimary : kTextDark,
+          ),
         ),
         content: Text(
           'Are you sure you want to delete this weight entry?',
-          style: GoogleFonts.poppins(),
+          style: GoogleFonts.poppins(
+            color: isDark ? kDarkTextPrimary : kTextDark,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
               'Cancel',
-              style: GoogleFonts.poppins(color: kTextSecondary),
+              style: GoogleFonts.poppins(
+                color: isDark ? kDarkTextSecondary : kTextSecondary,
+              ),
             ),
           ),
           TextButton(
@@ -262,7 +336,9 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
             child: Text(
               'Delete',
               style: GoogleFonts.poppins(
-                  color: kErrorColor, fontWeight: FontWeight.bold),
+                color: kErrorColor, 
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -274,8 +350,11 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
         await _weightLogService.deleteWeightLog(weightLog.id);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Weight entry deleted'),
+            SnackBar(
+              content: Text(
+                'Weight entry deleted',
+                style: GoogleFonts.poppins(color: Colors.white),
+              ),
               backgroundColor: kAccentGreen,
             ),
           );
@@ -284,7 +363,10 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error deleting weight entry: $e'),
+              content: Text(
+                'Error deleting weight entry: $e',
+                style: GoogleFonts.poppins(color: Colors.white),
+              ),
               backgroundColor: kErrorColor,
             ),
           );
@@ -295,17 +377,25 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: kAppBackground,
+      backgroundColor: isDark ? kDarkAppBackground : kAppBackground,
       appBar: AppBar(
         title: Text(
           'Weight Log',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            color: isDark ? kDarkTextPrimary : kTextDark,
+          ),
         ),
-        backgroundColor: kSurfaceColor,
+        backgroundColor: isDark ? kDarkSurfaceLight : kSurfaceColor,
         elevation: 0,
+        iconTheme: IconThemeData(
+          color: isDark ? kDarkTextPrimary : kTextDark,
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: kTextDark),
+          icon: Icon(Icons.arrow_back, color: isDark ? kDarkTextPrimary : kTextDark),
           onPressed: () => Navigator.pop(context),
         ),
         actions: const [],
@@ -331,6 +421,8 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
 
   /// Build statistics card
   Widget _buildStatsCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return StreamBuilder<WeightLogStats>(
       stream: _weightLogService.getWeightLogStatsStream(),
       builder: (context, snapshot) {
@@ -339,11 +431,11 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
             margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? kDarkSurfaceLight : Colors.white,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
@@ -359,16 +451,23 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  kTextSecondary.withValues(alpha: 0.1),
-                  kTextSecondary.withValues(alpha: 0.05)
-                ],
+                colors: isDark
+                    ? [
+                        kDarkTextSecondary.withValues(alpha: 0.1),
+                        kDarkTextSecondary.withValues(alpha: 0.05)
+                      ]
+                    : [
+                        kTextSecondary.withValues(alpha: 0.1),
+                        kTextSecondary.withValues(alpha: 0.05)
+                      ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: kTextSecondary.withValues(alpha: 0.2),
+                color: isDark
+                    ? kDarkBorderColor.withOpacity(0.3)
+                    : kTextSecondary.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
@@ -377,13 +476,17 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: kTextSecondary.withValues(alpha: 0.1),
+                    color: isDark
+                        ? kDarkTextSecondary.withValues(alpha: 0.1)
+                        : kTextSecondary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     Icons.analytics_outlined,
                     size: 32,
-                    color: kTextSecondary.withValues(alpha: 0.7),
+                    color: isDark
+                        ? kDarkTextSecondary.withValues(alpha: 0.7)
+                        : kTextSecondary.withValues(alpha: 0.7),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -392,7 +495,7 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: kTextDark,
+                    color: isDark ? kDarkTextPrimary : kTextDark,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -400,7 +503,7 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                   'Weight statistics will appear here once you log your first entry',
                   style: GoogleFonts.poppins(
                     fontSize: 12,
-                    color: kTextSecondary,
+                    color: isDark ? kDarkTextSecondary : kTextSecondary,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -509,6 +612,8 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
           return const Center(child: CircularProgressIndicator());
         }
 
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        
         if (snapshot.hasError) {
           return Center(
             child: Padding(
@@ -534,14 +639,14 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: kTextDark,
+                      color: isDark ? kDarkTextPrimary : kTextDark,
                     ),
                   ),
                   const SizedBox(height: 12),
                   Text(
                     'Unable to load your weight logs. Please check your internet connection and try again.',
                     style: GoogleFonts.poppins(
-                      color: kTextSecondary,
+                      color: isDark ? kDarkTextSecondary : kTextSecondary,
                       fontSize: 14,
                       height: 1.5,
                     ),
@@ -582,7 +687,7 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                     child: Text(
                       'Go Back',
                       style: GoogleFonts.poppins(
-                        color: kTextSecondary,
+                        color: isDark ? kDarkTextSecondary : kTextSecondary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -619,7 +724,7 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                     'Start Tracking Your Weight',
                     style: GoogleFonts.poppins(
                       fontSize: 20,
-                      color: kTextDark,
+                      color: isDark ? kDarkTextPrimary : kTextDark,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -627,7 +732,7 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                   Text(
                     'Log your weight to see your progress and track your fitness journey',
                     style: GoogleFonts.poppins(
-                      color: kTextSecondary,
+                      color: isDark ? kDarkTextSecondary : kTextSecondary,
                       fontSize: 14,
                       height: 1.5,
                     ),
@@ -672,14 +777,16 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
             final isToday = _isToday(weightLog.date);
             final isYesterday = _isYesterday(weightLog.date);
 
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            
             return Container(
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? kDarkSurfaceLight : Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
+                    color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -724,7 +831,7 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                                     style: GoogleFonts.poppins(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 18,
-                                      color: kTextDark,
+                                      color: isDark ? kDarkTextPrimary : kTextDark,
                                     ),
                                   ),
                                   if (isToday) ...[
@@ -753,7 +860,7 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                                 _getDateText(
                                     weightLog.date, isToday, isYesterday),
                                 style: GoogleFonts.poppins(
-                                  color: kTextSecondary,
+                                  color: isDark ? kDarkTextSecondary : kTextSecondary,
                                   fontSize: 13,
                                 ),
                               ),
@@ -771,7 +878,7 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                                   child: Text(
                                     weightLog.notes!,
                                     style: GoogleFonts.poppins(
-                                      color: kTextSecondary,
+                                      color: isDark ? kDarkTextSecondary : kTextSecondary,
                                       fontSize: 12,
                                       fontStyle: FontStyle.italic,
                                     ),
@@ -791,7 +898,9 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                           },
                           icon: Icon(
                             Icons.more_vert,
-                            color: kTextSecondary.withValues(alpha: 0.7),
+                            color: isDark 
+                                ? kDarkTextSecondary.withValues(alpha: 0.7)
+                                : kTextSecondary.withValues(alpha: 0.7),
                           ),
                           itemBuilder: (context) => [
                             PopupMenuItem(
@@ -801,9 +910,13 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                                   const Icon(Icons.edit,
                                       color: kAccentBlue, size: 20),
                                   const SizedBox(width: 12),
-                                  Text('Edit',
-                                      style: GoogleFonts.poppins(
-                                          fontWeight: FontWeight.w500)),
+                                  Text(
+                                    'Edit',
+                                    style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w500,
+                                      color: isDark ? kDarkTextPrimary : kTextDark,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -814,9 +927,13 @@ class _WeightLogScreenState extends State<WeightLogScreen> {
                                   const Icon(Icons.delete,
                                       color: kErrorColor, size: 20),
                                   const SizedBox(width: 12),
-                                  Text('Delete',
-                                      style: GoogleFonts.poppins(
-                                          fontWeight: FontWeight.w500)),
+                                  Text(
+                                    'Delete',
+                                    style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w500,
+                                      color: isDark ? kDarkTextPrimary : kTextDark,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
