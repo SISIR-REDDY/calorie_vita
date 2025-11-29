@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/optimized_food_scanner_pipeline.dart';
 import '../config/ai_config.dart';
 import '../services/network_service.dart';
@@ -13,6 +15,7 @@ import '../models/food_history_entry.dart';
 import '../models/nutrition_info.dart';
 import '../models/portion_estimation_result.dart';
 import '../models/food_recognition_result.dart';
+import '../models/user_goals.dart';
 import '../widgets/food_result_card.dart';
 import '../widgets/manual_food_entry_dialog.dart';
 import '../ui/app_colors.dart';
@@ -39,9 +42,59 @@ class _CameraScreenState extends State<CameraScreen> {
   double _selectedPortion = 150.0; // Default portion in grams
   bool _barcodeProcessing = false; // Prevent multiple barcode detections
   bool _scannerDisabled = false; // Completely disable scanner after detection
+  UserGoals? _userGoals;
+  bool _isLoadingGoals = false;
+  double _todaysCalories = 0.0;
 
   final ImagePicker _picker = ImagePicker();
   MobileScannerController? _scannerController;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserGoals();
+  }
+
+  Future<void> _loadUserGoals() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        setState(() => _isLoadingGoals = true);
+        final goalsDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('goals')
+            .doc('current')
+            .get();
+        
+        // Load today's calories
+        _todaysCalories = await FoodHistoryService.getTodaysTotalCalories();
+        
+        if (mounted) {
+          setState(() {
+            if (goalsDoc.exists) {
+              _userGoals = UserGoals.fromMap(goalsDoc.data()!);
+            } else {
+              _userGoals = const UserGoals(calorieGoal: 2000);
+            }
+            _isLoadingGoals = false;
+          });
+        }
+      } else if (mounted) {
+        setState(() {
+          _userGoals = const UserGoals(calorieGoal: 2000);
+          _isLoadingGoals = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _userGoals = const UserGoals(calorieGoal: 2000);
+          _isLoadingGoals = false;
+        });
+      }
+    }
+  }
 
   /// Parse macro value from string (e.g., "15g" -> 15.0)
   double _parseMacroValue(dynamic value) {
@@ -1175,223 +1228,50 @@ class _CameraScreenState extends State<CameraScreen> {
       );
     }
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 20),
+    // Calculate health metrics
+    final healthGrade = _calculateHealthGrade(nutrition);
+    final mealTime = _getMealTime();
+    final dailyGoalContribution = _getDailyGoalContribution(nutrition);
+    final calorieDensity = _getCalorieDensity(nutrition);
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.of(context).size.width < 360 ? 4 : 6,
+        vertical: 8,
+      ),
       child: Column(
         children: [
-          // Enhanced Food Result Card
-          Builder(
-            builder: (context) {
-              final isDark = Theme.of(context).brightness == Brightness.dark;
-              return Container(
-                decoration: BoxDecoration(
-                  color: isDark ? kDarkSurfaceLight : Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: isDark ? kDarkCardShadow : kCardShadow,
-                ),
-            child: Column(
-              children: [
-                // Header with confidence indicator
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: const BoxDecoration(
-                    gradient: kPrimaryGradient,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              nutrition.foodName,
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 2,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              nutrition.formattedWeight,
-                              style: GoogleFonts.poppins(
-                                color: Colors.white.withOpacity(0.9),
-                                fontSize: 14,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                            if (nutrition.brand != null) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                'by ${nutrition.brand}',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white.withOpacity(0.8),
-                                  fontSize: 12,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      // Confidence indicator
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.analytics,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${_scannerResult!.confidencePercentage}%',
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Nutrition details
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
-                      // Calories
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: kAccentBlue.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Builder(
-                              builder: (context) {
-                                final isDark = Theme.of(context).brightness == Brightness.dark;
-                                return Text(
-                                  'Calories',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark ? kDarkTextPrimary : kTextDark,
-                                  ),
-                                );
-                              },
-                            ),
-                            Text(
-                              nutrition.formattedCalories,
-                              style: GoogleFonts.poppins(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: kAccentBlue,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 16),
-                      
-                      // Macros
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildMacroCard(
-                              'Protein',
-                              nutrition.protein,
-                              kAccentGreen,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildMacroCard(
-                              'Carbs',
-                              nutrition.carbs,
-                              kWarningColor,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildMacroCard(
-                              'Fat',
-                              nutrition.fat,
-                              kErrorColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                      
-                      // Additional nutrition info
-                      if (nutrition.fiber > 0 || nutrition.sugar > 0) ...[
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            if (nutrition.fiber > 0)
-                              Expanded(
-                                child: _buildMacroCard(
-                                  'Fiber',
-                                  nutrition.fiber,
-                                  kAccentPurple,
-                                ),
-                              ),
-                            if (nutrition.fiber > 0 && nutrition.sugar > 0)
-                              const SizedBox(width: 12),
-                            if (nutrition.sugar > 0)
-                              Expanded(
-                                child: _buildMacroCard(
-                                  'Sugar',
-                                  nutrition.sugar,
-                                  kAccentPurple,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                      
-                      // Food Description
-                      if (_scannerResult!.snapToCalorieResult != null) ...[
-                        const SizedBox(height: 20),
-                        _buildFoodDescription(_scannerResult!.snapToCalorieResult!, nutrition),
-                      ],
-                      
-                      // AI Analysis
-                      if (aiAnalysis != null && aiAnalysis['insights'] != null) ...[
-                        const SizedBox(height: 20),
-                        _buildAIAnalysis(aiAnalysis),
-                      ],
-                      
-                      
-                    ],
-                  ),
-                ),
-              ],
-            ),
-                );
-              },
-            ),
+          // Compact Enhanced Header Card
+          _buildCompactHeaderCard(nutrition, healthGrade, mealTime, dailyGoalContribution, calorieDensity),
+          
+          const SizedBox(height: 10),
+          
+          // Health Grade Card
+          _buildHealthGradeCard(healthGrade),
+          
+          const SizedBox(height: 10),
+          
+          // Enhanced Nutrition Card with Macros
+          _buildCompactNutritionCard(nutrition),
+          
+          const SizedBox(height: 10),
+          
+          // Personalized Health Recommendations
+          _buildPersonalizedRecommendationsCard(nutrition, healthGrade),
+          
+          const SizedBox(height: 10),
+          
+          // Food Description
+          if (_scannerResult!.snapToCalorieResult != null) ...[
+            _buildFoodDescription(_scannerResult!.snapToCalorieResult!, nutrition),
+            const SizedBox(height: 10),
+          ],
+          
+          // AI Analysis
+          if (aiAnalysis != null && aiAnalysis['insights'] != null) ...[
+            _buildAIAnalysis(aiAnalysis),
+            const SizedBox(height: 10),
+          ],
         ],
       ),
     );
@@ -1908,6 +1788,826 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Health grade calculation
+  Map<String, dynamic> _calculateHealthGrade(NutritionInfo nutrition) {
+    double score = 100.0;
+    
+    final weight = nutrition.weightGrams > 0 ? nutrition.weightGrams : 100.0;
+    final caloriesPer100g = (nutrition.calories / weight * 100);
+    final proteinPer100g = (nutrition.protein / weight * 100);
+    final carbsPer100g = (nutrition.carbs / weight * 100);
+    final fatPer100g = (nutrition.fat / weight * 100);
+    final fiberPer100g = (nutrition.fiber / weight * 100);
+    final sugarPer100g = (nutrition.sugar / weight * 100);
+    
+    // Calorie density penalty
+    if (caloriesPer100g > 500) {
+      score -= 20;
+    } else if (caloriesPer100g > 400) {
+      score -= 15;
+    } else if (caloriesPer100g > 300) {
+      score -= 10;
+    } else if (caloriesPer100g < 50) {
+      score += 5;
+    }
+    
+    // Sugar penalty
+    if (sugarPer100g > 30) {
+      score -= 25;
+    } else if (sugarPer100g > 20) {
+      score -= 15;
+    } else if (sugarPer100g > 10) {
+      score -= 8;
+    }
+    
+    // Fiber bonus
+    if (fiberPer100g > 5) {
+      score += 15;
+    } else if (fiberPer100g > 3) {
+      score += 10;
+    } else if (fiberPer100g > 1) {
+      score += 5;
+    }
+    
+    // Protein bonus
+    if (proteinPer100g > 15) {
+      score += 10;
+    } else if (proteinPer100g > 10) {
+      score += 5;
+    }
+    
+    // Fat penalty
+    if (fatPer100g > 30) {
+      score -= 15;
+    } else if (fatPer100g > 20) {
+      score -= 8;
+    }
+    
+    // Sugar to carbs ratio
+    if (carbsPer100g > 0) {
+      final sugarRatio = (sugarPer100g / carbsPer100g) * 100;
+      if (sugarRatio > 50) {
+        score -= 10;
+      } else if (sugarRatio > 30) {
+        score -= 5;
+      }
+    }
+    
+    // Determine grade
+    String grade;
+    String label;
+    Color color;
+    
+    if (score >= 85) {
+      grade = 'A';
+      label = 'Excellent';
+      color = kSuccessColor;
+    } else if (score >= 70) {
+      grade = 'B';
+      label = 'Good';
+      color = kInfoColor;
+    } else if (score >= 55) {
+      grade = 'C';
+      label = 'Average';
+      color = kWarningColor;
+    } else if (score >= 40) {
+      grade = 'D';
+      label = 'Below Average';
+      color = kAccentColor;
+    } else {
+      grade = 'E';
+      label = 'Unhealthy';
+      color = kErrorColor;
+    }
+    
+    return {
+      'grade': grade,
+      'label': label,
+      'color': color,
+      'score': score,
+    };
+  }
+
+  // Get meal time
+  String _getMealTime() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 11) {
+      return 'Breakfast';
+    } else if (hour >= 11 && hour < 15) {
+      return 'Lunch';
+    } else if (hour >= 15 && hour < 18) {
+      return 'Snack';
+    } else if (hour >= 18 && hour < 22) {
+      return 'Dinner';
+    } else {
+      return 'Late Night';
+    }
+  }
+
+  // Get daily goal contribution
+  double _getDailyGoalContribution(NutritionInfo nutrition) {
+    final calorieGoal = _userGoals?.calorieGoal ?? 2000;
+    return (nutrition.calories / calorieGoal * 100);
+  }
+
+  // Get calorie density
+  double _getCalorieDensity(NutritionInfo nutrition) {
+    return nutrition.weightGrams > 0
+        ? (nutrition.calories / nutrition.weightGrams * 100)
+        : 0.0;
+  }
+
+  // Compact Header Card
+  Widget _buildCompactHeaderCard(NutritionInfo nutrition, Map<String, dynamic> healthGrade, String mealTime, double dailyGoalContribution, double calorieDensity) {
+    final isDark = context.isDarkMode;
+    final grade = healthGrade['grade'] as String;
+    final gradeLabel = healthGrade['label'] as String;
+    final gradeColor = healthGrade['color'] as Color;
+    
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            kPrimaryColor.withValues(alpha: 0.2),
+            kPrimaryColor.withValues(alpha: 0.1),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: kPrimaryColor.withValues(alpha: 0.3),
+          width: 1,
+        ),
+        boxShadow: isDark ? kDarkCardShadow : kCardShadow,
+      ),
+      child: Column(
+        children: [
+          // Top section with food name and health grade
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            child: Row(
+              children: [
+                // Food Icon
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        gradeColor.withValues(alpha: 0.3),
+                        gradeColor.withValues(alpha: 0.15),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    Icons.restaurant_menu_rounded,
+                    color: gradeColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Food Name and Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        nutrition.foodName,
+                        style: GoogleFonts.inter(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: context.textPrimary,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 5),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: gradeColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(7),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  grade,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: gradeColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  gradeLabel,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: gradeColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: kInfoColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(7),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.access_time_rounded, size: 11, color: kInfoColor),
+                                const SizedBox(width: 3),
+                                Text(
+                                  mealTime,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: kInfoColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Confidence Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.analytics_rounded, color: Colors.white, size: 14),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${_scannerResult!.confidencePercentage.toStringAsFixed(0)}%',
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Bottom section with compact stats
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark ? kDarkSurfaceDark : kSurfaceLight,
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(20),
+                bottomRight: Radius.circular(20),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Expanded(
+                  child: _buildCompactStatItem(
+                    Icons.local_fire_department_rounded,
+                    '${nutrition.calories.toStringAsFixed(0)}',
+                    'kcal',
+                    kPrimaryColor,
+                  ),
+                ),
+                Container(width: 1, height: 24, color: isDark ? kDarkDividerColor : kDividerColor),
+                Expanded(
+                  child: _buildCompactStatItem(
+                    Icons.track_changes_rounded,
+                    '${dailyGoalContribution.toStringAsFixed(1)}%',
+                    'Goal',
+                    kAccentColor,
+                  ),
+                ),
+                Container(width: 1, height: 24, color: isDark ? kDarkDividerColor : kDividerColor),
+                Expanded(
+                  child: _buildCompactStatItem(
+                    Icons.scale_rounded,
+                    nutrition.formattedWeight,
+                    'Size',
+                    kInfoColor,
+                  ),
+                ),
+                Container(width: 1, height: 24, color: isDark ? kDarkDividerColor : kDividerColor),
+                Expanded(
+                  child: _buildCompactStatItem(
+                    Icons.speed_rounded,
+                    '${calorieDensity.toStringAsFixed(0)}',
+                    'kcal/100g',
+                    kWarningColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactStatItem(IconData icon, String value, String label, Color color) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 16),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: context.textPrimary,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+            color: context.textSecondary,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
+
+  // Compact Nutrition Card
+  Widget _buildCompactNutritionCard(NutritionInfo nutrition) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.isDarkMode ? kDarkSurfaceLight : kSurfaceColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: context.isDarkMode ? kDarkBorderColor : kBorderColor,
+          width: 1,
+        ),
+        boxShadow: context.isDarkMode ? kDarkCardShadow : kCardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: kPrimaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.restaurant_menu_rounded, color: kPrimaryColor, size: 16),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Nutrition',
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: context.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Compact Macros Grid
+          Row(
+            children: [
+              Expanded(
+                child: _buildCompactMacroCard('Protein', nutrition.protein, kInfoColor, Icons.egg_rounded),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _buildCompactMacroCard('Carbs', nutrition.carbs, kAccentColor, Icons.bakery_dining_rounded),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _buildCompactMacroCard('Fat', nutrition.fat, kWarningColor, Icons.opacity_rounded),
+              ),
+            ],
+          ),
+          // Fiber and Sugar if available
+          if (nutrition.fiber > 0 || nutrition.sugar > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (nutrition.fiber > 0)
+                  Expanded(
+                    child: _buildCompactMacroCard('Fiber', nutrition.fiber, kSuccessColor, Icons.fiber_manual_record_rounded),
+                  ),
+                if (nutrition.fiber > 0 && nutrition.sugar > 0) const SizedBox(width: 6),
+                if (nutrition.sugar > 0)
+                  Expanded(
+                    child: _buildCompactMacroCard('Sugar', nutrition.sugar, kWarningColor, Icons.auto_awesome_rounded),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactMacroCard(String label, double value, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.12),
+            color.withValues(alpha: 0.06),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: color.withValues(alpha: 0.25),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                value.toStringAsFixed(1),
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: context.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 2),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  'g',
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: context.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              color: context.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+
+  // Health Grade Card
+  Widget _buildHealthGradeCard(Map<String, dynamic> healthGrade) {
+    final grade = healthGrade['grade'] as String;
+    final gradeLabel = healthGrade['label'] as String;
+    final gradeColor = healthGrade['color'] as Color;
+    final score = healthGrade['score'] as double;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            gradeColor.withValues(alpha: 0.15),
+            gradeColor.withValues(alpha: 0.08),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: gradeColor.withValues(alpha: 0.3),
+          width: 1.5,
+        ),
+        boxShadow: context.isDarkMode ? kDarkCardShadow : kCardShadow,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: gradeColor.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Center(
+              child: Text(
+                grade,
+                style: GoogleFonts.inter(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: gradeColor,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Health Status',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: context.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  gradeLabel,
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: gradeColor,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Score: ${score.toStringAsFixed(0)}/100',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: context.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Personalized Health Recommendations Card
+  Widget _buildPersonalizedRecommendationsCard(NutritionInfo nutrition, Map<String, dynamic> healthGrade) {
+    final recommendations = _generatePersonalizedRecommendations(nutrition, healthGrade);
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: context.isDarkMode
+              ? [
+                  kPrimaryColor.withValues(alpha: 0.15),
+                  kPrimaryColor.withValues(alpha: 0.08),
+                ]
+              : [
+                  kPrimaryColor.withValues(alpha: 0.08),
+                  kPrimaryColor.withValues(alpha: 0.04),
+                ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: kPrimaryColor.withValues(alpha: 0.2),
+          width: 1,
+        ),
+        boxShadow: context.isDarkMode ? kDarkCardShadow : kCardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: kPrimaryColor.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.lightbulb_outline_rounded, color: kPrimaryColor, size: 16),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Health Recommendations',
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: context.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...recommendations.map((rec) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _buildRecommendationItem(rec),
+          )),
+        ],
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _generatePersonalizedRecommendations(NutritionInfo nutrition, Map<String, dynamic> healthGrade) {
+    final recommendations = <Map<String, dynamic>>[];
+    final calorieGoal = _userGoals?.calorieGoal ?? 2000;
+    final totalCaloriesAfter = _todaysCalories + nutrition.calories;
+    final calorieDeficit = calorieGoal - totalCaloriesAfter;
+    final fitnessGoal = _userGoals?.fitnessGoal ?? 'maintenance';
+    final grade = healthGrade['grade'] as String;
+    final calorieDensity = _getCalorieDensity(nutrition);
+
+    // Calorie-based recommendations
+    if (totalCaloriesAfter > calorieGoal * 1.1) {
+      final excess = totalCaloriesAfter - calorieGoal;
+      final reduceBy = (excess / nutrition.calories * nutrition.weightGrams).round();
+      recommendations.add({
+        'type': 'warning',
+        'icon': Icons.warning_amber_rounded,
+        'color': kWarningColor,
+        'title': 'Calorie Excess',
+        'message': 'This will exceed your daily goal by ${excess.toStringAsFixed(0)} kcal. Consider reducing portion by ~${reduceBy}g.',
+      });
+    } else if (totalCaloriesAfter < calorieGoal * 0.8 && fitnessGoal != 'weight_loss') {
+      recommendations.add({
+        'type': 'info',
+        'icon': Icons.add_circle_outline_rounded,
+        'color': kInfoColor,
+        'title': 'Good Addition',
+        'message': 'This fits well within your daily goal. You\'ll have ${calorieDeficit.toStringAsFixed(0)} kcal remaining.',
+      });
+    }
+
+    // Portion recommendations
+    if (calorieDensity > 500) {
+      recommendations.add({
+        'type': 'tip',
+        'icon': Icons.tips_and_updates_rounded,
+        'color': kAccentColor,
+        'title': 'High Calorie Density',
+        'message': 'This food is calorie-dense. Consider smaller portions or pair with low-calorie foods for balance.',
+      });
+    }
+
+    // Health grade recommendations
+    if (grade == 'D' || grade == 'E') {
+      recommendations.add({
+        'type': 'health',
+        'icon': Icons.health_and_safety_rounded,
+        'color': kErrorColor,
+        'title': 'Health Consideration',
+        'message': 'This food has a lower health grade. Enjoy in moderation and balance with nutrient-dense foods.',
+      });
+    } else if (grade == 'A' || grade == 'B') {
+      recommendations.add({
+        'type': 'health',
+        'icon': Icons.check_circle_outline_rounded,
+        'color': kSuccessColor,
+        'title': 'Healthy Choice',
+        'message': 'Great choice! This food aligns well with your health goals.',
+      });
+    }
+
+    // Macro-specific recommendations
+    if (nutrition.protein < 5 && fitnessGoal == 'muscle_building') {
+      recommendations.add({
+        'type': 'tip',
+        'icon': Icons.fitness_center_rounded,
+        'color': kInfoColor,
+        'title': 'Protein Boost',
+        'message': 'Consider adding a protein source to support muscle building goals.',
+      });
+    }
+
+    if (nutrition.sugar > 20) {
+      recommendations.add({
+        'type': 'warning',
+        'icon': Icons.warning_amber_rounded,
+        'color': kWarningColor,
+        'title': 'High Sugar Content',
+        'message': 'This item contains ${nutrition.sugar.toStringAsFixed(1)}g sugar. Monitor your daily sugar intake.',
+      });
+    }
+
+    if (nutrition.fiber > 3) {
+      recommendations.add({
+        'type': 'tip',
+        'icon': Icons.eco_rounded,
+        'color': kSuccessColor,
+        'title': 'Good Fiber Source',
+        'message': 'Excellent fiber content! This supports digestive health and satiety.',
+      });
+    }
+
+    // Fitness goal specific
+    if (fitnessGoal == 'weight_loss' && nutrition.calories > 300) {
+      recommendations.add({
+        'type': 'tip',
+        'icon': Icons.trending_down_rounded,
+        'color': kInfoColor,
+        'title': 'Weight Loss Tip',
+        'message': 'For weight loss, consider reducing portion size or choosing a lower-calorie alternative.',
+      });
+    }
+
+    return recommendations.take(4).toList(); // Limit to 4 recommendations
+  }
+
+  Widget _buildRecommendationItem(Map<String, dynamic> recommendation) {
+    final icon = recommendation['icon'] as IconData;
+    final color = recommendation['color'] as Color;
+    final title = recommendation['title'] as String;
+    final message = recommendation['message'] as String;
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 16),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: context.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  message,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: context.textSecondary,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
