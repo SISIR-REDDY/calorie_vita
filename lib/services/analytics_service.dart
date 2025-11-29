@@ -540,11 +540,40 @@ class AnalyticsService {
       // Debug logging removed for performance
       final recommendations = <Map<String, dynamic>>[];
 
-      // Get user profile for personalized recommendations
+      // Get comprehensive user data for personalized recommendations
       Map<String, dynamic>? profile;
+      List<Map<String, dynamic>> weightHistory = [];
+      Map<String, dynamic>? allUserGoals;
+      
       try {
+        // Get user profile
         profile = await _firebaseService.getUserProfile(userId);
-        // Debug logging removed for performance
+        
+        // Get weight history with BMI data (last 30 days)
+        try {
+          weightHistory = await _firebaseService.getWeightHistory(userId, days: 30);
+        } catch (e) {
+          if (ProductionConfig.enableDebugLogs) {
+            debugPrint('⚠️ Could not load weight history for recommendations: $e');
+          }
+        }
+        
+        // Get all user goals (not just calories/steps/water)
+        try {
+          final goalsDoc = await _firestore
+              .collection('users')
+              .doc(userId)
+              .collection('goals')
+              .doc('current')
+              .get();
+          if (goalsDoc.exists) {
+            allUserGoals = goalsDoc.data() ?? {};
+          }
+        } catch (e) {
+          if (ProductionConfig.enableDebugLogs) {
+            debugPrint('⚠️ Could not load all user goals: $e');
+          }
+        }
       } catch (e) {
         if (ProductionConfig.enableDebugLogs) {
           debugPrint('⚠️ Could not load user profile for recommendations: $e');
@@ -554,6 +583,9 @@ class AnalyticsService {
       // Get user goals for better recommendations
       final userGoals = await _getUserGoals(userId);
       final calorieGoal = userGoals['caloriesGoal'] ?? 2000;
+      final proteinGoal = allUserGoals?['dailyProteinGoal'] ?? (profile?['proteinGoal'] ?? 0);
+      final carbsGoal = allUserGoals?['dailyCarbsGoal'] ?? (profile?['carbsGoal'] ?? 0);
+      final fatGoal = allUserGoals?['dailyFatGoal'] ?? (profile?['fatGoal'] ?? 0);
       // Debug logging removed for performance
 
       // Calorie-based recommendations - use TODAY's data from today's food entries
@@ -702,34 +734,211 @@ class AnalyticsService {
         }
       }
 
-      // Profile-based recommendations
+      // Profile-based recommendations with comprehensive data
       if (profile != null) {
         final age = profile['age'] as int?;
         final gender = profile['gender'] as String?;
         final height = profile['height'] as double?;
         final weight = profile['weight'] as double?;
+        final activityLevel = profile['activityLevel'] as String?;
+        final fitnessGoal = profile['fitnessGoal'] as String?;
 
         if (age != null && gender != null && height != null && weight != null) {
+          // Calculate current BMI
           final bmi = weight / (height * height);
+          
+          // Calculate BMI trend from weight history
+          double? bmiTrend;
+          if (weightHistory.isNotEmpty && weightHistory.length >= 2) {
+            final latestWeight = weightHistory.last['weight'] as double?;
+            final previousWeight = weightHistory[weightHistory.length - 2]['weight'] as double?;
+            if (latestWeight != null && previousWeight != null && height > 0) {
+              final latestBmi = latestWeight / (height * height);
+              final previousBmi = previousWeight / (height * height);
+              bmiTrend = latestBmi - previousBmi;
+            }
+          }
+          
+          // BMI-based recommendations with trend analysis
           if (bmi < 18.5) {
+            final trendText = bmiTrend != null && bmiTrend < 0 
+                ? ' Your BMI is decreasing, which is concerning.' 
+                : bmiTrend != null && bmiTrend > 0 
+                    ? ' Your BMI is improving.' 
+                    : '';
             recommendations.add({
               'title': 'Focus on healthy weight gain',
               'description':
-                  'Based on your profile (BMI: ${bmi.toStringAsFixed(1)}), consider increasing calorie intake with nutrient-dense foods and strength training.',
+                  'Based on your profile (BMI: ${bmi.toStringAsFixed(1)})$trendText Consider increasing calorie intake with nutrient-dense foods and strength training.',
               'type': 'nutrition',
               'priority': 'high',
               'timestamp': DateTime.now(),
             });
           } else if (bmi > 25) {
+            final trendText = bmiTrend != null && bmiTrend > 0 
+                ? ' Your BMI is increasing, which needs attention.' 
+                : bmiTrend != null && bmiTrend < 0 
+                    ? ' Your BMI is improving - keep it up!' 
+                    : '';
             recommendations.add({
               'title': 'Focus on sustainable weight management',
               'description':
-                  'Based on your profile (BMI: ${bmi.toStringAsFixed(1)}), maintain a moderate calorie deficit through balanced nutrition and regular activity.',
+                  'Based on your profile (BMI: ${bmi.toStringAsFixed(1)})$trendText Maintain a moderate calorie deficit through balanced nutrition and regular activity.',
               'type': 'nutrition',
               'priority': 'high',
               'timestamp': DateTime.now(),
             });
+          } else {
+            // Healthy BMI range
+            if (bmiTrend != null && bmiTrend > 0.2) {
+              recommendations.add({
+                'title': 'Monitor your weight trend',
+                'description':
+                    'Your BMI is in a healthy range (${bmi.toStringAsFixed(1)}), but it\'s trending upward. Consider maintaining your current routine or adjusting if needed.',
+                'type': 'general',
+                'priority': 'medium',
+                'timestamp': DateTime.now(),
+              });
+            }
           }
+          
+          // Activity level and fitness goal recommendations
+          if (activityLevel != null) {
+            if (activityLevel.toLowerCase() == 'sedentary' || activityLevel.toLowerCase() == 'lightly active') {
+              recommendations.add({
+                'title': 'Increase daily activity',
+                'description':
+                    'Based on your activity level ($activityLevel), consider adding 30 minutes of daily exercise to improve your health and reach your fitness goals.',
+                'type': 'activity',
+                'priority': 'medium',
+                'timestamp': DateTime.now(),
+              });
+            }
+          }
+          
+          if (fitnessGoal != null) {
+            if (fitnessGoal.toLowerCase().contains('weight loss') || fitnessGoal.toLowerCase().contains('fat loss')) {
+              recommendations.add({
+                'title': 'Optimize for weight loss',
+                'description':
+                    'To achieve your weight loss goal, maintain a consistent calorie deficit of 300-500 kcal daily while ensuring adequate protein intake (${proteinGoal > 0 ? proteinGoal.toStringAsFixed(0) : "1.6g per kg body weight"}g) to preserve muscle mass.',
+                'type': 'nutrition',
+                'priority': 'high',
+                'timestamp': DateTime.now(),
+              });
+            } else if (fitnessGoal.toLowerCase().contains('muscle') || fitnessGoal.toLowerCase().contains('strength')) {
+              recommendations.add({
+                'title': 'Support muscle building',
+                'description':
+                    'For muscle building, ensure you\'re consuming ${proteinGoal > 0 ? proteinGoal.toStringAsFixed(0) : "1.6-2.2g per kg body weight"}g protein daily and maintaining a slight calorie surplus with strength training 3-4 times per week.',
+                'type': 'nutrition',
+                'priority': 'high',
+                'timestamp': DateTime.now(),
+              });
+            }
+          }
+        }
+      }
+      
+      // Weight history trend analysis
+      if (weightHistory.isNotEmpty && weightHistory.length >= 7) {
+        final recentWeights = weightHistory.take(7).map((w) => w['weight'] as double?).whereType<double>().toList();
+        if (recentWeights.length >= 2) {
+          final weightChange = recentWeights.first - recentWeights.last;
+          if (weightChange.abs() > 0.5) {
+            final direction = weightChange > 0 ? 'gained' : 'lost';
+            recommendations.add({
+              'title': 'Weight trend analysis',
+              'description':
+                  'Over the past week, you\'ve ${direction} ${weightChange.abs().toStringAsFixed(1)} kg. ${weightChange > 0 ? "If this aligns with your goals, great! If not, consider adjusting your calorie intake." : "If this aligns with your goals, excellent progress! If losing too fast, consider increasing calories slightly."}',
+              'type': 'general',
+              'priority': 'medium',
+              'timestamp': DateTime.now(),
+            });
+          }
+        }
+      }
+      
+      // Macro goal-based recommendations (using all goals, not just calories)
+      if (proteinGoal > 0 && todayProtein > 0) {
+        final proteinDeficit = proteinGoal - todayProtein;
+        if (proteinDeficit > 20) {
+          recommendations.add({
+            'title': 'Reach your protein goal',
+            'description':
+                'You\'re ${proteinDeficit.toStringAsFixed(0)}g short of your daily protein goal (${proteinGoal.toStringAsFixed(0)}g). Add lean protein sources like chicken, fish, eggs, or legumes to your next meal.',
+            'type': 'nutrition',
+            'priority': 'high',
+            'timestamp': DateTime.now(),
+          });
+        } else if (proteinDeficit < -10) {
+          recommendations.add({
+            'title': 'Protein intake optimized',
+            'description':
+                'Great job! You\'ve exceeded your protein goal. This supports muscle maintenance and recovery.',
+            'type': 'general',
+            'priority': 'low',
+            'timestamp': DateTime.now(),
+          });
+        }
+      }
+      
+      if (carbsGoal > 0 && todayCarbs > 0) {
+        final carbsDeficit = carbsGoal - todayCarbs;
+        if (carbsDeficit > 30) {
+          recommendations.add({
+            'title': 'Add more carbohydrates',
+            'description':
+                'You\'re ${carbsDeficit.toStringAsFixed(0)}g below your daily carbs goal (${carbsGoal.toStringAsFixed(0)}g). Add whole grains, fruits, or starchy vegetables to fuel your activities.',
+            'type': 'nutrition',
+            'priority': 'medium',
+            'timestamp': DateTime.now(),
+          });
+        }
+      }
+      
+      if (fatGoal > 0 && todayFat > 0) {
+        final fatDeficit = fatGoal - todayFat;
+        if (fatDeficit > 15) {
+          recommendations.add({
+            'title': 'Include healthy fats',
+            'description':
+                'You\'re ${fatDeficit.toStringAsFixed(0)}g below your daily fat goal (${fatGoal.toStringAsFixed(0)}g). Add healthy fats from nuts, avocados, or olive oil to support hormone production and nutrient absorption.',
+            'type': 'nutrition',
+            'priority': 'medium',
+            'timestamp': DateTime.now(),
+          });
+        }
+      }
+      
+      // Exercise and activity recommendations based on daily summaries
+      if (_cachedDailySummaries.isNotEmpty) {
+        final todaySummary = _cachedDailySummaries.last;
+        final stepsGoal = userGoals['stepsGoal'] ?? 10000;
+        final stepsDeficit = stepsGoal - todaySummary.steps;
+        
+        if (stepsDeficit > 2000 && todaySummary.steps > 0) {
+          recommendations.add({
+            'title': 'Complete your step goal',
+            'description':
+                'You\'re ${stepsDeficit.toStringAsFixed(0)} steps away from your daily goal ($stepsGoal steps). A 20-minute walk can help you reach it!',
+            'type': 'activity',
+            'priority': 'medium',
+            'timestamp': DateTime.now(),
+          });
+        }
+        
+        // Exercise minutes analysis
+        final exerciseMinutes = await _getActualExerciseMinutes(userId, DateTime.now());
+        if (exerciseMinutes < 150) { // Less than 2.5 hours per week
+          recommendations.add({
+            'title': 'Increase exercise frequency',
+            'description':
+                'Aim for at least 150 minutes of moderate exercise per week for optimal health. Consider adding 2-3 more workout sessions this week.',
+            'type': 'activity',
+            'priority': 'medium',
+            'timestamp': DateTime.now(),
+          });
         }
       }
 
@@ -783,8 +992,9 @@ class AnalyticsService {
         return aPriority.compareTo(bPriority);
       });
 
-      // Limit to top 5 recommendations
-      final finalRecommendations = recommendations.take(5).toList();
+      // Remove limit - return all recommendations (no longer limited to 4-5)
+      // This ensures users get comprehensive personalized recommendations based on all their data
+      final finalRecommendations = recommendations;
 
       if (ProductionConfig.enableDebugLogs) {
         debugPrint('✅ Generated ${finalRecommendations.length} recommendations');

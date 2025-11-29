@@ -313,11 +313,12 @@ Be professional, encouraging, and strictly fitness-focused. Use specific numbers
                 '''You are a certified fitness trainer and sports nutritionist. Provide accurate, personalized fitness and nutrition recommendations ONLY.
 
 REQUIREMENTS:
-- Keep under 280 words
-- Focus on 4-5 key fitness/nutrition recommendations
+- Keep under 400 words
+- Provide comprehensive fitness/nutrition recommendations based on ALL available user data
 - Give specific numbers (calories, macros, reps, sets, weights)
 - Include realistic timeline and milestones
 - Be actionable and practical for fitness goals
+- Consider all aspects: current data, today's data, historical trends, BMI, weight history, all goals, exercise data
 
 ALLOWED TOPICS:
 • Fitness goals (strength, endurance, weight loss/gain)
@@ -923,40 +924,82 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
     return buffer.toString();
   }
 
-  /// Format user profile for AI recommendations
+  /// Format user profile for AI recommendations (comprehensive version)
   static String _formatProfileForAI(Map<String, dynamic> profile) {
     final buffer = StringBuffer();
 
     // Basic profile
     buffer.writeln('User Profile:');
     if (profile['name'] != null) buffer.writeln('Name: ${profile['name']}');
-    if (profile['age'] != null) buffer.writeln('Age: ${profile['age']}');
+    if (profile['age'] != null) buffer.writeln('Age: ${profile['age']} years');
     if (profile['gender'] != null) {
       buffer.writeln('Gender: ${profile['gender']}');
     }
     if (profile['weight'] != null) {
-      buffer.writeln('Weight: ${profile['weight']} kg');
+      buffer.writeln('Current Weight: ${profile['weight']} kg');
     }
     if (profile['height'] != null) {
       buffer.writeln('Height: ${profile['height']} cm');
+      // Calculate BMI if weight and height available
+      if (profile['weight'] != null) {
+        final heightM = (profile['height'] as num) / 100;
+        final bmi = (profile['weight'] as num) / (heightM * heightM);
+        buffer.writeln('BMI: ${bmi.toStringAsFixed(1)}');
+      }
     }
-    if (profile['activity_level'] != null) {
+    if (profile['activityLevel'] != null) {
+      buffer.writeln('Activity Level: ${profile['activityLevel']}');
+    } else if (profile['activity_level'] != null) {
       buffer.writeln('Activity Level: ${profile['activity_level']}');
     }
+    if (profile['fitnessGoal'] != null) {
+      buffer.writeln('Fitness Goal: ${profile['fitnessGoal']}');
+    }
+    if (profile['dietPreference'] != null) {
+      buffer.writeln('Diet Preference: ${profile['dietPreference']}');
+    }
 
-    // Goals and preferences
+    // All goals (comprehensive)
+    buffer.writeln('\nGoals:');
+    if (profile['calorieGoal'] != null) {
+      buffer.writeln('- Daily Calorie Goal: ${profile['calorieGoal']} kcal');
+    }
+    if (profile['proteinGoal'] != null) {
+      buffer.writeln('- Daily Protein Goal: ${profile['proteinGoal']}g');
+    }
+    if (profile['carbsGoal'] != null) {
+      buffer.writeln('- Daily Carbs Goal: ${profile['carbsGoal']}g');
+    }
+    if (profile['fatGoal'] != null) {
+      buffer.writeln('- Daily Fat Goal: ${profile['fatGoal']}g');
+    }
+    if (profile['stepsGoal'] != null) {
+      buffer.writeln('- Daily Steps Goal: ${profile['stepsGoal']}');
+    }
+    if (profile['waterGoal'] != null) {
+      buffer.writeln('- Daily Water Goal: ${profile['waterGoal']} glasses');
+    }
+    
+    // Additional goals from goals object
     if (profile['goals'] != null) {
-      buffer.writeln('\nGoals:');
       final goals = profile['goals'] as Map<String, dynamic>?;
       goals?.forEach((key, value) {
-        if (value != null) buffer.writeln('- $key: $value');
+        if (value != null && !['calorieGoal', 'proteinGoal', 'carbsGoal', 'fatGoal', 'stepsGoal', 'waterGoal'].contains(key)) {
+          buffer.writeln('- $key: $value');
+        }
       });
     }
 
+    // Dietary preferences and restrictions
     if (profile['dietary_preferences'] != null) {
       buffer.writeln('\nDietary Preferences:');
       final prefs = profile['dietary_preferences'] as List<dynamic>?;
       prefs?.forEach((pref) => buffer.writeln('- $pref'));
+    }
+    
+    if (profile['dietPreference'] != null && profile['dietary_preferences'] == null) {
+      buffer.writeln('\nDietary Preferences:');
+      buffer.writeln('- ${profile['dietPreference']}');
     }
 
     if (profile['allergies'] != null) {
@@ -965,26 +1008,110 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
       allergies?.forEach((allergy) => buffer.writeln('- $allergy'));
     }
 
-    // Current status
-    if (profile['current_calories'] != null) {
-      buffer.writeln('\nCurrent Status:');
-      buffer.writeln('Today\'s Calories: ${profile['current_calories']}');
-      if (profile['calorie_goal'] != null) {
-        buffer.writeln('Calorie Goal: ${profile['calorie_goal']}');
+    // Weight history and BMI trends (if available)
+    if (profile['weightHistory'] != null) {
+      final weightHistory = profile['weightHistory'] as List<dynamic>?;
+      if (weightHistory != null && weightHistory.isNotEmpty) {
+        buffer.writeln('\nWeight History (Recent):');
+        final recent = weightHistory.take(5).toList();
+        for (var entry in recent) {
+          if (entry is Map<String, dynamic>) {
+            final date = entry['date'];
+            final weight = entry['weight'];
+            final bmi = entry['bmi'];
+            buffer.writeln('- ${date ?? "Date"}: ${weight ?? "N/A"} kg (BMI: ${bmi?.toStringAsFixed(1) ?? "N/A"})');
+          }
+        }
+        if (weightHistory.length >= 2) {
+          final first = weightHistory.first as Map<String, dynamic>?;
+          final last = weightHistory.last as Map<String, dynamic>?;
+          if (first != null && last != null) {
+            final firstWeight = first['weight'] as num?;
+            final lastWeight = last['weight'] as num?;
+            if (firstWeight != null && lastWeight != null) {
+              final change = firstWeight - lastWeight;
+              buffer.writeln('Weight Change: ${change > 0 ? "+" : ""}${change.toStringAsFixed(1)} kg');
+            }
+          }
+        }
+      }
+    }
+
+    // Current status (today's data)
+    if (profile['current_calories'] != null || profile['caloriesConsumed'] != null) {
+      buffer.writeln('\nCurrent Status (Today):');
+      final calories = profile['current_calories'] ?? profile['caloriesConsumed'] ?? 0;
+      buffer.writeln('Today\'s Calories: $calories kcal');
+      if (profile['calorie_goal'] != null || profile['calorieGoal'] != null) {
+        final goal = profile['calorie_goal'] ?? profile['calorieGoal'] ?? 0;
+        buffer.writeln('Calorie Goal: $goal kcal');
+        final deficit = (goal as num) - (calories as num);
+        if (deficit > 0) {
+          buffer.writeln('Remaining: ${deficit.toStringAsFixed(0)} kcal');
+        }
       }
     }
 
     return buffer.toString();
   }
 
-  /// Format current fitness data for AI analysis
+  /// Format current fitness data for AI analysis (comprehensive version)
   static String _formatFitnessDataForAI(Map<String, dynamic> fitnessData) {
     final buffer = StringBuffer();
 
-    buffer.writeln('Today\'s Activity:');
+    buffer.writeln('Today\'s Activity & Nutrition:');
     
+    // Nutrition data
+    if (fitnessData['caloriesConsumed'] != null) {
+      buffer.writeln('• Calories Consumed: ${fitnessData['caloriesConsumed']} kcal');
+    }
+    if (fitnessData['caloriesGoal'] != null) {
+      buffer.writeln('• Calorie Goal: ${fitnessData['caloriesGoal']} kcal');
+      if (fitnessData['caloriesConsumed'] != null) {
+        final remaining = (fitnessData['caloriesGoal'] as num) - (fitnessData['caloriesConsumed'] as num);
+        buffer.writeln('• Remaining Calories: ${remaining.toStringAsFixed(0)} kcal');
+      }
+    }
+    
+    if (fitnessData['proteinConsumed'] != null) {
+      buffer.writeln('• Protein Consumed: ${fitnessData['proteinConsumed']}g');
+    }
+    if (fitnessData['proteinGoal'] != null) {
+      buffer.writeln('• Protein Goal: ${fitnessData['proteinGoal']}g');
+      if (fitnessData['proteinConsumed'] != null) {
+        final remaining = (fitnessData['proteinGoal'] as num) - (fitnessData['proteinConsumed'] as num);
+        if (remaining > 0) {
+          buffer.writeln('• Protein Remaining: ${remaining.toStringAsFixed(0)}g');
+        }
+      }
+    }
+    
+    if (fitnessData['carbsConsumed'] != null) {
+      buffer.writeln('• Carbs Consumed: ${fitnessData['carbsConsumed']}g');
+    }
+    if (fitnessData['carbsGoal'] != null) {
+      buffer.writeln('• Carbs Goal: ${fitnessData['carbsGoal']}g');
+    }
+    
+    if (fitnessData['fatConsumed'] != null) {
+      buffer.writeln('• Fat Consumed: ${fitnessData['fatConsumed']}g');
+    }
+    if (fitnessData['fatGoal'] != null) {
+      buffer.writeln('• Fat Goal: ${fitnessData['fatGoal']}g');
+    }
+    
+    // Activity data
     if (fitnessData['steps'] != null) {
       buffer.writeln('• Steps: ${fitnessData['steps']}');
+    }
+    if (fitnessData['stepsGoal'] != null) {
+      buffer.writeln('• Steps Goal: ${fitnessData['stepsGoal']}');
+      if (fitnessData['steps'] != null) {
+        final remaining = (fitnessData['stepsGoal'] as num) - (fitnessData['steps'] as num);
+        if (remaining > 0) {
+          buffer.writeln('• Steps Remaining: ${remaining.toStringAsFixed(0)}');
+        }
+      }
     }
     
     if (fitnessData['caloriesBurned'] != null) {
@@ -995,27 +1122,54 @@ If you cannot identify the product from the barcode, set confidence to 0.2 or lo
       buffer.writeln('• Distance: ${fitnessData['distance']} km');
     }
     
+    if (fitnessData['exerciseMinutes'] != null) {
+      buffer.writeln('• Exercise Minutes: ${fitnessData['exerciseMinutes']}');
+    }
+    
+    if (fitnessData['waterIntake'] != null) {
+      buffer.writeln('• Water Intake: ${fitnessData['waterIntake']} ml');
+    }
+    if (fitnessData['waterGoal'] != null) {
+      buffer.writeln('• Water Goal: ${fitnessData['waterGoal']} glasses');
+    }
+    
     if (fitnessData['weight'] != null) {
       buffer.writeln('• Current Weight: ${fitnessData['weight']} kg');
+    }
+    
+    if (fitnessData['bmi'] != null) {
+      buffer.writeln('• Current BMI: ${fitnessData['bmi'].toStringAsFixed(1)}');
     }
     
     if (fitnessData['activityLevel'] != null) {
       buffer.writeln('• Activity Level: ${fitnessData['activityLevel']}');
     }
+    
+    // Historical trends if available
+    if (fitnessData['weeklyAverageCalories'] != null) {
+      buffer.writeln('• Weekly Average Calories: ${fitnessData['weeklyAverageCalories']} kcal');
+    }
+    if (fitnessData['weeklyAverageSteps'] != null) {
+      buffer.writeln('• Weekly Average Steps: ${fitnessData['weeklyAverageSteps']}');
+    }
 
     // Add timestamp if available
     if (fitnessData['timestamp'] != null) {
       try {
-        final timestamp = DateTime.parse(fitnessData['timestamp']);
-        final now = DateTime.now();
-        final difference = now.difference(timestamp);
-        
-        if (difference.inMinutes < 60) {
-          buffer.writeln('• Data Age: ${difference.inMinutes} minutes ago');
-        } else if (difference.inHours < 24) {
-          buffer.writeln('• Data Age: ${difference.inHours} hours ago');
-        } else {
-          buffer.writeln('• Data Age: ${difference.inDays} days ago');
+        final timestamp = fitnessData['timestamp'] is String 
+            ? DateTime.parse(fitnessData['timestamp'])
+            : fitnessData['timestamp'] as DateTime?;
+        if (timestamp != null) {
+          final now = DateTime.now();
+          final difference = now.difference(timestamp);
+          
+          if (difference.inMinutes < 60) {
+            buffer.writeln('• Data Age: ${difference.inMinutes} minutes ago');
+          } else if (difference.inHours < 24) {
+            buffer.writeln('• Data Age: ${difference.inHours} hours ago');
+          } else {
+            buffer.writeln('• Data Age: ${difference.inDays} days ago');
+          }
         }
       } catch (e) {
         buffer.writeln('• Data Age: Recent');
